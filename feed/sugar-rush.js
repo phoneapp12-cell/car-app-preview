@@ -1,12 +1,15 @@
-/* Info Book 1.9.160 – Sugar Rush, levels 1–10. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.161 – Sugar Rush, levels 1–10. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
    Only Shane can play for now (IBScores.isShane() from scores.js); everyone else sees a coming-soon screen.
-   Scores are not sent to the family scoreboard yet. Sounds are soft and low: sine/triangle notes under 400 Hz,
-   gentle attack, through a lowpass, no clicks or chirps. Shane's track loops through the same AudioContext as the
-   sound effects (so they are not ducked), once the game has had a tap. The music toggle mutes music and end songs
-   and is remembered; the sound toggle is separate. */
+   Scores are not sent to the family scoreboard yet. Sounds are soft and mellow, but pitched so a phone speaker
+   can actually hear them: sine or triangle notes with a warm 2nd/3rd harmonic, fundamentals 300–800 Hz, a
+   2.5 kHz lowpass, 5–10 ms attacks, no clicks. (The old 65–392 Hz / 900 Hz graph sat under the speaker rolloff
+   and under the music.) SFX sit about 6 dB above the music, through a compressor, and big effects briefly duck
+   the bed. Shane's tracks share the same AudioContext. The context is unlocked on pointerup/touchend on the
+   game page itself (a silent buffer in the same gesture), not only on the menu. Music and sound toggles are
+   independent and default on. */
 (function (root) {
   'use strict';
   const N = 8, KINDS = 6, PTS = 30;
@@ -283,13 +286,20 @@
     const hit = step.hit || new Set();
     step.popped = [];
     step.delivered = step.delivered || [];
+    step.jellyCleared = 0;
+    step.brokeLock = false;
     step.clear.forEach(k => {
       const [r, c] = rc(k), t = b[r][c];
       if (t && !isHole(t) && !isBlock(t)) {
         step.popped.push({ id: t.id, r, c, color: t.c, s: t.s, lock: t.lock });
+        if (t.lock) step.brokeLock = true;
         if (st && t.c >= 0) st.collected[t.c] = (st.collected[t.c] || 0) + 1;
         b[r][c] = null;
-        if (st && st.jelly) st.jelly[r][c] = Math.max(0, (st.jelly[r][c] || 0) - 1);
+        if (st && st.jelly) {
+          const before = st.jelly[r][c] || 0;
+          st.jelly[r][c] = Math.max(0, before - 1);
+          if (before > 0) step.jellyCleared++;
+        }
       }
     });
     step.blocked = [];
@@ -299,12 +309,12 @@
       if (t.ice > 0) {
         t.ice--;
         step.blocked.push({ r, c, kind: 'ice', left: t.ice });
-        if (t.ice <= 0) { b[r][c] = null; if (st && st.jelly) st.jelly[r][c] = Math.max(0, (st.jelly[r][c] || 0) - 1); }
+        if (t.ice <= 0) { b[r][c] = null; if (st && st.jelly) { const before = st.jelly[r][c] || 0; st.jelly[r][c] = Math.max(0, before - 1); if (before > 0) step.jellyCleared++; } }
       } else if (t.choco > 0) {
         step.blocked.push({ r, c, kind: 'choco', left: 0 });
         step.chocoHit = true;
         b[r][c] = null;
-        if (st && st.jelly) st.jelly[r][c] = Math.max(0, (st.jelly[r][c] || 0) - 1);
+        if (st && st.jelly) { const before = st.jelly[r][c] || 0; st.jelly[r][c] = Math.max(0, before - 1); if (before > 0) step.jellyCleared++; }
       }
     });
     step.madeTiles = (step.made || []).map(m => { const [r, c] = rc(m.k), t = mk(m.color, m.s); b[r][c] = t; return { t, r, c }; });
@@ -546,8 +556,124 @@
     return wins;
   }
 
+
+  // Soft, mellow effects that still cut through on a phone speaker.
+  // Phone speakers roll off below ~400–500 Hz, so fundamentals sit in 300–800 Hz
+  // (E4–G5 pentatonic) with a warm 2nd/3rd harmonic and a 2.5 kHz lowpass — not
+  // the old 65–392 Hz / 900 Hz graph, which sat under the music and under the
+  // speaker's useful range. Mix matches Tetris: SFX about 6 dB above the music
+  // (SFX_NOTE * SFX_MASTER vs BGM_VOL * typical file RMS of ~0.156), a compressor
+  // on the SFX bus, and a brief duck of the music on big effects.
+  const BGM_VOL = 0.12, END_VOL = 0.20, MENU_VOL = 0.12, BGM_DUCK = 0.078, XF = 0.55;
+  const SFX_MASTER = 0.96, SFX_NOTE = 0.055, SFX_LP = 2500, SFX_MAX_HZ = 800, CLIP_VOL = 0.24;
+  const SCALE = [329.6, 392.0, 440.0, 523.3, 587.3, 659.3, 784.0];
+  const SFX_KINDS = ['select', 'swap', 'nope', 'pop', 'special', 'stripe', 'wrap', 'bomb', 'blast', 'win', 'lose', 'star', 'badge', 'hammer', 'spread', 'crush', 'fail'];
+  // Shane's Match & Pop pack (18.91s, /tmp/sr-end/sfx-pack.mp3). Boundaries from 50ms
+  // energy, librosa onset and long-scale novelty, checked on a spectrogram. Silencedetect
+  // found no gaps, so cuts sit on energy valleys and texture changes. Times are source-pack seconds.
+  const SFX_CUTS = {
+    pop:    { file: 'sugar-rush-sfx-pop.mp3',    start: 0.000, end: 0.818,  title: 'Match & Pop' },
+    crush:  { file: 'sugar-rush-sfx-crush.mp3',  start: 4.430, end: 8.200,  title: 'Sugar Crush' },
+    bomb:   { file: 'sugar-rush-sfx-bomb.mp3',   start: 8.310, end: 11.000, title: 'Color Bomb' },
+    hammer: { file: 'sugar-rush-sfx-hammer.mp3', start: 11.000, end: 11.595, title: 'Lollipop Hammer' },
+    spread: { file: 'sugar-rush-sfx-spread.mp3', start: 14.525, end: 15.900, title: 'Jelly / Chocolate Spread' },
+    fail:   { file: 'sugar-rush-sfx-fail.mp3',   start: 17.850, end: 18.870, title: 'Fail / Out of Moves' }
+  };
+  const CLIP_FILES = { pop: SFX_CUTS.pop.file, crush: SFX_CUTS.crush.file, bomb: SFX_CUTS.bomb.file, hammer: SFX_CUTS.hammer.file, spread: SFX_CUTS.spread.file, fail: SFX_CUTS.fail.file };
+
+  function attachSfxBus(ctx) {
+    const mix = ctx.createGain(); mix.gain.value = 1;
+    const sfxComp = ctx.createDynamicsCompressor();
+    sfxComp.threshold.value = -8; sfxComp.knee.value = 6; sfxComp.ratio.value = 6;
+    sfxComp.attack.value = 0.003; sfxComp.release.value = 0.15;
+    mix.connect(sfxComp); sfxComp.connect(ctx.destination);
+    const sfxLp = ctx.createBiquadFilter(); sfxLp.type = 'lowpass'; sfxLp.frequency.value = SFX_LP; sfxLp.Q.value = 0.5;
+    const master = ctx.createGain(); master.gain.value = SFX_MASTER;
+    master.connect(sfxLp); sfxLp.connect(mix);
+    // Clips are already lowpassed at 5.5–6 kHz; they share the compressor, not the 2.5 kHz synth filter.
+    const clip = ctx.createGain(); clip.gain.value = SFX_MASTER;
+    clip.connect(mix);
+    return { master, clip, lp: sfxLp, comp: sfxComp, mix };
+  }
+  function playClip(ctx, dest, buf, at, rate, vol) {
+    if (!ctx || !dest || !buf) return;
+    if (at == null) at = (ctx.currentTime || 0) + 0.01;
+    const src = ctx.createBufferSource(), g = ctx.createGain();
+    src.buffer = buf;
+    src.playbackRate.setValueAtTime(rate == null ? 1 : rate, at);
+    g.gain.setValueAtTime(Math.max(0.0001, vol == null ? CLIP_VOL : vol), at);
+    src.connect(g); g.connect(dest);
+    src.start(at);
+  }
+  function playTone(ctx, dest, f, at, dur, vol, type) {
+    if (!ctx || !dest) return;
+    f = Math.max(300, Math.min(SFX_MAX_HZ, f));
+    const att = 0.008, end = at + Math.max(dur, att + 0.02);
+    function osc(hz, peak, typ) {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = typ || 'sine';
+      o.frequency.setValueAtTime(hz, at);
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.linearRampToValueAtTime(Math.max(0.0001, peak), at + att);
+      g.gain.exponentialRampToValueAtTime(0.0001, end);
+      o.connect(g); g.connect(dest);
+      o.start(at); o.stop(end + 0.03);
+    }
+    if (type === 'triangle') {
+      osc(f, vol, 'triangle');
+      osc(f * 2, vol * 0.18, 'sine');
+      osc(f * 3, vol * 0.08, 'sine');
+    } else {
+      osc(f, vol, 'sine');
+      osc(f * 2, vol * 0.28, 'sine');
+      osc(f * 3, vol * 0.12, 'sine');
+    }
+  }
+  function playSweep(ctx, dest, f0, f1, at, dur, vol) {
+    if (!ctx || !dest) return;
+    f0 = Math.max(300, Math.min(SFX_MAX_HZ, f0));
+    f1 = Math.max(300, Math.min(SFX_MAX_HZ, f1));
+    const att = 0.008, end = at + Math.max(dur, att + 0.02);
+    function osc(mul, peak) {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(f0 * mul, at);
+      o.frequency.exponentialRampToValueAtTime(f1 * mul, at + dur * 0.55);
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.linearRampToValueAtTime(Math.max(0.0001, peak), at + att);
+      g.gain.exponentialRampToValueAtTime(0.0001, end);
+      o.connect(g); g.connect(dest);
+      o.start(at); o.stop(end + 0.03);
+    }
+    osc(1, vol); osc(2, vol * 0.22); osc(3, vol * 0.08);
+  }
+  function playSfx(ctx, dest, kind, n, at) {
+    if (!ctx || !dest) return;
+    if (at == null) at = (ctx.currentTime || 0) + 0.01;
+    n = n || 0;
+    const v = SFX_NOTE, S = SCALE;
+    if (kind === 'select') playTone(ctx, dest, S[2], at, 0.11, v * 0.55, 'sine');
+    else if (kind === 'swap') { playTone(ctx, dest, S[3], at, 0.16, v * 0.8, 'sine'); playTone(ctx, dest, S[2], at + 0.05, 0.14, v * 0.7, 'triangle'); }
+    else if (kind === 'nope') { playTone(ctx, dest, S[2], at, 0.16, v * 0.7, 'sine'); playTone(ctx, dest, S[0], at + 0.13, 0.22, v * 0.7, 'sine'); }
+    else if (kind === 'pop') {
+      const i = Math.min(S.length - 1, 2 + n);
+      playTone(ctx, dest, S[i], at, 0.22, v * 0.9, 'sine');
+      playTone(ctx, dest, S[Math.max(0, i - 2)], at, 0.26, v * 0.4, 'triangle');
+    }
+    else if (kind === 'special') { [2, 4, 5].forEach((i, j) => playTone(ctx, dest, S[i], at + j * 0.055, 0.34, v * 0.72, 'triangle')); }
+    else if (kind === 'stripe' || kind === 'blast') { playSweep(ctx, dest, S[1], S[5], at, 0.28, v * 0.85); playTone(ctx, dest, S[3], at + 0.04, 0.2, v * 0.4, 'triangle'); }
+    else if (kind === 'wrap') { [3, 5, 6].forEach(i => playTone(ctx, dest, S[i], at, 0.4, v * 0.62, 'sine')); }
+    else if (kind === 'bomb') { playTone(ctx, dest, S[0], at, 0.55, v * 0.7, 'sine'); playTone(ctx, dest, S[3], at, 0.5, v * 0.55, 'triangle'); playTone(ctx, dest, S[6], at + 0.04, 0.45, v * 0.45, 'sine'); }
+    else if (kind === 'win') { [0, 1, 2, 3, 5].forEach((i, j) => playTone(ctx, dest, S[i], at + j * 0.14, 0.5, v * 0.72, 'triangle')); }
+    else if (kind === 'lose') { [5, 3, 2, 0].forEach((i, j) => playTone(ctx, dest, S[i], at + j * 0.18, 0.42, v * 0.65, 'sine')); }
+    else if (kind === 'star') { [3, 5, 6].forEach((i, j) => playTone(ctx, dest, S[i], at + j * 0.09, 0.36, v * 0.7, 'sine')); }
+    else if (kind === 'badge') { [2, 3, 5, 6].forEach((i, j) => playTone(ctx, dest, S[i], at + j * 0.11, 0.45, v * 0.72, 'triangle')); }
+  }
+
   root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, cloneState, bestMove, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
-    allowed: () => !!(root.IBScores && root.IBScores.isShane && root.IBScores.isShane()) };
+    allowed: () => !!(root.IBScores && root.IBScores.isShane && root.IBScores.isShane()),
+    SCALE, SFX_KINDS, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, CLIP_VOL, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL,
+    SFX_CUTS, CLIP_FILES, attachSfxBus, playTone, playSweep, playSfx, playClip };
 
   if (!root.document) return;
   const doc = root.document;
@@ -582,19 +708,20 @@
   // ---------- Sound: one AudioContext for effects, music, menu and end songs ----------
   // 1.9.159 played the loop with a standalone HTMLAudioElement. On iOS (and some phones)
   // that media session ducks or silences Web Audio, so swaps and matches were inaudible
-  // while the music played. Everything now shares one context. Music is slightly quieter
-  // than the effects (about 6–8 dB) and stays soft and low.
-  const BGM_VOL = 0.12, END_VOL = 0.20, MENU_VOL = 0.12, SFX_OUT = 0.75, XF = 0.55;
-  const TRACKS = { game: 'sugar-rush-music.mp3', menu: 'sugar-rush-menu.mp3', win: 'sugar-rush-win.mp3', yum: 'sugar-rush-yum.mp3' };
-  let ac = null, out = null, musicGain = null, musicSoft = null;
+  // while the music played. Everything now shares one context. 1.9.161 also raises the
+  // effect pitches into the phone-speaker range, plays Shane's cut pack clips for
+  // matches and specials, and unlocks the context on the game page itself
+  // (pointerup/touchend plus a silent buffer in the same turn).
+  let ac = null, out = null, clipOut = null, musicGain = null, musicSoft = null;
   let bufs = {}, loading = {}, musicSrc = null, musicKind = '', endSrc = null, ducked = false;
 
   function audio() {
     if (ac) { if (ac.state === 'suspended' || ac.state === 'interrupted') ac.resume().catch(() => { }); return ac; }
     const A = root.AudioContext || root.webkitAudioContext; if (!A) return null;
     ac = new A();
-    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900; lp.Q.value = 0.5;
-    out = ac.createGain(); out.gain.value = SFX_OUT; out.connect(lp); lp.connect(ac.destination);
+    const bus = attachSfxBus(ac);
+    out = bus.master; clipOut = bus.clip;
+    Object.keys(CLIP_FILES).forEach(k => loadBuf(k));
     musicGain = ac.createGain(); musicGain.gain.value = 0.0001;
     musicSoft = ac.createBiquadFilter(); musicSoft.type = 'lowpass'; musicSoft.frequency.value = 2800; musicSoft.Q.value = 0.5;
     musicGain.connect(musicSoft); musicSoft.connect(ac.destination);
@@ -607,6 +734,7 @@
     loading[kind] = fetch(TRACKS[kind]).then(r => r.arrayBuffer()).then(ab => ac.decodeAudioData(ab.slice(0))).then(b => { bufs[kind] = b; return b; }).catch(() => { loading[kind] = null; return null; });
     return loading[kind];
   }
+  const TRACKS = { game: 'sugar-rush-music.mp3', menu: 'sugar-rush-menu.mp3', win: 'sugar-rush-win.mp3', yum: 'sugar-rush-yum.mp3', pop: CLIP_FILES.pop, crush: CLIP_FILES.crush, bomb: CLIP_FILES.bomb, hammer: CLIP_FILES.hammer, spread: CLIP_FILES.spread, fail: CLIP_FILES.fail };
   function volFor(kind) { return kind === 'menu' ? MENU_VOL : BGM_VOL; }
   function stopSrc(src, fade) {
     if (!src || !ac) return;
@@ -653,6 +781,16 @@
     musicGain.gain.setValueAtTime(Math.max(0.0001, musicGain.gain.value), t);
     musicGain.gain.linearRampToValueAtTime(0.0001, t + 0.4);
   }
+  function duckMusicBrief(dur) {
+    if (!ac || !musicGain || ducked) return;
+    dur = dur == null ? 0.35 : dur;
+    const t = ac.currentTime, v = musicOn ? volFor(wantKind()) : 0.0001;
+    musicGain.gain.cancelScheduledValues(t);
+    musicGain.gain.setValueAtTime(Math.max(0.0001, musicGain.gain.value), t);
+    musicGain.gain.linearRampToValueAtTime(BGM_DUCK, t + 0.03);
+    musicGain.gain.setValueAtTime(BGM_DUCK, t + dur);
+    musicGain.gain.linearRampToValueAtTime(v, t + dur + 0.22);
+  }
   function resumeMusic() {
     if (!ac || !musicGain || !musicOn) return;
     const t = ac.currentTime, v = volFor(wantKind());
@@ -691,36 +829,46 @@
     musicOn = on; ls.set('ib-sugar-music', on); paintButtons();
     if (on) playKind(wantKind()); else stopAllMusic();
   }
+  function silentUnlock(ctx) {
+    if (!ctx) return;
+    try {
+      const z = ctx.createBuffer(1, 1, ctx.sampleRate || 44100);
+      const s = ctx.createBufferSource(); s.buffer = z; s.connect(ctx.destination); s.start(0);
+    } catch (e) { }
+  }
   function unlockAudio() {
     if (!audio()) return;
+    silentUnlock(ac);
     const p = (ac.state === 'suspended' || ac.state === 'interrupted') ? ac.resume() : Promise.resolve();
     p.then(() => { if (musicOn) playKind(wantKind()); }).catch(() => { });
   }
 
-  const SCALE = [65.4, 73.4, 82.4, 98, 110, 130.8, 146.8, 164.8, 196, 220, 261.6, 293.7, 329.6, 392];
-  function note(f, at, dur, vol, type, dest) {
-    if (!ac) return;
-    const o = ac.createOscillator(), g = ac.createGain();
-    o.type = type || 'sine'; o.frequency.value = Math.min(f, 392);
-    g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(vol, at + 0.04); g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
-    o.connect(g); g.connect(dest || out); o.start(at); o.stop(at + dur + 0.05);
-  }
   function sfx(kind, n) {
+    // Gated only by the sound toggle (default on). The music toggle does not mute effects.
     if (!soundOn || !audio()) return;
     const go = () => {
-      if (!out) return;
-      const t = ac.currentTime + 0.01;
-      if (kind === 'swap') note(SCALE[5], t, .22, .10, 'triangle');
-      else if (kind === 'nope') { note(SCALE[4], t, .2, .10, 'sine'); note(SCALE[3], t + .14, .26, .10, 'sine'); }
-      else if (kind === 'pop') { const i = Math.min(SCALE.length - 1, 6 + n); note(SCALE[i], t, .32, .13, 'sine'); note(SCALE[Math.max(0, i - 5)], t, .36, .08, 'triangle'); }
-      else if (kind === 'special') { [5, 7, 8].forEach((i, j) => note(SCALE[i], t + j * .06, .6, .08, 'triangle')); }
-      else if (kind === 'blast') { note(SCALE[0], t, .5, .14, 'sine'); note(SCALE[5], t + .02, .45, .07, 'triangle'); }
-      else if (kind === 'win') { [5, 7, 8, 10, 12].forEach((i, j) => note(SCALE[i], t + j * .16, .7, .10, 'triangle')); note(SCALE[0], t, 1.4, .09, 'sine'); }
-      else if (kind === 'lose') { [8, 7, 5].forEach((i, j) => note(SCALE[i], t + j * .2, .6, .09, 'sine')); }
-      else if (kind === 'badge') { [5, 8, 10, 12].forEach((i, j) => note(SCALE[i], t + j * .12, .8, .10, 'triangle')); }
+      n = n || 0;
+      let playKind = kind;
+      if (playKind === 'pop' && n >= 2) playKind = 'crush';
+      const clipOf = { pop: 'pop', crush: 'crush', win: 'crush', bomb: 'bomb', stripe: 'hammer', wrap: 'hammer', blast: 'hammer', hammer: 'hammer', spread: 'spread', jelly: 'spread', lose: 'fail', fail: 'fail' };
+      const clip = clipOf[playKind];
+      const usedClip = !!(clip && bufs[clip] && clipOut);
+      if (usedClip) {
+        const rate = (playKind === 'pop') ? (1 + 0.05 * Math.min(3, n)) : 1;
+        playClip(ac, clipOut, bufs[clip], ac.currentTime + 0.01, rate, CLIP_VOL);
+      } else if (out) {
+        playSfx(ac, out, playKind === 'crush' ? 'win' : playKind, n);
+      }
+      if (playKind === 'bomb' || playKind === 'wrap' || playKind === 'stripe' || playKind === 'blast' || playKind === 'hammer' || playKind === 'crush' || playKind === 'win' || playKind === 'badge' || playKind === 'star' || playKind === 'fail' || playKind === 'lose') {
+        duckMusicBrief(playKind === 'win' || playKind === 'crush' || playKind === 'badge' ? 0.55 : 0.35);
+      }
     };
-    if (ac.state === 'suspended' || ac.state === 'interrupted') ac.resume().then(go).catch(() => { });
-    else go();
+    // Start the sound in this turn as well as after resume, so iOS does not drop the first one.
+    silentUnlock(ac);
+    if (ac.state === 'suspended' || ac.state === 'interrupted') {
+      ac.resume().then(go).catch(() => { });
+      try { go(); } catch (e) { }
+    } else go();
   }
 
   // ---------- Look ----------
@@ -959,7 +1107,7 @@
     if (!res.valid) { sfx('nope'); if (A) moveTo(A, a[0], a[1], 180); if (Z) moveTo(Z, z[0], z[1], 180); await wait(190); busy = false; return; }
     hud();
     for (let i = 0; i < res.steps.length; i++) await showStep(res.steps[i], i);
-    if (res.spread) { const t = st.board[res.spread.r][res.spread.c]; if (t) { const s = sprite(t, res.spread.r, res.spread.c); s.grow = now(); } }
+    if (res.spread) { sfx('spread'); const t = st.board[res.spread.r][res.spread.c]; if (t) { const s = sprite(t, res.spread.r, res.spread.c); s.grow = now(); } }
     if (res.shuffled) {
       addText('Shuffle!', W / 2, W / 2, 30, '#fff'); await wait(450);
       for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
@@ -986,7 +1134,16 @@
       if (f.s === 'row' || f.s === 'col') fx.push({ type: 'beam', s: f.s, r: f.r, c: f.c, t0: t, dur: 420 * SP });
       else { const [x, y] = cellXY(f.r, f.c); fx.push({ type: 'ring', x, y, t0: t, dur: 480 * SP }); }
     }
-    if (s.fired && s.fired.length) sfx('blast'); else sfx('pop', i);
+    let primary = null;
+    if (s.fired && s.fired.length) {
+      const kinds = s.fired.map(f => f.s);
+      if (kinds.some(k => k === 'b')) { sfx('bomb'); primary = 'bomb'; }
+      else { sfx('hammer'); primary = 'hammer'; }
+    } else if (i >= 2) { sfx('crush'); primary = 'crush'; }
+    else { sfx('pop', i); primary = 'pop'; }
+    const brokeIce = (s.blocked || []).some(b => b.kind === 'ice');
+    if ((s.brokeLock || brokeIce) && primary !== 'hammer' && primary !== 'bomb') setTimeout(() => sfx('hammer'), 40 * SP);
+    if (s.jellyCleared || (s.blocked || []).some(b => b.kind === 'choco')) setTimeout(() => sfx('spread'), 50 * SP);
     if (s.madeTiles && s.madeTiles.length) setTimeout(() => sfx('special'), 120 * SP);
     if (n) addText('+' + s.points, cx / n, cy / n, 22, '#fff');
     const word = (s.fired && s.fired.length) ? (i >= 1 ? praise(s, i + 1) : 'Pow!') : praise(s, i);
@@ -1025,9 +1182,10 @@
     const won = st.won;
     if (st.score > (prog.best[st.lv.n - 1] || 0)) { prog.best[st.lv.n - 1] = st.score; saveProg(); }
     winInfo = won ? recordWin(st) : { newBadge: false, yum: false, stars: 0 };
+    sfx(won ? 'win' : 'lose');
+    if (won && winInfo.newBadge) setTimeout(() => sfx('badge'), 240 * SP);
+    else if (won && (st.stars || winInfo.stars)) setTimeout(() => sfx('star'), 220 * SP);
     if (won && musicOn) playEndSong(winInfo.yum ? 'yum' : 'win');
-    else sfx(won ? 'win' : 'lose');
-    if (won && winInfo.newBadge) setTimeout(() => sfx('badge'), 200 * SP);
     setTimeout(() => showEnd(), 500 * SP);
   }
   function showEnd() {
@@ -1095,13 +1253,15 @@
     down = null;
     if (z[0] >= 0 && z[0] < N && z[1] >= 0 && z[1] < N) attempt(a, z);
   });
-  cv.addEventListener('pointerup', () => {
+  cv.addEventListener('pointerup', e => {
+    unlockAudio();
     if (!down) return; const p = down.p; down = null; if (busy) return;
     if (sel && adj(sel, p)) attempt(sel, p);
     else if (sel && sel[0] === p[0] && sel[1] === p[1]) sel = null;
-    else sel = p;
+    else { sel = p; sfx('select'); }
     lastAct = now();
   });
+  cv.addEventListener('touchend', unlockAudio, { passive: true });
   cv.addEventListener('pointercancel', () => { down = null; });
 
   function toggleSound() { soundOn = !soundOn; ls.set('ib-sugar-sound', soundOn); paintButtons(); unlockAudio(); if (soundOn) sfx('swap'); }
@@ -1116,6 +1276,8 @@
   $('endmap').addEventListener('click', backToMap);
   $('introbtn').addEventListener('click', () => { unlockAudio(); startLevel(pendingLv); });
   doc.addEventListener('pointerdown', unlockAudio, { passive: true });
+  doc.addEventListener('pointerup', unlockAudio, { passive: true });
+  doc.addEventListener('touchend', unlockAudio, { passive: true });
   doc.addEventListener('visibilitychange', () => {
     if (doc.hidden) { if (ac) ac.suspend().catch(() => { }); }
     else {
@@ -1132,8 +1294,11 @@
 
   root.SugarRush.ui = {
     state: () => st, attempt, showEnd, showMap, openLevel, startLevel, progress: () => prog,
+    sfx, unlockAudio, audio,
+    clipsReady: () => Object.keys(CLIP_FILES).every(k => !!bufs[k]),
+    setSound(on) { soundOn = !!on; ls.set('ib-sugar-sound', soundOn); paintButtons(); },
     setScore(n) { if (!st) return; st.score = n; st.moves = 0; st.over = true; st.won = goalsMet(st) || n >= (st.target || 0); st.stars = starsOf(st); hud(); },
     previewWin(opts) { opts = opts || {}; const n = opts.level || (st && st.lv && st.lv.n) || 2; if (!st || st.lv.n !== n) startLevel(n); st.score = opts.score || Math.max(st.lv.stars[2] || 0, 2400); st.moves = Math.max(st.moves, 1); st.won = true; st.over = true; st.stars = opts.stars || 3; if (opts.resetBadge) prog.badges[n - 1] = 0; winInfo = recordWin(st); hud(); showEnd(); },
-    view: () => ({ score: st && st.score, moves: st && st.moves, busy, soundOn, musicOn, screen, level: st && st.lv && st.lv.n })
+    view: () => ({ score: st && st.score, moves: st && st.moves, busy, soundOn, musicOn, screen, level: st && st.lv && st.lv.n, acState: ac && ac.state })
   };
 })(typeof window !== 'undefined' ? window : globalThis);
