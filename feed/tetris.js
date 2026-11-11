@@ -142,9 +142,47 @@
   // Colourful picture behind each theme (same order as THEMES), softened with a dark veil so the blocks stand out.
   const PICS = THEMES.map((_, i) => 'tetris-bg/' + i + '.webp');
   let themeIdx = 0;
-  // Level order (indexes into THEMES): Farmyard, Triangles, Beach, Rainforest, Ocean, Bush walk, New Zealand, Snowy mountains, City, Night sky, Jeremiah was a bullfrog, Space travel last.
-  const ORDER = [6, 8, 0, 1, 2, 3, 9, 10, 4, 5, 11, 7];
+  // Level order (indexes into THEMES): Farmyard, Triangles, Jeremiah was a bullfrog, Beach, Rainforest, Ocean, Bush walk, New Zealand, Snowy mountains, City, Night sky, Space travel last.
+  const ORDER = [6, 8, 11, 0, 1, 2, 3, 9, 10, 4, 5, 7];
   function themeFor(level) { return ORDER[(Math.max(1, level) - 1) % ORDER.length]; }
+  // 1.9.150 Triangle Tetris (theme 8, level 2): blocks are triangles, and only two colours at a time.
+  // Red and blue for the first half of the level, then pink and lime after half the lines needed (5 of 10).
+  const TRI_THEME = 8;
+  const TRI_PAL = { early: ['#e25b62', '#4e88d6'], late: ['#ef8cba', '#8dce5c'] };
+  function triangleLate(lines) { return (Math.max(0, lines | 0) % 10) >= 5; }
+  function trianglePalette(lines, level) {
+    if (themeFor(level == null ? 1 : level) !== TRI_THEME) return null;
+    return triangleLate(lines) ? TRI_PAL.late : TRI_PAL.early;
+  }
+  function blockColor(t, lines, level) {
+    if (!t) return '';
+    const pal = trianglePalette(lines, level);
+    return pal ? pal[(t - 1) % 2] : COLORS[t];
+  }
+  // 1.9.150 Space travel (theme 7, last level) plays like Space Invaders: bombs only clear one settled block,
+  // never the falling piece, and blocks above do not drop.
+  const SPACE_THEME = 7;
+  function bombWaitRange(level) {
+    const t = Math.max(0, Math.min(1, (Math.max(1, level) - 12) / 24));
+    return [11 - 3 * t, 15 - 3 * t];
+  }
+  function bombWait(level) {
+    const [lo, hi] = bombWaitRange(level);
+    return (lo + Math.random() * (hi - lo)) * 1000;
+  }
+  function pieceCovers(g, c, r) {
+    const p = g.piece;
+    if (!p || g.over || r < 0) return false;
+    const mr = r - p.y, mc = c - p.x;
+    return !!(p.m[mr] && p.m[mr][mc]);
+  }
+  function applyBombHit(g, c, r) {
+    if (r < 0) return 'sky';
+    if (r >= ROWS || c < 0 || c >= COLS) return 'gone';
+    if (pieceCovers(g, c, r)) return 'piece';
+    if (g.board[r][c]) { g.board[r][c] = 0; return 'block'; }
+    return 'empty';
+  }
   function sfx(name) {
     if (!soundOn || !ac) return;
     const d = sfxGain, T = THEMES[themeIdx], m = T.pitch * 0.5, w = 'sine', lo = f => nf(f) / 2;
@@ -160,6 +198,15 @@
       case 'tetris': [0, 1, 2, 3, 4, 5].forEach((k, i) => tone(lo(T.bells[k]), 0.7, w, 0.09, i * 0.09, 0, d)); break;
       case 'level': [1, 2, 3, 5].forEach((k, i) => tone(lo(T.bells[k]), 0.6, w, 0.08, i * 0.12, 0, d)); break;
       case 'over': [5, 3, 2, 0].forEach((k, i) => tone(nf(T.bells[k]) / 2, 0.9, 'sine', 0.09, i * 0.3, 0, d)); break;
+      case 'thump': {
+        // Muffled low thump for a space-invader bomb (extra-low lowpass, no zap or chirp).
+        const lp = ac.createBiquadFilter();
+        lp.type = 'lowpass'; lp.frequency.value = 400;
+        lp.connect(d);
+        tone(88, 0.28, 'sine', 0.07, 0, 46, lp);
+        tone(56, 0.36, 'triangle', 0.045, 0.03, 34, lp);
+        break;
+      }
       default: break;
     }
   }
@@ -444,7 +491,7 @@
     if (ac) { try { ac.close(); } catch (e) { } }
     ac = null; sfxGain = null; musicGain = null; melodyBus = null; noiseBuf = null;
   }
-  root.Tetris = { THEMES, LOOKS, PICS, themeFor, SHAPES, COLORS, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state };
+  root.Tetris = { THEMES, LOOKS, PICS, themeFor, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state };
 
   if (!root.document) return;
   const doc = root.document;
@@ -477,6 +524,27 @@
   }
   root.Tetris.press = press;
   root.Tetris.view = () => ({ x: g.piece.x, y: g.piece.y, t: g.piece.t, score: g.score, lines: g.lines, paused: g.paused, over: g.over, started, musicOn, soundOn });
+  // Seed a still board (used for screenshots and checks). No overlay, no gravity, music off.
+  root.Tetris.show = function (opts) {
+    opts = opts || {};
+    started = true; musicOn = false; soundOn = false;
+    g = newGame();
+    g.lines = opts.lines || 0;
+    g.level = Math.floor(g.lines / 10) + 1;
+    g.score = opts.score || 0;
+    g.paused = false; g.over = false; g.demo = true; g.acc = 0; g.popupT = 0; g.flashT = 0;
+    if (opts.board) g.board = opts.board;
+    if (opts.piece) g.piece = opts.piece;
+    if (opts.next != null) g.next = opts.next;
+    if (opts.hold != null) { g.hold = opts.hold; g.canHold = true; }
+    themeIdx = themeFor(g.level);
+    lookIdx = -1;
+    applyLook(themeIdx);
+    syncHud();
+    const mb = doc.getElementById('musicbtn'); if (mb) mb.textContent = 'Music off';
+    const sb = doc.getElementById('soundbtn'); if (sb) sb.textContent = 'Sound off';
+    invSeed(opts);
+  };
   doc.addEventListener('click', e => {
     const b = e.target.closest && e.target.closest('[data-act]');
     if (b) press(b.dataset.act);
@@ -543,7 +611,39 @@
     if (el < 300 && dy > cellPx() * 2.5 && dy > Math.abs(e.clientX - s.sx)) press('drop');
   });
   board.addEventListener('pointercancel', () => { touch.cur = null; });
-  function drawCell(ctx, x, y, color, size, alpha) {
+  function triPath(ctx, x, y, size, col, row) {
+    const pad = Math.max(1.2, size * 0.07);
+    const up = ((col + row) & 1) === 0;
+    const x1 = x + pad, y1 = y + pad, x2 = x + size - pad, y2 = y + size - pad, xm = x + size / 2;
+    ctx.beginPath();
+    if (up) { ctx.moveTo(xm, y1); ctx.lineTo(x2, y2); ctx.lineTo(x1, y2); }
+    else { ctx.moveTo(x1, y1); ctx.lineTo(x2, y1); ctx.lineTo(xm, y2); }
+    ctx.closePath();
+    return up;
+  }
+  function drawCell(ctx, x, y, color, size, alpha, col, row) {
+    if (themeFor(g.level) === TRI_THEME) {
+      ctx.globalAlpha = alpha;
+      triPath(ctx, x, y, size, col, row);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.save();
+      triPath(ctx, x, y, size, col, row);
+      ctx.clip();
+      const hi = ctx.createLinearGradient(x, y, x, y + size);
+      hi.addColorStop(0, 'rgba(255,255,255,0.32)');
+      hi.addColorStop(0.45, 'rgba(255,255,255,0)');
+      hi.addColorStop(1, 'rgba(0,0,0,0.22)');
+      ctx.fillStyle = hi;
+      ctx.fill();
+      ctx.restore();
+      ctx.lineWidth = Math.max(1, size * 0.06);
+      ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+      triPath(ctx, x, y, size, col, row);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      return;
+    }
     ctx.globalAlpha = alpha;
     ctx.fillStyle = color;
     ctx.fillRect(x + 1, y + 1, size - 2, size - 2);
@@ -551,6 +651,21 @@
     ctx.fillRect(x + 1, y + 1, size - 2, 4);
     ctx.fillStyle = 'rgba(0,0,0,0.22)';
     ctx.fillRect(x + 1, y + size - 5, size - 2, 4);
+    ctx.globalAlpha = 1;
+  }
+  function drawGhost(ctx, x, y, color, size, col, row) {
+    if (themeFor(g.level) === TRI_THEME) {
+      ctx.globalAlpha = 0.55;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = Math.max(1.5, size * 0.08);
+      triPath(ctx, x, y, size, col, row);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      return;
+    }
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = 0.5;
+    ctx.strokeRect(x + 2.5, y + 2.5, size - 5, size - 5);
     ctx.globalAlpha = 1;
   }
   function drawMini(cv, t, dim) {
@@ -567,7 +682,7 @@
     m.forEach((row, r) => row.forEach((v, c) => { if (v) { minR = Math.min(minR, r); maxR = Math.max(maxR, r); minC = Math.min(minC, c); maxC = Math.max(maxC, c); } }));
     const w = (maxC - minC + 1) * s, h = (maxR - minR + 1) * s;
     const ox = (cv.width - w) / 2, oy = (cv.height - h) / 2;
-    m.forEach((row, r) => row.forEach((v, c) => { if (v) drawCell(ctx, ox + (c - minC) * s, oy + (r - minR) * s, COLORS[t], s, dim ? 0.35 : 1); }));
+    m.forEach((row, r) => row.forEach((v, c) => { if (v) drawCell(ctx, ox + (c - minC) * s, oy + (r - minR) * s, blockColor(t, g.lines, g.level), s, dim ? 0.35 : 1, c, r); }));
   }
   let lookIdx = -1, boardBg = LOOKS[0].board;
   function applyLook(i) {
@@ -718,13 +833,131 @@
     }
     c.globalAlpha = 1;
   }
+  // Pixel invaders on the Space travel board. They drift; bombs fall slowly down a column.
+  const INV_PX = 2, INV_GAP = 48, INV_COUNT = 5;
+  const INV_W = 11 * INV_PX, INV_H = 8 * INV_PX;
+  const INV_SPRITES = [
+    [['..#.....#..','...#...#...','..#######..','.##.#.#.##.','###########','#.#.###.#.#','#.#.....#.#','...##.##...'],
+     ['..#.....#..','#..#...#..#','#.#######.#','###.#.#.###','.#########.','..#.###.#..','..#.....#..','.#.......#.' ]],
+    [['...#.#.....','..#####....','.#######...','.#.#.#.#...','#########..','.#####.#...','#.#...#.#..','.#.#.......'],
+     ['...#.#.....','..#####....','.#######...','#.#.#.#.#..','#########..','.#.#####...','..#...#.#..','.......#.#.']]
+  ];
+  const inv = { ready: false, x: 12, dir: 1, wait: 0, bombs: [], boom: [], t: 0 };
+  function invReset() {
+    inv.ready = true; inv.x = 12; inv.dir = 1; inv.bombs = []; inv.boom = []; inv.t = 0;
+    inv.wait = themeFor(g.level) === SPACE_THEME ? bombWait(g.level) : 0;
+  }
+  function invSeed(opts) {
+    opts = opts || {};
+    if (themeFor(g.level) !== SPACE_THEME) { inv.ready = false; inv.bombs = []; inv.boom = []; return; }
+    invReset();
+    inv.wait = 1e9;
+    if (opts.invX != null) inv.x = opts.invX;
+    if (opts.bomb) inv.bombs.push(opts.bomb);
+    if (opts.boom) inv.boom = opts.boom.slice();
+  }
+  function invDrop() {
+    const choices = [];
+    for (let i = 0; i < INV_COUNT; i++) {
+      const cx = inv.x + i * INV_GAP + INV_W / 2;
+      const col = Math.max(0, Math.min(COLS - 1, Math.floor(cx / CELL)));
+      choices.push({ cx, col, stacked: g.board.some(row => row[col]) });
+    }
+    const stacked = choices.filter(c => c.stacked);
+    const pool = stacked.length ? stacked : choices;
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    inv.bombs.push({ x: pick.cx, y: INV_H + 10, col: pick.col, vy: 2.2 * CELL });
+  }
+  function invMoveBombs(dt) {
+    const keep = [];
+    for (const b of inv.bombs) {
+      const from = Math.floor(b.y / CELL);
+      b.y += b.vy * dt / 1000;
+      const to = Math.floor(b.y / CELL);
+      let dead = false;
+      for (let r = from; r <= to; r++) {
+        const hit = applyBombHit(g, b.col, r);
+        if (hit === 'block') {
+          inv.boom.push({ c: b.col, r: r, t: 420 });
+          sfx('thump');
+          dead = true;
+          break;
+        }
+        if (hit === 'gone') { dead = true; break; }
+      }
+      if (!dead && b.y < ROWS * CELL + 10) keep.push(b);
+    }
+    inv.bombs = keep;
+  }
+  function invStep(dt) {
+    if (themeFor(g.level) !== SPACE_THEME) { if (inv.ready) { inv.ready = false; inv.bombs = []; inv.boom = []; } return; }
+    if (!inv.ready) invReset();
+    inv.t += dt;
+    if (g.demo) return; // keep a seeded still for screenshots
+    if (inv.boom.length) {
+      for (const e of inv.boom) e.t -= dt;
+      inv.boom = inv.boom.filter(e => e.t > 0);
+    }
+    const moving = started && !g.over && !g.paused;
+    if (!moving) return;
+    const span = COLS * CELL - ((INV_COUNT - 1) * INV_GAP + INV_W) - 36; // leave room for the on-board score
+    inv.x += inv.dir * 22 * (dt / 1000);
+    if (inv.x < 4) { inv.x = 4; inv.dir = 1; }
+    if (inv.x > span - 4) { inv.x = span - 4; inv.dir = -1; }
+    if (!g.demo) {
+      if (inv.bombs.length === 0) {
+        inv.wait -= dt;
+        if (inv.wait <= 0) { invDrop(); inv.wait = bombWait(g.level); }
+      }
+      invMoveBombs(dt);
+    }
+  }
+  function invSprite(ctx, rows, x, y, color) {
+    const px = INV_PX;
+    ctx.fillStyle = color;
+    for (let r = 0; r < rows.length; r++) {
+      const line = rows[r];
+      for (let c = 0; c < line.length; c++) if (line[c] === '#') ctx.fillRect(Math.round(x + c * px), Math.round(y + r * px), px, px);
+    }
+  }
+  function invDraw(ctx) {
+    if (themeFor(g.level) !== SPACE_THEME) return;
+    if (!inv.ready) invReset();
+    const frame = (inv.t / 400 | 0) % 2;
+    const colours = ['#7dcc8a', '#7eb8c9'];
+    for (let i = 0; i < INV_COUNT; i++) {
+      const rows = INV_SPRITES[i % 2][frame];
+      invSprite(ctx, rows, inv.x + i * INV_GAP, 6, colours[i % 2]);
+    }
+    for (const b of inv.bombs) {
+      const bx = b.x, by = b.y;
+      ctx.fillStyle = '#e6c36a';
+      ctx.fillRect(bx - 2, by - 6, 4, 3);
+      ctx.fillRect(bx - 3, by - 3, 6, 6);
+      ctx.fillRect(bx - 2, by + 3, 4, 3);
+      ctx.fillStyle = 'rgba(230,195,106,0.35)';
+      ctx.fillRect(bx - 1, by + 6, 2, 5);
+    }
+    for (const e of inv.boom) {
+      const k = Math.max(0, e.t / 420), cx = e.c * CELL + CELL / 2, cy = e.r * CELL + CELL / 2;
+      const rad = 5 + 12 * (1 - k);
+      ctx.globalAlpha = 0.35 * k;
+      ctx.fillStyle = '#f3d7a0';
+      ctx.beginPath(); ctx.arc(cx, cy, rad, 0, 6.283); ctx.fill();
+      ctx.globalAlpha = 0.7 * k;
+      ctx.fillStyle = '#e8b86a';
+      ctx.beginPath(); ctx.arc(cx, cy, rad * 0.45, 0, 6.283); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  }
+
   let last = performance.now();
   function loop(now) {
     applyLook(themeFor(g.level));
     try { fxDraw(now); } catch (e) { fx.off = true; }
     const dt = now - last;
     last = now;
-    const running = started && !g.over && !g.paused;
+    const running = started && !g.over && !g.paused && !g.demo;
     if (running) {
       g.acc += dt;
       if (g.acc >= dropInterval(g.level)) {
@@ -733,6 +966,7 @@
         else { lockPiece(g); syncHud(); }
       }
     }
+    try { invStep(dt); } catch (e) { }
     musicTick(g.level, running);
     if (g.flashT > 0) g.flashT -= dt;
     if (g.popupT > 0) g.popupT -= dt;
@@ -747,22 +981,18 @@
       for (let r = 1; r < ROWS; r++) { ctx.beginPath(); ctx.moveTo(0, r * CELL + 0.5); ctx.lineTo(COLS * CELL, r * CELL + 0.5); ctx.stroke(); }
       for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
         const v = g.board[r][c];
-        if (v) drawCell(ctx, c * CELL, r * CELL, COLORS[v], CELL, 1);
+        if (v) drawCell(ctx, c * CELL, r * CELL, blockColor(v, g.lines, g.level), CELL, 1, c, r);
       }
+      try { invDraw(ctx); } catch (e) { }
       if (!g.over) {
         const p = g.piece;
         let gy = p.y;
         while (!collides(g.board, p.m, p.x, gy + 1)) gy++;
         p.m.forEach((row, r) => row.forEach((v, c) => {
-          if (v && gy + r >= 0) {
-            ctx.strokeStyle = COLORS[p.t];
-            ctx.globalAlpha = 0.5;
-            ctx.strokeRect((p.x + c) * CELL + 2.5, (gy + r) * CELL + 2.5, CELL - 5, CELL - 5);
-            ctx.globalAlpha = 1;
-          }
+          if (v && gy + r >= 0) drawGhost(ctx, (p.x + c) * CELL, (gy + r) * CELL, blockColor(p.t, g.lines, g.level), CELL, p.x + c, gy + r);
         }));
         p.m.forEach((row, r) => row.forEach((v, c) => {
-          if (v && p.y + r >= 0) drawCell(ctx, (p.x + c) * CELL, (p.y + r) * CELL, COLORS[p.t], CELL, 1);
+          if (v && p.y + r >= 0) drawCell(ctx, (p.x + c) * CELL, (p.y + r) * CELL, blockColor(p.t, g.lines, g.level), CELL, 1, p.x + c, p.y + r);
         }));
       }
       if (g.flashT > 0) {
@@ -782,7 +1012,7 @@
         ctx.fillText(g.popup, board.width / 2, board.height / 2 - 40 - (1 - k) * 40);
         ctx.globalAlpha = 1;
       }
-      if (!started || g.over || g.paused) {
+      if (!g.demo && (!started || g.over || g.paused)) {
         ctx.fillStyle = 'rgba(10,11,14,0.72)';
         ctx.fillRect(0, 0, board.width, board.height);
         ctx.fillStyle = '#ffffff';

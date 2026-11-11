@@ -123,6 +123,57 @@ gHold.canHold = true;
 tetGame.act(gHold, 'hold');
 assert.strictEqual(gHold.hold, held);
 assert.strictEqual(gHold.canHold, false);
+// 1.9.150 triangle Tetris on the Triangles theme (level 2): two-colour palette, gameplay unchanged
+assert.strictEqual(tetGame.themeFor(1), 6);
+assert.strictEqual(tetGame.themeFor(2), 8);
+assert.strictEqual(tetGame.themeFor(3), 11);
+assert.strictEqual(tetGame.themeFor(12), 7);
+assert.strictEqual(tetGame.THEMES[8].name, 'Triangles');
+assert.strictEqual(tetGame.THEMES[11].name, 'Jeremiah was a bullfrog');
+assert.strictEqual(tetGame.TRI_THEME, 8);
+assert.deepStrictEqual(tetGame.trianglePalette(10, 2), tetGame.TRI_PAL.early);
+assert.deepStrictEqual(tetGame.trianglePalette(14, 2), tetGame.TRI_PAL.early);
+assert.deepStrictEqual(tetGame.trianglePalette(15, 2), tetGame.TRI_PAL.late);
+assert.deepStrictEqual(tetGame.trianglePalette(19, 2), tetGame.TRI_PAL.late);
+assert.strictEqual(tetGame.triangleLate(14), false);
+assert.strictEqual(tetGame.triangleLate(15), true);
+assert.strictEqual(tetGame.blockColor(1, 10, 2), tetGame.TRI_PAL.early[0]); // red
+assert.strictEqual(tetGame.blockColor(2, 10, 2), tetGame.TRI_PAL.early[1]); // blue
+assert.strictEqual(tetGame.blockColor(3, 15, 2), tetGame.TRI_PAL.late[0]);  // pink
+assert.strictEqual(tetGame.blockColor(4, 15, 2), tetGame.TRI_PAL.late[1]);  // lime
+const triCols = new Set([1, 2, 3, 4, 5, 6, 7].map(t => tetGame.blockColor(t, 12, 2)));
+assert.deepStrictEqual([...triCols].sort(), [...tetGame.TRI_PAL.early].sort());
+assert.strictEqual(tetGame.trianglePalette(0, 1), null, 'other themes keep their own colours');
+assert.strictEqual(tetGame.blockColor(1, 0, 1), tetGame.COLORS[1]);
+const gTri = tetGame.newGame();
+gTri.level = 2; gTri.lines = 12;
+const beforeX = 4;
+gTri.piece = { t: 4, m: [[4, 4], [4, 4]], x: beforeX, y: 0 };
+tetGame.act(gTri, 'left');
+assert.strictEqual(gTri.piece.x, beforeX - 1, 'triangle theme does not change movement');
+assert.strictEqual(tetGame.THEMES[7].name, 'Space travel');
+assert.strictEqual(tetGame.SPACE_THEME, 7);
+const wait12 = tetGame.bombWaitRange(12), wait36 = tetGame.bombWaitRange(36);
+assert.strictEqual(wait12[0], 11); assert.strictEqual(wait12[1], 15);
+assert.strictEqual(wait36[0], 8); assert.strictEqual(wait36[1], 12);
+assert.ok(wait12[0] >= 8 && wait36[0] >= 8);
+const gSp = tetGame.newGame();
+gSp.level = 12; gSp.lines = 110;
+gSp.board = tetGame.emptyBoard();
+for (let r = 16; r < 20; r++) gSp.board[r][4] = 3;
+gSp.board[15][4] = 5;
+gSp.piece = { t: 4, m: [[4, 4], [4, 4]], x: 4, y: 8 };
+assert.strictEqual(tetGame.applyBombHit(gSp, 4, 8), 'piece', 'bombs pass through the falling piece');
+assert.strictEqual(gSp.piece.t, 4);
+assert.strictEqual(gSp.over, false);
+assert.strictEqual(gSp.board[8][4], 0);
+assert.strictEqual(tetGame.applyBombHit(gSp, 4, 15), 'block');
+assert.strictEqual(gSp.board[15][4], 0, 'only the hit block is cleared');
+assert.strictEqual(gSp.board[16][4], 3, 'cells above do not fall');
+assert.strictEqual(gSp.board[17][4], 3);
+assert.strictEqual(tetGame.applyBombHit(gSp, 4, 19), 'block');
+assert.strictEqual(gSp.board[16][4], 3);
+assert.strictEqual(gSp.board[19][4], 0);
 
 // TV and garden filters, from labels seen on the live feed
 assert.strictEqual(nz.neon({ src: 'yt-neon', sn: 'Neon NZ', t: 'The Good Daughter' }), true);
@@ -303,12 +354,12 @@ for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 3, at.join(',
 const appSrc = fs.readFileSync('feed/app.js', 'utf8');
 for (const id of sights.TOPICS) assert.ok(appSrc.includes("'" + id + "'"), id);
 assert.ok(!/Math\.pow\(baseOf\(t\), 3\)/.test(appSrc));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.148'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.148'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.148'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.150'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.150'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.150'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.cdot.tv'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.bd ul.sum'));
-assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.148'"));
+assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.150'"));
 function swVersion(src) { const m = String(src).match(/const VERSION = '([^']+)'/); assert.ok(m, 'parent sw.js VERSION'); return m[1]; }
 const parentHere = swVersion(fs.readFileSync('sw.js', 'utf8'));
 let parentMain = parentHere;
@@ -347,10 +398,10 @@ assert.equal(artB.length, 1);
 assert.notEqual(artB[0].id, artA.id);
 seenArt.wasSeen = () => true;
 assert.equal(seenArt.ibArt.cards(0).length, 0);
-assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.148'"));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.150'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'art3d.js?v=' + VERSION"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'portal.js?v=' + VERSION"));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.148'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.150'));
 const portalSrc = fs.readFileSync('feed/portal.js', 'utf8');
 assert.ok(portalSrc.includes('prefers-reduced-motion'));
 assert.ok(portalSrc.includes("sessionStorage.getItem(KEY)"));
@@ -378,7 +429,7 @@ assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("cache: 'reload'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("cache: 'no-cache'"));
 assert.ok(appSrc.includes('ibPortalRise'));
 assert.ok(!/portal-style\.jpg|attachments\/image/.test(portalSrc + fs.readFileSync('feed/index.html', 'utf8')));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.148'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.150'));
 assert.ok(appSrc.includes("['art3d', '3D art'"));
 assert.ok(appSrc.includes("['3D art', 'art3d'"));
 assert.ok(appSrc.includes("'art3d'"));
@@ -502,7 +553,7 @@ assert.ok(cal.ics(saved).includes('TRIGGER:-PT1H'));
 const calFile = fs.readFileSync('feed/cal.js', 'utf8');
 assert.ok(calFile.includes('data-art="tetris"'));
 assert.ok(calFile.includes('Play Tetris'));
-// 1.9.148 Scrabble is playable; Sugar Rush is the next game coming soon
+// 1.9.150 Scrabble is playable; Sugar Rush is the next game coming soon
 assert.ok(calFile.includes('data-art="scrabble"'));
 assert.ok(calFile.includes('Play Scrabble'));
 assert.ok(calFile.includes('<span>Coming soon: Sugar Rush 🍬, a Candy Crush style matching game</span>'));
@@ -522,7 +573,7 @@ assert.ok(/scrabble:[\s\S]{0,220}local: true/.test(playFile));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'scrabble', 'scrabble.js'"));
 assert.ok(!fs.readFileSync('feed/sw.js', 'utf8').includes('scrabble-words'), 'word list is fetched when Scrabble opens, not precached');
 
-// 1.9.148 Scrabble rules and word checks (small word list here; tests/scrabble-sim.mjs plays full games with the real one)
+// 1.9.150 Scrabble rules and word checks (small word list here; tests/scrabble-sim.mjs plays full games with the real one)
 function loadScrabble() {
   const ctx = { console, Math, Object, Number, String, Array, Set, Map, JSON, Date, Uint8Array, Int8Array, Int32Array, setTimeout, parseInt };
   ctx.window = ctx; ctx.globalThis = ctx;
