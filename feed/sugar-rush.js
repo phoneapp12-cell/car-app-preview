@@ -1,34 +1,131 @@
-/* Info Book 1.9.159 – Sugar Rush, level 1. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.160 – Sugar Rush, levels 1–10. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
-   sweet of the colour it is swapped with). Level 1: reach 3,000 points in 20 moves.
+   sweet of the colour it is swapped with).
    Only Shane can play for now (IBScores.isShane() from scores.js); everyone else sees a coming-soon screen.
    Scores are not sent to the family scoreboard yet. Sounds are soft and low: sine/triangle notes under 400 Hz,
-   gentle attack, through a lowpass, no clicks or chirps. Shane's track (sugar-rush-music.mp3) loops once the
-   game has had a tap; the music toggle mutes it and is remembered. */
+   gentle attack, through a lowpass, no clicks or chirps. Shane's track loops through the same AudioContext as the
+   sound effects (so they are not ducked), once the game has had a tap. The music toggle mutes music and end songs
+   and is remembered; the sound toggle is separate. */
 (function (root) {
   'use strict';
   const N = 8, KINDS = 6, PTS = 30;
   const LEVEL = { n: 1, target: 3000, moves: 20, stars: [3000, 6000, 9000] };
   const BONUS = { row: 120, col: 120, w: 200, b: 300 };
   const NAMES = ['Cherry gumdrop', 'Orange jelly', 'Lemon drop', 'Apple chew', 'Blueberry gem', 'Grape twist'];
+  const HOLE = Object.freeze({ hole: 1 });
+
+  const HEART = ['..XXXX..', '.XXXXXX.', 'XXXXXXXX', 'XXXXXXXX', 'XXXXXXXX', '.XXXXXX.', '..XXXX..', '...XX...'];
+  const FUNNEL = ['.XXXXXX.', '.XXXXXX.', '..XXXX..', '..XXXX..', '..XXXX..', '..XXXX..', '.XXXXXX.', '.XXXXXX.'];
+  const FRAME = ['XXXXXXXX', 'X......X', 'X......X', 'XX....XX', 'XX....XX', 'X......X', 'X......X', 'XXXXXXXX'];
+
+  const LEVELS = [
+    { n: 1, name: 'The Sweet Shop', target: 3000, moves: 20, stars: [3000, 6000, 9000], kinds: 6,
+      help: 'Swipe a sweet into its neighbour, or tap one then the other, to line up 3 or more of the same. Reach 3,000 points in 20 moves.',
+      badge: { id: 'shop', name: 'Sweet Shop Star', icon: '⭐' } },
+    { n: 2, name: "Sarah's Sweet Spot", theme: 'sarah', target: 0, moves: 25, stars: [0, 1200, 2400], kinds: 5, mask: HEART,
+      collect: { color: 0, n: 10 },
+      help: "This heart-shaped tray is Sarah's corner of the shop. Collect 10 cherry gumdrops in 25 moves.",
+      intro: { title: "Sarah's Sweet Spot",
+        body: "This one is for Sarah, Shane's partner. She lights up at a tray of sweets and the quiet satisfaction of a good match — so this heart-shaped board is her sweet spot in the shop. Collect ten cherry gumdrops, and take your time." },
+      badge: { id: 'sarah', name: "Sarah's Heart", icon: '💖', special: true } },
+    { n: 3, name: 'A Little Jelly', target: 0, moves: 22, stars: [0, 1500, 3000], kinds: 6,
+      jelly: ['00000000', '00000000', '00111100', '00111100', '00111100', '00111100', '00000000', '00000000'],
+      help: 'Some tiles have a layer of jelly under the sweet. Make a match on a jelly tile to clear it. Clear every jelly in 22 moves.',
+      badge: { id: 'jelly', name: 'Jelly Ribbon', icon: '🎀' } },
+    { n: 4, name: 'Locked Jars', target: 2500, moves: 22, stars: [2500, 5000, 8000], kinds: 6,
+      locks: ['00000000', '00011000', '00111100', '01100110', '01100110', '00111100', '00011000', '00000000'],
+      help: 'A few sweets are locked. They cannot be swapped, but a match that includes them still counts and frees them. Reach 2,500 points in 22 moves.',
+      badge: { id: 'lock', name: 'Unlocked Key', icon: '🔑' } },
+    { n: 5, name: 'Icing on the Cake', target: 0, moves: 24, stars: [0, 1600, 3200], kinds: 6,
+      ice: ['00000000', '00011000', '00111100', '01100110', '01100110', '00111100', '00011000', '00000000'],
+      help: 'Icing blocks a tile until a match happens next to it, or a special sweet hits it. Clear all the icing in 24 moves.',
+      badge: { id: 'icing', name: 'Icing Rose', icon: '🧁' } },
+    { n: 6, name: 'Double Jelly', target: 0, moves: 24, stars: [0, 2000, 4000], kinds: 6,
+      jelly: ['00000000', '00222200', '02222220', '02222220', '02222220', '02222220', '00222200', '00000000'],
+      help: 'These jellies have two layers, so some tiles need two clears. Clear every jelly in 24 moves.',
+      badge: { id: 'double', name: 'Double Scoop', icon: '🍨' } },
+    { n: 7, name: 'Bring it Down', target: 0, moves: 34, stars: [0, 1600, 3200], kinds: 6, mask: FUNNEL,
+      ings: [[1, 2], [1, 5]],
+      ice: ['00000000', '00000000', '00000000', '00011000', '00000000', '00000000', '00000000', '00000000'],
+      help: 'Guide the two ingredients down to the bottom of the tray. A little icing sits in the way. Bring both down in 34 moves.',
+      badge: { id: 'down', name: 'Lift Ticket', icon: '🎁' } },
+    { n: 8, name: 'Chocolate Shop', target: 0, moves: 24, stars: [0, 1800, 3600], kinds: 6,
+      choco: ['11000000', '11000000', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000'],
+      jelly: ['00000000', '00000000', '00111100', '00111100', '00111100', '00111100', '00000000', '00000000'],
+      help: 'Chocolate spreads to a neighbouring tile at the end of a move if you did not hit it. Keep it in check and clear every jelly in 24 moves.',
+      badge: { id: 'choco', name: 'Cocoa Medal', icon: '🍫' } },
+    { n: 9, name: 'The Winding Path', target: 0, moves: 28, stars: [0, 1400, 2800], kinds: 5, mask: FRAME,
+      jelly: ['11111111', '10000001', '10000001', '10000001', '10000001', '10000001', '10000001', '11111111'],
+      collect: { color: 2, n: 6 },
+      help: 'The path runs around the edge of the tray. Clear the jelly and collect 6 lemon drops in 28 moves.',
+      badge: { id: 'path', name: 'Winding Charm', icon: '🌙' } },
+    { n: 10, name: 'Saturday Night', target: 0, moves: 32, stars: [0, 2500, 5000], kinds: 6,
+      jelly: ['00000000', '00111100', '01000010', '01000010', '01000010', '01000010', '00111100', '00000000'],
+      ings: [[0, 3], [0, 4]],
+      ice: ['00000000', '00000000', '00100100', '00000000', '00000000', '00000000', '00000000', '00000000'],
+      locks: ['00000000', '00000000', '00000000', '00100100', '00000000', '00000000', '00000000', '00000000'],
+      help: 'A little of everything: jelly, two ingredients, a bit of icing and a couple of locked jars. Finish it all in 32 moves.',
+      badge: { id: 'night', name: 'Night Light', icon: '🌟' } }
+  ];
 
   function rng(seed) {
     let a = (seed >>> 0) || 1;
-    return function () { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const f = function () { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    f._get = () => a; f._set = v => { a = v >>> 0; };
+    return f;
   }
+  function fork(rand) { const g = rng(1); if (rand && rand._get) g._set(rand._get()); return g; }
   let nid = 1;
   const mk = (c, s) => ({ id: nid++, c, s: s || '' });
   const key = (r, c) => r * N + c;
   const rc = k => [Math.floor(k / N), k % N];
   const adj = (a, z) => Math.abs(a[0] - z[0]) + Math.abs(a[1] - z[1]) === 1;
   const randKind = (rand, kinds) => Math.floor(rand() * (kinds || KINDS));
-
-  // Tests: '0'-'5' plain sweets, '*' a sprinkle bomb, '.' empty.
-  function fromRows(rows) {
-    return rows.map(row => row.split('').map(ch => ch === '.' ? null : ch === '*' ? mk(-1, 'b') : mk(+ch)));
+  const isHole = t => t === HOLE || !!(t && t.hole);
+  const isBlock = t => !!(t && (t.ice > 0 || t.choco > 0));
+  const isIng = t => !!(t && t.ing);
+  const isBomb = t => !!(t && t.s === 'b' && t.c < 0 && !t.ing && !t.ice && !t.choco);
+  const isCandy = t => !!(t && t.c >= 0 && !t.ice && !t.choco && !t.ing);
+  const canSwap = t => !!(t && !isHole(t) && (isCandy(t) || isBomb(t)) && !t.lock);
+  function isOpen(mask, r, c) {
+    if (r < 0 || r >= N || c < 0 || c >= N) return false;
+    if (!mask) return true;
+    const ch = mask[r][c];
+    return ch === 'X' || ch === '1';
   }
-  const toRows = b => b.map(row => row.map(t => !t ? '.' : t.c < 0 ? '*' : String(t.c)).join(''));
+  function parseDigits(rows) {
+    if (!rows) return null;
+    return rows.map(row => row.split('').map(ch => +ch || 0));
+  }
+  function lvOf(opt) {
+    opt = opt || {};
+    if (opt.level && typeof opt.level === 'object') return opt.level;
+    if (opt.level != null) return LEVELS[(opt.level | 0) - 1] || LEVELS[0];
+    return LEVELS[0];
+  }
+
+  // Tests: '0'-'5' plain sweets, '*' a sprinkle bomb, '.' empty, '#' a hole, 'I' icing, 'C' chocolate, 'G' an ingredient.
+  function fromRows(rows) {
+    return rows.map(row => row.split('').map(ch => {
+      if (ch === '.') return null;
+      if (ch === '#') return HOLE;
+      if (ch === '*') return mk(-1, 'b');
+      if (ch === 'I') return Object.assign(mk(-4), { ice: 1 });
+      if (ch === 'C') return Object.assign(mk(-5), { choco: 1 });
+      if (ch === 'G') return Object.assign(mk(-3), { ing: 1 });
+      return mk(+ch);
+    }));
+  }
+  const toRows = b => b.map(row => row.map(t => {
+    if (!t) return '.';
+    if (isHole(t)) return '#';
+    if (t.ice > 0) return 'I';
+    if (t.choco) return 'C';
+    if (t.ing) return 'G';
+    if (t.c < 0) return '*';
+    return String(t.c);
+  }).join(''));
 
   function findRuns(b) {
     const runs = [];
@@ -38,8 +135,8 @@
         for (let j = 1; j <= N; j++) {
           const cur = j < N ? (dir ? b[j][i] : b[i][j]) : null;
           const first = dir ? b[start][i] : b[i][start];
-          if (cur && first && cur.c >= 0 && cur.c === first.c) continue;
-          if (j - start >= 3 && first && first.c >= 0) {
+          if (cur && first && isCandy(cur) && isCandy(first) && cur.c === first.c) continue;
+          if (j - start >= 3 && first && isCandy(first)) {
             const cells = [];
             for (let k = start; k < j; k++) cells.push(dir ? key(k, i) : key(i, k));
             runs.push({ dir: dir ? 'v' : 'h', color: first.c, cells });
@@ -61,7 +158,6 @@
     }
     return gs;
   }
-  // What a matched group makes: 5 in a line a bomb, an L/T a wrapped sweet, 4 in a line a striped sweet.
   function specialFor(g) {
     const long = Math.max(...g.runs.map(r => r.cells.length));
     const hasH = g.runs.some(r => r.dir === 'h'), hasV = g.runs.some(r => r.dir === 'v');
@@ -79,18 +175,24 @@
   }
   function mostCommon(b, skip) {
     const n = new Array(KINDS).fill(0);
-    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) { const t = b[r][c]; if (t && t.c >= 0 && !skip.has(key(r, c))) n[t.c]++; }
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) { const t = b[r][c]; if (isCandy(t) && !skip.has(key(r, c))) n[t.c]++; }
     let best = 0; for (let i = 1; i < KINDS; i++) if (n[i] > n[best]) best = i;
     return best;
   }
-  // Specials caught in a clear go off, and can set each other off.
-  function expand(b, clear, fired, keep) {
+  function expand(b, clear, fired, hit, mask) {
     const q = [...clear], done = new Set();
-    const add = k => { if (!clear.has(k)) { clear.add(k); q.push(k); } };
+    const add = k => {
+      const [r, c] = rc(k);
+      if (!isOpen(mask, r, c)) return;
+      const t = b[r][c];
+      if (isHole(t) || isIng(t)) return;
+      if (isBlock(t)) { hit.add(k); return; }
+      if (!clear.has(k)) { clear.add(k); q.push(k); }
+    };
     while (q.length) {
       const k = q.pop(); if (done.has(k)) continue; done.add(k);
       const [r, c] = rc(k), t = b[r][c];
-      if (!t || !t.s || (keep && keep.has(k) && !t.s)) continue;
+      if (!t || !t.s || isBlock(t) || isIng(t)) continue;
       if (t.s === 'row') { fired.push({ r, c, s: 'row' }); for (let j = 0; j < N; j++) add(key(r, j)); }
       else if (t.s === 'col') { fired.push({ r, c, s: 'col' }); for (let i = 0; i < N; i++) add(key(i, c)); }
       else if (t.s === 'w') { fired.push({ r, c, s: 'w' }); for (let i = r - 1; i <= r + 1; i++) for (let j = c - 1; j <= c + 1; j++) if (i >= 0 && i < N && j >= 0 && j < N) add(key(i, j)); }
@@ -100,7 +202,11 @@
       }
     }
   }
-  function resolve(b, pref) {
+  function neighbourHits(b, clear, hit, mask) {
+    const bump = (r, c) => { if (isOpen(mask, r, c) && isBlock(b[r][c])) hit.add(key(r, c)); };
+    clear.forEach(k => { const [r, c] = rc(k); bump(r - 1, c); bump(r + 1, c); bump(r, c - 1); bump(r, c + 1); });
+  }
+  function resolve(b, pref, mask) {
     const runs = findRuns(b); if (!runs.length) return null;
     const gs = groups(runs), clear = new Set(), made = [], keep = new Set();
     for (const g of gs) {
@@ -108,121 +214,339 @@
       const s = specialFor(g);
       if (s) { const k = placeFor(g, pref); if (!keep.has(k)) { keep.add(k); made.push({ k, s, color: s === 'b' ? -1 : g.color }); } }
     }
-    const fired = [];
-    expand(b, clear, fired);
-    return { kind: 'clear', clear, made, fired, groups: gs.length };
+    const fired = [], hit = new Set();
+    expand(b, clear, fired, hit, mask);
+    neighbourHits(b, clear, hit, mask);
+    return { kind: 'clear', clear, made, fired, hit, groups: gs.length };
   }
-  function bombSwap(b, A, Z, at) {
-    const clear = new Set(), fired = [];
-    if (A.c < 0 && Z.c < 0) { for (let k = 0; k < N * N; k++) if (b[rc(k)[0]][rc(k)[1]]) clear.add(k); fired.push({ r: rc(at)[0], c: rc(at)[1], s: 'b', color: -1 }); }
-    else {
-      const other = A.c < 0 ? Z : A, bomb = A.c < 0 ? A : Z;
+  function bombSwap(b, A, Z, at, mask) {
+    const clear = new Set(), fired = [], hit = new Set();
+    if (A.c < 0 && Z.c < 0 && isBomb(A) && isBomb(Z)) {
+      for (let k = 0; k < N * N; k++) { const t = b[rc(k)[0]][rc(k)[1]]; if (t && !isHole(t) && !isIng(t)) { if (isBlock(t)) hit.add(k); else clear.add(k); } }
+      fired.push({ r: rc(at)[0], c: rc(at)[1], s: 'b', color: -1 });
+    } else {
+      const other = isBomb(A) ? Z : A, bomb = isBomb(A) ? A : Z;
       bomb.armed = true;
       for (let k = 0; k < N * N; k++) { const [r, c] = rc(k), t = b[r][c]; if (t === bomb || (t && t.c === other.c)) clear.add(k); }
       const bk = [...clear].find(k => b[rc(k)[0]][rc(k)[1]] === bomb);
       fired.push({ r: rc(bk)[0], c: rc(bk)[1], s: 'b', color: other.c });
-      expand(b, clear, fired);
+      expand(b, clear, fired, hit, mask);
+      neighbourHits(b, clear, hit, mask);
     }
-    return { kind: 'clear', clear, made: [], fired, groups: 1, bomb: true };
+    return { kind: 'clear', clear, made: [], fired, hit, groups: 1, bomb: true };
   }
-  function collapse(b, rand, kinds) {
+  function collapse(b, rand, kinds, mask) {
     const falls = [];
+    kinds = kinds || KINDS;
     for (let c = 0; c < N; c++) {
-      let w = N - 1;
-      for (let r = N - 1; r >= 0; r--) {
-        const t = b[r][c]; if (!t) continue;
-        if (r !== w) { b[w][c] = t; b[r][c] = null; falls.push({ t, r: w, c, from: r }); }
-        w--;
+      let r = N - 1;
+      while (r >= 0) {
+        while (r >= 0 && (!isOpen(mask, r, c) || isHole(b[r][c]))) r--;
+        if (r < 0) break;
+        if (isBlock(b[r][c])) { r--; continue; }
+        let top = r;
+        while (top - 1 >= 0 && isOpen(mask, top - 1, c) && !isHole(b[top - 1][c]) && !isBlock(b[top - 1][c])) top--;
+        const items = [];
+        for (let i = r; i >= top; i--) { if (b[i][c]) items.push({ t: b[i][c], from: i }); b[i][c] = null; }
+        let w = r;
+        for (const it of items) { b[w][c] = it.t; if (w !== it.from) falls.push({ t: it.t, r: w, c, from: it.from }); w--; }
+        let spawn = 0;
+        for (let i = w; i >= top; i--) {
+          spawn++;
+          const t = mk(randKind(rand, kinds));
+          b[i][c] = t;
+          falls.push({ t, r: i, c, from: top - spawn, fresh: true });
+        }
+        r = top - 1;
       }
-      for (let r = w; r >= 0; r--) { const t = mk(randKind(rand, kinds)); b[r][c] = t; falls.push({ t, r, c, from: r - (w + 1), fresh: true }); }
     }
     return falls;
   }
-  function applyStep(b, step, rand, kinds, cascade) {
+  function collectIngs(b, mask, st, step) {
+    let n = 0;
+    for (let c = 0; c < N; c++) {
+      let bottom = -1;
+      for (let r = N - 1; r >= 0; r--) if (isOpen(mask, r, c)) { bottom = r; break; }
+      if (bottom < 0) continue;
+      const t = b[bottom][c];
+      if (isIng(t)) {
+        (step.delivered || (step.delivered = [])).push({ t, r: bottom, c });
+        b[bottom][c] = null;
+        if (st) st.ingsLeft = Math.max(0, (st.ingsLeft || 0) - 1);
+        n++;
+      }
+    }
+    return n;
+  }
+  function applyStep(b, step, rand, kinds, cascade, st) {
+    const mask = st && st.mask;
+    const hit = step.hit || new Set();
     step.popped = [];
-    step.clear.forEach(k => { const [r, c] = rc(k), t = b[r][c]; if (t) step.popped.push({ id: t.id, r, c, color: t.c, s: t.s }); b[r][c] = null; });
-    step.madeTiles = step.made.map(m => { const [r, c] = rc(m.k), t = mk(m.color, m.s); b[r][c] = t; return { t, r, c }; });
+    step.delivered = step.delivered || [];
+    step.clear.forEach(k => {
+      const [r, c] = rc(k), t = b[r][c];
+      if (t && !isHole(t) && !isBlock(t)) {
+        step.popped.push({ id: t.id, r, c, color: t.c, s: t.s, lock: t.lock });
+        if (st && t.c >= 0) st.collected[t.c] = (st.collected[t.c] || 0) + 1;
+        b[r][c] = null;
+        if (st && st.jelly) st.jelly[r][c] = Math.max(0, (st.jelly[r][c] || 0) - 1);
+      }
+    });
+    step.blocked = [];
+    hit.forEach(k => {
+      const [r, c] = rc(k), t = b[r][c];
+      if (!t) return;
+      if (t.ice > 0) {
+        t.ice--;
+        step.blocked.push({ r, c, kind: 'ice', left: t.ice });
+        if (t.ice <= 0) { b[r][c] = null; if (st && st.jelly) st.jelly[r][c] = Math.max(0, (st.jelly[r][c] || 0) - 1); }
+      } else if (t.choco > 0) {
+        step.blocked.push({ r, c, kind: 'choco', left: 0 });
+        step.chocoHit = true;
+        b[r][c] = null;
+        if (st && st.jelly) st.jelly[r][c] = Math.max(0, (st.jelly[r][c] || 0) - 1);
+      }
+    });
+    step.madeTiles = (step.made || []).map(m => { const [r, c] = rc(m.k), t = mk(m.color, m.s); b[r][c] = t; return { t, r, c }; });
     step.cascade = cascade;
-    step.points = step.popped.length * PTS * cascade + step.made.reduce((n, m) => n + BONUS[m.s], 0);
-    step.falls = collapse(b, rand, kinds);
+    step.points = step.popped.length * PTS * cascade + (step.made || []).reduce((n, m) => n + (BONUS[m.s] || 0), 0);
+    step.falls = [];
+    for (let guard = 0; guard < 8; guard++) {
+      const f = collapse(b, rand, kinds, mask);
+      step.falls.push.apply(step.falls, f);
+      if (!collectIngs(b, mask, st, step)) break;
+    }
     return step;
   }
   function swapAt(b, a, z) { const t = b[a[0]][a[1]]; b[a[0]][a[1]] = b[z[0]][z[1]]; b[z[0]][z[1]] = t; }
-  function validSwap(b, a, z) {
+  function validSwap(b, a, z, mask) {
     if (!adj(a, z)) return false;
+    if (mask && (!isOpen(mask, a[0], a[1]) || !isOpen(mask, z[0], z[1]))) return false;
     const A = b[a[0]] && b[a[0]][a[1]], Z = b[z[0]] && b[z[0]][z[1]];
-    if (!A || !Z) return false;
-    if (A.c < 0 || Z.c < 0) return true;
+    if (!canSwap(A) || !canSwap(Z)) return false;
+    if (isBomb(A) || isBomb(Z)) return true;
     swapAt(b, a, z); const ok = findRuns(b).length > 0; swapAt(b, a, z);
     return ok;
   }
-  function findMove(b) {
+  function findMove(b, mask) {
     for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
-      if (c + 1 < N && validSwap(b, [r, c], [r, c + 1])) return [[r, c], [r, c + 1]];
-      if (r + 1 < N && validSwap(b, [r, c], [r + 1, c])) return [[r, c], [r + 1, c]];
+      if (c + 1 < N && validSwap(b, [r, c], [r, c + 1], mask)) return [[r, c], [r, c + 1]];
+      if (r + 1 < N && validSwap(b, [r, c], [r + 1, c], mask)) return [[r, c], [r + 1, c]];
     }
     return null;
   }
-  const hasMove = b => !!findMove(b);
-  function shuffle(b, rand, kinds) {
+  const hasMove = (b, mask) => !!findMove(b, mask);
+  function shuffle(b, rand, kinds, mask) {
     const cells = [], tiles = [];
-    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (b[r][c]) { cells.push([r, c]); tiles.push(b[r][c]); }
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+      const t = b[r][c];
+      if (isCandy(t) && !t.lock) { cells.push([r, c]); tiles.push(t); }
+    }
     for (let tries = 0; tries < 300; tries++) {
       for (let i = tiles.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); const x = tiles[i]; tiles[i] = tiles[j]; tiles[j] = x; }
       cells.forEach((p, i) => { b[p[0]][p[1]] = tiles[i]; });
-      if (!findRuns(b).length && hasMove(b)) return true;
+      if (!findRuns(b).length && hasMove(b, mask)) return true;
     }
-    // Too few colours left to rearrange: deal a fresh set of sweets.
-    const fresh = newBoard(rand, kinds);
-    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) b[r][c] = fresh[r][c];
+    const fresh = newBoard(rand, kinds, mask);
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+      if (isHole(b[r][c]) || isBlock(b[r][c]) || isIng(b[r][c]) || (b[r][c] && b[r][c].lock)) continue;
+      if (isOpen(mask, r, c)) b[r][c] = fresh[r][c];
+    }
     return true;
   }
-  function newBoard(rand, kinds) {
+  function newBoard(rand, kinds, mask) {
     kinds = kinds || KINDS;
     for (;;) {
       const b = [];
       for (let r = 0; r < N; r++) {
         b.push([]);
         for (let c = 0; c < N; c++) {
-          let k;
-          do { k = randKind(rand, kinds); } while ((c >= 2 && b[r][c - 1].c === k && b[r][c - 2].c === k) || (r >= 2 && b[r - 1][c].c === k && b[r - 2][c].c === k));
+          if (!isOpen(mask, r, c)) { b[r].push(HOLE); continue; }
+          let k, guard = 0;
+          do {
+            k = randKind(rand, kinds);
+            guard++;
+          } while (guard < 24 && (
+            (c >= 2 && isCandy(b[r][c - 1]) && b[r][c - 1].c === k && isCandy(b[r][c - 2]) && b[r][c - 2].c === k) ||
+            (r >= 2 && isCandy(b[r - 1][c]) && b[r - 1][c].c === k && isCandy(b[r - 2][c]) && b[r - 2][c].c === k)
+          ));
           b[r].push(mk(k));
         }
       }
-      if (hasMove(b)) return b;
+      if (hasMove(b, mask)) return b;
     }
   }
+  function decorate(board, lv, rand, kinds, mask) {
+    const grid = (rows, fn) => {
+      if (!rows) return;
+      for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+        const n = +(rows[r] && rows[r][c]) || 0;
+        if (n && isOpen(mask, r, c)) fn(r, c, n);
+      }
+    };
+    grid(lv.locks, (r, c) => { if (isCandy(board[r][c])) board[r][c].lock = 1; });
+    grid(lv.ice, (r, c, n) => { board[r][c] = Object.assign(mk(-4), { ice: n }); });
+    grid(lv.choco, (r, c) => { board[r][c] = Object.assign(mk(-5), { choco: 1 }); });
+    (lv.ings || []).forEach(([r, c]) => { if (isOpen(mask, r, c)) board[r][c] = Object.assign(mk(-3), { ing: 1 }); });
+    if (!hasMove(board, mask)) shuffle(board, rand, kinds, mask);
+    return board;
+  }
+  function countIngs(b) { let n = 0; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (isIng(b[r][c])) n++; return n; }
+  function jellyLeft(st) {
+    if (!st.jelly) return 0;
+    let n = 0; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) n += st.jelly[r][c] || 0;
+    return n;
+  }
+  function iceLeft(b) { let n = 0; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (b[r][c] && b[r][c].ice > 0) n += b[r][c].ice; return n; }
+  function chocoLeft(b) { let n = 0; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (b[r][c] && b[r][c].choco) n++; return n; }
+  function goalsMet(st) {
+    const lv = st.lv || LEVEL;
+    if (lv.target && st.score < lv.target) return false;
+    if (lv.jelly && jellyLeft(st) > 0) return false;
+    if (lv.ice && iceLeft(st.board) > 0) return false;
+    if (lv.collect && (st.collected[lv.collect.color] || 0) < lv.collect.n) return false;
+    if ((lv.ings && lv.ings.length) && (st.ingsLeft || 0) > 0) return false;
+    return true;
+  }
+  function spreadChoco(st) {
+    const b = st.board, mask = st.mask, spots = [], neigh = [];
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (b[r][c] && b[r][c].choco) spots.push([r, c]);
+    if (!spots.length) return null;
+    spots.forEach(([r, c]) => {
+      [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]].forEach(([i, j]) => {
+        if (!isOpen(mask, i, j)) return;
+        const t = b[i][j];
+        if (!t || isHole(t) || isBlock(t) || isIng(t)) return;
+        neigh.push([i, j]);
+      });
+    });
+    if (!neigh.length) return null;
+    const [i, j] = neigh[Math.floor(st.rand() * neigh.length)];
+    b[i][j] = Object.assign(mk(-5), { choco: 1 });
+    return { r: i, c: j };
+  }
   function starsFor(score, lv) { lv = lv || LEVEL; return lv.stars.filter(s => score >= s).length; }
+  function starsOf(st) {
+    if (!st.won) return 0;
+    return Math.max(1, starsFor(st.score, st.lv || LEVEL));
+  }
   function newGame(opt) {
     opt = opt || {};
+    const lv = lvOf(opt);
     const rand = opt.rand || rng(opt.seed == null ? Date.now() : opt.seed);
-    const kinds = opt.kinds || KINDS;
-    return { board: opt.board || newBoard(rand, kinds), rand, kinds, score: 0, moves: LEVEL.moves, target: LEVEL.target, over: false, won: false, stars: 0 };
+    const kinds = opt.kinds || lv.kinds || KINDS;
+    const mask = opt.mask || lv.mask || null;
+    let board = opt.board || newBoard(rand, kinds, mask);
+    if (!opt.board) board = decorate(board, lv, rand, kinds, mask);
+    return {
+      board, rand, kinds, mask, lv,
+      jelly: parseDigits(lv.jelly),
+      collected: new Array(KINDS).fill(0),
+      ingsLeft: countIngs(board),
+      score: 0, moves: lv.moves, target: lv.target || 0, over: false, won: false, stars: 0
+    };
   }
-  // One move: the swap, every cascade after it, and a shuffle if no moves are left. Returns the steps for the animation.
+  function isScoreOnly(lv) {
+    lv = lv || {};
+    return !lv.jelly && !lv.ice && !lv.collect && !(lv.ings && lv.ings.length);
+  }
+  function finishIfDone(st) {
+    const reached = goalsMet(st);
+    // Score-only levels (including level 1) play out every move, then award the win.
+    if (isScoreOnly(st.lv)) {
+      if (st.moves <= 0) { st.over = true; st.won = reached; st.stars = st.won ? starsOf(Object.assign({}, st, { won: true })) : 0; }
+      return;
+    }
+    if (reached) { st.won = true; st.over = true; st.stars = starsOf(st); return; }
+    if (st.moves <= 0) { st.over = true; st.won = false; st.stars = 0; }
+  }
   function play(st, a, z) {
-    const b = st.board;
-    if (st.over || !validSwap(b, a, z)) return { valid: false };
+    const b = st.board, mask = st.mask;
+    if (st.over || !validSwap(b, a, z, mask)) return { valid: false };
     const A = b[a[0]][a[1]], Z = b[z[0]][z[1]];
     swapAt(b, a, z);
     st.moves--;
     const steps = [];
     let cascade = 1;
-    if (A.c < 0 || Z.c < 0) { const s = applyStep(b, bombSwap(b, A, Z, key(z[0], z[1])), st.rand, st.kinds, cascade++); steps.push(s); st.score += s.points; }
+    if (isBomb(A) || isBomb(Z)) { const s = applyStep(b, bombSwap(b, A, Z, key(z[0], z[1]), mask), st.rand, st.kinds, cascade++, st); steps.push(s); st.score += s.points; }
     let pref = steps.length ? null : [z, a];
     for (let guard = 0; guard < 60; guard++) {
-      const s = resolve(b, pref); if (!s) break;
+      const s = resolve(b, pref, mask); if (!s) break;
       pref = null;
-      applyStep(b, s, st.rand, st.kinds, cascade++);
+      applyStep(b, s, st.rand, st.kinds, cascade++, st);
       steps.push(s); st.score += s.points;
     }
     let shuffled = false;
-    if (!hasMove(b)) { shuffle(b, st.rand, st.kinds); shuffled = true; }
-    if (st.moves <= 0) { st.over = true; st.won = st.score >= st.target; st.stars = starsFor(st.score); }
-    return { valid: true, steps, shuffled, swapped: [A, Z] };
+    if (!hasMove(b, mask)) { shuffle(b, st.rand, st.kinds, mask); shuffled = true; }
+    const chocoHit = steps.some(s => s.chocoHit);
+    const spread = (!chocoHit && chocoLeft(b)) ? spreadChoco(st) : null;
+    finishIfDone(st);
+    return { valid: true, steps, shuffled, swapped: [A, Z], spread };
   }
 
-  root.SugarRush = { N, KINDS, PTS, LEVEL, BONUS, NAMES, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, starsFor,
+  function cloneTile(t) {
+    if (!t) return null;
+    if (isHole(t)) return HOLE;
+    return Object.assign({}, t);
+  }
+  function cloneState(st) {
+    return {
+      board: st.board.map(row => row.map(cloneTile)),
+      rand: fork(st.rand),
+      kinds: st.kinds,
+      mask: st.mask,
+      lv: st.lv,
+      jelly: st.jelly ? st.jelly.map(r => r.slice()) : null,
+      collected: st.collected.slice(),
+      ingsLeft: st.ingsLeft,
+      score: st.score, moves: st.moves, target: st.target, over: st.over, won: st.won, stars: st.stars
+    };
+  }
+  function allMoves(st) {
+    const out = [], b = st.board, mask = st.mask;
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+      if (c + 1 < N && validSwap(b, [r, c], [r, c + 1], mask)) out.push([[r, c], [r, c + 1]]);
+      if (r + 1 < N && validSwap(b, [r, c], [r + 1, c], mask)) out.push([[r, c], [r + 1, c]]);
+    }
+    return out;
+  }
+  function heur(before, after, res) {
+    if (after.won) return 1e7 + after.score + after.moves * 50;
+    let h = after.score;
+    if (before.lv && before.lv.collect) h += ((after.collected[before.lv.collect.color] || 0) - (before.collected[before.lv.collect.color] || 0)) * 400;
+    if (before.jelly) h += (jellyLeft(before) - jellyLeft(after)) * 250;
+    if (before.lv && before.lv.ice) h += (iceLeft(before.board) - iceLeft(after.board)) * 300;
+    h += ((before.ingsLeft || 0) - (after.ingsLeft || 0)) * 800;
+    if (res && res.steps) h += res.steps.reduce((n, s) => n + (s.madeTiles ? s.madeTiles.length * 80 : 0), 0);
+    return h;
+  }
+  function bestMove(st) {
+    let best = null, bestH = -1e15;
+    const moves = allMoves(st);
+    for (const m of moves) {
+      const cl = cloneState(st);
+      const res = play(cl, m[0], m[1]);
+      if (!res.valid) continue;
+      const h = heur(st, cl, res);
+      if (h > bestH) { bestH = h; best = m; }
+    }
+    return best || findMove(st.board, st.mask);
+  }
+  function tryBeat(lv, seeds) {
+    let wins = 0;
+    for (let s = 1; s <= seeds; s++) {
+      const g = newGame({ level: lv, seed: s * 97 + lv.n * 13 });
+      let guard = 0;
+      while (!g.over && guard++ < 80) {
+        const m = bestMove(g); if (!m) break;
+        if (!play(g, m[0], m[1]).valid) break;
+      }
+      if (g.won) wins++;
+    }
+    return wins;
+  }
+
+  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, cloneState, bestMove, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
     allowed: () => !!(root.IBScores && root.IBScores.isShane && root.IBScores.isShane()) };
 
   if (!root.document) return;
@@ -233,20 +557,176 @@
     set(k, v) { try { root.localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } }
   };
   if (!root.SugarRush.allowed()) { $('soon').hidden = false; return; }
-  $('game').hidden = false;
 
   const reduce = root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const SP = reduce ? 0.35 : 1;
-  const cv = $('board'), ctx = cv.getContext('2d');
-  let W = 0, CS = 0, DPR = 1;
-  let st = newGame();
-  let best = ls.get('ib-sugar-best', 0);
-  let busy = false, sel = null, down = null, lastAct = performance.now();
-  let sprites = new Map(), fx = [];
   let soundOn = ls.get('ib-sugar-sound', true), musicOn = ls.get('ib-sugar-music', true);
+  let screen = 'map', lvNum = 1, st = null, pendingLv = 1;
+  let busy = false, sel = null, down = null, lastAct = performance.now();
+  let sprites = new Map(), fx = [], hintMove = null;
+  let winInfo = { newBadge: false, yum: false };
+
+  function loadProg() {
+    const p = ls.get('ib-sugar-progress', null) || {};
+    const stars = Array.isArray(p.stars) ? p.stars.slice(0, 10) : [];
+    const best = Array.isArray(p.best) ? p.best.slice(0, 10) : [];
+    const badges = Array.isArray(p.badges) ? p.badges.slice(0, 10) : [];
+    while (stars.length < 10) stars.push(0);
+    while (best.length < 10) best.push(0);
+    while (badges.length < 10) badges.push(0);
+    return { open: Math.max(1, Math.min(10, p.open || 1)), stars, best, badges };
+  }
+  function saveProg() { ls.set('ib-sugar-progress', prog); }
+  const prog = loadProg();
+
+  // ---------- Sound: one AudioContext for effects, music, menu and end songs ----------
+  // 1.9.159 played the loop with a standalone HTMLAudioElement. On iOS (and some phones)
+  // that media session ducks or silences Web Audio, so swaps and matches were inaudible
+  // while the music played. Everything now shares one context. Music is slightly quieter
+  // than the effects (about 6–8 dB) and stays soft and low.
+  const BGM_VOL = 0.12, END_VOL = 0.20, MENU_VOL = 0.12, SFX_OUT = 0.75, XF = 0.55;
+  const TRACKS = { game: 'sugar-rush-music.mp3', menu: 'sugar-rush-menu.mp3', win: 'sugar-rush-win.mp3', yum: 'sugar-rush-yum.mp3' };
+  let ac = null, out = null, musicGain = null, musicSoft = null;
+  let bufs = {}, loading = {}, musicSrc = null, musicKind = '', endSrc = null, ducked = false;
+
+  function audio() {
+    if (ac) { if (ac.state === 'suspended' || ac.state === 'interrupted') ac.resume().catch(() => { }); return ac; }
+    const A = root.AudioContext || root.webkitAudioContext; if (!A) return null;
+    ac = new A();
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900; lp.Q.value = 0.5;
+    out = ac.createGain(); out.gain.value = SFX_OUT; out.connect(lp); lp.connect(ac.destination);
+    musicGain = ac.createGain(); musicGain.gain.value = 0.0001;
+    musicSoft = ac.createBiquadFilter(); musicSoft.type = 'lowpass'; musicSoft.frequency.value = 2800; musicSoft.Q.value = 0.5;
+    musicGain.connect(musicSoft); musicSoft.connect(ac.destination);
+    return ac;
+  }
+  function loadBuf(kind) {
+    if (bufs[kind]) return Promise.resolve(bufs[kind]);
+    if (loading[kind]) return loading[kind];
+    if (!audio()) return Promise.resolve(null);
+    loading[kind] = fetch(TRACKS[kind]).then(r => r.arrayBuffer()).then(ab => ac.decodeAudioData(ab.slice(0))).then(b => { bufs[kind] = b; return b; }).catch(() => { loading[kind] = null; return null; });
+    return loading[kind];
+  }
+  function volFor(kind) { return kind === 'menu' ? MENU_VOL : BGM_VOL; }
+  function stopSrc(src, fade) {
+    if (!src || !ac) return;
+    try {
+      if (fade && musicGain) {
+        const t = ac.currentTime;
+        musicGain.gain.cancelScheduledValues(t);
+        musicGain.gain.setValueAtTime(Math.max(0.0001, musicGain.gain.value), t);
+        musicGain.gain.linearRampToValueAtTime(0.0001, t + fade);
+        setTimeout(() => { try { src.stop(); } catch (e) { } }, fade * 1000 + 30);
+      } else { src.stop(); }
+    } catch (e) { }
+  }
+  function startLoop(kind, fade) {
+    if (!ac || !bufs[kind] || !musicOn) return;
+    fade = fade == null ? XF : fade;
+    const t = ac.currentTime;
+    if (musicSrc && musicKind === kind && !ducked) return;
+    if (musicSrc && musicKind !== kind) { try { const old = musicSrc; musicGain.gain.cancelScheduledValues(t); musicGain.gain.setValueAtTime(Math.max(0.0001, musicGain.gain.value), t); musicGain.gain.linearRampToValueAtTime(0.0001, t + fade); setTimeout(() => { try { old.stop(); } catch (e) { } }, fade * 1000 + 30); } catch (e) { } }
+    const src = ac.createBufferSource();
+    src.buffer = bufs[kind]; src.loop = true; src.connect(musicGain);
+    try { src.start(0); } catch (e) { return; }
+    musicSrc = src; musicKind = kind; ducked = false;
+    const v = volFor(kind);
+    musicGain.gain.cancelScheduledValues(t);
+    if (fade && musicSrc) {
+      musicGain.gain.setValueAtTime(0.0001, t);
+      musicGain.gain.linearRampToValueAtTime(v, t + fade);
+    } else musicGain.gain.setValueAtTime(v, t);
+  }
+  function playKind(kind) {
+    if (!musicOn || !audio()) return;
+    const go = () => loadBuf(kind).then(() => { if (musicOn) startLoop(kind); });
+    if (ac.state === 'suspended' || ac.state === 'interrupted') ac.resume().then(go).catch(() => { });
+    else go();
+  }
+  function musicForScreen() { return (screen === 'game' && !$('end').hidden === false) || screen === 'game' ? ( $('end').hidden === false ? musicKind || 'game' : 'game') : 'menu'; }
+  function wantKind() { return screen === 'game' ? 'game' : 'menu'; }
+  function duckMusic() {
+    if (!ac || !musicGain) return;
+    const t = ac.currentTime;
+    ducked = true;
+    musicGain.gain.cancelScheduledValues(t);
+    musicGain.gain.setValueAtTime(Math.max(0.0001, musicGain.gain.value), t);
+    musicGain.gain.linearRampToValueAtTime(0.0001, t + 0.4);
+  }
+  function resumeMusic() {
+    if (!ac || !musicGain || !musicOn) return;
+    const t = ac.currentTime, v = volFor(wantKind());
+    ducked = false;
+    if (!musicSrc || musicKind !== wantKind()) { playKind(wantKind()); return; }
+    musicGain.gain.cancelScheduledValues(t);
+    musicGain.gain.setValueAtTime(Math.max(0.0001, musicGain.gain.value), t);
+    musicGain.gain.linearRampToValueAtTime(v, t + 0.5);
+  }
+  function stopEnd() {
+    if (endSrc) { try { endSrc.stop(); } catch (e) { } endSrc = null; }
+  }
+  function playEndSong(kind) {
+    if (!musicOn || !audio()) return;
+    duckMusic();
+    const go = () => loadBuf(kind).then(b => {
+      if (!b || !musicOn) return;
+      stopEnd();
+      const src = ac.createBufferSource();
+      const g = ac.createGain();
+      g.gain.value = END_VOL;
+      src.buffer = b; src.connect(g); g.connect(musicSoft || ac.destination);
+      try { src.start(0); } catch (e) { return; }
+      endSrc = src;
+      src.onended = () => { if (endSrc === src) endSrc = null; };
+    });
+    if (ac.state === 'suspended') ac.resume().then(go).catch(() => { }); else go();
+  }
+  function stopAllMusic() {
+    stopEnd();
+    if (musicSrc) { try { musicSrc.stop(); } catch (e) { } musicSrc = null; musicKind = ''; }
+    if (musicGain && ac) musicGain.gain.setValueAtTime(0.0001, ac.currentTime);
+    ducked = false;
+  }
+  function setMusic(on) {
+    musicOn = on; ls.set('ib-sugar-music', on); paintButtons();
+    if (on) playKind(wantKind()); else stopAllMusic();
+  }
+  function unlockAudio() {
+    if (!audio()) return;
+    const p = (ac.state === 'suspended' || ac.state === 'interrupted') ? ac.resume() : Promise.resolve();
+    p.then(() => { if (musicOn) playKind(wantKind()); }).catch(() => { });
+  }
+
+  const SCALE = [65.4, 73.4, 82.4, 98, 110, 130.8, 146.8, 164.8, 196, 220, 261.6, 293.7, 329.6, 392];
+  function note(f, at, dur, vol, type, dest) {
+    if (!ac) return;
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type || 'sine'; o.frequency.value = Math.min(f, 392);
+    g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(vol, at + 0.04); g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    o.connect(g); g.connect(dest || out); o.start(at); o.stop(at + dur + 0.05);
+  }
+  function sfx(kind, n) {
+    if (!soundOn || !audio()) return;
+    const go = () => {
+      if (!out) return;
+      const t = ac.currentTime + 0.01;
+      if (kind === 'swap') note(SCALE[5], t, .22, .10, 'triangle');
+      else if (kind === 'nope') { note(SCALE[4], t, .2, .10, 'sine'); note(SCALE[3], t + .14, .26, .10, 'sine'); }
+      else if (kind === 'pop') { const i = Math.min(SCALE.length - 1, 6 + n); note(SCALE[i], t, .32, .13, 'sine'); note(SCALE[Math.max(0, i - 5)], t, .36, .08, 'triangle'); }
+      else if (kind === 'special') { [5, 7, 8].forEach((i, j) => note(SCALE[i], t + j * .06, .6, .08, 'triangle')); }
+      else if (kind === 'blast') { note(SCALE[0], t, .5, .14, 'sine'); note(SCALE[5], t + .02, .45, .07, 'triangle'); }
+      else if (kind === 'win') { [5, 7, 8, 10, 12].forEach((i, j) => note(SCALE[i], t + j * .16, .7, .10, 'triangle')); note(SCALE[0], t, 1.4, .09, 'sine'); }
+      else if (kind === 'lose') { [8, 7, 5].forEach((i, j) => note(SCALE[i], t + j * .2, .6, .09, 'sine')); }
+      else if (kind === 'badge') { [5, 8, 10, 12].forEach((i, j) => note(SCALE[i], t + j * .12, .8, .10, 'triangle')); }
+    };
+    if (ac.state === 'suspended' || ac.state === 'interrupted') ac.resume().then(go).catch(() => { });
+    else go();
+  }
 
   // ---------- Look ----------
   const COL = [['#ff8a9a', '#e0284a', '#9e1030'], ['#ffc078', '#f76707', '#b34700'], ['#fff3a0', '#fcc419', '#c98e00'], ['#9ff0a8', '#37b24d', '#1d7a30'], ['#a5dcff', '#228be6', '#124f99'], ['#e2b6ff', '#9c36b5', '#5f1a75']];
+  const cv = $('board'), ctx = cv.getContext('2d');
+  let W = 0, CS = 0, DPR = 1;
   function rr(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
   function shapePath(k, R) {
     ctx.beginPath();
@@ -257,9 +737,35 @@
     else if (k === 4) { const q = [[0, -R * 1.05], [R * .95, 0], [0, R * 1.05], [-R * .95, 0]]; ctx.moveTo((q[3][0] + q[0][0]) / 2, (q[3][1] + q[0][1]) / 2); for (let i = 0; i < 4; i++) { const a = q[i], n = q[(i + 1) % 4]; ctx.arcTo(a[0], a[1], n[0], n[1], R * .25); } ctx.closePath(); }
     else { ctx.arc(0, 0, R * .78, 0, Math.PI * 2); }
   }
+  function drawHeart(x, y, s, col) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+    ctx.beginPath(); ctx.moveTo(0, 8);
+    ctx.bezierCurveTo(-12, -2, -8, -12, 0, -6);
+    ctx.bezierCurveTo(8, -12, 12, -2, 0, 8);
+    ctx.fillStyle = col; ctx.fill(); ctx.restore();
+  }
   function drawSweet(t, x, y, R, sc, al, wob) {
     ctx.save(); ctx.translate(x, y); if (wob) ctx.rotate(wob); ctx.scale(sc, sc); ctx.globalAlpha = al;
-    if (t.c < 0) { // sprinkle bomb
+    if (t.ing) {
+      ctx.fillStyle = '#c45c2e'; rr(-R * .7, -R * .55, R * 1.4, R * 1.2, R * .18); ctx.fill();
+      ctx.fillStyle = '#e8b04a'; rr(-R * .7, -R * .55, R * 1.4, R * .4, R * .16); ctx.fill();
+      ctx.fillStyle = '#fff6c8'; ctx.fillRect(-R * .08, -R * .7, R * .16, R * 1.35);
+      ctx.restore(); return;
+    }
+    if (t.ice > 0) {
+      const g = ctx.createLinearGradient(-R, -R, R, R);
+      g.addColorStop(0, t.ice > 1 ? 'rgba(230,248,255,.95)' : 'rgba(210,240,255,.85)');
+      g.addColorStop(1, 'rgba(160,210,240,.8)');
+      ctx.fillStyle = g; rr(-R * .85, -R * .85, R * 1.7, R * 1.7, R * .28); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = R * .08; rr(-R * .85, -R * .85, R * 1.7, R * 1.7, R * .28); ctx.stroke();
+      ctx.restore(); return;
+    }
+    if (t.choco) {
+      ctx.fillStyle = '#6b3a1f'; rr(-R * .85, -R * .85, R * 1.7, R * 1.7, R * .2); ctx.fill();
+      ctx.fillStyle = '#4a2414'; rr(-R * .6, -R * .6, R * 1.2, R * 1.2, R * .12); ctx.fill();
+      ctx.restore(); return;
+    }
+    if (t.c < 0) {
       const g = ctx.createRadialGradient(-R * .3, -R * .35, R * .1, 0, 0, R);
       g.addColorStop(0, '#9a6a4f'); g.addColorStop(.6, '#5b3423'); g.addColorStop(1, '#3a1f14');
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R * .95, 0, Math.PI * 2); ctx.fill();
@@ -267,7 +773,7 @@
       ctx.restore(); return;
     }
     const c = COL[t.c];
-    if (t.c === 5) { // twisted wrapper ends
+    if (t.c === 5) {
       ctx.fillStyle = c[1];
       for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(s * R * .6, 0); ctx.lineTo(s * R * 1.08, -R * .45); ctx.quadraticCurveTo(s * R * .95, 0, s * R * 1.08, R * .45); ctx.closePath(); ctx.fill(); }
     }
@@ -281,205 +787,305 @@
       ctx.restore();
     }
     ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.beginPath(); ctx.ellipse(-R * .3, -R * .42, R * .3, R * .15, -.5, 0, Math.PI * 2); ctx.fill();
+    if (t.lock) {
+      ctx.fillStyle = 'rgba(70,40,20,.8)'; rr(-R * .28, -R * .05, R * .56, R * .45, R * .08); ctx.fill();
+      ctx.strokeStyle = 'rgba(70,40,20,.8)'; ctx.lineWidth = R * .1; ctx.beginPath(); ctx.arc(0, -R * .08, R * .2, Math.PI, 0); ctx.stroke();
+    }
     ctx.restore();
   }
   function cellXY(r, c) { return [c * CS + CS / 2, r * CS + CS / 2]; }
-
-  // ---------- Sprites and animation ----------
   const now = () => performance.now();
   const easeOut = x => 1 - Math.pow(1 - x, 3), easeIn = x => x * x;
   function sprite(t, r, c) { const s = { t, r, c, y: r, x: c, sc: 1, al: 1, tw: null }; sprites.set(t.id, s); return s; }
   function moveTo(s, r, c, dur, ease) { s.tw = { fx: s.x, fy: s.y, tx: c, ty: r, t0: now(), dur: Math.max(1, dur * SP), ease: ease || easeOut }; s.r = r; s.c = c; }
-  function syncAll() { sprites = new Map(); for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) { const t = st.board[r][c]; if (t) sprite(t, r, c); } }
+  function syncAll() { sprites = new Map(); if (!st) return; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) { const t = st.board[r][c]; if (t && !isHole(t)) sprite(t, r, c); } }
   const wait = ms => new Promise(res => setTimeout(res, ms * SP));
   function fitCanvas() {
+    if (!cv) return;
     const w = Math.floor(cv.getBoundingClientRect().width) || 320;
     DPR = Math.min(2.5, root.devicePixelRatio || 1);
     cv.width = Math.round(w * DPR); cv.height = cv.width; W = cv.width; CS = W / N;
   }
   function frame() {
-    const t = now();
-    ctx.clearRect(0, 0, W, W);
-    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) { ctx.fillStyle = (r + c) % 2 ? 'rgba(255,255,255,.55)' : 'rgba(255,228,240,.7)'; rr(c * CS + 1.5, r * CS + 1.5, CS - 3, CS - 3, CS * .18); ctx.fill(); }
-    if (sel && !busy) { ctx.strokeStyle = '#ff4f9a'; ctx.lineWidth = 3 * DPR; rr(sel[1] * CS + 3, sel[0] * CS + 3, CS - 6, CS - 6, CS * .2); ctx.stroke(); }
-    for (const f of fx) if (f.type === 'beam') {
-      const p = Math.min(1, (t - f.t0) / f.dur); ctx.fillStyle = 'rgba(255,255,255,' + (0.7 * (1 - p)) + ')';
-      if (f.s === 'row') ctx.fillRect(0, f.r * CS + CS * (.5 - .4 * (1 - p)), W, CS * .8 * (1 - p)); else ctx.fillRect(f.c * CS + CS * (.5 - .4 * (1 - p)), 0, CS * .8 * (1 - p), W);
-    } else if (f.type === 'ring') {
-      const p = Math.min(1, (t - f.t0) / f.dur); ctx.strokeStyle = 'rgba(255,255,255,' + (0.8 * (1 - p)) + ')'; ctx.lineWidth = CS * .2 * (1 - p);
-      ctx.beginPath(); ctx.arc(f.x, f.y, CS * (.4 + 1.3 * p), 0, Math.PI * 2); ctx.stroke();
+    if (screen === 'game' && st) {
+      const t = now();
+      ctx.clearRect(0, 0, W, W);
+      const sarah = st.lv && st.lv.theme === 'sarah';
+      for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+        const open = isOpen(st.mask, r, c);
+        if (!open) {
+          if (sarah) drawHeart(c * CS + CS / 2, r * CS + CS / 2, CS * .018, 'rgba(255,140,180,.22)');
+          continue;
+        }
+        const jelly = st.jelly ? (st.jelly[r][c] || 0) : 0;
+        ctx.fillStyle = jelly >= 2 ? 'rgba(180,80,200,.35)' : jelly === 1 ? 'rgba(255,120,190,.28)' : ((r + c) % 2 ? 'rgba(255,255,255,.55)' : 'rgba(255,228,240,.7)');
+        rr(c * CS + 1.5, r * CS + 1.5, CS - 3, CS - 3, CS * .18); ctx.fill();
+        if (jelly) { ctx.strokeStyle = jelly >= 2 ? 'rgba(140,40,180,.55)' : 'rgba(230,70,150,.45)'; ctx.lineWidth = 2 * DPR; rr(c * CS + 4, r * CS + 4, CS - 8, CS - 8, CS * .16); ctx.stroke(); }
+      }
+      if (sel && !busy) { ctx.strokeStyle = '#ff4f9a'; ctx.lineWidth = 3 * DPR; rr(sel[1] * CS + 3, sel[0] * CS + 3, CS - 6, CS - 6, CS * .2); ctx.stroke(); }
+      for (const f of fx) if (f.type === 'beam') {
+        const p = Math.min(1, (t - f.t0) / f.dur); ctx.fillStyle = 'rgba(255,255,255,' + (0.7 * (1 - p)) + ')';
+        if (f.s === 'row') ctx.fillRect(0, f.r * CS + CS * (.5 - .4 * (1 - p)), W, CS * .8 * (1 - p)); else ctx.fillRect(f.c * CS + CS * (.5 - .4 * (1 - p)), 0, CS * .8 * (1 - p), W);
+      } else if (f.type === 'ring') {
+        const p = Math.min(1, (t - f.t0) / f.dur); ctx.strokeStyle = 'rgba(255,255,255,' + (0.8 * (1 - p)) + ')'; ctx.lineWidth = CS * .2 * (1 - p);
+        ctx.beginPath(); ctx.arc(f.x, f.y, CS * (.4 + 1.3 * p), 0, Math.PI * 2); ctx.stroke();
+      }
+      const hint = !busy && !st.over && t - lastAct > 6000 ? hintMove : null;
+      const R = CS * .37;
+      for (const s of sprites.values()) {
+        if (s.tw) { const p = Math.min(1, (t - s.tw.t0) / s.tw.dur), e = s.tw.ease(p); s.x = s.tw.fx + (s.tw.tx - s.tw.fx) * e; s.y = s.tw.fy + (s.tw.ty - s.tw.fy) * e; if (p >= 1) s.tw = null; }
+        if (s.pop) { const p = Math.min(1, (t - s.pop) / (220 * SP)); s.sc = 1 + .25 * p; s.al = 1 - p; }
+        if (s.grow) { const p = Math.min(1, (t - s.grow) / (260 * SP)); s.sc = .3 + .7 * easeOut(p); if (p >= 1) s.grow = 0; }
+        if (s.y < -0.5) continue;
+        let wob = 0;
+        if (hint && hint.some(h => h[0] === s.r && h[1] === s.c)) wob = Math.sin(t / 180) * .12;
+        drawSweet(s.t, s.x * CS + CS / 2, s.y * CS + CS / 2, R, s.sc, s.al, wob);
+      }
+      for (const f of fx) if (f.type === 'bit') {
+        const p = Math.min(1, (t - f.t0) / f.dur); ctx.globalAlpha = 1 - p; ctx.fillStyle = f.col;
+        ctx.beginPath(); ctx.arc(f.x + f.vx * p * CS, f.y + f.vy * p * CS + p * p * CS * .5, CS * .07 * (1 - p * .5), 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+      } else if (f.type === 'text') {
+        const p = Math.min(1, (t - f.t0) / f.dur); ctx.globalAlpha = p < .7 ? 1 : (1 - p) / .3;
+        ctx.font = '800 ' + Math.round(f.size * DPR) + 'px ui-rounded, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.lineWidth = 5 * DPR; ctx.strokeStyle = 'rgba(120,20,70,.85)'; ctx.strokeText(f.str, f.x, f.y - p * CS * .8); ctx.fillStyle = f.col || '#fff'; ctx.fillText(f.str, f.x, f.y - p * CS * .8); ctx.globalAlpha = 1;
+      }
+      fx = fx.filter(f => t - f.t0 < f.dur);
+      for (const [id, s] of sprites) if (s.pop && t - s.pop > 230 * SP) sprites.delete(id);
     }
-    const hint = !busy && !st.over && t - lastAct > 6000 ? hintMove : null;
-    const R = CS * .37;
-    for (const s of sprites.values()) {
-      if (s.tw) { const p = Math.min(1, (t - s.tw.t0) / s.tw.dur), e = s.tw.ease(p); s.x = s.tw.fx + (s.tw.tx - s.tw.fx) * e; s.y = s.tw.fy + (s.tw.ty - s.tw.fy) * e; if (p >= 1) s.tw = null; }
-      if (s.pop) { const p = Math.min(1, (t - s.pop) / (220 * SP)); s.sc = 1 + .25 * p; s.al = 1 - p; }
-      if (s.grow) { const p = Math.min(1, (t - s.grow) / (260 * SP)); s.sc = .3 + .7 * easeOut(p); if (p >= 1) s.grow = 0; }
-      if (s.y < -0.5) continue;
-      let wob = 0;
-      if (hint && hint.some(h => h[0] === s.r && h[1] === s.c)) wob = Math.sin(t / 180) * .12;
-      drawSweet(s.t, s.x * CS + CS / 2, s.y * CS + CS / 2, R, s.sc, s.al, wob);
-    }
-    for (const f of fx) if (f.type === 'bit') {
-      const p = Math.min(1, (t - f.t0) / f.dur); ctx.globalAlpha = 1 - p; ctx.fillStyle = f.col;
-      ctx.beginPath(); ctx.arc(f.x + f.vx * p * CS, f.y + f.vy * p * CS + p * p * CS * .5, CS * .07 * (1 - p * .5), 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
-    } else if (f.type === 'text') {
-      const p = Math.min(1, (t - f.t0) / f.dur); ctx.globalAlpha = p < .7 ? 1 : (1 - p) / .3;
-      ctx.font = '800 ' + Math.round(f.size * DPR) + 'px ui-rounded, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.lineWidth = 5 * DPR; ctx.strokeStyle = 'rgba(120,20,70,.85)'; ctx.strokeText(f.str, f.x, f.y - p * CS * .8); ctx.fillStyle = f.col || '#fff'; ctx.fillText(f.str, f.x, f.y - p * CS * .8); ctx.globalAlpha = 1;
-    }
-    fx = fx.filter(f => t - f.t0 < f.dur);
-    for (const [id, s] of sprites) if (s.pop && t - s.pop > 230 * SP) sprites.delete(id);
     root.requestAnimationFrame(frame);
   }
-  let hintMove = null;
 
-  // ---------- Sound (soft and low only) ----------
-  let ac = null, out = null;
-  function audio() {
-    if (ac) { if (ac.state === 'suspended') ac.resume().catch(() => { }); return ac; }
-    const A = root.AudioContext || root.webkitAudioContext; if (!A) return null;
-    ac = new A();
-    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900; lp.Q.value = 0.5;
-    out = ac.createGain(); out.gain.value = 0.55; out.connect(lp); lp.connect(ac.destination);
-    return ac;
+  function paintButtons() {
+    const s = soundOn ? '🔉 Sound on' : '🔇 Sound off', m = musicOn ? '🎵 Music on' : '🎵 Music off';
+    if ($('soundbtn')) $('soundbtn').textContent = s;
+    if ($('musicbtn')) $('musicbtn').textContent = m;
+    if ($('mapsound')) $('mapsound').textContent = s;
+    if ($('mapmusic')) $('mapmusic').textContent = m;
   }
-  // C major pentatonic, octaves 2–4 (65–392 Hz). Every sound is built from these, so nothing is high or sharp.
-  const SCALE = [65.4, 73.4, 82.4, 98, 110, 130.8, 146.8, 164.8, 196, 220, 261.6, 293.7, 329.6, 392];
-  function note(f, at, dur, vol, type, dest) {
-    if (!ac) return;
-    const o = ac.createOscillator(), g = ac.createGain();
-    o.type = type || 'sine'; o.frequency.value = Math.min(f, 400);
-    g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(vol, at + 0.04); g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
-    o.connect(g); g.connect(dest || out); o.start(at); o.stop(at + dur + 0.05);
+  function objText(g) {
+    if (!g || !g.lv) return '';
+    const lv = g.lv, bits = [];
+    if (lv.target) bits.push('Score ' + g.score.toLocaleString('en-NZ') + ' / ' + lv.target.toLocaleString('en-NZ'));
+    if (lv.collect) bits.push((NAMES[lv.collect.color] || 'Sweets') + ' ' + (g.collected[lv.collect.color] || 0) + ' / ' + lv.collect.n);
+    if (lv.jelly) bits.push('Jelly ' + jellyLeft(g) + ' left');
+    if (lv.ice) bits.push('Icing ' + iceLeft(g.board) + ' left');
+    if (lv.ings && lv.ings.length) bits.push('Ingredients ' + ((lv.ings.length - (g.ingsLeft || 0))) + ' / ' + lv.ings.length);
+    return bits.join(' · ');
   }
-  function sfx(kind, n) {
-    if (!soundOn || !audio()) return;
-    const t = ac.currentTime + 0.01;
-    if (kind === 'swap') note(SCALE[5], t, .22, .07, 'triangle');
-    else if (kind === 'nope') { note(SCALE[4], t, .2, .07, 'sine'); note(SCALE[3], t + .14, .26, .07, 'sine'); }
-    else if (kind === 'pop') { const i = Math.min(SCALE.length - 1, 6 + n); note(SCALE[i], t, .32, .09, 'sine'); note(SCALE[i - 5], t, .36, .06, 'triangle'); }
-    else if (kind === 'special') { [5, 7, 8].forEach((i, j) => note(SCALE[i], t + j * .06, .6, .06, 'triangle')); }
-    else if (kind === 'blast') { note(SCALE[0], t, .5, .12, 'sine'); note(SCALE[5], t + .02, .45, .05, 'triangle'); }
-    else if (kind === 'win') { [5, 7, 8, 10, 12].forEach((i, j) => note(SCALE[i], t + j * .16, .7, .08, 'triangle')); note(SCALE[0], t, 1.4, .08, 'sine'); }
-    else if (kind === 'lose') { [8, 7, 5].forEach((i, j) => note(SCALE[i], t + j * .2, .6, .07, 'sine')); }
-  }
-  // 1.9.159 Shane's looping track replaces the old synth music. It starts after a user tap
-  // (browsers block autoplay with sound). The toggle mutes it and is remembered in localStorage.
-  // File RMS 0.156 (−16.1 dB). BGM_VOL 0.10 → RMS 0.0156 (−36.1 dB).
-  // A pop is out.gain 0.55 * 0.09, sine RMS 0.035 (−29.1 dB) → about +7 dB vs the music.
-  // A swap is 0.027 (−31.3 dB) → about +5 dB. Sounds stay above the music, and still soft and low.
-  const BGM_VOL = 0.10;
-  let bgm = null, bgmWant = false;
-  function bgmEl() {
-    if (!bgm && root.Audio) { bgm = new root.Audio(); bgm.loop = true; bgm.preload = 'auto'; bgm.src = 'sugar-rush-music.mp3'; bgm.volume = BGM_VOL; }
-    return bgm;
-  }
-  function playMusic() {
-    const a = bgmEl(); if (!a || !musicOn) return;
-    a.volume = BGM_VOL;
-    if (!bgmWant || a.paused) {
-      bgmWant = true;
-      try { const p = a.play(); if (p && p.catch) p.catch(() => { bgmWant = false; }); } catch (e) { bgmWant = false; }
-    }
-  }
-  function stopMusic() {
-    bgmWant = false;
-    if (bgm) { try { bgm.pause(); } catch (e) { } }
-  }
-  function setMusic(on) {
-    musicOn = on; ls.set('ib-sugar-music', on); paintButtons();
-    if (on) playMusic(); else stopMusic();
-  }
-  function unlockAudio() { audio(); if (musicOn) playMusic(); }
-
-  // ---------- HUD ----------
-  function paintButtons() { $('soundbtn').textContent = soundOn ? '🔉 Sound on' : '🔇 Sound off'; $('musicbtn').textContent = musicOn ? '🎵 Music on' : '🎵 Music off'; }
   function hud() {
+    if (!st) return;
     $('score').textContent = st.score.toLocaleString('en-NZ');
     $('moves').textContent = st.moves;
-    $('best').textContent = Math.max(best, 0).toLocaleString('en-NZ');
-    const max = LEVEL.stars[2], p = Math.min(1, st.score / max);
+    $('best').textContent = Math.max(prog.best[st.lv.n - 1] || 0, st.score).toLocaleString('en-NZ');
+    $('obj').textContent = objText(st);
+    const stars = st.lv.stars, max = stars[2] || 1, p = Math.min(1, st.score / max);
     $('fill').style.width = (p * 100).toFixed(1) + '%';
-    LEVEL.stars.forEach((s, i) => { const el = $('st' + i); el.style.left = (s / max * 100) + '%'; el.classList.toggle('got', st.score >= s); });
+    stars.forEach((s, i) => { const el = $('st' + i); el.style.left = (s / max * 100) + '%'; el.classList.toggle('got', st.score >= s && (s > 0 || st.won)); });
   }
   function praise(step, i) {
-    const words = ['', '', 'Yum!', 'Sweet!', 'Super sweet!', 'Sugar rush!'];
+    const sarah = st && st.lv && st.lv.theme === 'sarah';
+    const words = sarah ? ['', '', 'Lovely!', 'Sweet!', 'For Sarah!', 'Sugar rush!'] : ['', '', 'Yum!', 'Sweet!', 'Super sweet!', 'Sugar rush!'];
     return words[Math.min(words.length - 1, i + 1)];
   }
 
-  // ---------- A move ----------
+  function renderMap() {
+    const path = $('path'), shelf = $('shelf');
+    path.innerHTML = '';
+    LEVELS.forEach((lv, i) => {
+      const n = i + 1, open = n <= prog.open, stars = prog.stars[i] || 0;
+      const b = doc.createElement('button');
+      b.type = 'button'; b.className = 'lv' + (lv.theme === 'sarah' ? ' sarah' : '') + (open ? ' open' : '') + (stars ? ' done' : '');
+      b.disabled = !open;
+      b.innerHTML = '<span class="no">' + (lv.theme === 'sarah' ? '💖' : n) + '</span><span class="st">' + [0, 1, 2].map(k => '<span class="' + (k < stars ? 'on' : '') + '">★</span>').join('') + '</span>';
+      b.setAttribute('aria-label', (open ? 'Play ' : 'Locked: ') + lv.name + (stars ? ', ' + stars + ' stars' : ''));
+      if (open) b.addEventListener('click', () => { unlockAudio(); openLevel(n); });
+      path.appendChild(b);
+    });
+    shelf.innerHTML = '';
+    LEVELS.forEach((lv, i) => {
+      const got = !!(prog.badges[i]);
+      const el = doc.createElement('div');
+      el.className = 'badge' + (got ? ' got' : '') + (lv.badge && lv.badge.special ? ' heart' : '');
+      el.innerHTML = '<i>' + (got ? lv.badge.icon : '·') + '</i><b>' + (got ? lv.badge.name : 'Level ' + (i + 1)) + '</b>';
+      shelf.appendChild(el);
+    });
+  }
+  function showMap() {
+    stopEnd();
+    screen = 'map';
+    $('game').hidden = true; $('intro').hidden = true; $('end').hidden = true; $('map').hidden = false;
+    doc.body.classList.remove('sarah');
+    renderMap(); paintButtons();
+    if (musicOn) playKind('menu');
+  }
+  function openLevel(n) {
+    const lv = LEVELS[n - 1]; if (!lv || n > prog.open) return;
+    pendingLv = n;
+    if (lv.intro) {
+      $('introtitle').textContent = lv.intro.title;
+      $('introbody').textContent = lv.intro.body;
+      $('introbtn').textContent = 'Play level ' + n;
+      $('intro').hidden = false;
+      return;
+    }
+    startLevel(n);
+  }
+  function startLevel(n) {
+    $('intro').hidden = true; $('end').hidden = true; $('map').hidden = true; $('game').hidden = false;
+    screen = 'game';
+    lvNum = n;
+    const lv = LEVELS[n - 1];
+    doc.body.classList.toggle('sarah', lv.theme === 'sarah');
+    $('lvname').textContent = 'Level ' + n + ' · ' + lv.name;
+    $('help').textContent = lv.help;
+    st = newGame({ level: lv });
+    sel = null; busy = false; lastAct = now();
+    fitCanvas(); syncAll(); hud();
+    hintMove = findMove(st.board, st.mask);
+    for (const s of sprites.values()) { s.y = s.r - N - 1 + (N - s.r) * .2; moveTo(s, s.r, s.c, 300 + (N - s.r) * 40, easeOut); }
+    if (musicOn) playKind('game');
+  }
+
   async function attempt(a, z) {
-    if (busy || st.over) return;
+    if (busy || !st || st.over) return;
+    const At = st.board[a[0]][a[1]], Zt = st.board[z[0]][z[1]];
+    if (!At || !Zt || isHole(At) || isHole(Zt)) return;
     sel = null; busy = true; lastAct = now(); hintMove = null;
-    const A = sprites.get(st.board[a[0]][a[1]].id), Z = sprites.get(st.board[z[0]][z[1]].id);
+    const A = sprites.get(At.id), Z = sprites.get(Zt.id);
     const res = play(st, a, z);
     sfx('swap');
-    moveTo(A, z[0], z[1], 160); moveTo(Z, a[0], a[1], 160);
+    if (A) moveTo(A, z[0], z[1], 160); if (Z) moveTo(Z, a[0], a[1], 160);
     await wait(170);
-    if (!res.valid) { sfx('nope'); moveTo(A, a[0], a[1], 180); moveTo(Z, z[0], z[1], 180); await wait(190); busy = false; return; }
+    if (!res.valid) { sfx('nope'); if (A) moveTo(A, a[0], a[1], 180); if (Z) moveTo(Z, z[0], z[1], 180); await wait(190); busy = false; return; }
     hud();
     for (let i = 0; i < res.steps.length; i++) await showStep(res.steps[i], i);
-    if (res.shuffled) { addText('Shuffle!', W / 2, W / 2, 30, '#fff'); await wait(450); for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) { const t = st.board[r][c], s = sprites.get(t.id) || sprite(t, r, c); moveTo(s, r, c, 420); } await wait(440); }
+    if (res.spread) { const t = st.board[res.spread.r][res.spread.c]; if (t) { const s = sprite(t, res.spread.r, res.spread.c); s.grow = now(); } }
+    if (res.shuffled) {
+      addText('Shuffle!', W / 2, W / 2, 30, '#fff'); await wait(450);
+      for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+        const t = st.board[r][c]; if (!t || isHole(t)) continue;
+        const s = sprites.get(t.id) || sprite(t, r, c); moveTo(s, r, c, 420);
+      }
+      await wait(440);
+    }
     hud();
-    hintMove = findMove(st.board);
+    hintMove = findMove(st.board, st.mask);
     busy = false; lastAct = now();
     if (st.over) finish();
   }
   function addText(str, x, y, size, col) { fx.push({ type: 'text', str, x, y, size, col, t0: now(), dur: 900 * SP }); }
   async function showStep(s, i) {
     const t = now();
-    let cx = 0, cy = 0;
+    let cx = 0, cy = 0, n = 0;
     for (const p of s.popped) {
       const sp = sprites.get(p.id); if (sp) sp.pop = t;
-      const [x, y] = cellXY(p.r, p.c); cx += x; cy += y;
+      const [x, y] = cellXY(p.r, p.c); cx += x; cy += y; n++;
       if (p.color >= 0 && !reduce) for (let k = 0; k < 4; k++) { const a = Math.random() * Math.PI * 2; fx.push({ type: 'bit', x, y, vx: Math.cos(a) * .6, vy: Math.sin(a) * .6 - .3, col: COL[p.color][1], t0: t, dur: 480 }); }
     }
-    for (const f of s.fired) {
+    for (const f of s.fired || []) {
       if (f.s === 'row' || f.s === 'col') fx.push({ type: 'beam', s: f.s, r: f.r, c: f.c, t0: t, dur: 420 * SP });
       else { const [x, y] = cellXY(f.r, f.c); fx.push({ type: 'ring', x, y, t0: t, dur: 480 * SP }); }
     }
-    if (s.fired.length) sfx('blast'); else sfx('pop', i);
-    if (s.madeTiles.length) setTimeout(() => sfx('special'), 120 * SP);
-    if (s.popped.length) addText('+' + s.points, cx / s.popped.length, cy / s.popped.length, 22, '#fff');
-    const word = s.fired.length ? (i >= 1 ? praise(s, i + 1) : 'Pow!') : praise(s, i);
+    if (s.fired && s.fired.length) sfx('blast'); else sfx('pop', i);
+    if (s.madeTiles && s.madeTiles.length) setTimeout(() => sfx('special'), 120 * SP);
+    if (n) addText('+' + s.points, cx / n, cy / n, 22, '#fff');
+    const word = (s.fired && s.fired.length) ? (i >= 1 ? praise(s, i + 1) : 'Pow!') : praise(s, i);
     if (word) addText(word, W / 2, W * .42, 34, '#ffe066');
-    for (const m of s.madeTiles) { const sp = sprite(m.t, m.r, m.c); sp.grow = t; }
+    for (const m of s.madeTiles || []) { const sp = sprite(m.t, m.r, m.c); sp.grow = t; }
+    if (s.delivered) for (const d of s.delivered) { const sp = sprites.get(d.t.id); if (sp) sp.pop = t; addText('Got it!', cellXY(d.r, d.c)[0], cellXY(d.r, d.c)[1], 20, '#ffe066'); }
     await wait(230);
     let longest = 0;
-    for (const f of s.falls) {
+    for (const f of s.falls || []) {
       let sp = sprites.get(f.t.id);
       if (!sp || sp.pop) { sp = sprite(f.t, f.from, f.c); }
-      const d = f.r - (f.fresh ? f.from : sp.y), dur = 120 + 70 * Math.sqrt(Math.max(1, d));
+      const d = f.r - (f.fresh ? f.from : sp.y), dur = 120 + 70 * Math.sqrt(Math.max(1, Math.abs(d)));
       longest = Math.max(longest, dur);
       moveTo(sp, f.r, f.c, dur, easeIn);
     }
     hud();
     await wait(longest + 40);
   }
+  function recordWin(g) {
+    const i = g.lv.n - 1;
+    const prevStars = prog.stars[i] || 0;
+    const hadBadge = !!(prog.badges[i]);
+    const newBadge = !hadBadge;
+    const stars = g.stars || 0;
+    if (stars > prog.stars[i]) prog.stars[i] = stars;
+    if (g.score > (prog.best[i] || 0)) prog.best[i] = g.score;
+    if (newBadge) prog.badges[i] = 1;
+    if (g.lv.n >= prog.open && g.lv.n < 10) prog.open = g.lv.n + 1;
+    saveProg();
+    const firstThree = stars === 3 && prevStars < 3;
+    // Yum! when a new badge is earned (first win) or the first 3-star on a level;
+    // Sweet Sparkle for a later ordinary win.
+    return { newBadge, yum: newBadge || firstThree, firstThree, stars };
+  }
   function finish() {
     const won = st.won;
-    if (st.score > best) { best = st.score; ls.set('ib-sugar-best', best); }
-    sfx(won ? 'win' : 'lose');
+    if (st.score > (prog.best[st.lv.n - 1] || 0)) { prog.best[st.lv.n - 1] = st.score; saveProg(); }
+    winInfo = won ? recordWin(st) : { newBadge: false, yum: false, stars: 0 };
+    if (won && musicOn) playEndSong(winInfo.yum ? 'yum' : 'win');
+    else sfx(won ? 'win' : 'lose');
+    if (won && winInfo.newBadge) setTimeout(() => sfx('badge'), 200 * SP);
     setTimeout(() => showEnd(), 500 * SP);
   }
   function showEnd() {
-    const won = st.score >= LEVEL.target, n = starsFor(st.score);
-    $('endtitle').textContent = won ? 'Level 1 complete!' : 'So close!';
-    $('endstars').innerHTML = [0, 1, 2].map(i => `<span class="${i < n ? 'on' : ''}">★</span>`).join('');
+    if (!st) return;
+    const won = st.won, n = st.stars || 0, lv = st.lv;
+    $('endtitle').textContent = won ? (lv.theme === 'sarah' ? "Sarah's level complete!" : ('Level ' + lv.n + ' complete!')) : 'So close!';
+    $('endstars').innerHTML = [0, 1, 2].map(i => '<span class="' + (i < n ? 'on' : '') + '">★</span>').join('');
     $('endscore').textContent = st.score.toLocaleString('en-NZ') + ' points';
-    $('endmsg').textContent = won ? (n === 3 ? 'Three stars! A perfect sweet shop.' : n === 2 ? 'Two stars. Reach 9,000 for all three.' : 'One star. Reach 6,000 for two.') + ' More levels are coming soon.' : 'You needed 3,000 points. Have another go!';
+    const badgeWrap = $('endbadge'), cap = $('endbadgecap');
+    if (won && winInfo.newBadge) {
+      const b = lv.badge;
+      badgeWrap.hidden = false; cap.hidden = false;
+      badgeWrap.className = 'winbadge soft' + (b.special ? ' heart' : '');
+      badgeWrap.textContent = b.icon;
+      cap.textContent = 'New badge: ' + b.name;
+    } else { badgeWrap.hidden = true; cap.hidden = true; }
+    if (won) {
+      const extra = n === 3 ? 'Three stars!' : n === 2 ? 'Two stars.' : 'One star.';
+      const next = lv.n < 10 ? ' Level ' + (lv.n + 1) + ' is open.' : ' You have finished every level in the shop.';
+      $('endmsg').textContent = extra + next;
+    } else {
+      const bits = [];
+      if (lv.target) bits.push('you needed ' + lv.target.toLocaleString('en-NZ') + ' points');
+      if (lv.collect) bits.push('you needed ' + lv.collect.n + ' ' + (NAMES[lv.collect.color] || 'sweets').toLowerCase());
+      if (lv.jelly) bits.push('some jelly is still on the tray');
+      if (lv.ice) bits.push('some icing is still in the way');
+      if (lv.ings && lv.ings.length) bits.push('an ingredient did not make it down');
+      $('endmsg').textContent = bits.length ? ('Not quite — ' + bits.join(', ') + '. Have another go!') : 'Have another go!';
+    }
     $('againbtn').textContent = won ? 'Play again' : 'Try again';
+    $('nextbtn').hidden = !(won && lv.n < 10);
     $('end').hidden = false;
   }
+  function leaveEnd() { stopEnd(); $('end').hidden = true; }
   function restart() {
-    $('end').hidden = true; st = newGame(); syncAll(); sel = null; busy = false; hud();
-    hintMove = findMove(st.board); lastAct = now();
-    for (const s of sprites.values()) { s.y = s.r - N - 1 + (N - s.r) * .2; moveTo(s, s.r, s.c, 300 + (N - s.r) * 40, easeOut); }
+    leaveEnd();
+    resumeMusic();
+    startLevel(lvNum);
+  }
+  function goNext() {
+    leaveEnd();
+    if (lvNum < 10) openLevel(lvNum + 1);
+    else showMap();
+    if (screen === 'game' && musicOn) playKind('game');
+  }
+  function backToMap() {
+    leaveEnd();
+    showMap();
   }
 
-  // ---------- Input: swipe, or tap one sweet then a neighbour ----------
-  function cellAt(e) { const b = cv.getBoundingClientRect(); const c = Math.floor((e.clientX - b.left) / b.width * N), r = Math.floor((e.clientY - b.top) / b.height * N); return r >= 0 && r < N && c >= 0 && c < N ? [r, c] : null; }
+  function cellAt(e) {
+    if (!st) return null;
+    const b = cv.getBoundingClientRect();
+    const c = Math.floor((e.clientX - b.left) / b.width * N), r = Math.floor((e.clientY - b.top) / b.height * N);
+    if (r < 0 || r >= N || c < 0 || c >= N) return null;
+    if (!isOpen(st.mask, r, c) || isHole(st.board[r][c])) return null;
+    return [r, c];
+  }
   cv.addEventListener('pointerdown', e => { unlockAudio(); const p = cellAt(e); if (!p) return; down = { p, x: e.clientX, y: e.clientY }; try { cv.setPointerCapture(e.pointerId); } catch (er) { } e.preventDefault(); });
   cv.addEventListener('pointermove', e => {
     if (!down || busy) return;
@@ -497,16 +1103,37 @@
     lastAct = now();
   });
   cv.addEventListener('pointercancel', () => { down = null; });
-  $('soundbtn').addEventListener('click', () => { soundOn = !soundOn; ls.set('ib-sugar-sound', soundOn); paintButtons(); unlockAudio(); if (soundOn) sfx('swap'); });
+
+  function toggleSound() { soundOn = !soundOn; ls.set('ib-sugar-sound', soundOn); paintButtons(); unlockAudio(); if (soundOn) sfx('swap'); }
+  $('soundbtn').addEventListener('click', toggleSound);
+  $('mapsound').addEventListener('click', toggleSound);
   $('musicbtn').addEventListener('click', () => setMusic(!musicOn));
+  $('mapmusic').addEventListener('click', () => setMusic(!musicOn));
   $('restartbtn').addEventListener('click', restart);
   $('againbtn').addEventListener('click', restart);
-  doc.addEventListener('visibilitychange', () => { if (doc.hidden) { if (bgm && bgmWant) { try { bgm.pause(); } catch (e) { } } if (ac) ac.suspend().catch(() => { }); } else { if (ac && (soundOn || musicOn)) ac.resume().catch(() => { }); if (musicOn && bgmWant) playMusic(); } });
-  root.addEventListener('pagehide', () => { stopMusic(); if (ac) ac.close().catch(() => { }); });
+  $('nextbtn').addEventListener('click', goNext);
+  $('mapbtn').addEventListener('click', backToMap);
+  $('endmap').addEventListener('click', backToMap);
+  $('introbtn').addEventListener('click', () => { unlockAudio(); startLevel(pendingLv); });
+  doc.addEventListener('pointerdown', unlockAudio, { passive: true });
+  doc.addEventListener('visibilitychange', () => {
+    if (doc.hidden) { if (ac) ac.suspend().catch(() => { }); }
+    else {
+      if (ac && (soundOn || musicOn)) ac.resume().catch(() => { });
+      if (musicOn && !doc.hidden) playKind(wantKind());
+    }
+  });
+  root.addEventListener('pagehide', () => { stopAllMusic(); if (ac) ac.close().catch(() => { }); });
   root.addEventListener('resize', fitCanvas);
 
-  fitCanvas(); paintButtons(); syncAll(); hud(); hintMove = findMove(st.board);
+  paintButtons();
+  showMap();
   root.requestAnimationFrame(frame);
-  // For screenshots and checks.
-  root.SugarRush.ui = { state: () => st, attempt, showEnd, setScore(n) { st.score = n; st.moves = 0; st.over = true; st.won = n >= LEVEL.target; hud(); }, view: () => ({ score: st.score, moves: st.moves, busy, soundOn, musicOn }) };
+
+  root.SugarRush.ui = {
+    state: () => st, attempt, showEnd, showMap, openLevel, startLevel, progress: () => prog,
+    setScore(n) { if (!st) return; st.score = n; st.moves = 0; st.over = true; st.won = goalsMet(st) || n >= (st.target || 0); st.stars = starsOf(st); hud(); },
+    previewWin(opts) { opts = opts || {}; const n = opts.level || (st && st.lv && st.lv.n) || 2; if (!st || st.lv.n !== n) startLevel(n); st.score = opts.score || Math.max(st.lv.stars[2] || 0, 2400); st.moves = Math.max(st.moves, 1); st.won = true; st.over = true; st.stars = opts.stars || 3; if (opts.resetBadge) prog.badges[n - 1] = 0; winInfo = recordWin(st); hud(); showEnd(); },
+    view: () => ({ score: st && st.score, moves: st && st.moves, busy, soundOn, musicOn, screen, level: st && st.lv && st.lv.n })
+  };
 })(typeof window !== 'undefined' ? window : globalThis);
