@@ -203,7 +203,9 @@
     // Relative tetris.html is /feed/tetris.html. ship-pages.sh already sends SAMEORIGIN for /feed/tetris.html and /feed/tetris.
     tetris: { url: 'tetris', title: 'Tetris', host: 'Info Book', live: 'Sound starts when you tap', local: true },
     // 1.9.147 Scrabble, our own page like Tetris. ship-pages.sh sends SAMEORIGIN for /feed/scrabble too.
-    scrabble: { url: 'scrabble', title: 'Scrabble', host: 'Info Book', live: 'Play the computer or pass the phone', local: true }
+    scrabble: { url: 'scrabble', title: 'Scrabble', host: 'Info Book', live: 'Play the computer or pass the phone', local: true },
+    // 1.9.156 Sugar Rush level 1 (Shane only for now; the page itself checks too). ship-pages.sh sends SAMEORIGIN for /feed/sugar-rush.
+    sugar: { url: 'sugar-rush', title: 'Sugar Rush', host: 'Info Book', live: 'Level 1 · soft sounds start when you tap', local: true }
   };
   let artWin, artFrame, artScroll = 0, artHist = false, artBtn = null;
   function artParts() {
