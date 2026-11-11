@@ -303,12 +303,12 @@ for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 3, at.join(',
 const appSrc = fs.readFileSync('feed/app.js', 'utf8');
 for (const id of sights.TOPICS) assert.ok(appSrc.includes("'" + id + "'"), id);
 assert.ok(!/Math\.pow\(baseOf\(t\), 3\)/.test(appSrc));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.146'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.146'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.146'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.147'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.147'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.147'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.cdot.tv'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.bd ul.sum'));
-assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.146'"));
+assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.147'"));
 function swVersion(src) { const m = String(src).match(/const VERSION = '([^']+)'/); assert.ok(m, 'parent sw.js VERSION'); return m[1]; }
 const parentHere = swVersion(fs.readFileSync('sw.js', 'utf8'));
 let parentMain = parentHere;
@@ -347,10 +347,10 @@ assert.equal(artB.length, 1);
 assert.notEqual(artB[0].id, artA.id);
 seenArt.wasSeen = () => true;
 assert.equal(seenArt.ibArt.cards(0).length, 0);
-assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.146'"));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.147'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'art3d.js?v=' + VERSION"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'portal.js?v=' + VERSION"));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.146'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.147'));
 const portalSrc = fs.readFileSync('feed/portal.js', 'utf8');
 assert.ok(portalSrc.includes('prefers-reduced-motion'));
 assert.ok(portalSrc.includes("sessionStorage.getItem(KEY)"));
@@ -378,7 +378,7 @@ assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("cache: 'reload'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("cache: 'no-cache'"));
 assert.ok(appSrc.includes('ibPortalRise'));
 assert.ok(!/portal-style\.jpg|attachments\/image/.test(portalSrc + fs.readFileSync('feed/index.html', 'utf8')));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.146'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.147'));
 assert.ok(appSrc.includes("['art3d', '3D art'"));
 assert.ok(appSrc.includes("['3D art', 'art3d'"));
 assert.ok(appSrc.includes("'art3d'"));
@@ -500,10 +500,16 @@ assert.equal(cal.prefill(nextBang, nineForty).time, '19:30');
 assert.equal(cal.prefill(nextBang, nineForty).at, nextBang.ev);
 assert.ok(cal.ics(saved).includes('TRIGGER:-PT1H'));
 const calFile = fs.readFileSync('feed/cal.js', 'utf8');
-assert.ok(calFile.includes('coming soon'));
 assert.ok(calFile.includes('data-art="tetris"'));
 assert.ok(calFile.includes('Play Tetris'));
-assert.ok(calFile.includes('<span>Coming soon: Scrabble 🔤</span>'));
+// 1.9.147 Scrabble is playable; Sugar Rush is the next game coming soon
+assert.ok(calFile.includes('data-art="scrabble"'));
+assert.ok(calFile.includes('Play Scrabble'));
+assert.ok(calFile.includes('<span>Coming soon: Sugar Rush 🍬, a Candy Crush style matching game</span>'));
+assert.ok(!/Scrabble is the next game|Coming soon: Scrabble|Scrabble · coming soon/.test(calFile + appSrc));
+assert.ok(appSrc.includes('data-art="scrabble"><span class="mfe">🔤</span><span>Play Scrabble</span>'));
+assert.ok(appSrc.includes('<span>Sugar Rush · coming soon</span>'));
+assert.ok(!/scrabble\.html|href=[^>\n]*scrabble/i.test(calFile));
 assert.ok(!/<iframe/i.test(calFile));
 assert.ok(!/tetris\.html|href=[^>\n]*tetris/i.test(calFile));
 const playFile = fs.readFileSync('feed/play.js', 'utf8');
@@ -511,6 +517,74 @@ assert.ok(playFile.includes("tetris: { url: 'tetris'"));
 assert.ok(/tetris:[\s\S]{0,220}local: true/.test(playFile));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'tetris'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'tetris.js'"));
+assert.ok(playFile.includes("scrabble: { url: 'scrabble'"));
+assert.ok(/scrabble:[\s\S]{0,220}local: true/.test(playFile));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'scrabble', 'scrabble.js'"));
+assert.ok(!fs.readFileSync('feed/sw.js', 'utf8').includes('scrabble-words'), 'word list is fetched when Scrabble opens, not precached');
+
+// 1.9.147 Scrabble rules and word checks (small word list here; tests/scrabble-sim.mjs plays full games with the real one)
+function loadScrabble() {
+  const ctx = { console, Math, Object, Number, String, Array, Set, Map, JSON, Date, Uint8Array, Int8Array, Int32Array, setTimeout, parseInt };
+  ctx.window = ctx; ctx.globalThis = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync('feed/scrabble.js', 'utf8'), ctx, { filename: 'feed/scrabble.js' });
+  return ctx.Scrabble;
+}
+const SC = loadScrabble();
+assert.equal(Object.values(SC.COUNTS).reduce((a, b) => a + b, 0), 100);
+assert.equal(SC.COUNTS['?'], 2);
+assert.equal(Object.keys(SC.COUNTS).reduce((a, k) => a + SC.COUNTS[k] * SC.VALUES[k], 0), 187);
+const prem = k => SC.PREMIUM.filter(x => x === k).length;
+assert.deepEqual([prem('TW'), prem('DW'), prem('TL'), prem('DL'), prem('ST')], [8, 16, 12, 24, 1]);
+assert.equal(SC.PREMIUM[7 * 15 + 7], 'ST');
+const scDict = SC.buildTrie('cat\ncats\nat\nta\nzoo\nzoos\nax\nxi\nqi\nretains\nretinas\nhello\na\n');
+assert.ok(scDict.has('cat') && scDict.has('CATS') && !scDict.has('ca') && !scDict.has('a'));
+const scEmpty = new Array(225).fill(null);
+const sq = (r, c, l, b) => ({ r, c, l, b: b ? 1 : 0 });
+assert.match(SC.check(scEmpty, [sq(0, 0, 'A'), sq(0, 1, 'T')], scDict).err, /centre/);
+assert.match(SC.check(scEmpty, [sq(7, 7, 'A')], scDict).err, /two letters/);
+assert.match(SC.check(scEmpty, [sq(7, 6, 'C'), sq(8, 7, 'A')], scDict).err, /straight line/);
+assert.match(SC.check(scEmpty, [sq(7, 5, 'C'), sq(7, 7, 'T')], scDict).err, /gaps/);
+assert.match(SC.check(scEmpty, [sq(7, 6, 'C'), sq(7, 7, 'Q')], scDict).err, /Not in the word list: CQ/);
+const c1 = SC.check(scEmpty, [sq(7, 6, 'C'), sq(7, 7, 'A'), sq(7, 8, 'T')], scDict);
+assert.ok(c1.ok); assert.equal(c1.score, (3 + 1 + 1) * 2); // centre star doubles
+const st1 = SC.newGame({ players: [{ name: 'A' }, { name: 'B' }], rand: SC.rng(5) });
+assert.equal(st1.bag.length, 86);
+st1.players[0].rack = ['C', 'A', 'T', 'S', 'E', 'R', '?'];
+assert.ok(SC.play(st1, [sq(7, 6, 'C'), sq(7, 7, 'A'), sq(7, 8, 'T')], scDict).ok);
+assert.equal(st1.players[0].score, 10); assert.equal(st1.turn, 1); assert.equal(st1.players[0].rack.length, 7);
+assert.match(SC.check(st1.board, [sq(0, 0, 'A'), sq(0, 1, 'T')], scDict).err, /join on/);
+// hook an S onto CAT; (7,9) is a plain square
+const hook = SC.check(st1.board, [sq(7, 9, 'S')], scDict);
+assert.ok(hook.ok); assert.equal(hook.words[0].w, 'CATS'); assert.equal(hook.score, 6);
+// a cross-word that is not a word is named in the message
+assert.match(SC.check(st1.board, [sq(6, 7, 'Z'), sq(8, 7, 'O')], scDict).err, /ZAO/);
+// blank scores 0 and letter multipliers do not apply to it
+const blankB = SC.check(st1.board, [sq(6, 8, 'A', 1)], scDict);
+assert.ok(blankB.ok); assert.deepEqual(blankB.words.map(w => w.w), ['AT']); assert.equal(blankB.score, 1); // blank on a DL square: 0 x 2 + T 1
+// 50-point bingo
+const bingo = SC.check(scEmpty, 'RETAINS'.split('').map((l, i) => sq(7, 4 + i, l)), scDict);
+assert.ok(bingo.ok && bingo.bingo); assert.equal(bingo.score, 7 * 2 + 50);
+// end of game: rack points come off, the player who went out gets them
+const st2 = SC.newGame({ players: [{ name: 'A' }, { name: 'B' }], rand: SC.rng(9) });
+st2.players[0].rack = []; st2.players[1].rack = ['Q', 'A']; st2.players[0].score = 50; st2.players[1].score = 40; st2.bag = [];
+SC.finish(st2, 0);
+assert.deepEqual(st2.players.map(p => p.score), [61, 29]); assert.ok(st2.over); assert.deepEqual(st2.winners, [0]);
+// six scoreless turns end the game
+const st3 = SC.newGame({ players: [{ name: 'A' }, { name: 'B' }], rand: SC.rng(3) });
+for (let i = 0; i < 6; i++) SC.pass(st3);
+assert.ok(st3.over);
+// swap needs 7 in the bag
+const st4 = SC.newGame({ players: [{ name: 'A' }, { name: 'B' }], rand: SC.rng(4) });
+const r4 = st4.players[0].rack.slice(0, 3);
+assert.ok(SC.swap(st4, r4, SC.rng(1)).ok); assert.equal(st4.bag.length, 86); assert.equal(st4.players[0].rack.length, 7);
+st4.bag = st4.bag.slice(0, 6); assert.match(SC.swap(st4, st4.players[st4.turn].rack.slice(0, 1)).err, /7 tiles/);
+// the computer only makes legal moves, and finds the bingo
+const gm = SC.genMoves(scEmpty, 'RETAINS'.split(''), scDict);
+assert.ok(gm.length > 0 && gm.every(m => SC.check(scEmpty, m.place, scDict).ok));
+assert.equal(Math.max(...gm.map(m => m.score)), 66); // RETAINS over the star and a DL: (7 + 1) x 2 + 50
+const fullDict = SC.buildTrie(fs.readFileSync('feed/scrabble-words.txt', 'utf8'));
+assert.ok(fullDict.size > 160000 && fullDict.has('quixotic') && fullDict.has('xu') && !fullDict.has('xqz'));
 const storySrc = fs.readFileSync('feed/stories.js', 'utf8');
 const pickFn = (appSrc.match(/function pickVid\(\) \{[\s\S]*?\n\}/) || [])[0];
 assert.ok(pickFn && !/playVid/.test(pickFn), 'pickVid must not start playback');
@@ -615,6 +689,8 @@ assert.match(headers, /\/\*\n {2}X-Content-Type-Options: nosniff\n {2}Referrer-P
 assert.match(headers, /\/feed\/tetris\n {2}! X-Frame-Options\n {2}X-Frame-Options: SAMEORIGIN/);
 assert.match(headers, /\/feed\/tetris\.html\n {2}! X-Frame-Options\n {2}X-Frame-Options: SAMEORIGIN/);
 assert.ok(!/\/feed\/tetris(?:\.html)?\n {2}X-Frame-Options: DENY/.test(headers));
+assert.match(headers, /\/feed\/scrabble\n {2}! X-Frame-Options\n {2}X-Frame-Options: SAMEORIGIN/);
+assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Frame-Options: SAMEORIGIN/);
 
 console.log('feed-info tests ok');
 
