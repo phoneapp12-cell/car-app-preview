@@ -196,7 +196,7 @@
   function open(pre) { on = true; root.ibCalOn = true; edit = pre || null; draw(); root.scrollTo(0, 0); }
   root.ibCalOpen = open;
   root.ibCalDraw = function () { if (on) draw(); };
-  root.ibSoon = function () { on = false; root.ibCalOn = false; const el = root.document.querySelector('[data-id="gamesoon"]'); if (el) el.scrollIntoView({ block: 'start' }); else root.alert('Games are coming soon. Nothing to play yet.'); };
+  root.ibSoon = function () { on = false; root.ibCalOn = false; const el = root.document.querySelector('[data-id="gamesoon"]'); if (el) el.scrollIntoView({ block: 'start' }); else root.alert('Scroll the feed to find the Games card and play Tetris.'); };
 
   async function askNotify() {
     if (!root.Notification || Notification.permission !== 'default') return Notification && Notification.permission;

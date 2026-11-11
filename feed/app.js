@@ -1364,7 +1364,7 @@ function mfDrawer(open) {
   // 1.9.123 content topics live only inside the Interests submenu
   const keepNav = new Set(['life', 'family', 'photos', 'liked']);
   const browse = topicList().filter(t => keepNav.has(t[0]));
-  const br = `<p class="mfsec">Browse</p><button type="button" class="mfopt" data-calopen="1"><span class="mfe">📅</span><span>Calendar</span></button>${intSub()}<button type="button" class="mfopt" data-soon="1"><span class="mfe">🎮</span><span>Games · coming soon</span></button>` + browse.map(t =>
+  const br = `<p class="mfsec">Browse</p><button type="button" class="mfopt" data-calopen="1"><span class="mfe">📅</span><span>Calendar</span></button>${intSub()}<button type="button" class="mfopt" data-soon="1"><span class="mfe">🎮</span><span>Games · new</span></button>` + browse.map(t =>
     `<button type="button" class="mfopt${tab===t[0]?' on':''}" data-mftab="${t[0]}"><span class="mfe">${t[2]}</span><span>${esc(t[1])}${t[0]==='family'&&typeof famNewLikes==='function'&&famNewLikes()?' · new':''}</span>${tab===t[0]?'<i>✓</i>':''}</button>`
   ).join('') + `<button type="button" class="mfopt${tab==='all'?' on':''}" data-mftab="all"><span class="mfe">✨</span><span>All feed</span>${tab==='all'?'<i>✓</i>':''}</button>`;
   extra.innerHTML = br + x;
