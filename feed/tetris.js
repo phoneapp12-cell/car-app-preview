@@ -75,7 +75,7 @@
     o.start(t0);
     o.stop(t0 + dur + 0.02);
   }
-  // Six calm themes; music and sounds change every 5 levels (1-5, 6-10, ... 26-30 and beyond).
+  // Six calm themes (Beach, Rainforest, Ocean, Bush walk, City, Night sky); music, sounds, colours and background change every 5 levels (1-5, 6-10, ... 26-30 and beyond).
   const SEMI = { C: 0, CS: 1, D: 2, DS: 3, E: 4, F: 5, FS: 6, G: 7, GS: 8, A: 9, AS: 10, B: 11 };
   function nf(n) {
     const oct = parseInt(n.slice(-1), 10);
@@ -83,24 +83,33 @@
     return 440 * Math.pow(2, (midi - 69) / 12);
   }
   const THEMES = [
-    { name: 'Ocean', beat: 0.75, pad: 'sine', ambient: 'wave', critter: 'dolphin', pitch: 1, sfx: 'sine',
+    { name: 'Beach', beat: 0.7, pad: 'sine', ambient: 'wave', critter: 'gull', pitch: 1, sfx: 'sine',
       chords: [['F3', 'A3', 'C4', 'E4'], ['C3', 'G3', 'B3', 'E4'], ['A2', 'E3', 'G3', 'C4'], ['G2', 'D3', 'G3', 'B3']],
       bells: ['C5', 'D5', 'E5', 'G5', 'A5', 'C6'] },
     { name: 'Rainforest', beat: 0.7, pad: 'triangle', ambient: 'rain', critter: 'bird', pitch: 1.122, sfx: 'triangle',
       chords: [['D3', 'A3', 'D4', 'FS4'], ['B2', 'FS3', 'A3', 'D4'], ['G2', 'D3', 'B3', 'D4'], ['A2', 'E3', 'A3', 'CS4']],
       bells: ['D5', 'E5', 'FS5', 'A5', 'B5', 'D6'] },
-    { name: 'Starry night', beat: 0.85, pad: 'sine', ambient: 'shimmer', critter: 'twinkle', pitch: 1.335, sfx: 'sine',
-      chords: [['E3', 'B3', 'DS4', 'GS4'], ['CS3', 'GS3', 'B3', 'E4'], ['A2', 'E3', 'GS3', 'CS4'], ['B2', 'FS3', 'A3', 'DS4']],
-      bells: ['E5', 'FS5', 'GS5', 'B5', 'CS6', 'E6'] },
-    { name: 'Coral reef', beat: 0.65, pad: 'triangle', ambient: 'bubbles', critter: 'bubble', pitch: 0.891, sfx: 'triangle',
+    { name: 'Ocean', beat: 0.9, pad: 'sine', ambient: 'wave', critter: ['dolphin', 'whale'], pitch: 0.794, sfx: 'sine',
+      chords: [['D2', 'A2', 'F3', 'C4'], ['AS1', 'F2', 'D3', 'A3'], ['G2', 'D3', 'AS3', 'D4'], ['A2', 'E3', 'G3', 'CS4']],
+      bells: ['D4', 'F4', 'G4', 'A4', 'C5', 'D5'] },
+    { name: 'Bush walk', beat: 0.75, pad: 'triangle', ambient: 'wind', critter: ['tui', 'bird'], pitch: 0.891, sfx: 'triangle',
       chords: [['AS2', 'F3', 'A3', 'D4'], ['G2', 'D3', 'F3', 'AS3'], ['DS3', 'AS3', 'D4', 'G4'], ['F2', 'C3', 'F3', 'A3']],
       bells: ['AS4', 'C5', 'D5', 'F5', 'G5', 'AS5'] },
-    { name: 'Northern lights', beat: 0.9, pad: 'sine', ambient: 'shimmer', critter: 'twinkle', pitch: 0.794, sfx: 'sine',
-      chords: [['A2', 'E3', 'B3', 'C4'], ['F2', 'C3', 'G3', 'A3'], ['C3', 'G3', 'B3', 'E4'], ['G2', 'D3', 'A3', 'B3']],
-      bells: ['A4', 'B4', 'C5', 'E5', 'G5', 'A5'] },
-    { name: 'Deep sea', beat: 1, pad: 'sine', ambient: 'wave', critter: 'whale', pitch: 0.667, sfx: 'sine',
-      chords: [['D2', 'A2', 'F3', 'C4'], ['AS1', 'F2', 'D3', 'A3'], ['G2', 'D3', 'AS3', 'D4'], ['A2', 'E3', 'G3', 'CS4']],
-      bells: ['D4', 'F4', 'G4', 'A4', 'C5', 'D5'] }
+    { name: 'City', beat: 0.6, pad: 'triangle', ambient: 'traffic', critter: 'chime', pitch: 1.059, sfx: 'triangle',
+      chords: [['A2', 'E3', 'G3', 'C4'], ['D3', 'A3', 'C4', 'F4'], ['G2', 'D3', 'F3', 'B3'], ['C3', 'G3', 'B3', 'E4']],
+      bells: ['A4', 'C5', 'D5', 'E5', 'G5', 'A5'] },
+    { name: 'Night sky', beat: 0.95, pad: 'sine', ambient: 'shimmer', critter: 'twinkle', pitch: 1.335, sfx: 'sine',
+      chords: [['E3', 'B3', 'DS4', 'GS4'], ['CS3', 'GS3', 'B3', 'E4'], ['A2', 'E3', 'GS3', 'CS4'], ['B2', 'FS3', 'A3', 'DS4']],
+      bells: ['E5', 'FS5', 'GS5', 'B5', 'CS6', 'E6'] }
+  ];
+  // Colours and see-through backgrounds for each theme (same order as THEMES).
+  const LOOKS = [
+    { colors: ['#22d3ee', '#0ea5e9', '#fb923c', '#fde047', '#2dd4bf', '#f472b6', '#f87171'], bg: 'linear-gradient(180deg,#38bdf8 0%,#7dd3fc 45%,#fcd34d 85%,#f5d08a 100%)', board: 'rgba(8,47,73,0.5)' },
+    { colors: ['#84cc16', '#16a34a', '#f59e0b', '#facc15', '#22c55e', '#10b981', '#f97316'], bg: 'linear-gradient(180deg,#052e16 0%,#14532d 55%,#3f6212 100%)', board: 'rgba(3,24,10,0.55)' },
+    { colors: ['#22d3ee', '#3b82f6', '#06b6d4', '#a5f3fc', '#14b8a6', '#818cf8', '#38bdf8'], bg: 'linear-gradient(180deg,#0b8fb0 0%,#065a82 40%,#03263f 100%)', board: 'rgba(2,20,36,0.55)' },
+    { colors: ['#a3e635', '#65a30d', '#d97706', '#fbbf24', '#4ade80', '#b45309', '#e11d48'], bg: 'linear-gradient(180deg,#365314 0%,#1a2e05 55%,#3b2a14 100%)', board: 'rgba(16,20,6,0.55)' },
+    { colors: ['#f472b6', '#22d3ee', '#a855f7', '#facc15', '#34d399', '#fb923c', '#60a5fa'], bg: 'linear-gradient(180deg,#0f172a 0%,#312e81 55%,#831843 100%)', board: 'rgba(10,10,25,0.55)' },
+    { colors: ['#e0e7ff', '#a78bfa', '#fde68a', '#facc15', '#93c5fd', '#c4b5fd', '#f9a8d4'], bg: 'radial-gradient(1px 1px at 20% 30%,#fff,transparent),radial-gradient(1px 1px at 70% 15%,#fff,transparent),radial-gradient(1.5px 1.5px at 45% 60%,#fff,transparent),radial-gradient(1px 1px at 85% 75%,#fff,transparent),linear-gradient(180deg,#020617 0%,#1e1b4b 60%,#312e81 100%)', board: 'rgba(5,6,25,0.5)' }
   ];
   let themeIdx = 0;
   function themeFor(level) { return Math.max(0, Math.min(THEMES.length - 1, Math.floor((level - 1) / 5))); }
@@ -131,13 +140,14 @@
     const bars = 8, len = bars * 4;
     for (let b = 0; b < bars; b++) {
       T.chords[b % T.chords.length].forEach((n, k) => add(b * 4 + k * 0.25, { v: 'pad', f: nf(n), d: 4.6 }));
-      if (T.ambient === 'wave' && b % 2 === 0) add(b * 4, { v: 'wave', d: 8 });
+      if ((T.ambient === 'wave' || T.ambient === 'wind' || T.ambient === 'traffic') && b % 2 === 0) add(b * 4, { v: T.ambient, d: 8 });
       if (T.ambient === 'rain') add(b * 4, { v: 'rain', d: 4.2 });
       if (T.ambient === 'shimmer' && b % 2 === 1) add(b * 4, { v: 'shimmer', f: nf(T.bells[5]), d: 6 });
       if (T.ambient === 'bubbles') [0.5, 1.75, 3].forEach(p => add(b * 4 + p, { v: 'bubble' }));
     }
     for (const [pos, k] of BELLS) add(pos, { v: 'bell', f: nf(T.bells[k]), d: 3 });
-    [7, 23].forEach(p => add(p, { v: T.critter }));
+    const cr = [].concat(T.critter);
+    [7, 23].forEach((p, i) => add(p, { v: cr[i % cr.length] }));
     while (steps.length < len * 2) steps.push([]);
     return steps;
   });
@@ -193,6 +203,8 @@
         o.connect(g); g.connect(melodyBus); o.start(at); o.stop(at + d + 0.05);
       });
     } else if (e.v === 'wave' && noiseBuf) noiseSwell(at, e.d * beat, 0.12, 250, 900);
+    else if (e.v === 'wind' && noiseBuf) noiseSwell(at, e.d * beat, 0.05, 400, 1400);
+    else if (e.v === 'traffic' && noiseBuf) noiseSwell(at, e.d * beat, 0.08, 120, 380);
     else if (e.v === 'rain' && noiseBuf) {
       const src = ac.createBufferSource();
       src.buffer = noiseBuf; src.loop = true;
@@ -217,6 +229,12 @@
       for (let i = 0; i < 4; i++) { const b = 2400 + Math.random() * 600; blip(b, b * 1.25, b * 0.95, at + i * 0.12, 0.09, 0.025, melodyBus); }
     } else if (e.v === 'twinkle') {
       [0, 0.2, 0.45].forEach((dt, i) => blip(nf(T.bells[3 + i]) * 2, nf(T.bells[3 + i]) * 2, nf(T.bells[3 + i]) * 2, at + dt, 0.6, 0.02, melodyBus));
+    } else if (e.v === 'gull') {
+      [0, 0.45].forEach(dt => blip(1500, 1900, 1000, at + dt, 0.35, 0.02, melodyBus, 'triangle'));
+    } else if (e.v === 'tui') {
+      blip(1200, 2600, 2400, at, 0.18, 0.025, melodyBus); blip(3200, 3000, 1800, at + 0.25, 0.12, 0.02, melodyBus); blip(900, 950, 900, at + 0.45, 0.2, 0.025, melodyBus);
+    } else if (e.v === 'chime') {
+      [3, 1, 4].forEach((k, i) => blip(nf(T.bells[k]), nf(T.bells[k]), nf(T.bells[k]), at + i * 0.35, 1.2, 0.03, melodyBus));
     } else if (e.v === 'whale') {
       blip(180, 320, 140, at, 2.6, 0.05, melodyBus);
       blip(240, 400, 200, at + 2, 2.2, 0.035, melodyBus);
@@ -341,7 +359,7 @@
     if (ac) { try { ac.close(); } catch (e) { } }
     ac = null; sfxGain = null; musicGain = null; melodyBus = null; noiseBuf = null;
   }
-  root.Tetris = { THEMES, themeFor, SHAPES, COLORS, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state };
+  root.Tetris = { THEMES, LOOKS, themeFor, SHAPES, COLORS, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state };
 
   if (!root.document) return;
   const doc = root.document;
@@ -454,7 +472,8 @@
     if (!cv) return;
     const ctx = cv.getContext('2d');
     if (!ctx) return;
-    ctx.fillStyle = '#14161c';
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    ctx.fillStyle = boardBg;
     ctx.fillRect(0, 0, cv.width, cv.height);
     if (!t) return;
     const m = SHAPES[t];
@@ -465,8 +484,22 @@
     const ox = (cv.width - w) / 2, oy = (cv.height - h) / 2;
     m.forEach((row, r) => row.forEach((v, c) => { if (v) drawCell(ctx, ox + (c - minC) * s, oy + (r - minR) * s, COLORS[t], s, dim ? 0.35 : 1); }));
   }
+  let lookIdx = -1, boardBg = LOOKS[0].board;
+  function applyLook(i) {
+    if (i === lookIdx) return;
+    lookIdx = i;
+    const L = LOOKS[i];
+    for (let k = 1; k < COLORS.length; k++) COLORS[k] = L.colors[k - 1];
+    boardBg = L.board;
+    doc.documentElement.style.background = L.bg;
+    doc.documentElement.style.backgroundAttachment = 'fixed';
+    doc.body.style.background = 'transparent';
+    drawMini(doc.getElementById('next'), g.next, false);
+    drawMini(doc.getElementById('hold'), g.hold, !g.canHold);
+  }
   let last = performance.now();
   function loop(now) {
+    applyLook(themeFor(g.level));
     const dt = now - last;
     last = now;
     const running = started && !g.over && !g.paused;
@@ -484,7 +517,8 @@
     if (g.popupT > 0) g.popupT -= dt;
     const ctx = board.getContext('2d');
     if (ctx) {
-      ctx.fillStyle = '#14161c';
+      ctx.clearRect(0, 0, board.width, board.height);
+      ctx.fillStyle = boardBg;
       ctx.fillRect(0, 0, board.width, board.height);
       ctx.strokeStyle = 'rgba(255,255,255,0.05)';
       ctx.lineWidth = 1;
