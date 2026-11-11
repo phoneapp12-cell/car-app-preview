@@ -564,6 +564,11 @@ html.th-candy .card{border-color:#ffc2e5;box-shadow:0 2px 0 #ffb3dc,0 8px 20px r
 .artmeta strong{font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .artsite{color:#fff;font-weight:800;font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .artlive{font-size:.72rem;color:#ddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.artfs{margin-left:auto;min-height:44px;border-radius:12px;border:1px solid rgba(255,255,255,.3);background:transparent;color:#fff;font-weight:700;padding:8px 12px}
+.artfs[hidden]{display:none}
+.artfsx{display:none;position:absolute;top:max(8px,env(safe-area-inset-top));right:8px;z-index:2;min-height:40px;border-radius:20px;border:0;background:rgba(255,255,255,.85);color:#111;font-weight:700;padding:6px 12px}
+.artwin.artfull .artbar{display:none}
+.artwin.artfull .artfsx{display:block}
 .artframe{flex:1 1 auto;width:100%;min-height:0;border:0;background:#000}
 @media (prefers-reduced-motion:reduce){#feed > .card.puzzle *,#feed > .card.zoomq *,#feed > .card.fallq *,#feed > .card.tetq *,#feed > .card.cine *{animation:none!important;transition:none!important}}
 /* 1.9.114 main-feed videos fill the card width. Landscape stays 16:9, portrait (Shorts) stays 9:16.
