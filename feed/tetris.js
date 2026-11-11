@@ -350,7 +350,12 @@
     const hz = i => midiHz(scale[Math.max(0, Math.min(scale.length - 1, mid + i))]);
     if (name === 'rotate') return [hz(2)];
     if (name === 'land') return [hz(-2)];
-    if (name === 'level') return [0, 1, 2, 4].map(hz);
+    if (name === 'level') {
+      const inRange = scale.filter(m => { const f = midiHz(m); return f >= 300 && f <= 800; });
+      const src = inRange.length >= 4 ? inRange : scale;
+      const i0 = Math.max(0, Math.min(src.length - 4, Math.floor((src.length - 4) / 2)));
+      return [0, 1, 2, 4].map(i => midiHz(src[Math.max(0, Math.min(src.length - 1, i0 + i))]));
+    }
     if (name === 'tetris') return [0, 1, 2, 3, 4, 5].map(hz);
     if (name === 'clear') {
       const n = Math.max(1, Math.min(3, lines || 1));
@@ -406,6 +411,80 @@
     } catch (e) { return 0; }
   }
 
+  // Distinct LEVEL UP cue: a soft rising whoosh/shimmer into a warm in-key chord
+  // and bell flourish (~1.3s). Energy stays about 300–1200 Hz so a phone speaker
+  // can play it, with a gentle lowpass and no sharp highs.
+  const LU_LO = 300, LU_HI = 1200;
+  function luHz(f) { return Math.max(LU_LO, Math.min(LU_HI, f)); }
+  function levelUpNotes(ti) {
+    const scale = scaleMidi(TRACKS[ti]);
+    if (!scale || !scale.length) return null;
+    const freqs = scale.map(midiHz).filter(f => f >= LU_LO && f <= LU_HI);
+    const src = freqs.length >= 4 ? freqs : scale.map(midiHz).map(luHz);
+    const i0 = Math.max(0, Math.min(src.length - 4, Math.floor((src.length - 4) / 3)));
+    return [0, 2, 4, 7].map(i => luHz(src[Math.max(0, Math.min(src.length - 1, i0 + Math.min(i, src.length - 1 - i0)))]));
+  }
+  function luBell(freq, dur, vol, dest, at) {
+    if (!ac || !dest) return;
+    const f = luHz(freq);
+    const typ = 'sine';
+    function partial(hz, peak, attack) {
+      const o = ac.createOscillator(), g = ac.createGain(), lp = ac.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 1200; lp.Q.value = 0.5;
+      o.type = typ;
+      o.frequency.setValueAtTime(hz, at);
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.linearRampToValueAtTime(Math.max(0.0001, peak), at + attack);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+      o.connect(g); g.connect(lp); lp.connect(dest);
+      o.start(at); o.stop(at + dur + 0.05);
+    }
+    partial(f, vol, 0.028);
+    if (f * 2 <= LU_HI) partial(f * 2, vol * 0.16, 0.04); // quiet, still mellow octave
+  }
+  function playLevelUpSfx(ti) {
+    if (!soundOn || !ac || !sfxGain) return;
+    const dest = sfxGain;
+    const delay = sfxDelay('level');
+    const t0 = ac.currentTime + delay;
+    duckMusic(delay, 0.75);
+    const notes = levelUpNotes(ti == null ? themeIdx : ti) || sfxFreqs(ti == null ? themeIdx : ti, 'level') || [];
+    // Rising whoosh: wide band-pass noise, centre glides 380 → 880 Hz, capped by a 1100 Hz lowpass.
+    if (noiseBuf) {
+      const src = ac.createBufferSource();
+      src.buffer = noiseBuf;
+      const bp = ac.createBiquadFilter();
+      bp.type = 'bandpass'; bp.Q.value = 0.9;
+      bp.frequency.setValueAtTime(380, t0);
+      bp.frequency.exponentialRampToValueAtTime(880, t0 + 0.42);
+      const lp = ac.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 1100; lp.Q.value = 0.5;
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.linearRampToValueAtTime(0.26, t0 + 0.07);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.52);
+      src.connect(bp); bp.connect(lp); lp.connect(g); g.connect(dest);
+      src.start(t0); src.stop(t0 + 0.55);
+    }
+    // Quiet in-key sine sweep under the whoosh (not a siren: short, soft, stays mid).
+    if (notes[0] && notes[2]) {
+      const o = ac.createOscillator(), g = ac.createGain(), lp = ac.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 1100; lp.Q.value = 0.5;
+      o.type = 'sine';
+      o.frequency.setValueAtTime(luHz(notes[0]), t0);
+      o.frequency.exponentialRampToValueAtTime(luHz(notes[2]), t0 + 0.4);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.linearRampToValueAtTime(0.12, t0 + 0.08);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.5);
+      o.connect(g); g.connect(lp); lp.connect(dest);
+      o.start(t0); o.stop(t0 + 0.55);
+    }
+    // Warm chord + rising bell flourish land as the whoosh peaks.
+    const land = t0 + 0.34;
+    const chord = notes.slice(0, Math.min(4, notes.length));
+    chord.forEach((f, i) => luBell(f, 1.15, 0.30 * (1 - i * 0.04), dest, land + i * 0.018));
+    notes.forEach((f, i) => luBell(f, 0.62, 0.27, dest, land + 0.1 + i * 0.11));
+  }
   function sfx(name, lines) {
     if (!soundOn || !ac) return;
     const d = sfxGain, T = THEMES[themeIdx], m = T.pitch * 0.5, w = 'sine', lo = f => nf(f) / 2;
@@ -415,16 +494,16 @@
       const delay = sfxDelay(name);
       const t0 = ac.currentTime + delay;
       const typ = (T && T.sfx) === 'triangle' ? 'triangle' : 'sine';
-      if (name === 'clear' || name === 'tetris') duckMusic(delay, name === 'tetris' ? 0.75 : 0.55);
+      if (name === 'clear' || name === 'tetris' || name === 'level') duckMusic(delay, name === 'tetris' ? 0.75 : (name === 'level' ? 0.5 : 0.55));
       const gap = (name === 'tetris' || name === 'level') ? 0.09 : 0.1;
       const dur = (name === 'rotate') ? 0.12 : (name === 'lock' || name === 'drop') ? 0.2 : 0.5;
       const nLines = name === 'tetris' ? 4 : (name === 'clear' ? Math.max(1, Math.min(3, lines || 1)) : 1);
-      const vol = (name === 'clear' || name === 'tetris') ? SFX_NOTE * (0.88 + nLines * 0.08) : SFX_NOTE;
-      if (name === 'clear' || name === 'tetris') {
+      const vol = (name === 'clear' || name === 'tetris' || name === 'level') ? SFX_NOTE * (0.88 + nLines * 0.08) : SFX_NOTE;
+      if (name === 'clear' || name === 'tetris' || name === 'level') {
         // Soft in-key chord under a gentle arpeggio; a little louder for more lines, still soft.
-        const chord = notes.slice(0, Math.min(notes.length, name === 'tetris' ? 4 : 3));
+        const chord = notes.slice(0, Math.min(notes.length, name === 'tetris' || name === 'level' ? 4 : 3));
         const cVol = SFX_NOTE * (0.5 + nLines * 0.07);
-        chord.forEach(f => softTone(f, 0.58 + nLines * 0.04, typ, cVol, d, t0));
+        chord.forEach(f => softTone(f, 0.58 + (name === 'level' ? 0.12 : nLines * 0.04), typ, cVol, d, t0));
         notes.forEach((f, i) => softTone(f, dur, typ, vol, d, t0 + 0.05 + i * gap));
         return;
       }
@@ -692,21 +771,91 @@
       if (g.pendingLevel) {
         const pl = g.pendingLevel;
         g.pendingLevel = null;
-        themeIdx = pl.theme;
-        noteIdx = 0;
-        g.popup = pl.popup;
-        g.popupT = 1100;
-        sfx('level');
+        startLevelUp(g, pl.from, pl.to);
       }
       return false;
     }
+    return true;
+  }
+  // Brief LEVEL UP! overlay when the player reaches a new theme.
+  // About 1.8s, candy-gloss word, themed particles, a soft shimmer, then fade.
+  // Gravity and input pause for that moment so a piece does not drop behind the banner;
+  // music keeps playing, with a short duck that always restores.
+  const LEVEL_UP_MS = 1800;
+  function levelUpDuration() { return LEVEL_UP_MS; }
+  function levelUpCopy(fromLevel, toLevel) {
+    const ti = themeFor(toLevel);
+    const name = (THEMES[ti] && THEMES[ti].name) || '';
+    if (themeFor(fromLevel) === SPACE_THEME) {
+      return { beat: true, title: 'YOU DID IT!', sub: 'You beat every level!', theme: ti, level: toLevel };
+    }
+    return { beat: false, title: 'LEVEL UP!', sub: 'Level ' + toLevel + ': ' + name, theme: ti, level: toLevel };
+  }
+  function burstParts(ti, n, pal, scatter, rows) {
+    const kind = clearKind(ti);
+    let reduce = false;
+    try { reduce = !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { }
+    const count = reduce ? Math.min(8, clearPartCount(n)) : clearPartCount(n);
+    const fallback = (LOOKS[ti] && LOOKS[ti].colors) || COLORS.slice(1);
+    const use = (pal && pal.length) ? pal : fallback;
+    const pick = () => use[(Math.random() * use.length) | 0];
+    const parts = [];
+    const rowList = (rows && rows.length) ? rows : [10];
+    for (let i = 0; i < count; i++) {
+      const row = rowList[i % rowList.length];
+      const x0 = scatter
+        ? 16 + Math.random() * (COLS * CELL - 32)
+        : (i / Math.max(1, count - 1)) * COLS * CELL * 0.92 + Math.random() * 8;
+      const y0 = scatter
+        ? (ROWS * CELL) * (0.28 + Math.random() * 0.36)
+        : row * CELL + CELL * 0.5;
+      const ang = -0.35 + (i % 7) * 0.18 + Math.random() * 0.2;
+      const spd = 28 + n * 8 + Math.random() * 36;
+      parts.push({
+        kind, x0, y0,
+        vx: Math.cos(ang) * spd * (Math.random() < 0.5 ? 1 : -1),
+        vy: -Math.abs(Math.sin(ang) * spd) - 20 - n * 4,
+        color: pick(),
+        size: (kind === 'bubbles' ? 3.8 : kind === 'frog' ? 4.2 : 2.4) + Math.random() * (kind === 'frog' ? 4 : 3.2) + n * 0.3,
+        delay: (i / Math.max(1, count)) * 0.22,
+        rot: Math.random() * 6.28,
+        spin: (Math.random() - 0.5) * 3,
+        hop: 18 + Math.random() * 16
+      });
+    }
+    return parts;
+  }
+  function startLevelUp(g, fromLevel, toLevel) {
+    const copy = levelUpCopy(fromLevel, toLevel);
+    const ti = copy.theme;
+    themeIdx = ti;
+    noteIdx = 0;
+    const pal = (LOOKS[ti] && LOOKS[ti].colors) || COLORS.slice(1);
+    const parts = burstParts(ti, 4, pal, true, null);
+    let reduce = false;
+    try { reduce = !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { }
+    g.levelUp = {
+      t: 0, dur: LEVEL_UP_MS, hold: false, at: 0,
+      title: copy.title, sub: copy.sub, beat: copy.beat,
+      level: toLevel, theme: ti, kind: clearKind(ti), parts, n: 4, reduce,
+      lines: g.lines
+    };
+    playLevelUpSfx(ti);
+    return g.levelUp;
+  }
+  function tickLevelUp(g, dt) {
+    const lu = g.levelUp;
+    if (!lu) return false;
+    if (lu.hold) return true;
+    lu.t += dt;
+    if (lu.t >= lu.dur) { g.levelUp = null; return false; }
     return true;
   }
   function newGame(opt) {
     opt = opt || {};
     const level = Math.max(1, opt.level || 1);
     const practice = !!opt.practice;
-    const g = { board: emptyBoard(), piece: spawn(1), bag: refillBag(), next: 0, hold: 0, canHold: true, score: 0, lines: (level - 1) * 10, level, over: false, paused: false, acc: 0, flashT: 0, popup: '', popupT: 0, practice, startLevel: level, clearFx: null, pendingLevel: null };
+    const g = { board: emptyBoard(), piece: spawn(1), bag: refillBag(), next: 0, hold: 0, canHold: true, score: 0, lines: (level - 1) * 10, level, over: false, paused: false, acc: 0, flashT: 0, popup: '', popupT: 0, practice, startLevel: level, clearFx: null, pendingLevel: null, levelUp: null };
     g.piece = spawn(takeNext(g));
     g.next = takeNext(g);
     return g;
@@ -740,7 +889,7 @@
       g.popupT = 1100;
       sfx(full.length === 4 ? 'tetris' : 'clear', full.length);
       if (g.level > oldLevel) {
-        g.pendingLevel = { theme: themeFor(g.level), popup: 'Level ' + g.level + '! +' + pts };
+        g.pendingLevel = { from: oldLevel, to: g.level };
       }
     } else sfx('lock');
     g.piece = spawn(g.next);
@@ -759,7 +908,7 @@
       return next;
     }
     if (g.over || g.paused) return g;
-    if (g.clearFx) return g;
+    if (g.clearFx || g.levelUp) return g;
     const p = g.piece;
     if (a === 'left' || a === 'right') {
       const dx = a === 'left' ? -1 : 1;
@@ -881,7 +1030,7 @@
     ac = null; sfxGain = null; musicGain = null; bgmGain = null; melodyBus = null; noiseBuf = null;
     bgmBufs = {}; bgmLoading = {};
   }
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear };
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI };
 
   if (!root.document) return;
   const doc = root.document;
@@ -939,7 +1088,7 @@
     g.lines = opts.lines || 0;
     g.level = Math.floor(g.lines / 10) + 1;
     g.score = opts.score || 0;
-    g.paused = false; g.over = false; g.demo = true; g.acc = 0; g.popupT = 0; g.flashT = 0;
+    g.paused = false; g.over = false; g.demo = true; g.acc = 0; g.popupT = 0; g.flashT = 0; g.levelUp = null;
     if (opts.board) g.board = opts.board;
     if (opts.piece) g.piece = opts.piece;
     if (opts.next != null) g.next = opts.next;
@@ -960,6 +1109,13 @@
       }
       g.board = g.board.filter((_, i) => rows.indexOf(i) < 0);
       while (g.board.length < ROWS) g.board.unshift(Array(COLS).fill(0));
+    }
+    if (opts.levelUp) {
+      const from = opts.levelUp.from != null ? opts.levelUp.from : Math.max(1, g.level - 1);
+      const to = opts.levelUp.to != null ? opts.levelUp.to : g.level;
+      startLevelUp(g, from, to);
+      g.levelUp.hold = true;
+      g.levelUp.at = opts.levelUp.at != null ? opts.levelUp.at : 0.32;
     }
     syncHud();
     const mb = doc.getElementById('musicbtn'); if (mb) mb.textContent = 'Music off';
@@ -1396,7 +1552,140 @@
     ctx.beginPath(); ctx.arc(x - r * 0.4, y - r * 0.55, r * 0.14, 0, 6.283); ctx.fill();
     ctx.beginPath(); ctx.arc(x + r * 0.4, y - r * 0.55, r * 0.14, 0, 6.283); ctx.fill();
   }
+  function drawPart(ctx, o, tSec, fade, n) {
+    const age = tSec - o.delay;
+    if (age < 0) return;
+    const life = 0.28 + n * 0.04;
+    const k = Math.max(0, 1 - age / life);
+    if (k <= 0) return;
+    const x = o.x0 + o.vx * age;
+    let y = o.y0 + o.vy * age + 70 * age * age;
+    const isHop = o.kind === 'frog' && (o.rot * 10) % 3 < 1.2;
+    if (isHop) {
+      const hopP = Math.min(1, age / 0.28);
+      y = o.y0 - o.hop * 4 * hopP * (1 - hopP);
+    }
+    ctx.globalAlpha = k * fade * (0.7 + 0.15 * n);
+    if (o.kind === 'bubbles') {
+      const by = y - age * 40;
+      ctx.strokeStyle = 'rgba(220,245,255,0.95)';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath(); ctx.arc(x, by, o.size, 0, 6.283); ctx.stroke();
+      ctx.fillStyle = 'rgba(220,245,255,0.18)'; ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.beginPath(); ctx.arc(x - o.size * 0.3, by - o.size * 0.3, o.size * 0.22, 0, 6.283); ctx.fill();
+    } else if (o.kind === 'stars') {
+      ctx.fillStyle = o.color;
+      drawStar(ctx, x, y, o.size * (0.7 + 0.3 * Math.sin((age + o.rot) * 10)));
+    } else if (o.kind === 'leaves') {
+      drawLeaf(ctx, x, y, o.size * 1.4, o.rot + o.spin * age, o.color);
+    } else if (o.kind === 'snow') {
+      drawFlake(ctx, x, y, o.size * 1.3, '#e0f2fe');
+    } else if (o.kind === 'frog') {
+      if (isHop) drawFrog(ctx, x, y, Math.max(4.5, o.size * 0.85));
+      else drawPad(ctx, x, y, o.size * 1.3, o.color);
+    } else {
+      ctx.fillStyle = rgbaHex(o.color, 0.35);
+      ctx.beginPath(); ctx.arc(x, y, o.size * 1.8, 0, 6.283); ctx.fill();
+      ctx.fillStyle = o.color;
+      drawStar(ctx, x, y, o.size);
+    }
+    ctx.globalAlpha = 1;
+  }
+  function candyScale(p, reduce) {
+    if (reduce) return 1;
+    if (p < 0.16) {
+      const k = p / 0.16;
+      const e = 1 - Math.pow(1 - k, 3);
+      return 0.28 + e * 1.0; // pop to 1.28
+    }
+    if (p < 0.28) {
+      const k = (p - 0.16) / 0.12;
+      return 1.28 - k * 0.28;
+    }
+    return 1 + 0.03 * Math.sin((p - 0.28) * 10);
+  }
+  function candyFade(p) {
+    if (p < 0.08) return p / 0.08;
+    if (p > 0.72) return Math.max(0, (1 - p) / 0.28);
+    return 1;
+  }
+  function drawCandyWord(ctx, text, x, y, size, alpha, scale) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+    ctx.globalAlpha = alpha;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '800 ' + size + 'px ' + FONT;
+    ctx.lineJoin = 'round';
+    ctx.miterLimit = 2;
+    ctx.shadowColor = 'rgba(255,110,200,0.9)';
+    ctx.shadowBlur = 26;
+    ctx.lineWidth = Math.max(6, size * 0.18);
+    ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+    ctx.strokeText(text, 0, 0);
+    const fill = ctx.createLinearGradient(0, -size * 0.7, 0, size * 0.65);
+    fill.addColorStop(0, '#fff7fb');
+    fill.addColorStop(0.22, '#ffd6ee');
+    fill.addColorStop(0.48, '#ff6bb5');
+    fill.addColorStop(0.78, '#f472b6');
+    fill.addColorStop(1, '#fb7185');
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = fill;
+    ctx.fillText(text, 0, 0);
+    ctx.shadowBlur = 0;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(-board.width, -size, board.width * 2, size * 0.48);
+    ctx.clip();
+    ctx.globalAlpha = alpha * 0.65;
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.fillText(text, 0, -size * 0.05);
+    ctx.restore();
+    ctx.restore();
+  }
+  function drawLevelUp(ctx, lu) {
+    if (!lu) return;
+    const p = lu.hold ? (lu.at || 0) : Math.min(1, lu.t / lu.dur);
+    const fade = candyFade(p);
+    const scale = candyScale(p, lu.reduce);
+    const tSec = p * (lu.dur / 1000);
+    ctx.save();
+    ctx.globalAlpha = 0.28 * fade;
+    ctx.fillStyle = '#140814';
+    ctx.fillRect(0, 0, board.width, board.height);
+    ctx.restore();
+    // Soft shimmer sweep across the board
+    const sw = board.width * 0.42;
+    const sx = -sw + Math.min(1, p / 0.55) * (board.width + sw * 2);
+    const sg = ctx.createLinearGradient(sx, 0, sx + sw, board.height * 0.15);
+    sg.addColorStop(0, 'rgba(255,255,255,0)');
+    sg.addColorStop(0.45, 'rgba(255,230,250,' + (0.22 * fade) + ')');
+    sg.addColorStop(0.5, 'rgba(255,255,255,' + (0.4 * fade) + ')');
+    sg.addColorStop(0.55, 'rgba(255,210,240,' + (0.22 * fade) + ')');
+    sg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = sg;
+    ctx.fillRect(0, 0, board.width, board.height);
+    for (const o of lu.parts) drawPart(ctx, o, tSec, fade, lu.n || 4);
+    const cx = board.width / 2;
+    const cy = board.height / 2 - 18;
+    const size = lu.beat && lu.title.length > 10 ? 28 : 36;
+    drawCandyWord(ctx, lu.title, cx, cy, size, fade, scale);
+    ctx.save();
+    ctx.globalAlpha = fade * (p < 0.14 ? Math.max(0, (p - 0.06) / 0.08) : 1);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '600 16px ' + FONT;
+    ctx.shadowColor = 'rgba(20,8,16,0.65)';
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = '#fff7fb';
+    ctx.fillText(lu.sub, cx, cy + 36);
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
   function drawClearFx(ctx, fx) {
+
     if (!fx) return;
     const p = fx.hold ? fx.at : Math.min(1, fx.t / fx.dur);
     const n = fx.n;
@@ -1504,7 +1793,8 @@
     const dt = now - last;
     last = now;
     const clearing = tickClear(g, dt);
-    const running = started && !g.over && !g.paused && !g.demo && !clearing;
+    const leveling = tickLevelUp(g, dt);
+    const running = started && !g.over && !g.paused && !g.demo && !clearing && !leveling;
     if (running) {
       g.acc += dt;
       if (g.acc >= dropInterval(g.level)) {
@@ -1547,6 +1837,7 @@
         }));
       }
       if (fx) drawClearFx(ctx, fx);
+      if (g.levelUp) drawLevelUp(ctx, g.levelUp);
       ctx.textAlign = 'right';
       ctx.font = '600 16px ' + FONT;
       ctx.fillStyle = 'rgba(255,255,255,0.85)';
@@ -1560,7 +1851,7 @@
         ctx.fillText(g.popup, board.width / 2, board.height / 2 - 40 - (1 - k) * 40);
         ctx.globalAlpha = 1;
       }
-      if (!g.demo && (!started || g.over || g.paused)) {
+      if (!g.demo && !g.levelUp && (!started || g.over || g.paused)) {
         ctx.fillStyle = 'rgba(10,11,14,0.72)';
         ctx.fillRect(0, 0, board.width, board.height);
         ctx.fillStyle = '#ffffff';
