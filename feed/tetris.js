@@ -104,7 +104,22 @@
       bells: ['A4', 'C5', 'D5', 'E5', 'G5', 'A5'] },
     { name: 'Night sky', beat: 0.95, pad: 'sine', ambient: 'shimmer', critter: 'twinkle', pitch: 1.335, sfx: 'sine',
       chords: [['E3', 'B3', 'DS4', 'GS4'], ['CS3', 'GS3', 'B3', 'E4'], ['A2', 'E3', 'GS3', 'CS4'], ['B2', 'FS3', 'A3', 'DS4']],
-      bells: ['E5', 'FS5', 'GS5', 'B5', 'CS6', 'E6'] }
+      bells: ['E5', 'FS5', 'GS5', 'B5', 'CS6', 'E6'] },
+    { name: 'Farmyard', beat: 0.7, pad: 'triangle', ambient: 'wind', critter: 'bird', pitch: 1, sfx: 'triangle',
+      chords: [['G2', 'D3', 'G3', 'B3'], ['C3', 'G3', 'C4', 'E4'], ['E2', 'B2', 'G3', 'B3'], ['D3', 'A3', 'D4', 'FS4']],
+      bells: ['G4', 'A4', 'B4', 'D5', 'E5', 'G5'] },
+    { name: 'Space travel', beat: 1, pad: 'sine', ambient: 'none', critter: 'whale', pitch: 0.75, sfx: 'sine',
+      chords: [['C3', 'G3', 'B3', 'E4'], ['A2', 'E3', 'G3', 'B3'], ['F2', 'C3', 'E3', 'A3'], ['G2', 'D3', 'FS3', 'B3']],
+      bells: ['B4', 'C5', 'E5', 'G5', 'A5', 'B5'] },
+    { name: 'Triangles', beat: 0.65, pad: 'triangle', ambient: 'none', critter: 'none', pitch: 1.19, sfx: 'sine',
+      chords: [['E3', 'B3', 'E4', 'G4'], ['C3', 'G3', 'C4', 'E4'], ['D3', 'A3', 'D4', 'FS4'], ['B2', 'FS3', 'B3', 'D4']],
+      bells: ['E5', 'FS5', 'G5', 'B5', 'D6', 'E6'] },
+    { name: 'New Zealand', beat: 0.75, pad: 'sine', ambient: 'wave', critter: 'tui', pitch: 0.94, sfx: 'sine',
+      chords: [['F2', 'C3', 'F3', 'A3'], ['D3', 'A3', 'D4', 'F4'], ['AS2', 'F3', 'AS3', 'D4'], ['C3', 'G3', 'C4', 'E4']],
+      bells: ['F4', 'G4', 'A4', 'C5', 'D5', 'F5'] },
+    { name: 'Snowy mountains', beat: 0.9, pad: 'sine', ambient: 'wind', critter: 'none', pitch: 1.06, sfx: 'sine',
+      chords: [['A2', 'E3', 'A3', 'C4'], ['F2', 'C3', 'F3', 'A3'], ['C3', 'G3', 'C4', 'E4'], ['G2', 'D3', 'G3', 'B3']],
+      bells: ['A4', 'C5', 'D5', 'E5', 'G5', 'A5'] }
   ];
   // Colours and see-through backgrounds for each theme (same order as THEMES).
   const LOOKS = [
@@ -113,7 +128,12 @@
     { colors: ['#22d3ee', '#3b82f6', '#06b6d4', '#a5f3fc', '#14b8a6', '#818cf8', '#38bdf8'], bg: 'linear-gradient(180deg,#0b8fb0 0%,#065a82 40%,#03263f 100%)', board: 'rgba(2,20,36,0.55)' },
     { colors: ['#a3e635', '#65a30d', '#d97706', '#fbbf24', '#4ade80', '#b45309', '#e11d48'], bg: 'linear-gradient(180deg,#365314 0%,#1a2e05 55%,#3b2a14 100%)', board: 'rgba(16,20,6,0.55)' },
     { colors: ['#f472b6', '#22d3ee', '#a855f7', '#facc15', '#34d399', '#fb923c', '#60a5fa'], bg: 'linear-gradient(180deg,#0f172a 0%,#312e81 55%,#831843 100%)', board: 'rgba(10,10,25,0.55)' },
-    { colors: ['#e0e7ff', '#a78bfa', '#fde68a', '#facc15', '#93c5fd', '#c4b5fd', '#f9a8d4'], bg: 'radial-gradient(1px 1px at 20% 30%,#fff,transparent),radial-gradient(1px 1px at 70% 15%,#fff,transparent),radial-gradient(1.5px 1.5px at 45% 60%,#fff,transparent),radial-gradient(1px 1px at 85% 75%,#fff,transparent),linear-gradient(180deg,#020617 0%,#1e1b4b 60%,#312e81 100%)', board: 'rgba(5,6,25,0.5)' }
+    { colors: ['#e0e7ff', '#a78bfa', '#fde68a', '#facc15', '#93c5fd', '#c4b5fd', '#f9a8d4'], bg: 'radial-gradient(1px 1px at 20% 30%,#fff,transparent),radial-gradient(1px 1px at 70% 15%,#fff,transparent),radial-gradient(1.5px 1.5px at 45% 60%,#fff,transparent),radial-gradient(1px 1px at 85% 75%,#fff,transparent),linear-gradient(180deg,#020617 0%,#1e1b4b 60%,#312e81 100%)', board: 'rgba(5,6,25,0.5)' },
+    { colors: ['#facc15', '#ef4444', '#84cc16', '#fb923c', '#22c55e', '#f472b6', '#60a5fa'], bg: 'linear-gradient(180deg,#3b82f6 0%,#93c5fd 45%,#65a30d 100%)', board: 'rgba(20,40,10,0.5)' },
+    { colors: ['#c084fc', '#f472b6', '#22d3ee', '#fb923c', '#a3e635', '#818cf8', '#fde047'], bg: 'linear-gradient(180deg,#1e1b4b 0%,#581c87 55%,#0f172a 100%)', board: 'rgba(15,10,40,0.55)' },
+    { colors: ['#f43f5e', '#f59e0b', '#14b8a6', '#facc15', '#a855f7', '#06b6d4', '#ec4899'], bg: 'linear-gradient(135deg,#0f766e 0%,#7e22ce 50%,#ea580c 100%)', board: 'rgba(20,10,40,0.5)' },
+    { colors: ['#ef4444', '#14b8a6', '#22c55e', '#facc15', '#38bdf8', '#e5e7eb', '#f97316'], bg: 'linear-gradient(180deg,#2563eb 0%,#22d3ee 45%,#15803d 100%)', board: 'rgba(5,30,30,0.5)' },
+    { colors: ['#e0f2fe', '#93c5fd', '#f9a8d4', '#fde68a', '#5eead4', '#c4b5fd', '#fca5a5'], bg: 'linear-gradient(180deg,#f9a8d4 0%,#818cf8 45%,#1e3a8a 100%)', board: 'rgba(15,23,60,0.5)' }
   ];
   // Colourful picture behind each theme (same order as THEMES), softened with a dark veil so the blocks stand out.
   const PICS = THEMES.map((_, i) => 'tetris-bg/' + i + '.webp');
@@ -529,7 +549,22 @@
      { e: ['✈️'], n: 1, m: 'fly', sp: [18, 26], y: [0.05, 0.18], sz: [22, 26], a: 0.85 }],
     [{ e: ['*'], n: 40, m: 'star', y: [0, 0.7], sz: [1, 2.4], a: 1 },
      { e: ['.'], n: 8, m: 'firefly', y: [0.55, 0.95], sz: [2, 3.5], a: 0.9 },
-     { e: ['-'], n: 1, m: 'shoot', sz: [2, 2], a: 0.9 }]
+     { e: ['-'], n: 1, m: 'shoot', sz: [2, 2], a: 0.9 }],
+    [{ e: ['☁️'], n: 3, m: 'fly', sp: [6, 12], y: [0.04, 0.2], sz: [40, 60], a: 0.85 },
+     { e: ['🐄', '🐑', '🐖', '🐓', '🐥'], n: 4, m: 'walk', sp: [8, 16], y: [0.9, 0.97], sz: [24, 32], a: 0.95 },
+     { e: ['🐝', '🦋'], n: 3, m: 'flutter', sp: [14, 22], y: [0.3, 0.8], sz: [16, 22], a: 0.9 }],
+    [{ e: ['*'], n: 35, m: 'star', y: [0, 1], sz: [0.8, 2], a: 1 },
+     { e: ['🚀'], n: 1, m: 'fly', dir: 1, noflip: 1, vy: -16, sp: [26, 36], y: [0.7, 0.95], sz: [30, 36], a: 0.95 },
+     { e: ['🛸', '🪐', '🌍', '☄️'], n: 3, m: 'fly', sp: [6, 14], y: [0.1, 0.85], sz: [24, 36], a: 0.85 },
+     { e: ['-'], n: 1, m: 'shoot', sz: [2, 2], a: 0.9 }],
+    [{ e: ['^'], n: 14, m: 'tri', sp: [10, 22], sz: [10, 28], a: 0.45 }],
+    [{ e: ['🐑'], n: 4, m: 'walk', sp: [6, 12], y: [0.9, 0.97], sz: [22, 28], a: 0.95 },
+     { e: ['🌺'], n: 6, m: 'drift', sp: [12, 22], sz: [14, 22], a: 0.9 },
+     { e: ['🐦'], n: 2, m: 'fly', sp: [22, 32], y: [0.08, 0.35], sz: [20, 26], a: 0.9 },
+     { e: ['🌿'], n: 3, m: 'drift', sp: [10, 16], sz: [16, 22], a: 0.85 }],
+    [{ e: ['.'], n: 45, m: 'snow', sp: [16, 34], sz: [1.2, 3.2], a: 0.85 },
+     { e: ['❄️'], n: 6, m: 'drift', sp: [10, 18], sz: [14, 22], a: 0.9 },
+     { e: ['🦅'], n: 1, m: 'fly', sp: [18, 26], y: [0.08, 0.3], sz: [26, 32], a: 0.9 }]
   ];
   const fx = { cv: null, ctx: null, w: 0, h: 0, list: [], theme: -1, last: 0, cache: new Map(), off: false };
   try { fx.off = !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { }
@@ -552,11 +587,13 @@
     root.addEventListener('resize', fxSize);
   }
   function fxSpawn(k, first) {
-    const dir = Math.random() < 0.5 ? 1 : -1, sz = rnd(k.sz[0], k.sz[1]);
+    const dir = k.dir || (Math.random() < 0.5 ? 1 : -1), sz = rnd(k.sz[0], k.sz[1]);
     const c = { k, ch: k.e[Math.floor(Math.random() * k.e.length)], sz, dir, ph: rnd(0, 6.28), sp: k.sp ? rnd(k.sp[0], k.sp[1]) : 0 };
     const yr = k.y || [0, 1];
     c.y = fx.h * rnd(yr[0], yr[1]); c.y0 = c.y;
-    if (k.m === 'drift') { c.x = rnd(0, fx.w); c.y = first ? rnd(-20, fx.h) : -30; }
+    if (k.m === 'snow') { c.x = rnd(0, fx.w); c.y = first ? rnd(-10, fx.h) : -10; }
+    else if (k.m === 'tri') { c.x = rnd(0, fx.w); c.y = first ? rnd(0, fx.h) : fx.h + 40; c.hue = rnd(0, 360); }
+    else if (k.m === 'drift') { c.x = rnd(0, fx.w); c.y = first ? rnd(-20, fx.h) : -30; }
     else if (k.m === 'bubble') { c.x = rnd(0, fx.w); c.y = first ? rnd(0, fx.h) : fx.h + 10; }
     else if (k.m === 'twinkle' || k.m === 'star' || k.m === 'window' || k.m === 'firefly') { c.x = rnd(0, fx.w); }
     else if (k.m === 'shoot') { c.x = -999; c.wait = rnd(3, 9); }
@@ -587,7 +624,10 @@
     for (let i = 0; i < fx.list.length; i++) {
       let o = fx.list[i]; const k = o.k, m = k.m;
       let a = k.a, rot = 0, flip = o.dir > 0;
-      if (m === 'fly' || m === 'walk') { o.x += o.dir * o.sp * dt; o.y = o.y0 + (m === 'fly' ? Math.sin(t * 0.8 + o.ph) * 6 : 0); }
+      if (k.vy) o.y0 += k.vy * dt;
+      if (m === 'snow') { o.y += o.sp * dt; o.x += Math.sin(t * 0.7 + o.ph) * 10 * dt; }
+      else if (m === 'tri') { o.y -= o.sp * dt; o.x += Math.sin(t * 0.4 + o.ph) * 6 * dt; rot = t * 0.3 + o.ph; }
+      else if (m === 'fly' || m === 'walk') { o.x += o.dir * o.sp * dt; o.y = o.y0 + (m === 'fly' ? Math.sin(t * 0.8 + o.ph) * 6 : 0); }
       else if (m === 'flutter') { o.x += o.dir * o.sp * dt; o.y = o.y0 + Math.sin(t * 1.6 + o.ph) * 18; rot = Math.sin(t * 6 + o.ph) * 0.15; }
       else if (m === 'swim') { o.x += o.dir * o.sp * dt; const s = Math.sin(o.x / 60 + o.ph); o.y = o.y0 + s * (o.sz * 0.5); rot = -Math.cos(o.x / 60 + o.ph) * 0.35 * o.dir; }
       else if (m === 'drift') { o.y += o.sp * dt; o.x += Math.sin(t * 0.9 + o.ph) * 12 * dt; rot = Math.sin(t * 0.7 + o.ph) * 0.6; }
@@ -605,12 +645,14 @@
       if (gone && m !== 'twinkle') { fx.list[i] = fxSpawn(k, false); continue; }
       c.globalAlpha = a;
       if (m === 'bubble') { c.strokeStyle = 'rgba(220,245,255,0.8)'; c.lineWidth = 1.2; c.beginPath(); c.arc(o.x, o.y, o.sz, 0, 6.283); c.stroke(); }
+      else if (m === 'snow') { c.fillStyle = '#fff'; c.beginPath(); c.arc(o.x, o.y, o.sz, 0, 6.283); c.fill(); }
+      else if (m === 'tri') { c.save(); c.translate(o.x, o.y); c.rotate(rot); c.fillStyle = 'hsla(' + ((o.hue + t * 12) % 360) + ',90%,65%,1)'; c.beginPath(); c.moveTo(0, -o.sz); c.lineTo(o.sz * 0.87, o.sz * 0.5); c.lineTo(-o.sz * 0.87, o.sz * 0.5); c.closePath(); c.fill(); c.restore(); }
       else if (m === 'star') { c.fillStyle = '#fff'; c.beginPath(); c.arc(o.x, o.y, o.sz, 0, 6.283); c.fill(); }
       else if (m === 'window') { c.fillStyle = '#fde68a'; c.fillRect(o.x, o.y, o.sz, o.sz * 1.3); }
       else if (m === 'firefly') { c.fillStyle = '#bef264'; c.shadowColor = '#bef264'; c.shadowBlur = 8; c.beginPath(); c.arc(o.x, o.y, o.sz, 0, 6.283); c.fill(); c.shadowBlur = 0; }
       else {
         const g = glyph(o.ch, o.sz);
-        c.save(); c.translate(o.x, o.y); if (rot) c.rotate(rot); if (flip && m !== 'drift' && m !== 'twinkle') c.scale(-1, 1);
+        c.save(); c.translate(o.x, o.y); if (rot) c.rotate(rot); if (flip && !k.noflip && m !== 'drift' && m !== 'twinkle') c.scale(-1, 1);
         c.drawImage(g, -g.p / 2, -g.p / 2, g.p, g.p); c.restore();
       }
     }
