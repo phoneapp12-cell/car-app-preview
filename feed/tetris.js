@@ -75,7 +75,7 @@
     o.start(t0);
     o.stop(t0 + dur + 0.02);
   }
-  // Six calm themes (Beach, Rainforest, Ocean, Bush walk, City, Night sky); music, sounds, colours and background change every 5 levels (1-5, 6-10, ... 26-30 and beyond).
+  // Six calm themes (Beach, Rainforest, Ocean, Bush walk, City, Night sky); music, sounds, colours and background change every level, cycling round (1-5, 6-10, ... 26-30 and beyond).
   const SEMI = { C: 0, CS: 1, D: 2, DS: 3, E: 4, F: 5, FS: 6, G: 7, GS: 8, A: 9, AS: 10, B: 11 };
   function nf(n) {
     const oct = parseInt(n.slice(-1), 10);
@@ -112,7 +112,7 @@
     { colors: ['#e0e7ff', '#a78bfa', '#fde68a', '#facc15', '#93c5fd', '#c4b5fd', '#f9a8d4'], bg: 'radial-gradient(1px 1px at 20% 30%,#fff,transparent),radial-gradient(1px 1px at 70% 15%,#fff,transparent),radial-gradient(1.5px 1.5px at 45% 60%,#fff,transparent),radial-gradient(1px 1px at 85% 75%,#fff,transparent),linear-gradient(180deg,#020617 0%,#1e1b4b 60%,#312e81 100%)', board: 'rgba(5,6,25,0.5)' }
   ];
   let themeIdx = 0;
-  function themeFor(level) { return Math.max(0, Math.min(THEMES.length - 1, Math.floor((level - 1) / 5))); }
+  function themeFor(level) { return (Math.max(1, level) - 1) % THEMES.length; }
   function sfx(name) {
     if (!soundOn || !ac) return;
     const d = sfxGain, T = THEMES[themeIdx], m = T.pitch, w = T.sfx;
