@@ -274,7 +274,7 @@
 
   const prevCard = root.card;
   root.card = function (i) {
-    if (i && i.x === 'gamesoon') return `<article class="card soon" data-id="gamesoon" style="--c1:#7c3aed;--c2:#f59e0b"><div class="hd"><div class="av">🎮</div><div class="who"><b>Info Book</b><small>Not a game yet</small></div><span class="tp">Games</span></div><div class="soonband" aria-hidden="true">🎮 🎲 🧩</div><div class="bd"><h3>Games — coming soon</h3><ul class="sum open" data-more aria-expanded="true"><li>New games are on the way.</li><li>Nothing here plays yet.</li></ul><p class="soonnames"><span>Tetris</span></p></div></article>`;
+    if (i && i.x === 'gamesoon') return `<article class="card soon" data-id="gamesoon" style="--c1:#7c3aed;--c2:#f59e0b"><div class="hd"><div class="av">🎮</div><div class="who"><b>Info Book</b><small>Tetris is ready</small></div><span class="tp">Games</span></div><div class="soonband" aria-hidden="true">🎮 🎲 🧩</div><div class="bd"><h3>Games</h3><ul class="sum open" data-more aria-expanded="true"><li>Tetris opens here. Tap the board to start. Sound starts then too.</li><li>Other games are still coming soon.</li></ul><div class="xbtns"><button type="button" class="btn pri" data-art="tetris">Play Tetris</button></div><p class="soonnames"><span>More games coming soon</span></p></div></article>`;
     const html = prevCard ? prevCard(i) : '';
     const b = btn(i); if (!b || !html) return html;
     if (html.includes('<div class="xbtns">')) return html.replace('<div class="xbtns">', '<div class="xbtns">' + b);
