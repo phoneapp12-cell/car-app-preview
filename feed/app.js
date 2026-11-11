@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.140';
+const APP_VERSION = '1.9.141';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -1333,6 +1333,10 @@ function mfChip() {
   c.innerHTML = MF === 'all' ? '' : `<button type="button" data-mfset="all" aria-label="Show videos and pictures">${o[1]} ${o[2]} <b>✕</b></button>`;
 }
 function mfSet(v) { MF = v; ls.set('mediaFilter', v); mfDrawer(false); try { draw(); scrollTo(0, 0); } catch (e) { } toast(MF_OPTS.find(x => x[0] === v)[2]); }
+let GAMES_OPEN = false; // 1.9.141 Games sub-menu: play straight from the menu
+function gameSub() {
+  return `<button type="button" class="mfopt${GAMES_OPEN ? ' on' : ''}" data-gamesmenu="1" aria-expanded="${GAMES_OPEN}"><span class="mfe">🎮</span><span>Games · new</span><i>${GAMES_OPEN ? '▾' : '▸'}</i></button><div class="intsub"${GAMES_OPEN ? '' : ' hidden'}><button type="button" class="mfopt" data-art="tetris"><span class="mfe">🧱</span><span>Play Tetris</span></button><button type="button" class="mfopt" disabled aria-disabled="true"><span class="mfe">🔤</span><span>Scrabble · coming soon</span></button></div>`;
+}
 let INT_OPEN = false; // 1.9.122 Interests stays open while its switches are tapped
 function intSub() {
   const groups = TOPICS.filter(t => INTERESTS.some(x => x.topic === t[0]));
@@ -1364,7 +1368,7 @@ function mfDrawer(open) {
   // 1.9.123 content topics live only inside the Interests submenu
   const keepNav = new Set(['life', 'family', 'photos', 'liked']);
   const browse = topicList().filter(t => keepNav.has(t[0]));
-  const br = `<p class="mfsec">Browse</p><button type="button" class="mfopt" data-calopen="1"><span class="mfe">📅</span><span>Calendar</span></button>${intSub()}<button type="button" class="mfopt" data-soon="1"><span class="mfe">🎮</span><span>Games · new</span></button>` + browse.map(t =>
+  const br = `<p class="mfsec">Browse</p><button type="button" class="mfopt" data-calopen="1"><span class="mfe">📅</span><span>Calendar</span></button>${intSub()}${gameSub()}` + browse.map(t =>
     `<button type="button" class="mfopt${tab===t[0]?' on':''}" data-mftab="${t[0]}"><span class="mfe">${t[2]}</span><span>${esc(t[1])}${t[0]==='family'&&typeof famNewLikes==='function'&&famNewLikes()?' · new':''}</span>${tab===t[0]?'<i>✓</i>':''}</button>`
   ).join('') + `<button type="button" class="mfopt${tab==='all'?' on':''}" data-mftab="all"><span class="mfe">✨</span><span>All feed</span>${tab==='all'?'<i>✓</i>':''}</button>`;
   extra.innerHTML = br + x;
@@ -1376,6 +1380,8 @@ function mfDrawer(open) {
     const t = e.target; if (!t || !t.closest) return;
     if (t.closest('#mfbtn')) { mfDrawer(true); return; }
     if (t.closest('[data-calopen]')) { e.preventDefault(); mfDrawer(false); if (window.ibCalOpen) window.ibCalOpen(); return; }
+    if (t.closest('[data-gamesmenu]')) { e.preventDefault(); GAMES_OPEN = !GAMES_OPEN; mfDrawer(true); return; }
+    if (t.closest('.mfopt[data-art]')) { mfDrawer(false); return; } // play.js opens the game window
     if (t.closest('[data-intmenu]')) { e.preventDefault(); INT_OPEN = !INT_OPEN; mfDrawer(true); return; }
     const io = t.closest('[data-intoff]'); if (io) { e.preventDefault(); e.stopPropagation(); const n = io.dataset.intoff; if (!INT_BY_NAME.has(n)) return; if (INT_OFF[n]) delete INT_OFF[n]; else INT_OFF[n] = 1; ls.set('intOff', INT_OFF); for (const i of (FEED && FEED.items) || []) delete i._ints; INT_OPEN = true; mfDrawer(true); try { const sheet = document.getElementById('sheet'); if (sheet && sheet.classList.contains('on')) { const y = sheet.scrollTop; settings(); sheet.scrollTop = y; } } catch (err) { } try { draw(); } catch (err) { } toast((INT_OFF[n] ? 'Off: ' : 'On: ') + n); return; }
     if (t.closest('[data-soon]')) { e.preventDefault(); mfDrawer(false); if (window.ibSoon) window.ibSoon(); return; }
