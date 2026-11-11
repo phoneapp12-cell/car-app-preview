@@ -28,7 +28,7 @@
         if (!Ctor) return;
         ac = new Ctor();
         sfxGain = ac.createGain();
-        sfxGain.gain.value = 0.5;
+        sfxGain.gain.value = 0.4;
         sfxGain.connect(ac.destination);
         musicGain = ac.createGain();
         musicGain.gain.value = 0.22;
@@ -79,16 +79,17 @@
     if (!soundOn || !ac) return;
     const d = sfxGain;
     switch (name) {
-      case 'move': tone(300, 0.04, 'square', 0.12, 0, 0, d); break;
-      case 'rotate': tone(520, 0.06, 'square', 0.12, 0, 700, d); break;
-      case 'soft': tone(180, 0.03, 'triangle', 0.12, 0, 0, d); break;
-      case 'drop': tone(500, 0.14, 'sawtooth', 0.18, 0, 70, d); break;
-      case 'lock': tone(140, 0.08, 'triangle', 0.35, 0, 90, d); break;
-      case 'hold': tone(660, 0.05, 'sine', 0.25, 0, 0, d); tone(880, 0.06, 'sine', 0.25, 0.05, 0, d); break;
-      case 'clear': [523, 659, 784].forEach((f, i) => tone(f, 0.12, 'square', 0.18, i * 0.06, 0, d)); break;
-      case 'tetris': [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.16, 'square', 0.2, i * 0.07, 0, d)); break;
-      case 'level': [784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.1, 'triangle', 0.25, i * 0.08, 0, d)); break;
-      case 'over': [440, 370, 311, 262, 196].forEach((f, i) => tone(f, 0.28, 'sawtooth', 0.18, i * 0.18, 0, d)); break;
+      // Soft chimes and water drops to suit the calm ocean music.
+      case 'move': tone(880, 0.05, 'sine', 0.05, 0, 0, d); break;
+      case 'rotate': tone(700, 0.09, 'sine', 0.09, 0, 1200, d); break;
+      case 'soft': tone(520, 0.03, 'sine', 0.03, 0, 0, d); break;
+      case 'drop': tone(420, 0.22, 'sine', 0.12, 0, 160, d); break;
+      case 'lock': tone(330, 0.12, 'triangle', 0.08, 0, 260, d); break;
+      case 'hold': tone(784, 0.18, 'sine', 0.08, 0, 0, d); tone(1047, 0.22, 'sine', 0.07, 0.08, 0, d); break;
+      case 'clear': [784, 988, 1175].forEach((f, i) => tone(f, 0.5, 'sine', 0.09, i * 0.09, 0, d)); break;
+      case 'tetris': [523, 659, 784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.7, 'sine', 0.09, i * 0.09, 0, d)); break;
+      case 'level': [659, 784, 988, 1319].forEach((f, i) => tone(f, 0.6, 'sine', 0.08, i * 0.12, 0, d)); break;
+      case 'over': [523, 440, 392, 330].forEach((f, i) => tone(f, 0.9, 'sine', 0.09, i * 0.3, 0, d)); break;
       default: break;
     }
   }
