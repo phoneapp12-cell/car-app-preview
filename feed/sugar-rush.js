@@ -1,9 +1,9 @@
-/* Info Book 1.9.165 – Sugar Rush, levels 1–10. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.166 – Sugar Rush, levels 1–10. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
    Only Shane can play for now (IBScores.isShane() from scores.js); everyone else sees a coming-soon screen.
-   Scores are not sent to the family scoreboard yet. Good moves are spoken in a warm, soft New Zealand voice
+   Scores are not sent to the family scoreboard yet. Good moves are spoken in a bright, punchy callout voice (matched to Shane's "Great!" clip)
    (Yay, Great, Awesome, Sweet as, Succulent). A plain 3-match plays a short, soft chime (about 200 ms, sine
    with a gentle bell harmonic, 400–800 Hz, 2.5 kHz lowpass). There are no pack pops, smashes or synth select
    or swap sounds. Voices sit clearly above the music, through a compressor, with a brief music duck that
@@ -581,8 +581,8 @@
   // the SW leaves range requests alone.
   const MEDIA_HASH = {
     'sugar-rush-music.mp3': '39970f66', 'sugar-rush-menu.mp3': '3343a079', 'sugar-rush-win.mp3': '9b0efbad', 'sugar-rush-yum.mp3': 'ac1b2cf5',
-    'sugar-rush-voice-yay.mp3': '40e8206a', 'sugar-rush-voice-great.mp3': '97351d14', 'sugar-rush-voice-awesome.mp3': '5a118908',
-    'sugar-rush-voice-sweetas.mp3': '6afb7d4d', 'sugar-rush-voice-succulent.mp3': 'cbe4f93d'
+    'sugar-rush-voice-yay.mp3': '6ca043f6', 'sugar-rush-voice-great.mp3': 'c287c114', 'sugar-rush-voice-awesome.mp3': 'a56af295',
+    'sugar-rush-voice-sweetas.mp3': '50b435e6', 'sugar-rush-voice-succulent.mp3': '1d5018ba'
   };
   function mediaUrl(file) { return file.replace(/\.mp3$/, '-' + MEDIA_HASH[file] + '.mp3'); }
 
