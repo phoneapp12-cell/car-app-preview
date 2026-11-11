@@ -20,6 +20,13 @@ cat > "$out/_headers" <<'H'
 /feed/tetris.html
   ! X-Frame-Options
   X-Frame-Options: SAMEORIGIN
+# 1.9.147 Scrabble opens in the same feed window, so it needs the same rule.
+/feed/scrabble
+  ! X-Frame-Options
+  X-Frame-Options: SAMEORIGIN
+/feed/scrabble.html
+  ! X-Frame-Options
+  X-Frame-Options: SAMEORIGIN
 /sw.js
   Cache-Control: no-cache
 /index.html
