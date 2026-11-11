@@ -1,6 +1,6 @@
 /* Info Book – service worker. To ship an update: change VERSION. */
 const CACHE = 'my-feed-';
-const VERSION = '1.9.144';
+const VERSION = '1.9.145';
 const SHELL = ['./', 'index.html', 'portal.js?v=' + VERSION, 'app.js?v=' + VERSION, 'family.js?v=' + VERSION, 'extras.js?v=' + VERSION, 'jokes.js?v=' + VERSION, 'learn.js?v=' + VERSION, 'common-en.js?v=' + VERSION, 'explain.js?v=' + VERSION, 'effects.js?v=' + VERSION, 'stories.js?v=' + VERSION, 'weekly.js?v=' + VERSION, 'play.js?v=' + VERSION, 'nz.js?v=' + VERSION, 'read.js?v=' + VERSION, 'sights.js?v=' + VERSION, 'art3d.js?v=' + VERSION, 'cal.js?v=' + VERSION, 'back.js?v=' + VERSION, 'manifest.webmanifest', 'icons/icon-192.png', 'icons/logo.svg', 'img/xmas.webp', 'img/newyear.webp', 'img/play/banner-match.svg', 'img/play/banner-sitcom.svg', 'img/play/banner-animal.svg', 'img/play/zoomquilt.svg', 'img/play/falling.svg', 'img/play/tetris.svg', 'tetris', 'tetris.js', 'img/play/kiwi.svg', 'img/play/tui.svg', 'img/play/pukeko.svg', 'img/play/korora.svg', 'img/play/kea.svg', 'img/play/fantail.svg', 'img/play/ruru.svg', 'img/play/dog.svg'];
 /* 1.9.83 wait-verify: new SW waits (no skipWaiting or clients.claim) — new SW waits until the next open so the page never reloads mid-session */
 self.addEventListener('install', e => {
@@ -13,7 +13,7 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(n => n.startsWith(CACHE) && n !== CACHE + VERSION).map(n => caches.delete(n))))); });
 self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
-  if (e.request.method !== 'GET' || u.origin !== location.origin) return; // feed data and pictures go straight to the network
+  if (e.request.method !== 'GET' || u.origin !== location.origin || /\.mp3$/i.test(u.pathname)) return; // music streams with range requests, so leave it to the browser // feed data and pictures go straight to the network
   // Revalidate the page and every script. A cached index.html is what leaves a phone on old portal.js.
   const bust = e.request.mode === 'navigate' || /\.js$/i.test(u.pathname);
   const net = bust ? fetch(e.request.url, { cache: 'no-cache', credentials: 'same-origin', redirect: 'follow' }) : fetch(e.request);
