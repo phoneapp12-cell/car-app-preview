@@ -75,62 +75,109 @@
     o.start(t0);
     o.stop(t0 + dur + 0.02);
   }
-  function sfx(name) {
-    if (!soundOn || !ac) return;
-    const d = sfxGain;
-    switch (name) {
-      // Soft chimes and water drops to suit the calm ocean music.
-      case 'move': tone(880, 0.05, 'sine', 0.05, 0, 0, d); break;
-      case 'rotate': tone(700, 0.09, 'sine', 0.09, 0, 1200, d); break;
-      case 'soft': tone(520, 0.03, 'sine', 0.03, 0, 0, d); break;
-      case 'drop': tone(420, 0.22, 'sine', 0.12, 0, 160, d); break;
-      case 'lock': tone(330, 0.12, 'triangle', 0.08, 0, 260, d); break;
-      case 'hold': tone(784, 0.18, 'sine', 0.08, 0, 0, d); tone(1047, 0.22, 'sine', 0.07, 0.08, 0, d); break;
-      case 'clear': [784, 988, 1175].forEach((f, i) => tone(f, 0.5, 'sine', 0.09, i * 0.09, 0, d)); break;
-      case 'tetris': [523, 659, 784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.7, 'sine', 0.09, i * 0.09, 0, d)); break;
-      case 'level': [659, 784, 988, 1319].forEach((f, i) => tone(f, 0.6, 'sine', 0.08, i * 0.12, 0, d)); break;
-      case 'over': [523, 440, 392, 330].forEach((f, i) => tone(f, 0.9, 'sine', 0.09, i * 0.3, 0, d)); break;
-      default: break;
-    }
-  }
-  // Calm ocean music: soft sine pads, gentle bell notes, slow wave swells and the odd dolphin chirp. Same slow pace at every level.
+  // Six calm themes; music and sounds change every 5 levels (1-5, 6-10, ... 26-30 and beyond).
   const SEMI = { C: 0, CS: 1, D: 2, DS: 3, E: 4, F: 5, FS: 6, G: 7, GS: 8, A: 9, AS: 10, B: 11 };
   function nf(n) {
     const oct = parseInt(n.slice(-1), 10);
     const midi = 12 * (oct + 1) + SEMI[n.slice(0, -1)];
     return 440 * Math.pow(2, (midi - 69) / 12);
   }
-  const OCEAN_CHORDS = [
-    ['F3', 'A3', 'C4', 'E4'], ['C3', 'G3', 'B3', 'E4'], ['A2', 'E3', 'G3', 'C4'], ['G2', 'D3', 'G3', 'B3']
+  const THEMES = [
+    { name: 'Ocean', beat: 0.75, pad: 'sine', ambient: 'wave', critter: 'dolphin', pitch: 1, sfx: 'sine',
+      chords: [['F3', 'A3', 'C4', 'E4'], ['C3', 'G3', 'B3', 'E4'], ['A2', 'E3', 'G3', 'C4'], ['G2', 'D3', 'G3', 'B3']],
+      bells: ['C5', 'D5', 'E5', 'G5', 'A5', 'C6'] },
+    { name: 'Rainforest', beat: 0.7, pad: 'triangle', ambient: 'rain', critter: 'bird', pitch: 1.122, sfx: 'triangle',
+      chords: [['D3', 'A3', 'D4', 'FS4'], ['B2', 'FS3', 'A3', 'D4'], ['G2', 'D3', 'B3', 'D4'], ['A2', 'E3', 'A3', 'CS4']],
+      bells: ['D5', 'E5', 'FS5', 'A5', 'B5', 'D6'] },
+    { name: 'Starry night', beat: 0.85, pad: 'sine', ambient: 'shimmer', critter: 'twinkle', pitch: 1.335, sfx: 'sine',
+      chords: [['E3', 'B3', 'DS4', 'GS4'], ['CS3', 'GS3', 'B3', 'E4'], ['A2', 'E3', 'GS3', 'CS4'], ['B2', 'FS3', 'A3', 'DS4']],
+      bells: ['E5', 'FS5', 'GS5', 'B5', 'CS6', 'E6'] },
+    { name: 'Coral reef', beat: 0.65, pad: 'triangle', ambient: 'bubbles', critter: 'bubble', pitch: 0.891, sfx: 'triangle',
+      chords: [['AS2', 'F3', 'A3', 'D4'], ['G2', 'D3', 'F3', 'AS3'], ['DS3', 'AS3', 'D4', 'G4'], ['F2', 'C3', 'F3', 'A3']],
+      bells: ['AS4', 'C5', 'D5', 'F5', 'G5', 'AS5'] },
+    { name: 'Northern lights', beat: 0.9, pad: 'sine', ambient: 'shimmer', critter: 'twinkle', pitch: 0.794, sfx: 'sine',
+      chords: [['A2', 'E3', 'B3', 'C4'], ['F2', 'C3', 'G3', 'A3'], ['C3', 'G3', 'B3', 'E4'], ['G2', 'D3', 'A3', 'B3']],
+      bells: ['A4', 'B4', 'C5', 'E5', 'G5', 'A5'] },
+    { name: 'Deep sea', beat: 1, pad: 'sine', ambient: 'wave', critter: 'whale', pitch: 0.667, sfx: 'sine',
+      chords: [['D2', 'A2', 'F3', 'C4'], ['AS1', 'F2', 'D3', 'A3'], ['G2', 'D3', 'AS3', 'D4'], ['A2', 'E3', 'G3', 'CS4']],
+      bells: ['D4', 'F4', 'G4', 'A4', 'C5', 'D5'] }
   ];
-  const BELL_NOTES = ['C5', 'D5', 'E5', 'G5', 'A5', 'C6'];
+  let themeIdx = 0;
+  function themeFor(level) { return Math.max(0, Math.min(THEMES.length - 1, Math.floor((level - 1) / 5))); }
+  function sfx(name) {
+    if (!soundOn || !ac) return;
+    const d = sfxGain, T = THEMES[themeIdx], m = T.pitch, w = T.sfx;
+    switch (name) {
+      // Soft chimes and drops, pitched and voiced to the current theme.
+      case 'move': tone(880 * m, 0.05, w, 0.05, 0, 0, d); break;
+      case 'rotate': tone(700 * m, 0.09, w, 0.09, 0, 1200 * m, d); break;
+      case 'soft': tone(520 * m, 0.03, w, 0.03, 0, 0, d); break;
+      case 'drop': tone(420 * m, 0.22, w, 0.12, 0, 160 * m, d); break;
+      case 'lock': tone(330 * m, 0.12, 'triangle', 0.08, 0, 260 * m, d); break;
+      case 'hold': tone(784 * m, 0.18, w, 0.08, 0, 0, d); tone(1047 * m, 0.22, w, 0.07, 0.08, 0, d); break;
+      case 'clear': [0, 2, 3].forEach((k, i) => tone(nf(T.bells[k]), 0.5, w, 0.09, i * 0.09, 0, d)); break;
+      case 'tetris': [0, 1, 2, 3, 4, 5].forEach((k, i) => tone(nf(T.bells[k]), 0.7, w, 0.09, i * 0.09, 0, d)); break;
+      case 'level': [1, 2, 3, 5].forEach((k, i) => tone(nf(THEMES[themeIdx].bells[k]), 0.6, w, 0.08, i * 0.12, 0, d)); break;
+      case 'over': [5, 3, 2, 0].forEach((k, i) => tone(nf(T.bells[k]) / 2, 0.9, 'sine', 0.09, i * 0.3, 0, d)); break;
+      default: break;
+    }
+  }
   const BELLS = [
     [0, 4], [1.5, 2], [3, 3], [5, 1], [6.5, 0], [9, 2], [10, 4], [12.5, 3], [14, 5], [17, 2], [18.5, 1], [21, 0], [22, 2], [25, 4], [26.5, 3], [29, 1], [30, 0]
   ];
-  const STEPS = (function () {
+  const STEPS = THEMES.map(T => {
     const steps = [];
     const add = (pos, e) => { const i = Math.round(pos * 2); while (steps.length <= i) steps.push([]); steps[i].push(e); };
     const bars = 8, len = bars * 4;
     for (let b = 0; b < bars; b++) {
-      const ch = OCEAN_CHORDS[b % OCEAN_CHORDS.length];
-      ch.forEach((n, k) => add(b * 4 + k * 0.25, { v: 'pad', f: nf(n), d: 4.6 }));
-      if (b % 2 === 0) add(b * 4, { v: 'wave', d: 8 });
+      T.chords[b % T.chords.length].forEach((n, k) => add(b * 4 + k * 0.25, { v: 'pad', f: nf(n), d: 4.6 }));
+      if (T.ambient === 'wave' && b % 2 === 0) add(b * 4, { v: 'wave', d: 8 });
+      if (T.ambient === 'rain') add(b * 4, { v: 'rain', d: 4.2 });
+      if (T.ambient === 'shimmer' && b % 2 === 1) add(b * 4, { v: 'shimmer', f: nf(T.bells[5]), d: 6 });
+      if (T.ambient === 'bubbles') [0.5, 1.75, 3].forEach(p => add(b * 4 + p, { v: 'bubble' }));
     }
-    for (const [pos, k] of BELLS) add(pos, { v: 'bell', f: nf(BELL_NOTES[k]), d: 3 });
-    [7, 23].forEach(p => add(p, { v: 'chirp' }));
+    for (const [pos, k] of BELLS) add(pos, { v: 'bell', f: nf(T.bells[k]), d: 3 });
+    [7, 23].forEach(p => add(p, { v: T.critter }));
     while (steps.length < len * 2) steps.push([]);
     return steps;
-  })();
-  function playEvent(e, at, beat) {
+  });
+  function blip(f0, f1, f2, t0, dur, vol, dest, type) {
+    const o = ac.createOscillator();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(f0, t0);
+    o.frequency.exponentialRampToValueAtTime(f1, t0 + dur * 0.45);
+    o.frequency.exponentialRampToValueAtTime(f2, t0 + dur);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(vol, t0 + Math.min(0.02, dur * 0.2));
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(dest); o.start(t0); o.stop(t0 + dur + 0.02);
+  }
+  function noiseSwell(at, d, peak, lo, hi) {
+    const src = ac.createBufferSource();
+    src.buffer = noiseBuf; src.loop = true;
+    const f = ac.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.setValueAtTime(lo, at);
+    f.frequency.linearRampToValueAtTime(hi, at + d * 0.45);
+    f.frequency.linearRampToValueAtTime(lo, at + d);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.linearRampToValueAtTime(peak, at + d * 0.45);
+    g.gain.linearRampToValueAtTime(0.0001, at + d);
+    src.connect(f); f.connect(g); g.connect(musicGain);
+    src.start(at, Math.random() * 0.5); src.stop(at + d + 0.05);
+  }
+  function playEvent(e, at, beat, T) {
     if (!ac || !musicGain) return;
     if (e.v === 'pad') {
       const o = ac.createOscillator();
-      o.type = 'sine';
+      o.type = T.pad;
       o.frequency.setValueAtTime(e.f, at);
       const g = ac.createGain();
       const d = e.d * beat;
       g.gain.setValueAtTime(0.0001, at);
-      g.gain.linearRampToValueAtTime(0.06, at + d * 0.35);
+      g.gain.linearRampToValueAtTime(T.pad === 'sine' ? 0.06 : 0.045, at + d * 0.35);
       g.gain.linearRampToValueAtTime(0.0001, at + d);
       o.connect(g); g.connect(musicGain); o.start(at); o.stop(at + d + 0.05);
     } else if (e.v === 'bell') {
@@ -145,44 +192,45 @@
         g.gain.exponentialRampToValueAtTime(0.0001, at + d);
         o.connect(g); g.connect(melodyBus); o.start(at); o.stop(at + d + 0.05);
       });
-    } else if (e.v === 'wave' && noiseBuf) {
-      const d = e.d * beat;
+    } else if (e.v === 'wave' && noiseBuf) noiseSwell(at, e.d * beat, 0.12, 250, 900);
+    else if (e.v === 'rain' && noiseBuf) {
       const src = ac.createBufferSource();
       src.buffer = noiseBuf; src.loop = true;
       const f = ac.createBiquadFilter();
-      f.type = 'lowpass';
-      f.frequency.setValueAtTime(300, at);
-      f.frequency.linearRampToValueAtTime(900, at + d * 0.45);
-      f.frequency.linearRampToValueAtTime(250, at + d);
+      f.type = 'bandpass'; f.frequency.value = 3200; f.Q.value = 0.6;
       const g = ac.createGain();
+      const d = e.d * beat;
       g.gain.setValueAtTime(0.0001, at);
-      g.gain.linearRampToValueAtTime(0.12, at + d * 0.45);
+      g.gain.linearRampToValueAtTime(0.05, at + 0.6);
+      g.gain.setValueAtTime(0.05, at + d - 0.6);
       g.gain.linearRampToValueAtTime(0.0001, at + d);
       src.connect(f); f.connect(g); g.connect(musicGain);
       src.start(at, Math.random() * 0.5); src.stop(at + d + 0.05);
-    } else if (e.v === 'chirp') {
-      for (let i = 0; i < 3; i++) {
-        const t0 = at + i * 0.16, base = 1700 + Math.random() * 500;
-        const o = ac.createOscillator();
-        o.type = 'sine';
-        o.frequency.setValueAtTime(base, t0);
-        o.frequency.exponentialRampToValueAtTime(base * 1.6, t0 + 0.06);
-        o.frequency.exponentialRampToValueAtTime(base * 0.9, t0 + 0.13);
-        const g = ac.createGain();
-        g.gain.setValueAtTime(0.0001, t0);
-        g.gain.linearRampToValueAtTime(0.03, t0 + 0.02);
-        g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.14);
-        o.connect(g); g.connect(melodyBus); o.start(t0); o.stop(t0 + 0.16);
-      }
+    } else if (e.v === 'shimmer') {
+      [1, 1.5, 2].forEach((m, i) => blip(e.f * m, e.f * m * 1.003, e.f * m, at + i * 0.4, e.d * beat, 0.018, melodyBus));
+    } else if (e.v === 'bubble') {
+      const f = 400 + Math.random() * 500;
+      blip(f, f * 2.2, f * 2.6, at, 0.09, 0.035, musicGain);
+    } else if (e.v === 'dolphin') {
+      for (let i = 0; i < 3; i++) { const b = 1700 + Math.random() * 500; blip(b, b * 1.6, b * 0.9, at + i * 0.16, 0.14, 0.03, melodyBus); }
+    } else if (e.v === 'bird') {
+      for (let i = 0; i < 4; i++) { const b = 2400 + Math.random() * 600; blip(b, b * 1.25, b * 0.95, at + i * 0.12, 0.09, 0.025, melodyBus); }
+    } else if (e.v === 'twinkle') {
+      [0, 0.2, 0.45].forEach((dt, i) => blip(nf(T.bells[3 + i]) * 2, nf(T.bells[3 + i]) * 2, nf(T.bells[3 + i]) * 2, at + dt, 0.6, 0.02, melodyBus));
+    } else if (e.v === 'whale') {
+      blip(180, 320, 140, at, 2.6, 0.05, melodyBus);
+      blip(240, 400, 200, at + 2, 2.2, 0.035, melodyBus);
     }
   }
-  function scheduleMusic() {
+  function scheduleMusic(level) {
     if (!ac || !musicGain) return;
-    const beat = 0.75;
+    const ti = themeFor(level || 1);
+    if (ti !== themeIdx) { themeIdx = ti; noteIdx = 0; }
+    const T = THEMES[themeIdx], steps = STEPS[themeIdx], beat = T.beat;
     if (nextNoteTime < ac.currentTime) nextNoteTime = ac.currentTime + 0.05;
     while (nextNoteTime < ac.currentTime + 0.25) {
-      const evs = STEPS[noteIdx % STEPS.length];
-      for (const e of evs) playEvent(e, nextNoteTime, beat);
+      const evs = steps[noteIdx % steps.length];
+      for (const e of evs) playEvent(e, nextNoteTime, beat, T);
       nextNoteTime += beat / 2;
       noteIdx++;
     }
@@ -246,7 +294,7 @@
       g.popup = LINE_WORDS[full.length] + ' +' + pts;
       g.popupT = 1100;
       sfx(full.length === 4 ? 'tetris' : 'clear');
-      if (g.level > oldLevel) { setTimeout(() => sfx('level'), 350); g.popup = 'Level ' + g.level + '! +' + pts; }
+      if (g.level > oldLevel) { themeIdx = themeFor(g.level); noteIdx = 0; setTimeout(() => sfx('level'), 350); g.popup = 'Level ' + g.level + '! +' + pts; }
     } else sfx('lock');
     g.piece = spawn(g.next);
     g.next = takeNext(g);
@@ -257,7 +305,7 @@
   function act(g, a) {
     ensureAudio();
     if (a === 'pause') { if (!g.over) g.paused = !g.paused; return g; }
-    if (a === 'restart') { noteIdx = 0; return newGame(); }
+    if (a === 'restart') { noteIdx = 0; themeIdx = 0; return newGame(); }
     if (g.over || g.paused) return g;
     const p = g.piece;
     if (a === 'left' || a === 'right') {
@@ -293,7 +341,7 @@
     if (ac) { try { ac.close(); } catch (e) { } }
     ac = null; sfxGain = null; musicGain = null; melodyBus = null; noiseBuf = null;
   }
-  root.Tetris = { SHAPES, COLORS, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state };
+  root.Tetris = { THEMES, themeFor, SHAPES, COLORS, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state };
 
   if (!root.document) return;
   const doc = root.document;
