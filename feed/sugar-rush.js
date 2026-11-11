@@ -580,6 +580,14 @@
     fail:   { file: 'sugar-rush-sfx-fail.mp3',   start: 17.850, end: 18.870, title: 'Fail / Out of Moves' }
   };
   const CLIP_FILES = { pop: SFX_CUTS.pop.file, crush: SFX_CUTS.crush.file, bomb: SFX_CUTS.bomb.file, hammer: SFX_CUTS.hammer.file, spread: SFX_CUTS.spread.file, fail: SFX_CUTS.fail.file };
+  // 1.9.163 Content hash on every music and clip URL so a replaced file is not served from the HTTP cache.
+  // Decoded-buffer fetches use the same helper. Pathname still ends in .mp3, so the SW leaves range requests alone.
+  const MEDIA_HASH = {
+    'sugar-rush-music.mp3': '39970f66', 'sugar-rush-menu.mp3': '3343a079', 'sugar-rush-win.mp3': '9b0efbad', 'sugar-rush-yum.mp3': 'ac1b2cf5',
+    'sugar-rush-sfx-pop.mp3': '677f075b', 'sugar-rush-sfx-crush.mp3': '0d496f41', 'sugar-rush-sfx-bomb.mp3': '741b2cf5',
+    'sugar-rush-sfx-hammer.mp3': '18a643dd', 'sugar-rush-sfx-spread.mp3': '616bda2b', 'sugar-rush-sfx-fail.mp3': '9c99f845'
+  };
+  function mediaUrl(file) { return file + '?v=' + MEDIA_HASH[file]; }
 
   function attachSfxBus(ctx) {
     const mix = ctx.createGain(); mix.gain.value = 1;
@@ -673,7 +681,7 @@
   root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, cloneState, bestMove, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
     allowed: () => !!(root.IBScores && root.IBScores.isShane && root.IBScores.isShane()),
     SCALE, SFX_KINDS, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, CLIP_VOL, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL,
-    SFX_CUTS, CLIP_FILES, attachSfxBus, playTone, playSweep, playSfx, playClip };
+    SFX_CUTS, CLIP_FILES, MEDIA_HASH, mediaUrl, attachSfxBus, playTone, playSweep, playSfx, playClip };
 
   if (!root.document) return;
   const doc = root.document;
@@ -731,7 +739,7 @@
     if (bufs[kind]) return Promise.resolve(bufs[kind]);
     if (loading[kind]) return loading[kind];
     if (!audio()) return Promise.resolve(null);
-    loading[kind] = fetch(TRACKS[kind]).then(r => r.arrayBuffer()).then(ab => ac.decodeAudioData(ab.slice(0))).then(b => { bufs[kind] = b; return b; }).catch(() => { loading[kind] = null; return null; });
+    loading[kind] = fetch(mediaUrl(TRACKS[kind])).then(r => r.arrayBuffer()).then(ab => ac.decodeAudioData(ab.slice(0))).then(b => { bufs[kind] = b; return b; }).catch(() => { loading[kind] = null; return null; });
     return loading[kind];
   }
   const TRACKS = { game: 'sugar-rush-music.mp3', menu: 'sugar-rush-menu.mp3', win: 'sugar-rush-win.mp3', yum: 'sugar-rush-yum.mp3', pop: CLIP_FILES.pop, crush: CLIP_FILES.crush, bomb: CLIP_FILES.bomb, hammer: CLIP_FILES.hammer, spread: CLIP_FILES.spread, fail: CLIP_FILES.fail };

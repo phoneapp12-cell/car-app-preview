@@ -783,6 +783,10 @@
   }
   // 1.9.145 Real recorded music, one track per theme (tetris-bg/m<theme>.mp3, Kevin MacLeod, CC BY 4.0).
   // It speeds up a little each level (pitch kept), and the old generated music is no longer played.
+  // 1.9.163 Each URL carries a short content hash so a replaced track is not replayed from the
+  // browser HTTP cache. The SW still matches on pathname (it ends in .mp3) and leaves range requests alone.
+  const BGM_HASH = ['a719f241', '9711dc01', '9ca3b84e', '7776197f', '6a9bd0f6', '63c9eafe', 'ef3f9675', 'b76dd1d3', 'fdec4369', '2b10c8ba', 'cdbe7d34', 'b61bc42a'];
+  function bgmSrc(ti) { return 'tetris-bg/m' + ti + '.mp3?v=' + BGM_HASH[ti]; }
   let bgm = null, bgmIdx = -1, bgmWant = false;
   function bgmEl() {
     if (!bgm && root.Audio) { bgm = new root.Audio(); bgm.loop = true; bgm.preload = 'auto'; bgm.volume = BGM_VOL; try { bgm.preservesPitch = true; } catch (e) { } }
@@ -793,7 +797,7 @@
     const want = !!(musicOn && running);
     if (!want) { if (bgmWant) { bgmWant = false; a.pause(); } return; }
     const ti = themeFor(level || 1);
-    if (ti !== bgmIdx) { bgmIdx = ti; a.src = 'tetris-bg/m' + ti + '.mp3'; bgmWant = false; }
+    if (ti !== bgmIdx) { bgmIdx = ti; a.src = bgmSrc(ti); bgmWant = false; }
     const lv = Math.max(1, level || 1), rate = Math.min(1.25, 1 + (lv - 1) * 0.02);
     if (Math.abs(a.playbackRate - rate) > 0.001) a.playbackRate = rate;
     if (!bgmWant) { bgmWant = true; try { const p = a.play(); if (p && p.catch) p.catch(() => { bgmWant = false; }); } catch (e) { bgmWant = false; } }
@@ -804,7 +808,7 @@
     if (ac) { try { ac.close(); } catch (e) { } }
     ac = null; sfxGain = null; musicGain = null; melodyBus = null; noiseBuf = null;
   }
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear };
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear };
 
   if (!root.document) return;
   const doc = root.document;
