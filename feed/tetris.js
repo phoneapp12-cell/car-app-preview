@@ -111,6 +111,25 @@
     { colors: ['#f472b6', '#22d3ee', '#a855f7', '#facc15', '#34d399', '#fb923c', '#60a5fa'], bg: 'linear-gradient(180deg,#0f172a 0%,#312e81 55%,#831843 100%)', board: 'rgba(10,10,25,0.55)' },
     { colors: ['#e0e7ff', '#a78bfa', '#fde68a', '#facc15', '#93c5fd', '#c4b5fd', '#f9a8d4'], bg: 'radial-gradient(1px 1px at 20% 30%,#fff,transparent),radial-gradient(1px 1px at 70% 15%,#fff,transparent),radial-gradient(1.5px 1.5px at 45% 60%,#fff,transparent),radial-gradient(1px 1px at 85% 75%,#fff,transparent),linear-gradient(180deg,#020617 0%,#1e1b4b 60%,#312e81 100%)', board: 'rgba(5,6,25,0.5)' }
   ];
+  // Faded scene pictures drawn behind the board, one per theme (same order as THEMES).
+  const SCENES = [
+    // Beach: sun, sea, sand and a palm tree
+    '<circle cx="300" cy="170" r="60" fill="#fff7cc" opacity=".55"/><path d="M0 470 Q100 450 200 470 T400 470 V560 H0Z" fill="#0e7490" opacity=".35"/><path d="M0 520 Q60 505 120 520 T240 520 T360 520 T480 520" stroke="#fff" stroke-width="4" fill="none" opacity=".35"/><path d="M0 600 Q200 540 400 600 V800 H0Z" fill="#fde68a" opacity=".5"/><path d="M80 760 Q95 600 70 440" stroke="#7c4a1e" stroke-width="14" fill="none" opacity=".45"/><g fill="#166534" opacity=".45"><path d="M70 440 Q10 420 -10 470 Q30 430 70 445Z"/><path d="M70 440 Q130 410 170 460 Q120 425 72 446Z"/><path d="M70 440 Q60 380 110 350 Q80 395 74 442Z"/><path d="M70 440 Q20 370 -20 380 Q35 395 68 444Z"/></g>',
+    // Rainforest: trunks, vines and ferns
+    '<g fill="#14532d" opacity=".5"><rect x="30" y="0" width="34" height="800"/><rect x="300" y="0" width="44" height="800"/><rect x="190" y="0" width="20" height="800" opacity=".6"/></g><g stroke="#4d7c0f" stroke-width="4" fill="none" opacity=".45"><path d="M64 0 Q120 160 90 320"/><path d="M300 0 Q250 200 280 380"/><path d="M210 0 Q240 120 220 240"/></g><g fill="#65a30d" opacity=".45"><path d="M0 800 Q60 620 140 600 Q80 660 60 800Z"/><path d="M400 800 Q340 640 250 610 Q320 680 330 800Z"/><path d="M120 800 Q180 660 260 650 Q200 700 190 800Z"/></g>',
+    // Ocean: waves, a dolphin and a whale tail
+    '<g stroke="#e0f2fe" stroke-width="5" fill="none" opacity=".35"><path d="M0 120 Q50 95 100 120 T200 120 T300 120 T400 120"/><path d="M0 160 Q50 135 100 160 T200 160 T300 160 T400 160"/></g><path d="M90 420 Q170 340 270 380 Q300 360 310 330 Q315 375 300 395 Q330 420 340 450 Q300 420 270 425 Q190 470 120 440 Q105 470 80 480 Q95 450 90 420Z" fill="#bae6fd" opacity=".4"/><path d="M200 760 Q200 660 190 640 Q150 610 120 620 Q170 625 196 660 Q222 625 272 620 Q242 610 205 640 Q200 660 210 760Z" fill="#0c4a6e" opacity=".5"/><g fill="#e0f2fe" opacity=".35"><circle cx="60" cy="600" r="8"/><circle cx="80" cy="560" r="5"/><circle cx="340" cy="560" r="7"/><circle cx="320" cy="520" r="4"/></g>',
+    // Bush walk: hills, ponga ferns, a track and a tui
+    '<path d="M0 520 Q120 430 240 500 T400 470 V800 H0Z" fill="#3f6212" opacity=".45"/><path d="M0 620 Q150 560 400 630 V800 H0Z" fill="#1a2e05" opacity=".5"/><path d="M230 800 Q180 720 230 680 Q270 650 240 620" stroke="#d6b98a" stroke-width="22" fill="none" opacity=".4"/><g opacity=".45"><rect x="66" y="430" width="8" height="250" fill="#3b2a14"/><g fill="#65a30d"><path d="M70 430 Q20 420 0 460 Q30 440 70 436Z"/><path d="M70 430 Q120 420 140 460 Q110 440 70 436Z"/><path d="M70 430 Q40 390 20 380 Q50 400 70 432Z"/><path d="M70 430 Q100 390 120 380 Q90 400 70 432Z"/></g></g><g fill="#0f172a" opacity=".5"><ellipse cx="320" cy="260" rx="22" ry="12"/><circle cx="342" cy="252" r="8"/><path d="M300 262 L272 274 L300 268Z"/><circle cx="344" cy="262" r="3" fill="#fff"/></g>',
+    // City: skyline with lit windows and a tower
+    '<g fill="#020617" opacity=".55"><rect x="0" y="560" width="60" height="240"/><rect x="62" y="500" width="50" height="300"/><rect x="114" y="590" width="40" height="210"/><rect x="250" y="520" width="56" height="280"/><rect x="308" y="460" width="46" height="340"/><rect x="356" y="580" width="44" height="220"/><path d="M196 800 V380 L190 370 H210 L204 380 V800Z"/><ellipse cx="200" cy="420" rx="18" ry="10"/><path d="M199 370 V250 H201 V370Z"/></g><g fill="#fde68a" opacity=".45"><rect x="12" y="580" width="8" height="10"/><rect x="34" y="610" width="8" height="10"/><rect x="74" y="520" width="8" height="10"/><rect x="92" y="560" width="8" height="10"/><rect x="262" y="540" width="8" height="10"/><rect x="284" y="600" width="8" height="10"/><rect x="318" y="490" width="8" height="10"/><rect x="336" y="530" width="8" height="10"/><rect x="370" y="610" width="8" height="10"/></g>',
+    // Night sky: moon, stars, Southern Cross and hills
+    '<circle cx="300" cy="150" r="50" fill="#fef9c3" opacity=".55"/><circle cx="322" cy="136" r="46" fill="#1e1b4b" opacity=".9"/><g fill="#fff" opacity=".7"><circle cx="80" cy="120" r="3"/><circle cx="120" cy="230" r="4"/><circle cx="70" cy="300" r="3"/><circle cx="150" cy="170" r="2.5"/><circle cx="104" cy="200" r="2"/><circle cx="220" cy="80" r="2"/><circle cx="360" cy="300" r="2"/><circle cx="260" cy="260" r="2"/></g><path d="M0 680 Q100 600 200 660 T400 640 V800 H0Z" fill="#020617" opacity=".6"/>'
+  ];
+  function sceneUrl(i) {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 800" preserveAspectRatio="xMidYMax slice">' + SCENES[i] + '</svg>';
+    return 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")';
+  }
   let themeIdx = 0;
   function themeFor(level) { return (Math.max(1, level) - 1) % THEMES.length; }
   function sfx(name) {
@@ -359,7 +378,7 @@
     if (ac) { try { ac.close(); } catch (e) { } }
     ac = null; sfxGain = null; musicGain = null; melodyBus = null; noiseBuf = null;
   }
-  root.Tetris = { THEMES, LOOKS, themeFor, SHAPES, COLORS, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state };
+  root.Tetris = { THEMES, LOOKS, SCENES, sceneUrl, themeFor, SHAPES, COLORS, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state };
 
   if (!root.document) return;
   const doc = root.document;
@@ -491,7 +510,7 @@
     const L = LOOKS[i];
     for (let k = 1; k < COLORS.length; k++) COLORS[k] = L.colors[k - 1];
     boardBg = L.board;
-    doc.documentElement.style.background = L.bg;
+    doc.documentElement.style.background = sceneUrl(i) + ' center bottom / cover no-repeat, ' + L.bg;
     doc.documentElement.style.backgroundAttachment = 'fixed';
     doc.body.style.background = 'transparent';
     drawMini(doc.getElementById('next'), g.next, false);
