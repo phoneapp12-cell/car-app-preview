@@ -15,8 +15,10 @@ cat > "$out/_headers" <<'H'
 # to /feed/tetris, both responses X-Frame-Options DENY). SAMEORIGIN lets the
 # feed frame it and still blocks other sites.
 /feed/tetris
+  ! X-Frame-Options
   X-Frame-Options: SAMEORIGIN
 /feed/tetris.html
+  ! X-Frame-Options
   X-Frame-Options: SAMEORIGIN
 /sw.js
   Cache-Control: no-cache
