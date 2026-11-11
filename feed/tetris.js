@@ -105,7 +105,7 @@
     { name: 'Night sky', beat: 0.95, pad: 'sine', ambient: 'shimmer', critter: 'twinkle', pitch: 1.335, sfx: 'sine',
       chords: [['E3', 'B3', 'DS4', 'GS4'], ['CS3', 'GS3', 'B3', 'E4'], ['A2', 'E3', 'GS3', 'CS4'], ['B2', 'FS3', 'A3', 'DS4']],
       bells: ['E5', 'FS5', 'GS5', 'B5', 'CS6', 'E6'] },
-    { name: 'Farmyard', beat: 0.7, pad: 'triangle', ambient: 'wind', critter: 'bird', pitch: 1, sfx: 'triangle',
+    { name: 'Farmyard', beat: 0.55, pad: 'triangle', ambient: 'none', critter: 'farm', bouncy: true, pitch: 1, sfx: 'triangle',
       chords: [['G2', 'D3', 'G3', 'B3'], ['C3', 'G3', 'C4', 'E4'], ['E2', 'B2', 'G3', 'B3'], ['D3', 'A3', 'D4', 'FS4']],
       bells: ['G4', 'A4', 'B4', 'D5', 'E5', 'G5'] },
     { name: 'Space travel', beat: 1, pad: 'sine', ambient: 'none', critter: 'whale', pitch: 0.75, sfx: 'sine',
@@ -173,9 +173,15 @@
       if (false && T.ambient === 'shimmer' && b % 2 === 1) add(b * 4, { v: 'shimmer', f: nf(T.bells[5]), d: 6 });
       if (false && T.ambient === 'bubbles') [0.5, 1.75, 3].forEach(p => add(b * 4 + p, { v: 'bubble' }));
     }
+    if (T.bouncy) for (let b = 0; b < bars; b++) { // oom-pah country bounce
+      const ch = T.chords[b % T.chords.length];
+      add(b * 4, { v: 'bass', f: nf(ch[0]) }); add(b * 4 + 2, { v: 'bass', f: nf(ch[1]) / 2 });
+      [1, 3].forEach(q => ch.slice(1).forEach(n => add(b * 4 + q, { v: 'pah', f: nf(n) })));
+    }
     for (const [pos, k] of BELLS) add(pos, { v: 'bell', f: nf(T.bells[k]) / 2, d: 3 });
     const cr = [].concat(T.critter);
-    [7, 23].forEach((p, i) => { if (cr[i % cr.length] === 'whale') add(p, { v: 'whale' }); }); // high chirps removed: too sharp
+    [7, 23].forEach((p, i) => { if (cr[i % cr.length] === 'whale') add(p, { v: 'whale' }); });
+    if (T.critter === 'farm') { add(6, { v: 'pig' }); add(14, { v: 'sheep' }); add(22, { v: 'pig' }); add(26.5, { v: 'sheep' }); add(30, { v: 'horse' }); } // high chirps removed: too sharp
     while (steps.length < len * 2) steps.push([]);
     return steps;
   });
@@ -206,8 +212,34 @@
     src.connect(f); f.connect(g); g.connect(musicGain);
     src.start(at, Math.random() * 0.5); src.stop(at + d + 0.05);
   }
+  // Soft farm animal voices: a buzzy tone shaped by a vocal filter, kept low and mellow.
+  function animal(at, pts, vol, vib, vibHz, bp, q) {
+    const o = ac.createOscillator(); o.type = 'sawtooth';
+    const end = pts[pts.length - 1][0];
+    o.frequency.setValueAtTime(pts[0][1], at);
+    for (const [tt, f] of pts.slice(1)) o.frequency.exponentialRampToValueAtTime(f, at + tt);
+    if (vib) { const l = ac.createOscillator(), lg = ac.createGain(); l.frequency.value = vibHz; lg.gain.value = vib; l.connect(lg); lg.connect(o.frequency); l.start(at); l.stop(at + end + 0.05); }
+    const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = bp; f.Q.value = q;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.linearRampToValueAtTime(vol, at + Math.min(0.08, end * 0.25));
+    g.gain.setValueAtTime(vol, at + end * 0.7);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + end);
+    o.connect(f); f.connect(g); g.connect(musicGain); o.start(at); o.stop(at + end + 0.05);
+  }
+  function oink(at) { animal(at, [[0, 150], [0.07, 200], [0.18, 120]], 0.5, 0, 0, 650, 2.5); animal(at + 0.24, [[0, 140], [0.06, 185], [0.16, 115]], 0.45, 0, 0, 650, 2.5); }
+  function baa(at) { animal(at, [[0, 230], [0.15, 265], [0.85, 245]], 0.42, 14, 7, 850, 1.6); }
+  function neigh(at) {
+    animal(at, [[0, 330], [0.2, 470], [0.7, 380], [1.1, 260]], 0.32, 34, 11, 900, 2);
+    if (noiseBuf) { const n = ac.createBufferSource(); n.buffer = noiseBuf; const lf = ac.createBiquadFilter(); lf.type = 'lowpass'; lf.frequency.value = 500; const ng = ac.createGain(); const t = at + 1.25; ng.gain.setValueAtTime(0.0001, t); ng.gain.linearRampToValueAtTime(0.18, t + 0.04); ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.3); n.connect(lf); lf.connect(ng); ng.connect(musicGain); n.start(t); n.stop(t + 0.35); }
+  }
   function playEvent(e, at, beat, T) {
     if (!ac || !musicGain) return;
+    if (e.v === 'pig') { oink(at); return; }
+    if (e.v === 'sheep') { baa(at); return; }
+    if (e.v === 'horse') { neigh(at); return; }
+    if (e.v === 'bass') { blip(e.f, e.f, e.f * 0.98, at, beat * 0.9, 0.16, musicGain, 'triangle'); return; }
+    if (e.v === 'pah') { blip(e.f, e.f, e.f, at, beat * 0.35, 0.035, musicGain, 'triangle'); return; }
     if (e.v === 'pad') {
       const o = ac.createOscillator();
       o.type = T.pad;
