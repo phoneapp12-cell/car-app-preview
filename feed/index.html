@@ -564,6 +564,11 @@ html.th-candy .card{border-color:#ffc2e5;box-shadow:0 2px 0 #ffb3dc,0 8px 20px r
 .artmeta strong{font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .artsite{color:#fff;font-weight:800;font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .artlive{font-size:.72rem;color:#ddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.artfs{margin-left:auto;min-height:44px;border-radius:12px;border:1px solid rgba(255,255,255,.3);background:transparent;color:#fff;font-weight:700;padding:8px 12px}
+.artfs[hidden]{display:none}
+.artfsx{display:none;position:absolute;top:max(8px,env(safe-area-inset-top));right:8px;z-index:2;min-height:40px;border-radius:20px;border:0;background:rgba(255,255,255,.85);color:#111;font-weight:700;padding:6px 12px}
+.artwin.artfull .artbar{display:none}
+.artwin.artfull .artfsx{display:block}
 .artframe{flex:1 1 auto;width:100%;min-height:0;border:0;background:#000}
 @media (prefers-reduced-motion:reduce){#feed > .card.puzzle *,#feed > .card.zoomq *,#feed > .card.fallq *,#feed > .card.tetq *,#feed > .card.cine *{animation:none!important;transition:none!important}}
 /* 1.9.114 main-feed videos fill the card width. Landscape stays 16:9, portrait (Shorts) stays 9:16.
@@ -633,7 +638,7 @@ html.force-light .cdot{box-shadow:0 0 0 2px #fff, inset 0 -6px 8px rgba(0,0,0,.1
 .card.soon h3,.card.soon li{color:#fff}
 .soonnames{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 0}
 .soonnames span{display:inline-block;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.22);color:#fff;font-weight:800}
-/* 1.9.130 opening portal. Copies sit above the rings. No clip, no transformed parent. */
+/* 1.9.131 opening portal. Copies sit above the rings. No clip, no transformed parent. */
 html.portal-on .top{z-index:50;isolation:isolate}
 html.portal-on #feed,html.portal-on #stories-host,html.portal-on #instb,html.portal-on #instwrap{visibility:hidden}
 html.portal-on #feed > .sk{visibility:hidden}
@@ -660,6 +665,7 @@ html.portal-on #feed > .card:not(.portal-rise),html.portal-on #feed > .hrow:not(
 @keyframes pbeam{from{transform:translate3d(0,12px,0) scaleY(.6);opacity:.2}to{transform:translate3d(0,-70px,0) scaleY(1);opacity:0}}
 @keyframes pspark{from{transform:translate3d(0,8px,0);opacity:0}40%{opacity:1}to{transform:translate3d(0,-90px,0);opacity:0}}
 @media (prefers-reduced-motion:reduce){#ibportal,#ibrise{display:none}html.portal-on #feed,html.portal-on #stories-host,html.portal-on #instb,html.portal-on #instwrap,html.portal-on #feed > .card:not(.portal-rise),html.portal-on #feed > .hrow:not(.portal-rise){visibility:visible}#ibrise .ib-ghost.ib-go{animation:none}}
+body[data-artopen] .artwin, body[data-artopen] .artbar{overscroll-behavior:none;touch-action:none}
 </style>
 </head>
 <body>
@@ -679,24 +685,24 @@ html.portal-on #feed > .card:not(.portal-rise),html.portal-on #feed > .hrow:not(
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="portal.js?v=1.9.130"></script>
-<script src="family.js?v=1.9.130"></script>
-<script src="app.js?v=1.9.130"></script>
-<script src="extras.js?v=1.9.130"></script>
-<script src="jokes.js?v=1.9.130"></script>
-<script src="learn.js?v=1.9.130"></script>
-<script src="common-en.js?v=1.9.130"></script>
-<script src="explain.js?v=1.9.130"></script>
-<script src="effects.js?v=1.9.130"></script>
-<script src="stories.js?v=1.9.130"></script>
-<script src="weekly.js?v=1.9.130"></script>
-<script src="play.js?v=1.9.130"></script>
-<script src="nz.js?v=1.9.130"></script>
-<script src="sights.js?v=1.9.130"></script>
-<script src="art3d.js?v=1.9.130"></script>
-<script src="read.js?v=1.9.130"></script>
-<script src="cal.js?v=1.9.130"></script>
-<script src="back.js?v=1.9.130"></script>
+<script src="portal.js?v=1.9.131"></script>
+<script src="family.js?v=1.9.131"></script>
+<script src="app.js?v=1.9.131"></script>
+<script src="extras.js?v=1.9.131"></script>
+<script src="jokes.js?v=1.9.131"></script>
+<script src="learn.js?v=1.9.131"></script>
+<script src="common-en.js?v=1.9.131"></script>
+<script src="explain.js?v=1.9.131"></script>
+<script src="effects.js?v=1.9.131"></script>
+<script src="stories.js?v=1.9.131"></script>
+<script src="weekly.js?v=1.9.131"></script>
+<script src="play.js?v=1.9.131"></script>
+<script src="nz.js?v=1.9.131"></script>
+<script src="sights.js?v=1.9.131"></script>
+<script src="art3d.js?v=1.9.131"></script>
+<script src="read.js?v=1.9.131"></script>
+<script src="cal.js?v=1.9.131"></script>
+<script src="back.js?v=1.9.131"></script>
 <script>
 /* 1.9.82 self-heal: if the feed is still skeletons after 9s (crash/stale cache), offer a manual reload.
    Auto-reload only on a real JS error, at most once per 10 minutes (localStorage). No controllerchange reload —

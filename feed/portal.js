@@ -1,4 +1,4 @@
-/* 1.9.130 Opening portal. Once per app open, not on scroll or topic changes.
+/* 1.9.131 Opening portal. Once per app open, not on scroll or topic changes.
    Skipped only when the phone asks for less motion (logged with ?portaldebug=1).
    The rise is a CSS animation on plain copies that sit above the rings. Nothing
    clips them, and their parents are not transformed, so a phone can paint it.

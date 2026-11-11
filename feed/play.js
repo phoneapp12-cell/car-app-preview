@@ -212,10 +212,26 @@
     artWin.setAttribute('role', 'dialog');
     artWin.setAttribute('aria-modal', 'true');
     artWin.setAttribute('aria-labelledby', 'arttitle');
-    artWin.innerHTML = '<div class="artbar"><button type="button" class="artx" data-artclose>Close</button><div class="artmeta"><strong id="arttitle"></strong><a class="artsite" target="_blank" rel="noopener"></a><span class="artlive"></span></div></div><iframe class="artframe" title="" sandbox="allow-scripts allow-same-origin" allow="autoplay" referrerpolicy="strict-origin-when-cross-origin"></iframe>';
+    artWin.innerHTML = '<div class="artbar"><button type="button" class="artx" data-artclose>Close</button><div class="artmeta"><strong id="arttitle"></strong><a class="artsite" target="_blank" rel="noopener"></a><span class="artlive"></span></div><button type="button" class="artfs" data-artfs hidden>Full screen</button></div><button type="button" class="artfsx" data-artfsx>Exit full screen</button><iframe class="artframe" title="" sandbox="allow-scripts allow-same-origin" allow="autoplay" referrerpolicy="strict-origin-when-cross-origin"></iframe>';
     root.document.body.appendChild(artWin);
     artFrame = artWin.querySelector('iframe');
-    artWin.addEventListener('click', e => { if (e.target.closest('[data-artclose]')) closeArt(false); });
+    artWin.addEventListener('click', e => {
+      if (e.target.closest('[data-artclose]')) closeArt(false);
+      else if (e.target.closest('[data-artfs]')) setFull(true);
+      else if (e.target.closest('[data-artfsx]')) setFull(false);
+    });
+    root.document.addEventListener('fullscreenchange', () => { if (!root.document.fullscreenElement && artWin) artWin.classList.remove('artfull'); });
+    root.document.addEventListener('webkitfullscreenchange', () => { if (!root.document.webkitFullscreenElement && artWin) artWin.classList.remove('artfull'); });
+  }
+  // Full screen: real browser full screen where allowed (Android), otherwise the window just fills the screen without its bar (iPhone).
+  function setFull(on) {
+    if (!artWin) return;
+    const d = root.document;
+    artWin.classList.toggle('artfull', !!on);
+    try {
+      if (on) { const req = artWin.requestFullscreen || artWin.webkitRequestFullscreen; if (req) { const p = req.call(artWin); if (p && p.catch) p.catch(() => { }); } }
+      else if (d.fullscreenElement || d.webkitFullscreenElement) { const ex = d.exitFullscreen || d.webkitExitFullscreen; if (ex) { const p = ex.call(d); if (p && p.catch) p.catch(() => { }); } }
+    } catch (e) { }
   }
   function pauseFeed() {
     root.document.querySelectorAll('.media.vid.playing, .media.vid.armed').forEach(el => { try { root.pauseVid(el); } catch (e) { } });
@@ -225,6 +241,8 @@
     if (on) {
       artScroll = root.scrollY || root.document.documentElement.scrollTop || 0;
       body.dataset.artopen = '1';
+      root.document.documentElement.style.overscrollBehavior = 'none'; // no pull-to-refresh while a game or window is open
+      body.style.overscrollBehavior = 'none';
       body.style.position = 'fixed';
       body.style.top = '-' + artScroll + 'px';
       body.style.left = '0';
@@ -236,6 +254,8 @@
       body.style.left = '';
       body.style.right = '';
       body.style.width = '';
+      root.document.documentElement.style.overscrollBehavior = '';
+      body.style.overscrollBehavior = '';
       delete body.dataset.artopen;
       root.scrollTo(0, artScroll);
     }
@@ -262,6 +282,7 @@
     else { site.hidden = false; site.href = spec.url; site.textContent = spec.host; }
     artFrame.title = spec.local ? spec.title : spec.title + ' on ' + spec.host;
     artFrame.src = spec.url;
+    artWin.querySelector('[data-artfs]').hidden = !spec.local;
     artWin.hidden = false;
     lockFeed(true);
     const close = artWin.querySelector('[data-artclose]');
@@ -270,6 +291,7 @@
   }
   function closeArt(fromPop) {
     if (!artWin || artWin.hidden) return;
+    setFull(false);
     unloadArt();
     artWin.hidden = true;
     lockFeed(false);
