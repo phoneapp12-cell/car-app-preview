@@ -20,6 +20,12 @@
 
   let ac = null, sfxGain = null, musicGain = null, soundOn = true, musicOn = true;
   let nextNoteTime = 0, noteIdx = 0, melodyBus = null, noiseBuf = null;
+  // 1.9.155 Mix: game sounds sit ~6 dB above the music, still soft and low.
+  // Tracks m0–m11 mean file RMS 0.190. Music at BGM_VOL 0.44 → RMS 0.0836 (−21.6 dB).
+  // A musical note peak is SFX_NOTE * SFX_MASTER = 0.24, sine RMS 0.170 (−15.4 dB) → +6.2 dB vs music.
+  // (Was 0.08 * 0.48 = 0.0384 peak, RMS 0.027, about 11 dB below the music at volume 0.5.)
+  // Line clears duck the music 35%. A limiter on the SFX bus stops overlapping notes clipping.
+  const BGM_VOL = 0.44, BGM_DUCK = 0.286, SFX_MASTER = 0.96, SFX_NOTE = 0.25;
 
   function ensureAudio() {
     try {
@@ -28,10 +34,24 @@
         if (!Ctor) return;
         ac = new Ctor();
         sfxGain = ac.createGain();
-        sfxGain.gain.value = 0.48;
+        sfxGain.gain.value = SFX_MASTER;
         const sfxSoft = ac.createBiquadFilter(); // take the sharp top off every sound
         sfxSoft.type = 'lowpass'; sfxSoft.frequency.value = 1400;
-        sfxGain.connect(sfxSoft); sfxSoft.connect(ac.destination);
+        const sfxLim = ac.createDynamicsCompressor();
+        sfxLim.threshold.value = -4;
+        sfxLim.knee.value = 4;
+        sfxLim.ratio.value = 20;
+        sfxLim.attack.value = 0.003;
+        sfxLim.release.value = 0.15;
+        const sfxCeil = ac.createWaveShaper(); // hard ceiling so compressor makeup cannot clip
+        const curve = new Float32Array(2048);
+        for (let i = 0; i < curve.length; i++) {
+          const x = i / 1024 - 1;
+          const a = Math.abs(x);
+          curve[i] = a <= 0.9 ? x : Math.sign(x) * (0.9 + 0.08 * Math.tanh((a - 0.9) / 0.1));
+        }
+        sfxCeil.curve = curve;
+        sfxGain.connect(sfxSoft); sfxSoft.connect(sfxLim); sfxLim.connect(sfxCeil); sfxCeil.connect(ac.destination);
         musicGain = ac.createGain();
         musicGain.gain.value = 0.26;
         const musicSoft = ac.createBiquadFilter();
@@ -363,8 +383,8 @@
     const go = () => {
       try {
         if (!bgm || !musicOn || tok !== duckTok) return;
-        bgm.volume = 0.4;
-        setTimeout(() => { try { if (bgm && musicOn && tok === duckTok) bgm.volume = 0.5; } catch (e) { } }, Math.max(200, (dur || 0.45) * 1000));
+        bgm.volume = BGM_DUCK;
+        setTimeout(() => { try { if (bgm && musicOn && tok === duckTok) bgm.volume = BGM_VOL; } catch (e) { } }, Math.max(200, (dur || 0.45) * 1000));
       } catch (e) { }
     };
     if (delay > 0) setTimeout(go, delay * 1000);
@@ -389,29 +409,29 @@
       if (name === 'clear' || name === 'tetris') duckMusic(delay, name === 'tetris' ? 0.7 : 0.5);
       const gap = (name === 'tetris' || name === 'level') ? 0.09 : 0.1;
       const dur = (name === 'rotate') ? 0.12 : (name === 'lock' || name === 'drop') ? 0.2 : 0.5;
-      const vol = 0.08;
+      const vol = SFX_NOTE;
       notes.forEach((f, i) => softTone(f, dur, typ, vol, d, t0 + i * gap));
       return;
     }
     switch (name) {
       // Soft chimes and drops, pitched and voiced to the current theme.
-      case 'move': tone(880 * m, 0.05, w, 0.05, 0, 0, d); break;
-      case 'rotate': tone(700 * m, 0.09, w, 0.09, 0, 1200 * m, d); break;
-      case 'soft': tone(520 * m, 0.03, w, 0.03, 0, 0, d); break;
-      case 'drop': tone(420 * m, 0.22, w, 0.12, 0, 160 * m, d); break;
-      case 'lock': tone(330 * m, 0.12, 'triangle', 0.08, 0, 260 * m, d); break;
-      case 'hold': tone(784 * m, 0.18, w, 0.08, 0, 0, d); tone(1047 * m, 0.22, w, 0.07, 0.08, 0, d); break;
-      case 'clear': [0, 2, 3].forEach((k, i) => tone(lo(T.bells[k]), 0.5, w, 0.09, i * 0.09, 0, d)); break;
-      case 'tetris': [0, 1, 2, 3, 4, 5].forEach((k, i) => tone(lo(T.bells[k]), 0.7, w, 0.09, i * 0.09, 0, d)); break;
-      case 'level': [1, 2, 3, 5].forEach((k, i) => tone(lo(T.bells[k]), 0.6, w, 0.08, i * 0.12, 0, d)); break;
-      case 'over': [5, 3, 2, 0].forEach((k, i) => tone(nf(T.bells[k]) / 2, 0.9, 'sine', 0.09, i * 0.3, 0, d)); break;
+      case 'move': tone(880 * m, 0.05, w, 0.16, 0, 0, d); break;
+      case 'rotate': tone(700 * m, 0.09, w, 0.28, 0, 1200 * m, d); break;
+      case 'soft': tone(520 * m, 0.03, w, 0.09, 0, 0, d); break;
+      case 'drop': tone(420 * m, 0.22, w, 0.38, 0, 160 * m, d); break;
+      case 'lock': tone(330 * m, 0.12, 'triangle', 0.25, 0, 260 * m, d); break;
+      case 'hold': tone(784 * m, 0.18, w, 0.25, 0, 0, d); tone(1047 * m, 0.22, w, 0.22, 0.08, 0, d); break;
+      case 'clear': [0, 2, 3].forEach((k, i) => tone(lo(T.bells[k]), 0.5, w, 0.28, i * 0.09, 0, d)); break;
+      case 'tetris': [0, 1, 2, 3, 4, 5].forEach((k, i) => tone(lo(T.bells[k]), 0.7, w, 0.28, i * 0.09, 0, d)); break;
+      case 'level': [1, 2, 3, 5].forEach((k, i) => tone(lo(T.bells[k]), 0.6, w, 0.25, i * 0.12, 0, d)); break;
+      case 'over': [5, 3, 2, 0].forEach((k, i) => tone(nf(T.bells[k]) / 2, 0.9, 'sine', 0.28, i * 0.3, 0, d)); break;
       case 'thump': {
         // Muffled low thump for a space-invader bomb (extra-low lowpass, no zap or chirp).
         const lp = ac.createBiquadFilter();
         lp.type = 'lowpass'; lp.frequency.value = 400;
         lp.connect(d);
-        tone(88, 0.28, 'sine', 0.07, 0, 46, lp);
-        tone(56, 0.36, 'triangle', 0.045, 0.03, 34, lp);
+        tone(88, 0.28, 'sine', 0.22, 0, 46, lp);
+        tone(56, 0.36, 'triangle', 0.14, 0.03, 34, lp);
         break;
       }
       default: break;
@@ -688,7 +708,7 @@
   // It speeds up a little each level (pitch kept), and the old generated music is no longer played.
   let bgm = null, bgmIdx = -1, bgmWant = false;
   function bgmEl() {
-    if (!bgm && root.Audio) { bgm = new root.Audio(); bgm.loop = true; bgm.preload = 'auto'; bgm.volume = 0.5; try { bgm.preservesPitch = true; } catch (e) { } }
+    if (!bgm && root.Audio) { bgm = new root.Audio(); bgm.loop = true; bgm.preload = 'auto'; bgm.volume = BGM_VOL; try { bgm.preservesPitch = true; } catch (e) { } }
     return bgm;
   }
   function musicTick(level, running) {
@@ -703,11 +723,11 @@
   }
   function stopAudio() {
     duckTok++;
-    if (bgm) { try { bgm.pause(); bgm.volume = 0.5; } catch (e) { } bgmWant = false; }
+    if (bgm) { try { bgm.pause(); bgm.volume = BGM_VOL; } catch (e) { } bgmWant = false; }
     if (ac) { try { ac.close(); } catch (e) { } }
     ac = null; sfxGain = null; musicGain = null; melodyBus = null; noiseBuf = null;
   }
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY };
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY };
 
   if (!root.document) return;
   const doc = root.document;

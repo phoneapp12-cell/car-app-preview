@@ -123,7 +123,7 @@ gHold.canHold = true;
 tetGame.act(gHold, 'hold');
 assert.strictEqual(gHold.hold, held);
 assert.strictEqual(gHold.canHold, false);
-// 1.9.154 triangle Tetris on the Triangles theme (level 11, second to last): two-colour palette, gameplay unchanged
+// 1.9.155 triangle Tetris on the Triangles theme (level 11, second to last): two-colour palette, gameplay unchanged
 assert.strictEqual(tetGame.themeFor(1), 6);
 assert.strictEqual(tetGame.themeFor(2), 11);
 assert.strictEqual(tetGame.themeFor(3), 0);
@@ -358,12 +358,12 @@ for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 3, at.join(',
 const appSrc = fs.readFileSync('feed/app.js', 'utf8');
 for (const id of sights.TOPICS) assert.ok(appSrc.includes("'" + id + "'"), id);
 assert.ok(!/Math\.pow\(baseOf\(t\), 3\)/.test(appSrc));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.154'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.154'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.154'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.155'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.155'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.155'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.cdot.tv'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.bd ul.sum'));
-assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.154'"));
+assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.155'"));
 function swVersion(src) { const m = String(src).match(/const VERSION = '([^']+)'/); assert.ok(m, 'parent sw.js VERSION'); return m[1]; }
 const parentHere = swVersion(fs.readFileSync('sw.js', 'utf8'));
 let parentMain = parentHere;
@@ -402,10 +402,10 @@ assert.equal(artB.length, 1);
 assert.notEqual(artB[0].id, artA.id);
 seenArt.wasSeen = () => true;
 assert.equal(seenArt.ibArt.cards(0).length, 0);
-assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.154'"));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.155'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'art3d.js?v=' + VERSION"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'portal.js?v=' + VERSION"));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.154'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.155'));
 const portalSrc = fs.readFileSync('feed/portal.js', 'utf8');
 assert.ok(portalSrc.includes('prefers-reduced-motion'));
 assert.ok(portalSrc.includes("sessionStorage.getItem(KEY)"));
@@ -433,7 +433,7 @@ assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("cache: 'reload'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("cache: 'no-cache'"));
 assert.ok(appSrc.includes('ibPortalRise'));
 assert.ok(!/portal-style\.jpg|attachments\/image/.test(portalSrc + fs.readFileSync('feed/index.html', 'utf8')));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.154'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.155'));
 assert.ok(appSrc.includes("['art3d', '3D art'"));
 assert.ok(appSrc.includes("['3D art', 'art3d'"));
 assert.ok(appSrc.includes("'art3d'"));
@@ -557,7 +557,7 @@ assert.ok(cal.ics(saved).includes('TRIGGER:-PT1H'));
 const calFile = fs.readFileSync('feed/cal.js', 'utf8');
 assert.ok(calFile.includes('data-art="tetris"'));
 assert.ok(calFile.includes('Play Tetris'));
-// 1.9.154 Scrabble is playable; Sugar Rush is the next game coming soon
+// 1.9.155 Scrabble is playable; Sugar Rush is the next game coming soon
 assert.ok(calFile.includes('data-art="scrabble"'));
 assert.ok(calFile.includes('Play Scrabble'));
 assert.ok(calFile.includes('<span>Coming soon: Sugar Rush 🍬, a Candy Crush style matching game</span>'));
@@ -577,7 +577,7 @@ assert.ok(/scrabble:[\s\S]{0,220}local: true/.test(playFile));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'scrabble', 'scrabble.js'"));
 assert.ok(!fs.readFileSync('feed/sw.js', 'utf8').includes('scrabble-words'), 'word list is fetched when Scrabble opens, not precached');
 
-// 1.9.154 Scrabble rules and word checks (small word list here; tests/scrabble-sim.mjs plays full games with the real one)
+// 1.9.155 Scrabble rules and word checks (small word list here; tests/scrabble-sim.mjs plays full games with the real one)
 function loadScrabble() {
   const ctx = { console, Math, Object, Number, String, Array, Set, Map, JSON, Date, Uint8Array, Int8Array, Int32Array, setTimeout, parseInt };
   ctx.window = ctx; ctx.globalThis = ctx;
@@ -796,7 +796,7 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   execSync('node worker/test/scores.test.mjs', { stdio: 'pipe' });
 }
 
-// 1.9.154 Shane-only Tetris level picker (practice mode, not posted to the family scoreboard)
+// 1.9.155 Shane-only Tetris level picker (practice mode, not posted to the family scoreboard)
 {
   const names = ['Farmyard', 'Jeremiah was a bullfrog', 'Beach', 'Rainforest', 'Ocean', 'Bush walk', 'New Zealand', 'Snowy mountains', 'City', 'Night sky', 'Triangles', 'Space travel'];
   assert.deepStrictEqual(Array.from(tetGame.ORDER), [6, 11, 0, 1, 2, 3, 9, 10, 4, 5, 8, 7]);
@@ -845,7 +845,7 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
 }
 
 
-// 1.9.154 Tetris sounds follow the music (tempo/key), and Space bombs actually drop
+// 1.9.155 Tetris sounds follow the music (tempo/key), and Space bombs actually drop
 {
   const almost = (a, b, eps) => assert.ok(Math.abs(a - b) <= (eps || 1e-6), a + ' != ' + b);
   assert.strictEqual(tetGame.TRACKS.length, 12);
@@ -943,6 +943,30 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   const sp = src.split('function startPractice')[1].split('function showShanePicker')[0];
   assert.ok(/invReset\(/.test(sp), 'Choose level resets bombs so they can drop');
   assert.ok(!/invSeed\(/.test(sp), 'Choose level must not use the screenshot seed');
+}
+
+// 1.9.155 Tetris game sounds sit ~6 dB above the music, still soft and low
+{
+  assert.strictEqual(tetGame.SFX_MASTER, 0.96);
+  assert.strictEqual(tetGame.SFX_NOTE, 0.25);
+  assert.strictEqual(tetGame.BGM_VOL, 0.44);
+  assert.strictEqual(tetGame.BGM_DUCK, 0.286);
+  const almostEqual = (a, b, eps) => assert.ok(Math.abs(a - b) <= (eps || 1e-3), a + ' != ' + b);
+  const sfxPeak = tetGame.SFX_NOTE * tetGame.SFX_MASTER;
+  const sfxRms = sfxPeak / Math.SQRT2;
+  const musicRms = tetGame.BGM_VOL * 0.190;
+  const db = 20 * Math.log10(sfxRms / musicRms);
+  almostEqual(sfxPeak, 0.24);
+  assert.ok(db >= 5.5 && db <= 7, 'SFX vs mean music should be ~6 dB, got ' + db.toFixed(2));
+  almostEqual(tetGame.BGM_DUCK / tetGame.BGM_VOL, 0.65); // 35% duck
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.ok(src.includes("createDynamicsCompressor"), 'SFX bus has a compressor/limiter');
+  assert.ok(src.includes("createWaveShaper"), 'SFX bus has a clip ceiling');
+  assert.ok(/sfxSoft\.type = 'lowpass'/.test(src) && src.includes('frequency.value = 1400'), 'SFX lowpass kept');
+  assert.ok(src.includes('SFX_MAX_HZ = 800'), 'fundamentals stay under 800 Hz');
+  assert.ok(!/sfxGain\.gain\.value = 0\.48/.test(src));
+  assert.ok(!/const vol = 0\.08/.test(src));
+  assert.ok(!/bgm\.volume = 0\.5/.test(src));
 }
 
 console.log('feed-info tests ok');
