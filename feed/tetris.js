@@ -406,10 +406,19 @@
       const delay = sfxDelay(name);
       const t0 = ac.currentTime + delay;
       const typ = (T && T.sfx) === 'triangle' ? 'triangle' : 'sine';
-      if (name === 'clear' || name === 'tetris') duckMusic(delay, name === 'tetris' ? 0.7 : 0.5);
+      if (name === 'clear' || name === 'tetris') duckMusic(delay, name === 'tetris' ? 0.75 : 0.55);
       const gap = (name === 'tetris' || name === 'level') ? 0.09 : 0.1;
       const dur = (name === 'rotate') ? 0.12 : (name === 'lock' || name === 'drop') ? 0.2 : 0.5;
-      const vol = SFX_NOTE;
+      const nLines = name === 'tetris' ? 4 : (name === 'clear' ? Math.max(1, Math.min(3, lines || 1)) : 1);
+      const vol = (name === 'clear' || name === 'tetris') ? SFX_NOTE * (0.88 + nLines * 0.08) : SFX_NOTE;
+      if (name === 'clear' || name === 'tetris') {
+        // Soft in-key chord under a gentle arpeggio; a little louder for more lines, still soft.
+        const chord = notes.slice(0, Math.min(notes.length, name === 'tetris' ? 4 : 3));
+        const cVol = SFX_NOTE * (0.5 + nLines * 0.07);
+        chord.forEach(f => softTone(f, 0.58 + nLines * 0.04, typ, cVol, d, t0));
+        notes.forEach((f, i) => softTone(f, dur, typ, vol, d, t0 + 0.05 + i * gap));
+        return;
+      }
       notes.forEach((f, i) => softTone(f, dur, typ, vol, d, t0 + i * gap));
       return;
     }
@@ -621,11 +630,74 @@
     return { t, m, x: Math.floor((COLS - m[0].length) / 2), y: t === 1 ? -1 : 0 };
   }
   function takeNext(g) { if (g.bag.length === 0) g.bag = refillBag(); return g.bag.shift(); }
+  // 1.9.158 Line-clear flourish: a soft coloured sweep, themed sparkles, a short pause, then the rows drop.
+  // Pause stays under 400ms so the game still flows. More lines = a bigger burst; four lines get a soft banner.
+  const CLEAR_KIND = { 1: 'leaves', 2: 'bubbles', 3: 'leaves', 5: 'stars', 7: 'stars', 10: 'snow', 11: 'frog' };
+  function clearDuration(n) { return Math.min(400, 240 + 40 * Math.max(1, Math.min(4, n || 1))); }
+  function clearKind(ti) { return CLEAR_KIND[ti] || 'sparkle'; }
+  function clearPartCount(n) { return Math.min(36, 8 + 8 * Math.max(1, Math.min(4, n || 1))); }
+  function startClear(g, rows, snap, lines, level) {
+    const n = rows.length;
+    const ti = themeFor(level);
+    const kind = clearKind(ti);
+    const dur = clearDuration(n);
+    const parts = [];
+    let reduce = false;
+    try { reduce = !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { }
+    const count = reduce ? Math.min(8, clearPartCount(n)) : clearPartCount(n);
+    const colours = [];
+    rows.forEach(r => {
+      (snap[r] || []).forEach(v => { if (v) colours.push(blockColor(v, lines, level)); });
+    });
+    const fallback = (LOOKS[ti] && LOOKS[ti].colors) || COLORS.slice(1);
+    const pal = colours.length ? colours : fallback;
+    const pick = () => pal[(Math.random() * pal.length) | 0];
+    for (let i = 0; i < count; i++) {
+      const row = rows[i % rows.length];
+      const x0 = (i / Math.max(1, count - 1)) * COLS * CELL * 0.92 + Math.random() * 8;
+      const y0 = row * CELL + CELL * 0.5;
+      const ang = -0.35 + (i % 7) * 0.18 + Math.random() * 0.2;
+      const spd = 28 + n * 8 + Math.random() * 36;
+      parts.push({
+        kind, x0, y0,
+        vx: Math.cos(ang) * spd * (Math.random() < 0.5 ? 1 : -1),
+        vy: -Math.abs(Math.sin(ang) * spd) - 20 - n * 4,
+        color: pick(),
+        size: (kind === 'bubbles' ? 3.8 : kind === 'frog' ? 4.2 : 2.4) + Math.random() * (kind === 'frog' ? 4 : 3.2) + n * 0.3,
+        delay: (i / Math.max(1, count)) * 0.22,
+        rot: Math.random() * 6.28,
+        spin: (Math.random() - 0.5) * 3,
+        hop: 18 + Math.random() * 16
+      });
+    }
+    g.clearFx = { t: 0, dur, rows: rows.slice(), snap, n, kind, parts, lines, level, hold: false, at: 0, banner: n === 4 };
+    return g.clearFx;
+  }
+  function tickClear(g, dt) {
+    const fx = g.clearFx;
+    if (!fx) return false;
+    if (fx.hold) return true;
+    fx.t += dt;
+    if (fx.t >= fx.dur) {
+      g.clearFx = null;
+      if (g.pendingLevel) {
+        const pl = g.pendingLevel;
+        g.pendingLevel = null;
+        themeIdx = pl.theme;
+        noteIdx = 0;
+        g.popup = pl.popup;
+        g.popupT = 1100;
+        sfx('level');
+      }
+      return false;
+    }
+    return true;
+  }
   function newGame(opt) {
     opt = opt || {};
     const level = Math.max(1, opt.level || 1);
     const practice = !!opt.practice;
-    const g = { board: emptyBoard(), piece: spawn(1), bag: refillBag(), next: 0, hold: 0, canHold: true, score: 0, lines: (level - 1) * 10, level, over: false, paused: false, acc: 0, flashT: 0, popup: '', popupT: 0, practice, startLevel: level };
+    const g = { board: emptyBoard(), piece: spawn(1), bag: refillBag(), next: 0, hold: 0, canHold: true, score: 0, lines: (level - 1) * 10, level, over: false, paused: false, acc: 0, flashT: 0, popup: '', popupT: 0, practice, startLevel: level, clearFx: null, pendingLevel: null };
     g.piece = spawn(takeNext(g));
     g.next = takeNext(g);
     return g;
@@ -646,17 +718,21 @@
     for (let r = 0; r < ROWS; r++) if (g.board[r].every(v => v !== 0)) full.push(r);
     if (full.length) {
       const oldLevel = g.level;
+      const snap = g.board.map(r => r.slice());
+      startClear(g, full, snap, g.lines, g.level);
       g.board = g.board.filter((_, i) => full.indexOf(i) < 0);
       while (g.board.length < ROWS) g.board.unshift(Array(COLS).fill(0));
       const pts = LINE_POINTS[full.length] * g.level;
       g.lines += full.length;
       g.score += pts;
       g.level = Math.floor(g.lines / 10) + 1;
-      g.flashT = 180;
+      g.flashT = g.clearFx.dur;
       g.popup = LINE_WORDS[full.length] + ' +' + pts;
       g.popupT = 1100;
       sfx(full.length === 4 ? 'tetris' : 'clear', full.length);
-      if (g.level > oldLevel) { themeIdx = themeFor(g.level); noteIdx = 0; setTimeout(() => sfx('level'), 350); g.popup = 'Level ' + g.level + '! +' + pts; }
+      if (g.level > oldLevel) {
+        g.pendingLevel = { theme: themeFor(g.level), popup: 'Level ' + g.level + '! +' + pts };
+      }
     } else sfx('lock');
     g.piece = spawn(g.next);
     g.next = takeNext(g);
@@ -674,6 +750,7 @@
       return next;
     }
     if (g.over || g.paused) return g;
+    if (g.clearFx) return g;
     const p = g.piece;
     if (a === 'left' || a === 'right') {
       const dx = a === 'left' ? -1 : 1;
@@ -727,7 +804,7 @@
     if (ac) { try { ac.close(); } catch (e) { } }
     ac = null; sfxGain = null; musicGain = null; melodyBus = null; noiseBuf = null;
   }
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY };
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear };
 
   if (!root.document) return;
   const doc = root.document;
@@ -792,6 +869,20 @@
     themeIdx = themeFor(g.level);
     lookIdx = -1;
     applyLook(themeIdx);
+    if (opts.clear) {
+      const rows = (opts.clear.rows || []).slice();
+      const snap = g.board.map(r => r.slice());
+      startClear(g, rows, snap, g.lines, g.level);
+      g.clearFx.hold = true;
+      g.clearFx.at = opts.clear.at != null ? opts.clear.at : 0.45;
+      if (g.clearFx.n === 4) {
+        const pts = LINE_POINTS[4] * g.level;
+        g.popup = 'TETRIS! +' + pts;
+        g.popupT = 1100;
+      }
+      g.board = g.board.filter((_, i) => rows.indexOf(i) < 0);
+      while (g.board.length < ROWS) g.board.unshift(Array(COLS).fill(0));
+    }
     syncHud();
     const mb = doc.getElementById('musicbtn'); if (mb) mb.textContent = 'Music off';
     const sb = doc.getElementById('soundbtn'); if (sb) sb.textContent = 'Sound off';
@@ -1182,13 +1273,160 @@
     }
   }
 
+  function rgbaHex(h, a) {
+    if (!h || h[0] !== '#') return 'rgba(255,255,255,' + a + ')';
+    const n = parseInt(h.slice(1), 16);
+    return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+  }
+  function drawStar(ctx, x, y, r) {
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const ang = -Math.PI / 2 + i * Math.PI / 4, rad = i % 2 ? r * 0.4 : r;
+      if (i === 0) ctx.moveTo(x + Math.cos(ang) * rad, y + Math.sin(ang) * rad);
+      else ctx.lineTo(x + Math.cos(ang) * rad, y + Math.sin(ang) * rad);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+  function drawLeaf(ctx, x, y, r, rot, color) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
+    ctx.beginPath(); ctx.ellipse(0, 0, r, r * 0.45, 0, 0, 6.283); ctx.fillStyle = color; ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(-r, 0); ctx.lineTo(r, 0); ctx.stroke();
+    ctx.restore();
+  }
+  function drawFlake(ctx, x, y, r, color) {
+    ctx.save(); ctx.translate(x, y); ctx.strokeStyle = color; ctx.lineWidth = 1.15; ctx.lineCap = 'round';
+    for (let i = 0; i < 6; i++) {
+      ctx.rotate(Math.PI / 3);
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -r); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, -r * 0.55); ctx.lineTo(-r * 0.22, -r * 0.75); ctx.moveTo(0, -r * 0.55); ctx.lineTo(r * 0.22, -r * 0.75); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  function drawPad(ctx, x, y, r, color) {
+    ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.55, 0, 0, 6.283);
+    ctx.fillStyle = color; ctx.fill();
+    ctx.strokeStyle = 'rgba(20,60,20,0.35)'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + r * 0.7, y - r * 0.15); ctx.stroke();
+  }
+  function drawFrog(ctx, x, y, r) {
+    ctx.fillStyle = '#4ade80';
+    ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.7, 0, 0, 6.283); ctx.fill();
+    ctx.beginPath(); ctx.arc(x - r * 0.4, y - r * 0.55, r * 0.32, 0, 6.283); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + r * 0.4, y - r * 0.55, r * 0.32, 0, 6.283); ctx.fill();
+    ctx.fillStyle = '#14532d';
+    ctx.beginPath(); ctx.arc(x - r * 0.4, y - r * 0.55, r * 0.14, 0, 6.283); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + r * 0.4, y - r * 0.55, r * 0.14, 0, 6.283); ctx.fill();
+  }
+  function drawClearFx(ctx, fx) {
+    if (!fx) return;
+    const p = fx.hold ? fx.at : Math.min(1, fx.t / fx.dur);
+    const n = fx.n;
+    const fade = p < 0.12 ? p / 0.12 : (p > 0.82 ? Math.max(0, (1 - p) / 0.18) : 1);
+    fx.rows.forEach((row) => {
+      const y = row * CELL;
+      const rowCols = (fx.snap[row] || []).map(v => v ? blockColor(v, fx.lines, fx.level) : null);
+      const mid = rowCols.find(Boolean) || '#ffffff';
+      const mid2 = rowCols.filter(Boolean).slice(-1)[0] || mid;
+      ctx.fillStyle = rgbaHex(mid, (0.12 + 0.1 * n) * fade);
+      ctx.fillRect(0, y, COLS * CELL, CELL);
+      const bw = CELL * (1.5 + n * 0.35);
+      const x = -bw + p * (COLS * CELL + bw);
+      const g2 = ctx.createLinearGradient(x, y, x + bw, y);
+      g2.addColorStop(0, 'rgba(255,255,255,0)');
+      g2.addColorStop(0.35, rgbaHex(mid, 0.35 * fade));
+      g2.addColorStop(0.5, 'rgba(255,255,255,' + (0.42 * fade) + ')');
+      g2.addColorStop(0.65, rgbaHex(mid2, 0.35 * fade));
+      g2.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g2;
+      ctx.fillRect(0, y - 2, COLS * CELL, CELL + 4);
+      if (n >= 3) {
+        const x2 = x - bw * 0.55;
+        const g3 = ctx.createLinearGradient(x2, y, x2 + bw * 0.8, y);
+        g3.addColorStop(0, 'rgba(255,255,255,0)');
+        g3.addColorStop(0.5, rgbaHex(mid, 0.18 * fade));
+        g3.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = g3;
+        ctx.fillRect(0, y - 1, COLS * CELL, CELL + 2);
+      }
+    });
+    const tSec = p * (fx.dur / 1000);
+    for (const o of fx.parts) {
+      const age = tSec - o.delay;
+      if (age < 0) continue;
+      const life = 0.28 + n * 0.04;
+      const k = Math.max(0, 1 - age / life);
+      if (k <= 0) continue;
+      const x = o.x0 + o.vx * age;
+      let y = o.y0 + o.vy * age + 70 * age * age;
+      const isHop = o.kind === 'frog' && (o.rot * 10) % 3 < 1.2;
+      if (isHop) {
+        const hopP = Math.min(1, age / 0.28);
+        y = o.y0 - o.hop * 4 * hopP * (1 - hopP);
+      }
+      ctx.globalAlpha = k * fade * (0.7 + 0.15 * n);
+      if (o.kind === 'bubbles') {
+        const by = y - age * 40;
+        ctx.strokeStyle = 'rgba(220,245,255,0.95)';
+        ctx.lineWidth = 1.3;
+        ctx.beginPath(); ctx.arc(x, by, o.size, 0, 6.283); ctx.stroke();
+        ctx.fillStyle = 'rgba(220,245,255,0.18)'; ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.55)';
+        ctx.beginPath(); ctx.arc(x - o.size * 0.3, by - o.size * 0.3, o.size * 0.22, 0, 6.283); ctx.fill();
+      } else if (o.kind === 'stars') {
+        ctx.fillStyle = o.color;
+        drawStar(ctx, x, y, o.size * (0.7 + 0.3 * Math.sin((age + o.rot) * 10)));
+      } else if (o.kind === 'leaves') {
+        drawLeaf(ctx, x, y, o.size * 1.4, o.rot + o.spin * age, o.color);
+      } else if (o.kind === 'snow') {
+        drawFlake(ctx, x, y, o.size * 1.3, '#e0f2fe');
+      } else if (o.kind === 'frog') {
+        if (isHop) drawFrog(ctx, x, y, Math.max(4.5, o.size * 0.85));
+        else drawPad(ctx, x, y, o.size * 1.3, o.color);
+      } else {
+        ctx.fillStyle = rgbaHex(o.color, 0.35);
+        ctx.beginPath(); ctx.arc(x, y, o.size * 1.8, 0, 6.283); ctx.fill();
+        ctx.fillStyle = o.color;
+        drawStar(ctx, x, y, o.size);
+      }
+    }
+    ctx.globalAlpha = 1;
+    if (fx.banner) {
+      const a = fade * (0.85 + 0.15 * Math.sin(p * 6.28));
+      const w = 210, h = 48;
+      const x = (board.width - w) / 2, yb = board.height / 2 - 86;
+      ctx.globalAlpha = a;
+      ctx.fillStyle = 'rgba(12, 16, 10, 0.72)';
+      const rr = 14;
+      ctx.beginPath();
+      ctx.moveTo(x + rr, yb);
+      ctx.arcTo(x + w, yb, x + w, yb + h, rr);
+      ctx.arcTo(x + w, yb + h, x, yb + h, rr);
+      ctx.arcTo(x, yb + h, x, yb, rr);
+      ctx.arcTo(x, yb, x + w, yb, rr);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(253, 230, 138, 0.55)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.fillStyle = '#fde68a';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = '700 26px ' + FONT;
+      ctx.fillText(g.popup && g.popup.indexOf('TETRIS') === 0 ? g.popup : 'TETRIS!', x + w / 2, yb + h / 2 + 1);
+      ctx.textBaseline = 'alphabetic';
+      ctx.globalAlpha = 1;
+    }
+  }
+
   let last = performance.now();
   function loop(now) {
-    applyLook(themeFor(g.level));
+    applyLook(themeFor(g.clearFx ? g.clearFx.level : g.level));
     try { fxDraw(now); } catch (e) { fx.off = true; }
     const dt = now - last;
     last = now;
-    const running = started && !g.over && !g.paused && !g.demo;
+    const clearing = tickClear(g, dt);
+    const running = started && !g.over && !g.paused && !g.demo && !clearing;
     if (running) {
       g.acc += dt;
       if (g.acc >= dropInterval(g.level)) {
@@ -1197,7 +1435,7 @@
         else { lockPiece(g); syncHud(); }
       }
     }
-    try { invStep(dt); } catch (e) { }
+    try { if (!clearing) invStep(dt); } catch (e) { }
     musicTick(g.level, running);
     if (g.flashT > 0) g.flashT -= dt;
     if (g.popupT > 0) g.popupT -= dt;
@@ -1210,12 +1448,16 @@
       ctx.lineWidth = 1;
       for (let c = 1; c < COLS; c++) { ctx.beginPath(); ctx.moveTo(c * CELL + 0.5, 0); ctx.lineTo(c * CELL + 0.5, ROWS * CELL); ctx.stroke(); }
       for (let r = 1; r < ROWS; r++) { ctx.beginPath(); ctx.moveTo(0, r * CELL + 0.5); ctx.lineTo(COLS * CELL, r * CELL + 0.5); ctx.stroke(); }
+      const fx = g.clearFx;
+      const drawBoard = fx ? fx.snap : g.board;
+      const colLines = fx ? fx.lines : g.lines;
+      const colLevel = fx ? fx.level : g.level;
       for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
-        const v = g.board[r][c];
-        if (v) drawCell(ctx, c * CELL, r * CELL, blockColor(v, g.lines, g.level), CELL, 1, c, r);
+        const v = drawBoard[r][c];
+        if (v) drawCell(ctx, c * CELL, r * CELL, blockColor(v, colLines, colLevel), CELL, 1, c, r);
       }
       try { invDraw(ctx); } catch (e) { }
-      if (!g.over) {
+      if (!g.over && !fx) {
         const p = g.piece;
         let gy = p.y;
         while (!collides(g.board, p.m, p.x, gy + 1)) gy++;
@@ -1226,19 +1468,16 @@
           if (v && p.y + r >= 0) drawCell(ctx, (p.x + c) * CELL, (p.y + r) * CELL, blockColor(p.t, g.lines, g.level), CELL, 1, p.x + c, p.y + r);
         }));
       }
-      if (g.flashT > 0) {
-        ctx.fillStyle = 'rgba(255,255,255,' + (g.flashT / 180) * 0.35 + ')';
-        ctx.fillRect(0, 0, board.width, board.height);
-      }
+      if (fx) drawClearFx(ctx, fx);
       ctx.textAlign = 'right';
       ctx.font = '600 16px ' + FONT;
       ctx.fillStyle = 'rgba(255,255,255,0.85)';
       ctx.fillText(String(g.score), board.width - 8, 22);
-      if (g.popupT > 0) {
+      if (g.popupT > 0 && !(fx && fx.banner)) {
         const k = g.popupT / 1100;
         ctx.globalAlpha = Math.min(1, k * 2);
         ctx.textAlign = 'center';
-        ctx.font = '700 24px ' + FONT;
+        ctx.font = '700 ' + (g.clearFx && g.clearFx.n >= 2 ? '26' : '24') + 'px ' + FONT;
         ctx.fillStyle = '#facc15';
         ctx.fillText(g.popup, board.width / 2, board.height / 2 - 40 - (1 - k) * 40);
         ctx.globalAlpha = 1;
