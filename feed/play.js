@@ -199,7 +199,9 @@
   // so their canvas and looping sound unload. No top-navigation, so the framed page cannot take over Info Book.
   const ART = {
     fall: { url: 'https://fallingfalling.com/', title: 'Falling Falling', host: 'fallingfalling.com', live: 'Moves, and plays a looping sound' },
-    zoom: { url: 'https://zoomquilt.org/', title: 'Zoomquilt', host: 'zoomquilt.org', live: 'Zooms on its own' }
+    zoom: { url: 'https://zoomquilt.org/', title: 'Zoomquilt', host: 'zoomquilt.org', live: 'Zooms on its own' },
+    // Relative tetris.html is /feed/tetris.html. ship-pages.sh already sends SAMEORIGIN for /feed/tetris.html and /feed/tetris.
+    tetris: { url: 'tetris.html', title: 'Tetris', host: 'Info Book', live: 'Sound starts when you tap', local: true }
   };
   let artWin, artFrame, artScroll = 0, artHist = false, artBtn = null;
   function artParts() {
