@@ -196,7 +196,7 @@
   function open(pre) { on = true; root.ibCalOn = true; edit = pre || null; draw(); root.scrollTo(0, 0); }
   root.ibCalOpen = open;
   root.ibCalDraw = function () { if (on) draw(); };
-  root.ibSoon = function () { on = false; root.ibCalOn = false; const el = root.document.querySelector('[data-id="gamesoon"]'); if (el) el.scrollIntoView({ block: 'start' }); else root.alert('Games are coming soon. Nothing to play yet.'); };
+  root.ibSoon = function () { on = false; root.ibCalOn = false; const el = root.document.querySelector('[data-id="gamesoon"]'); if (el) el.scrollIntoView({ block: 'start' }); else root.alert('Scroll the feed to find the Games card and play Tetris.'); };
 
   async function askNotify() {
     if (!root.Notification || Notification.permission !== 'default') return Notification && Notification.permission;
@@ -274,7 +274,7 @@
 
   const prevCard = root.card;
   root.card = function (i) {
-    if (i && i.x === 'gamesoon') return `<article class="card soon" data-id="gamesoon" style="--c1:#7c3aed;--c2:#f59e0b"><div class="hd"><div class="av">🎮</div><div class="who"><b>Info Book</b><small>Tetris is ready</small></div><span class="tp">Games</span></div><div class="soonband" aria-hidden="true">🎮 🎲 🧩</div><div class="bd"><h3>Games</h3><ul class="sum open" data-more aria-expanded="true"><li>Tetris opens here. Tap the board to start. Sound starts then too.</li><li>Other games are still coming soon.</li></ul><div class="xbtns"><button type="button" class="btn pri" data-art="tetris">Play Tetris</button></div><p class="soonnames"><span>More games coming soon</span></p></div></article>`;
+    if (i && i.x === 'gamesoon') return `<article class="card soon" data-id="gamesoon" style="--c1:#7c3aed;--c2:#f59e0b"><div class="hd"><div class="av">🎮</div><div class="who"><b>Info Book</b><small>Tetris is ready</small></div><span class="tp">Games</span></div><div class="soonband" aria-hidden="true">🎮 🎲 🧩</div><div class="bd"><h3>Games</h3><ul class="sum open" data-more aria-expanded="true"><li>Tetris opens here. Tap the board to start. Sound starts then too.</li><li>Scrabble is the next game coming soon.</li></ul><div class="xbtns"><button type="button" class="btn pri" data-art="tetris">Play Tetris</button></div><p class="soonnames"><span>Coming soon: Scrabble 🔤</span></p></div></article>`;
     const html = prevCard ? prevCard(i) : '';
     const b = btn(i); if (!b || !html) return html;
     if (html.includes('<div class="xbtns">')) return html.replace('<div class="xbtns">', '<div class="xbtns">' + b);
