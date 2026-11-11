@@ -1,10 +1,11 @@
-/* Info Book 1.9.156 – Sugar Rush, level 1. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.159 – Sugar Rush, level 1. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with). Level 1: reach 3,000 points in 20 moves.
    Only Shane can play for now (IBScores.isShane() from scores.js); everyone else sees a coming-soon screen.
    Scores are not sent to the family scoreboard yet. Sounds are soft and low: sine/triangle notes under 400 Hz,
-   gentle attack, through a lowpass, no clicks or chirps. */
+   gentle attack, through a lowpass, no clicks or chirps. Shane's track (sugar-rush-music.mp3) loops once the
+   game has had a tap; the music toggle mutes it and is remembered. */
 (function (root) {
   'use strict';
   const N = 8, KINDS = 6, PTS = 30;
@@ -242,7 +243,7 @@
   let best = ls.get('ib-sugar-best', 0);
   let busy = false, sel = null, down = null, lastAct = performance.now();
   let sprites = new Map(), fx = [];
-  let soundOn = ls.get('ib-sugar-sound', true), musicOn = ls.get('ib-sugar-music', false);
+  let soundOn = ls.get('ib-sugar-sound', true), musicOn = ls.get('ib-sugar-music', true);
 
   // ---------- Look ----------
   const COL = [['#ff8a9a', '#e0284a', '#9e1030'], ['#ffc078', '#f76707', '#b34700'], ['#fff3a0', '#fcc419', '#c98e00'], ['#9ff0a8', '#37b24d', '#1d7a30'], ['#a5dcff', '#228be6', '#124f99'], ['#e2b6ff', '#9c36b5', '#5f1a75']];
@@ -363,24 +364,34 @@
     else if (kind === 'win') { [5, 7, 8, 10, 12].forEach((i, j) => note(SCALE[i], t + j * .16, .7, .08, 'triangle')); note(SCALE[0], t, 1.4, .08, 'sine'); }
     else if (kind === 'lose') { [8, 7, 5].forEach((i, j) => note(SCALE[i], t + j * .2, .6, .07, 'sine')); }
   }
-  // Optional background music: slow, quiet triangle chords and a low bass, off unless turned on.
-  let musicTimer = 0, musicAt = 0, musicBar = 0, musicGain = null;
-  const CHORDS = [[5, 7, 8], [4, 5, 7], [3, 5, 6], [3, 4, 6]]; // C, Am, F-ish, G-ish from the scale
-  function musicTick() {
-    if (!ac || !musicOn) return;
-    while (musicAt < ac.currentTime + 1.2) {
-      const ch = CHORDS[musicBar % CHORDS.length];
-      ch.forEach(i => note(SCALE[i], musicAt, 2.6, .03, 'triangle', musicGain));
-      note(SCALE[ch[0] - 5 >= 0 ? ch[0] - 5 : 0], musicAt, 2.2, .05, 'sine', musicGain);
-      note(SCALE[ch[2] + 2], musicAt + 1.2, 1.1, .02, 'sine', musicGain);
-      musicAt += 2.4; musicBar++;
+  // 1.9.159 Shane's looping track replaces the old synth music. It starts after a user tap
+  // (browsers block autoplay with sound). The toggle mutes it and is remembered in localStorage.
+  // File RMS 0.156 (−16.1 dB). BGM_VOL 0.10 → RMS 0.0156 (−36.1 dB).
+  // A pop is out.gain 0.55 * 0.09, sine RMS 0.035 (−29.1 dB) → about +7 dB vs the music.
+  // A swap is 0.027 (−31.3 dB) → about +5 dB. Sounds stay above the music, and still soft and low.
+  const BGM_VOL = 0.10;
+  let bgm = null, bgmWant = false;
+  function bgmEl() {
+    if (!bgm && root.Audio) { bgm = new root.Audio(); bgm.loop = true; bgm.preload = 'auto'; bgm.src = 'sugar-rush-music.mp3'; bgm.volume = BGM_VOL; }
+    return bgm;
+  }
+  function playMusic() {
+    const a = bgmEl(); if (!a || !musicOn) return;
+    a.volume = BGM_VOL;
+    if (!bgmWant || a.paused) {
+      bgmWant = true;
+      try { const p = a.play(); if (p && p.catch) p.catch(() => { bgmWant = false; }); } catch (e) { bgmWant = false; }
     }
+  }
+  function stopMusic() {
+    bgmWant = false;
+    if (bgm) { try { bgm.pause(); } catch (e) { } }
   }
   function setMusic(on) {
     musicOn = on; ls.set('ib-sugar-music', on); paintButtons();
-    if (on) { if (!audio()) return; if (!musicGain) { musicGain = ac.createGain(); musicGain.gain.value = 1; musicGain.connect(out); } musicGain.gain.setValueAtTime(1, ac.currentTime); musicAt = ac.currentTime + 0.1; clearInterval(musicTimer); musicTimer = setInterval(musicTick, 300); musicTick(); }
-    else { clearInterval(musicTimer); if (musicGain && ac) { musicGain.gain.setTargetAtTime(0.0001, ac.currentTime, 0.3); musicGain.disconnect(); musicGain = null; } }
+    if (on) playMusic(); else stopMusic();
   }
+  function unlockAudio() { audio(); if (musicOn) playMusic(); }
 
   // ---------- HUD ----------
   function paintButtons() { $('soundbtn').textContent = soundOn ? '🔉 Sound on' : '🔇 Sound off'; $('musicbtn').textContent = musicOn ? '🎵 Music on' : '🎵 Music off'; }
@@ -469,7 +480,7 @@
 
   // ---------- Input: swipe, or tap one sweet then a neighbour ----------
   function cellAt(e) { const b = cv.getBoundingClientRect(); const c = Math.floor((e.clientX - b.left) / b.width * N), r = Math.floor((e.clientY - b.top) / b.height * N); return r >= 0 && r < N && c >= 0 && c < N ? [r, c] : null; }
-  cv.addEventListener('pointerdown', e => { audio(); if (musicOn && !musicTimer) setMusic(true); const p = cellAt(e); if (!p) return; down = { p, x: e.clientX, y: e.clientY }; try { cv.setPointerCapture(e.pointerId); } catch (er) { } e.preventDefault(); });
+  cv.addEventListener('pointerdown', e => { unlockAudio(); const p = cellAt(e); if (!p) return; down = { p, x: e.clientX, y: e.clientY }; try { cv.setPointerCapture(e.pointerId); } catch (er) { } e.preventDefault(); });
   cv.addEventListener('pointermove', e => {
     if (!down || busy) return;
     const dx = e.clientX - down.x, dy = e.clientY - down.y, cell = cv.getBoundingClientRect().width / N;
@@ -486,12 +497,12 @@
     lastAct = now();
   });
   cv.addEventListener('pointercancel', () => { down = null; });
-  $('soundbtn').addEventListener('click', () => { soundOn = !soundOn; ls.set('ib-sugar-sound', soundOn); paintButtons(); if (soundOn) sfx('swap'); });
+  $('soundbtn').addEventListener('click', () => { soundOn = !soundOn; ls.set('ib-sugar-sound', soundOn); paintButtons(); unlockAudio(); if (soundOn) sfx('swap'); });
   $('musicbtn').addEventListener('click', () => setMusic(!musicOn));
   $('restartbtn').addEventListener('click', restart);
   $('againbtn').addEventListener('click', restart);
-  doc.addEventListener('visibilitychange', () => { if (doc.hidden && ac) ac.suspend().catch(() => { }); else if (!doc.hidden && ac && (soundOn || musicOn)) ac.resume().catch(() => { }); });
-  root.addEventListener('pagehide', () => { clearInterval(musicTimer); if (ac) ac.close().catch(() => { }); });
+  doc.addEventListener('visibilitychange', () => { if (doc.hidden) { if (bgm && bgmWant) { try { bgm.pause(); } catch (e) { } } if (ac) ac.suspend().catch(() => { }); } else { if (ac && (soundOn || musicOn)) ac.resume().catch(() => { }); if (musicOn && bgmWant) playMusic(); } });
+  root.addEventListener('pagehide', () => { stopMusic(); if (ac) ac.close().catch(() => { }); });
   root.addEventListener('resize', fitCanvas);
 
   fitCanvas(); paintButtons(); syncAll(); hud(); hintMove = findMove(st.board);
