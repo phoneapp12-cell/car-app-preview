@@ -514,12 +514,25 @@
     if (g.over) {
       best = Math.max(best, g.score);
       try { root.localStorage.setItem('tetris-best', String(best)); } catch (e) { }
+      if (!g.scored) { g.scored = true; gameOverScores(g); }
     }
+  }
+  // 1.9.149 family scoreboard (scores.js): send the finished game once, then show the board over the game
+  const SB = { acc: '#facc15', btn: '#3f3a12' };
+  function gameOverScores(gm) {
+    const S = root.IBScores; if (!S || !started) return;
+    const sent = gm.score > 0 ? S.submit('tetris', { score: gm.score, lines: gm.lines, level: gm.level }, { note: gm.lines + ' lines' }) : null;
+    setTimeout(() => { if (g === gm && gm.over) S.open('tetris', { ...SB, over: true, score: gm.score, detail: gm.lines + ' line' + (gm.lines === 1 ? '' : 's') + ' · level ' + gm.level, sent, onAgain: () => press('restart') }); }, 1200);
+  }
+  function openScores() {
+    const S = root.IBScores; if (!S) return;
+    if (started && !g.over && !g.paused) press('pause');
+    S.open('tetris', SB);
   }
   function press(a) {
     if (!started) started = true;
     const next = act(g, a);
-    if (a === 'restart') g = next;
+    if (a === 'restart') { g = next; if (root.IBScores) root.IBScores.close(); }
     syncHud();
   }
   root.Tetris.press = press;
@@ -553,6 +566,8 @@
     musicOn = !musicOn; ensureAudio();
     doc.getElementById('musicbtn').textContent = musicOn ? 'Music on' : 'Music off';
   });
+  { const sb = doc.getElementById('scoresbtn'); if (sb) sb.addEventListener('click', openScores); }
+  if (/^#scores/.test(root.location && root.location.hash || '')) setTimeout(openScores, 0);
   doc.getElementById('soundbtn').addEventListener('click', () => {
     soundOn = !soundOn; ensureAudio();
     doc.getElementById('soundbtn').textContent = soundOn ? 'Sound on' : 'Sound off';
@@ -560,6 +575,7 @@
   const map = { ArrowLeft: 'left', ArrowRight: 'right', ArrowDown: 'down', ArrowUp: 'rotate', x: 'rotate', X: 'rotate', z: 'rotateBack', Z: 'rotateBack', ' ': 'drop', c: 'hold', C: 'hold', Shift: 'hold', p: 'pause', P: 'pause', Escape: 'pause', r: 'restart', R: 'restart' };
   root.addEventListener('keydown', e => {
     if (e.key === 'm' || e.key === 'M') { musicOn = !musicOn; ensureAudio(); const b = doc.getElementById('musicbtn'); if (b) b.textContent = musicOn ? 'Music on' : 'Music off'; return; }
+    if (root.IBScores && root.IBScores.isOpen()) { if (e.key === 'Escape') root.IBScores.close(); return; }
     const a = map[e.key];
     if (!a) return;
     e.preventDefault();

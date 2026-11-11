@@ -743,6 +743,50 @@ assert.ok(!/\/feed\/tetris(?:\.html)?\n {2}X-Frame-Options: DENY/.test(headers))
 assert.match(headers, /\/feed\/scrabble\n {2}! X-Frame-Options\n {2}X-Frame-Options: SAMEORIGIN/);
 assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Frame-Options: SAMEORIGIN/);
 
+// 1.9.149 family scoreboard: scores.js sends with this phone's family link only, keeps local bests, and the worker checks scores
+{
+  const mem = new Map(), calls = [];
+  const lsStub = { getItem: k => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: k => mem.delete(k) };
+  const ctx = { console, Math, Object, Number, String, Array, JSON, Date, Promise, setTimeout, clearTimeout, encodeURIComponent, localStorage: lsStub,
+    fetch: async (url, opt) => { calls.push({ url, opt }); return { ok: true, json: async () => ({ ok: 1, rank: 2, best: 900, newBest: false }) }; } };
+  ctx.window = ctx; ctx.globalThis = ctx; vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync('feed/scores.js', 'utf8'), ctx, { filename: 'feed/scores.js' });
+  const S = ctx.IBScores;
+  assert.strictEqual(S.API, 'https://shane-my-feed-data.phoneapp12.workers.dev/api');
+  assert.strictEqual(S.who(), null);
+  assert.strictEqual(await S.submit('tetris', { score: 500, lines: 4, level: 1 }), null, 'no family link: nothing sent');
+  assert.strictEqual(calls.length, 0);
+  assert.strictEqual(S.localBests('tetris')[0].score, 500, 'kept on this phone');
+  mem.set('mf.member', JSON.stringify({ tok: 'pending-token-xxxxxxxxxxxxxxxxxxxxxxxxx', pending: 1 }));
+  assert.strictEqual(S.who(), null, 'an unchecked invite is not an identity');
+  mem.set('mf.member', JSON.stringify({ id: 'm1', name: 'Shane Jenkins', role: 'admin', tok: 'tok-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' }));
+  assert.strictEqual(S.who().first, 'Shane');
+  const r = await S.submit('tetris', { score: 900, lines: 8, level: 1 });
+  assert.strictEqual(r.rank, 2);
+  assert.strictEqual(calls[0].url, S.API + '/scores');
+  assert.strictEqual(calls[0].opt.method, 'POST');
+  assert.strictEqual(calls[0].opt.headers.Authorization, 'Bearer tok-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx');
+  const sentBody = JSON.parse(calls[0].opt.body);
+  assert.deepStrictEqual({ ...sentBody }, { game: 'tetris', score: 900, lines: 8, level: 1 });
+  assert.ok(!('name' in sentBody), 'the server names the player from the token');
+  await S.submit('scrabble', { score: 210 }, { name: 'Aranea', localOnly: true });
+  assert.strictEqual(calls.length, 1, 'other pass-the-phone players stay on this phone');
+  assert.deepStrictEqual(S.localBests('tetris').map(x => x.score), [900, 500]);
+  await S.load('scrabble'); assert.strictEqual(calls[1].url, S.API + '/scores?game=scrabble');
+  assert.strictEqual(S.nzDate(Date.UTC(2026, 10, 11, 11, 30)), '12 Nov', 'dates are NZ dates');
+  ctx.fetch = async () => { throw new Error('offline'); };
+  assert.strictEqual(await S.load('tetris'), null, 'offline fails quietly');
+  const tet = fs.readFileSync('feed/tetris.js', 'utf8'), tetHtml = fs.readFileSync('feed/tetris.html', 'utf8');
+  assert.ok(tetHtml.indexOf('scores.js') > 0 && tetHtml.indexOf('scores.js') < tetHtml.indexOf('tetris.js'));
+  assert.ok(tetHtml.includes('id="scoresbtn"') && tet.includes("S.submit('tetris', { score: gm.score, lines: gm.lines, level: gm.level }"));
+  const scr = fs.readFileSync('feed/scrabble.js', 'utf8'), scrHtml = fs.readFileSync('feed/scrabble.html', 'utf8');
+  assert.ok(scrHtml.includes('<script src="scores.js"></script>') && scrHtml.includes('id="overscores"') && scrHtml.includes('id="gscoresbtn"'));
+  assert.ok(scr.includes('localOnly: true') && scr.includes('if (!st.scored)'));
+  assert.ok(!/importScripts\s*\(/.test(scr), 'scrabble.js also runs as the computer player worker, so it never loads scores.js itself');
+  assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'scores.js'"));
+  execSync('node worker/test/scores.test.mjs', { stdio: 'pipe' });
+}
+
 console.log('feed-info tests ok');
 
 const live = process.env.SKIP_LIVE ? null : await fetch('https://due-dates-calendar-relay.phoneapp12.workers.dev/events', { headers: { Accept: 'application/json', Origin: 'https://shane-my-app.pages.dev' } });
