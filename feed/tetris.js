@@ -28,11 +28,15 @@
         if (!Ctor) return;
         ac = new Ctor();
         sfxGain = ac.createGain();
-        sfxGain.gain.value = 0.4;
-        sfxGain.connect(ac.destination);
+        sfxGain.gain.value = 0.3;
+        const sfxSoft = ac.createBiquadFilter(); // take the sharp top off every sound
+        sfxSoft.type = 'lowpass'; sfxSoft.frequency.value = 1400;
+        sfxGain.connect(sfxSoft); sfxSoft.connect(ac.destination);
         musicGain = ac.createGain();
-        musicGain.gain.value = 0.22;
-        musicGain.connect(ac.destination);
+        musicGain.gain.value = 0.16;
+        const musicSoft = ac.createBiquadFilter();
+        musicSoft.type = 'lowpass'; musicSoft.frequency.value = 1100;
+        musicGain.connect(musicSoft); musicSoft.connect(ac.destination);
         melodyBus = ac.createGain();
         melodyBus.gain.value = 1;
         melodyBus.connect(musicGain);
@@ -134,7 +138,7 @@
   function themeFor(level) { return (Math.max(1, level) - 1) % THEMES.length; }
   function sfx(name) {
     if (!soundOn || !ac) return;
-    const d = sfxGain, T = THEMES[themeIdx], m = T.pitch, w = T.sfx;
+    const d = sfxGain, T = THEMES[themeIdx], m = T.pitch * 0.5, w = 'sine', lo = f => nf(f) / 2;
     switch (name) {
       // Soft chimes and drops, pitched and voiced to the current theme.
       case 'move': tone(880 * m, 0.05, w, 0.05, 0, 0, d); break;
@@ -143,9 +147,9 @@
       case 'drop': tone(420 * m, 0.22, w, 0.12, 0, 160 * m, d); break;
       case 'lock': tone(330 * m, 0.12, 'triangle', 0.08, 0, 260 * m, d); break;
       case 'hold': tone(784 * m, 0.18, w, 0.08, 0, 0, d); tone(1047 * m, 0.22, w, 0.07, 0.08, 0, d); break;
-      case 'clear': [0, 2, 3].forEach((k, i) => tone(nf(T.bells[k]), 0.5, w, 0.09, i * 0.09, 0, d)); break;
-      case 'tetris': [0, 1, 2, 3, 4, 5].forEach((k, i) => tone(nf(T.bells[k]), 0.7, w, 0.09, i * 0.09, 0, d)); break;
-      case 'level': [1, 2, 3, 5].forEach((k, i) => tone(nf(THEMES[themeIdx].bells[k]), 0.6, w, 0.08, i * 0.12, 0, d)); break;
+      case 'clear': [0, 2, 3].forEach((k, i) => tone(lo(T.bells[k]), 0.5, w, 0.09, i * 0.09, 0, d)); break;
+      case 'tetris': [0, 1, 2, 3, 4, 5].forEach((k, i) => tone(lo(T.bells[k]), 0.7, w, 0.09, i * 0.09, 0, d)); break;
+      case 'level': [1, 2, 3, 5].forEach((k, i) => tone(lo(T.bells[k]), 0.6, w, 0.08, i * 0.12, 0, d)); break;
       case 'over': [5, 3, 2, 0].forEach((k, i) => tone(nf(T.bells[k]) / 2, 0.9, 'sine', 0.09, i * 0.3, 0, d)); break;
       default: break;
     }
@@ -161,12 +165,12 @@
       T.chords[b % T.chords.length].forEach((n, k) => add(b * 4 + k * 0.25, { v: 'pad', f: nf(n), d: 4.6 }));
       if ((T.ambient === 'wave' || T.ambient === 'wind' || T.ambient === 'traffic') && b % 2 === 0) add(b * 4, { v: T.ambient, d: 8 });
       if (T.ambient === 'rain') add(b * 4, { v: 'rain', d: 4.2 });
-      if (T.ambient === 'shimmer' && b % 2 === 1) add(b * 4, { v: 'shimmer', f: nf(T.bells[5]), d: 6 });
-      if (T.ambient === 'bubbles') [0.5, 1.75, 3].forEach(p => add(b * 4 + p, { v: 'bubble' }));
+      if (false && T.ambient === 'shimmer' && b % 2 === 1) add(b * 4, { v: 'shimmer', f: nf(T.bells[5]), d: 6 });
+      if (false && T.ambient === 'bubbles') [0.5, 1.75, 3].forEach(p => add(b * 4 + p, { v: 'bubble' }));
     }
-    for (const [pos, k] of BELLS) add(pos, { v: 'bell', f: nf(T.bells[k]), d: 3 });
+    for (const [pos, k] of BELLS) add(pos, { v: 'bell', f: nf(T.bells[k]) / 2, d: 3 });
     const cr = [].concat(T.critter);
-    [7, 23].forEach((p, i) => add(p, { v: cr[i % cr.length] }));
+    [7, 23].forEach((p, i) => { if (cr[i % cr.length] === 'whale') add(p, { v: 'whale' }); }); // high chirps removed: too sharp
     while (steps.length < len * 2) steps.push([]);
     return steps;
   });
@@ -210,14 +214,14 @@
       g.gain.linearRampToValueAtTime(0.0001, at + d);
       o.connect(g); g.connect(musicGain); o.start(at); o.stop(at + d + 0.05);
     } else if (e.v === 'bell') {
-      [1, 2.01].forEach((m, i) => {
+      [1].forEach((m, i) => {
         const o = ac.createOscillator();
         o.type = 'sine';
         o.frequency.setValueAtTime(e.f * m, at);
         const g = ac.createGain();
         const d = e.d * beat * (i ? 0.5 : 1);
         g.gain.setValueAtTime(0.0001, at);
-        g.gain.linearRampToValueAtTime(i ? 0.025 : 0.09, at + 0.02);
+        g.gain.linearRampToValueAtTime(0.07, at + 0.06);
         g.gain.exponentialRampToValueAtTime(0.0001, at + d);
         o.connect(g); g.connect(melodyBus); o.start(at); o.stop(at + d + 0.05);
       });
@@ -228,12 +232,12 @@
       const src = ac.createBufferSource();
       src.buffer = noiseBuf; src.loop = true;
       const f = ac.createBiquadFilter();
-      f.type = 'bandpass'; f.frequency.value = 3200; f.Q.value = 0.6;
+      f.type = 'lowpass'; f.frequency.value = 900;
       const g = ac.createGain();
       const d = e.d * beat;
       g.gain.setValueAtTime(0.0001, at);
-      g.gain.linearRampToValueAtTime(0.05, at + 0.6);
-      g.gain.setValueAtTime(0.05, at + d - 0.6);
+      g.gain.linearRampToValueAtTime(0.04, at + 0.6);
+      g.gain.setValueAtTime(0.04, at + d - 0.6);
       g.gain.linearRampToValueAtTime(0.0001, at + d);
       src.connect(f); f.connect(g); g.connect(musicGain);
       src.start(at, Math.random() * 0.5); src.stop(at + d + 0.05);
