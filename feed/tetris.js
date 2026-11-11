@@ -142,11 +142,11 @@
   // Colourful picture behind each theme (same order as THEMES), softened with a dark veil so the blocks stand out.
   const PICS = THEMES.map((_, i) => 'tetris-bg/' + i + '.webp');
   let themeIdx = 0;
-  // Level order (indexes into THEMES): Farmyard, Triangles, Jeremiah was a bullfrog, Beach, Rainforest, Ocean, Bush walk, New Zealand, Snowy mountains, City, Night sky, Space travel last.
-  const ORDER = [6, 8, 11, 0, 1, 2, 3, 9, 10, 4, 5, 7];
+  // Level order (indexes into THEMES): Farmyard, Jeremiah was a bullfrog, Beach, Rainforest, Ocean, Bush walk, New Zealand, Snowy mountains, City, Night sky, Triangles, Space travel last.
+  const ORDER = [6, 11, 0, 1, 2, 3, 9, 10, 4, 5, 8, 7];
   function themeFor(level) { return ORDER[(Math.max(1, level) - 1) % ORDER.length]; }
-  // 1.9.150 Triangle Tetris (theme 8, level 2): blocks are triangles, and only two colours at a time.
-  // Red and blue for the first half of the level, then pink and lime after half the lines needed (5 of 10).
+  // 1.9.151 Triangle Tetris (theme 8, level 11, second to last): blocks are triangles, and only two colours at a time.
+  // Red and blue for the first 5 lines of the level, then pink and lime after half the lines needed (5 of 10).
   const TRI_THEME = 8;
   const TRI_PAL = { early: ['#e25b62', '#4e88d6'], late: ['#ef8cba', '#8dce5c'] };
   function triangleLate(lines) { return (Math.max(0, lines | 0) % 10) >= 5; }
