@@ -37,11 +37,11 @@
         melodyBus.gain.value = 1;
         melodyBus.connect(musicGain);
         const delay = ac.createDelay(1);
-        delay.delayTime.value = 0.21;
+        delay.delayTime.value = 0.45;
         const fb = ac.createGain();
-        fb.gain.value = 0.28;
+        fb.gain.value = 0.4;
         const wet = ac.createGain();
-        wet.gain.value = 0.3;
+        wet.gain.value = 0.45;
         const tone_ = ac.createBiquadFilter();
         tone_.type = 'lowpass';
         tone_.frequency.value = 2600;
@@ -92,141 +92,92 @@
       default: break;
     }
   }
+  // Calm ocean music: soft sine pads, gentle bell notes, slow wave swells and the odd dolphin chirp. Same slow pace at every level.
   const SEMI = { C: 0, CS: 1, D: 2, DS: 3, E: 4, F: 5, FS: 6, G: 7, GS: 8, A: 9, AS: 10, B: 11 };
   function nf(n) {
-    if (n === 'R') return 0;
     const oct = parseInt(n.slice(-1), 10);
     const midi = 12 * (oct + 1) + SEMI[n.slice(0, -1)];
     return 440 * Math.pow(2, (midi - 69) / 12);
   }
-  const MELODY = [
-    ['E5', 1], ['B4', .5], ['C5', .5], ['D5', 1], ['C5', .5], ['B4', .5], ['A4', 1], ['A4', .5], ['C5', .5], ['E5', 1], ['D5', .5], ['C5', .5],
-    ['B4', 1.5], ['C5', .5], ['D5', 1], ['E5', 1], ['C5', 1], ['A4', 1], ['A4', 2],
-    ['D5', 1.5], ['F5', .5], ['A5', 1], ['G5', .5], ['F5', .5], ['E5', 1.5], ['C5', .5], ['E5', 1], ['D5', .5], ['C5', .5],
-    ['B4', 1], ['B4', .5], ['C5', .5], ['D5', 1], ['E5', 1], ['C5', 1], ['A4', 1], ['A4', 1], ['R', 1.5]
+  const OCEAN_CHORDS = [
+    ['F3', 'A3', 'C4', 'E4'], ['C3', 'G3', 'B3', 'E4'], ['A2', 'E3', 'G3', 'C4'], ['G2', 'D3', 'G3', 'B3']
   ];
-  const MELODY_B = [
-    ['E5', 2], ['C5', 2], ['D5', 2], ['B4', 2], ['C5', 2], ['A4', 2], ['GS4', 2], ['B4', 2],
-    ['E5', 2], ['C5', 2], ['D5', 2], ['B4', 2], ['C5', 1], ['E5', 1], ['A5', 2], ['GS5', 4]
+  const BELL_NOTES = ['C5', 'D5', 'E5', 'G5', 'A5', 'C6'];
+  const BELLS = [
+    [0, 4], [1.5, 2], [3, 3], [5, 1], [6.5, 0], [9, 2], [10, 4], [12.5, 3], [14, 5], [17, 2], [18.5, 1], [21, 0], [22, 2], [25, 4], [26.5, 3], [29, 1], [30, 0]
   ];
-  const CHORDS_A = ['E', 'Am', 'E', 'Am', 'Dm', 'C', 'E', 'Am'];
-  const CHORDS_B = ['Am', 'E', 'Am', 'E', 'Am', 'E', 'Am', 'E'];
-  const CHORD_NOTES = { Am: ['A3', 'C4', 'E4'], E: ['E3', 'GS3', 'B3'], Dm: ['D3', 'F3', 'A3'], C: ['C3', 'E3', 'G3'] };
-  const CHORD_ROOT = { Am: 'A2', E: 'E2', Dm: 'D2', C: 'C2' };
   const STEPS = (function () {
     const steps = [];
     const add = (pos, e) => { const i = Math.round(pos * 2); while (steps.length <= i) steps.push([]); steps[i].push(e); };
-    let pos = 0;
-    const section = (mel, chords) => {
-      const start = pos;
-      let p = start;
-      for (const pair of mel) { if (pair[0] !== 'R') add(p, { v: 'lead', f: nf(pair[0]), d: pair[1] }); p += pair[1]; }
-      chords.forEach((c, bar) => {
-        const b0 = start + bar * 4;
-        for (const cn of CHORD_NOTES[c]) add(b0, { v: 'pad', f: nf(cn), d: 4 });
-        const root = nf(CHORD_ROOT[c]);
-        for (let k = 0; k < 8; k++) add(b0 + k * 0.5, { v: 'bass', f: k % 2 ? root * 2 : root, d: 0.5 });
-        for (let beat = 0; beat < 4; beat++) {
-          add(b0 + beat, { v: beat % 2 === 0 ? 'kick' : 'snare', f: 0, d: 0 });
-          add(b0 + beat + 0.5, { v: 'hat', f: 0, d: 0 });
-          add(b0 + beat, { v: 'hat', f: 0, d: 0 });
-        }
-      });
-      pos = start + chords.length * 4;
-    };
-    section(MELODY, CHORDS_A);
-    section(MELODY, CHORDS_A);
-    section(MELODY_B, CHORDS_B);
-    while (steps.length < pos * 2) steps.push([]);
+    const bars = 8, len = bars * 4;
+    for (let b = 0; b < bars; b++) {
+      const ch = OCEAN_CHORDS[b % OCEAN_CHORDS.length];
+      ch.forEach((n, k) => add(b * 4 + k * 0.25, { v: 'pad', f: nf(n), d: 4.6 }));
+      if (b % 2 === 0) add(b * 4, { v: 'wave', d: 8 });
+    }
+    for (const [pos, k] of BELLS) add(pos, { v: 'bell', f: nf(BELL_NOTES[k]), d: 3 });
+    [7, 23].forEach(p => add(p, { v: 'chirp' }));
+    while (steps.length < len * 2) steps.push([]);
     return steps;
   })();
-  function noiseHit(at, dur, vol, hp) {
-    if (!ac || !musicGain || !noiseBuf) return;
-    const src = ac.createBufferSource();
-    src.buffer = noiseBuf;
-    const f = ac.createBiquadFilter();
-    f.type = 'highpass';
-    f.frequency.value = hp;
-    const g = ac.createGain();
-    g.gain.setValueAtTime(vol, at);
-    g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
-    src.connect(f); f.connect(g); g.connect(musicGain);
-    src.start(at, Math.random() * 0.5);
-    src.stop(at + dur + 0.02);
-  }
-  function lead(freq, at, dur) {
-    if (!ac || !melodyBus) return;
-    const o1 = ac.createOscillator(), o2 = ac.createOscillator();
-    o1.type = 'square'; o2.type = 'sawtooth';
-    o1.frequency.setValueAtTime(freq, at);
-    o2.frequency.setValueAtTime(freq * 1.004, at);
-    const lfo = ac.createOscillator(), lfoG = ac.createGain();
-    lfo.frequency.value = 5.5;
-    lfoG.gain.setValueAtTime(0, at);
-    lfoG.gain.linearRampToValueAtTime(freq * 0.006, at + Math.min(dur, 0.4));
-    lfo.connect(lfoG); lfoG.connect(o1.frequency); lfoG.connect(o2.frequency);
-    const filt = ac.createBiquadFilter();
-    filt.type = 'lowpass';
-    filt.frequency.setValueAtTime(4200, at);
-    filt.frequency.exponentialRampToValueAtTime(1600, at + dur);
-    const g = ac.createGain();
-    g.gain.setValueAtTime(0.0001, at);
-    g.gain.linearRampToValueAtTime(0.16, at + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.09, at + Math.min(dur, 0.2));
-    g.gain.exponentialRampToValueAtTime(0.0001, at + dur * 0.95);
-    o1.connect(filt); o2.connect(filt); filt.connect(g); g.connect(melodyBus);
-    [o1, o2, lfo].forEach(o => { o.start(at); o.stop(at + dur + 0.05); });
-  }
   function playEvent(e, at, beat) {
     if (!ac || !musicGain) return;
-    if (e.v === 'lead') lead(e.f, at, e.d * beat);
-    else if (e.v === 'pad') {
+    if (e.v === 'pad') {
       const o = ac.createOscillator();
-      o.type = 'triangle';
+      o.type = 'sine';
       o.frequency.setValueAtTime(e.f, at);
       const g = ac.createGain();
       const d = e.d * beat;
       g.gain.setValueAtTime(0.0001, at);
-      g.gain.linearRampToValueAtTime(0.07, at + 0.12);
-      g.gain.linearRampToValueAtTime(0.05, at + d * 0.7);
-      g.gain.exponentialRampToValueAtTime(0.0001, at + d);
+      g.gain.linearRampToValueAtTime(0.06, at + d * 0.35);
+      g.gain.linearRampToValueAtTime(0.0001, at + d);
       o.connect(g); g.connect(musicGain); o.start(at); o.stop(at + d + 0.05);
-    } else if (e.v === 'bass') {
-      const o = ac.createOscillator();
-      o.type = 'sawtooth';
-      o.frequency.setValueAtTime(e.f, at);
-      const filt = ac.createBiquadFilter();
-      filt.type = 'lowpass';
-      filt.frequency.setValueAtTime(900, at);
-      filt.frequency.exponentialRampToValueAtTime(220, at + e.d * beat);
+    } else if (e.v === 'bell') {
+      [1, 2.01].forEach((m, i) => {
+        const o = ac.createOscillator();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(e.f * m, at);
+        const g = ac.createGain();
+        const d = e.d * beat * (i ? 0.5 : 1);
+        g.gain.setValueAtTime(0.0001, at);
+        g.gain.linearRampToValueAtTime(i ? 0.025 : 0.09, at + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, at + d);
+        o.connect(g); g.connect(melodyBus); o.start(at); o.stop(at + d + 0.05);
+      });
+    } else if (e.v === 'wave' && noiseBuf) {
+      const d = e.d * beat;
+      const src = ac.createBufferSource();
+      src.buffer = noiseBuf; src.loop = true;
+      const f = ac.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.setValueAtTime(300, at);
+      f.frequency.linearRampToValueAtTime(900, at + d * 0.45);
+      f.frequency.linearRampToValueAtTime(250, at + d);
       const g = ac.createGain();
       g.gain.setValueAtTime(0.0001, at);
-      g.gain.linearRampToValueAtTime(0.3, at + 0.005);
-      g.gain.exponentialRampToValueAtTime(0.0001, at + e.d * beat * 0.9);
-      o.connect(filt); filt.connect(g); g.connect(musicGain); o.start(at); o.stop(at + e.d * beat + 0.02);
-    } else if (e.v === 'kick') {
-      const o = ac.createOscillator();
-      o.type = 'sine';
-      o.frequency.setValueAtTime(150, at);
-      o.frequency.exponentialRampToValueAtTime(45, at + 0.14);
-      const g = ac.createGain();
-      g.gain.setValueAtTime(0.8, at);
-      g.gain.exponentialRampToValueAtTime(0.0001, at + 0.18);
-      o.connect(g); g.connect(musicGain); o.start(at); o.stop(at + 0.2);
-    } else if (e.v === 'snare') {
-      noiseHit(at, 0.14, 0.35, 1400);
-      const o = ac.createOscillator();
-      o.type = 'triangle';
-      o.frequency.setValueAtTime(200, at);
-      const g = ac.createGain();
-      g.gain.setValueAtTime(0.25, at);
-      g.gain.exponentialRampToValueAtTime(0.0001, at + 0.08);
-      o.connect(g); g.connect(musicGain); o.start(at); o.stop(at + 0.1);
-    } else if (e.v === 'hat') noiseHit(at, 0.04, 0.09, 7500);
+      g.gain.linearRampToValueAtTime(0.12, at + d * 0.45);
+      g.gain.linearRampToValueAtTime(0.0001, at + d);
+      src.connect(f); f.connect(g); g.connect(musicGain);
+      src.start(at, Math.random() * 0.5); src.stop(at + d + 0.05);
+    } else if (e.v === 'chirp') {
+      for (let i = 0; i < 3; i++) {
+        const t0 = at + i * 0.16, base = 1700 + Math.random() * 500;
+        const o = ac.createOscillator();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(base, t0);
+        o.frequency.exponentialRampToValueAtTime(base * 1.6, t0 + 0.06);
+        o.frequency.exponentialRampToValueAtTime(base * 0.9, t0 + 0.13);
+        const g = ac.createGain();
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.linearRampToValueAtTime(0.03, t0 + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.14);
+        o.connect(g); g.connect(melodyBus); o.start(t0); o.stop(t0 + 0.16);
+      }
+    }
   }
-  function scheduleMusic(level) {
+  function scheduleMusic() {
     if (!ac || !musicGain) return;
-    const beat = Math.max(0.2, 0.32 - (level - 1) * 0.012);
+    const beat = 0.75;
     if (nextNoteTime < ac.currentTime) nextNoteTime = ac.currentTime + 0.05;
     while (nextNoteTime < ac.currentTime + 0.25) {
       const evs = STEPS[noteIdx % STEPS.length];
