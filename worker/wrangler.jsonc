@@ -1,0 +1,19 @@
+{
+  // Info Book family data service + My Feed refresher (Cloudflare Workers, free plan).
+  // Source here was recovered from the deployed script's source map (deployed 2026-11-06), so deploying it keeps live behaviour.
+  "name": "shane-my-feed-data",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-09-25",
+  "workers_dev": true,
+  "observability": { "enabled": false },
+  "kv_namespaces": [{ "binding": "FEED_KV", "id": "9e0643489b0f4879bf6c75939d9b6c92" },
+    // 1.9.0 read-only: My App's own copies of the shared cars' due dates in its data service
+    { "binding": "RELAY_KV", "id": "471149f31c3f46bda746283ffba8b4d3" }],
+  // 1.7.0: the family network (members, comments, settings, and from 1.9.149 game scores) lives in one SQLite Durable Object (free plan)
+  "durable_objects": { "bindings": [{ "name": "FAMILY", "class_name": "Family" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Family"] }],
+  // 1.9.12 Info Bot: Workers AI (free daily allocation)
+  "ai": { "binding": "AI" },
+  // Secrets (set already, not in this file): SEED_KEY, VAPID_PRIVATE
+  "triggers": { "crons": ["*/10 * * * *"] }
+}
