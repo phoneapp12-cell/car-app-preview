@@ -123,7 +123,7 @@ gHold.canHold = true;
 tetGame.act(gHold, 'hold');
 assert.strictEqual(gHold.hold, held);
 assert.strictEqual(gHold.canHold, false);
-// 1.9.153 triangle Tetris on the Triangles theme (level 11, second to last): two-colour palette, gameplay unchanged
+// 1.9.154 triangle Tetris on the Triangles theme (level 11, second to last): two-colour palette, gameplay unchanged
 assert.strictEqual(tetGame.themeFor(1), 6);
 assert.strictEqual(tetGame.themeFor(2), 11);
 assert.strictEqual(tetGame.themeFor(3), 0);
@@ -156,10 +156,11 @@ tetGame.act(gTri, 'left');
 assert.strictEqual(gTri.piece.x, beforeX - 1, 'triangle theme does not change movement');
 assert.strictEqual(tetGame.THEMES[7].name, 'Space travel');
 assert.strictEqual(tetGame.SPACE_THEME, 7);
-const wait12 = tetGame.bombWaitRange(12), wait36 = tetGame.bombWaitRange(36);
-assert.strictEqual(wait12[0], 11); assert.strictEqual(wait12[1], 15);
-assert.strictEqual(wait36[0], 8); assert.strictEqual(wait36[1], 12);
-assert.ok(wait12[0] >= 8 && wait36[0] >= 8);
+const waitFirst = tetGame.bombWaitRange(12, true), waitLater = tetGame.bombWaitRange(12, false);
+assert.deepStrictEqual(Array.from(waitFirst), [4, 6]);
+assert.deepStrictEqual(Array.from(waitLater), [6, 10]);
+assert.deepStrictEqual(Array.from(tetGame.bombWaitRange(36, true)), [4, 6]);
+assert.deepStrictEqual(Array.from(tetGame.bombWaitRange(36, false)), [6, 10]);
 const gSp = tetGame.newGame();
 gSp.level = 12; gSp.lines = 110;
 gSp.board = tetGame.emptyBoard();
@@ -357,12 +358,12 @@ for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 3, at.join(',
 const appSrc = fs.readFileSync('feed/app.js', 'utf8');
 for (const id of sights.TOPICS) assert.ok(appSrc.includes("'" + id + "'"), id);
 assert.ok(!/Math\.pow\(baseOf\(t\), 3\)/.test(appSrc));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.153'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.153'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.153'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.154'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.154'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.154'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.cdot.tv'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.bd ul.sum'));
-assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.153'"));
+assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.154'"));
 function swVersion(src) { const m = String(src).match(/const VERSION = '([^']+)'/); assert.ok(m, 'parent sw.js VERSION'); return m[1]; }
 const parentHere = swVersion(fs.readFileSync('sw.js', 'utf8'));
 let parentMain = parentHere;
@@ -401,10 +402,10 @@ assert.equal(artB.length, 1);
 assert.notEqual(artB[0].id, artA.id);
 seenArt.wasSeen = () => true;
 assert.equal(seenArt.ibArt.cards(0).length, 0);
-assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.153'"));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.154'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'art3d.js?v=' + VERSION"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'portal.js?v=' + VERSION"));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.153'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.154'));
 const portalSrc = fs.readFileSync('feed/portal.js', 'utf8');
 assert.ok(portalSrc.includes('prefers-reduced-motion'));
 assert.ok(portalSrc.includes("sessionStorage.getItem(KEY)"));
@@ -432,7 +433,7 @@ assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("cache: 'reload'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("cache: 'no-cache'"));
 assert.ok(appSrc.includes('ibPortalRise'));
 assert.ok(!/portal-style\.jpg|attachments\/image/.test(portalSrc + fs.readFileSync('feed/index.html', 'utf8')));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.153'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.154'));
 assert.ok(appSrc.includes("['art3d', '3D art'"));
 assert.ok(appSrc.includes("['3D art', 'art3d'"));
 assert.ok(appSrc.includes("'art3d'"));
@@ -556,7 +557,7 @@ assert.ok(cal.ics(saved).includes('TRIGGER:-PT1H'));
 const calFile = fs.readFileSync('feed/cal.js', 'utf8');
 assert.ok(calFile.includes('data-art="tetris"'));
 assert.ok(calFile.includes('Play Tetris'));
-// 1.9.153 Scrabble is playable; Sugar Rush is the next game coming soon
+// 1.9.154 Scrabble is playable; Sugar Rush is the next game coming soon
 assert.ok(calFile.includes('data-art="scrabble"'));
 assert.ok(calFile.includes('Play Scrabble'));
 assert.ok(calFile.includes('<span>Coming soon: Sugar Rush 🍬, a Candy Crush style matching game</span>'));
@@ -576,7 +577,7 @@ assert.ok(/scrabble:[\s\S]{0,220}local: true/.test(playFile));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'scrabble', 'scrabble.js'"));
 assert.ok(!fs.readFileSync('feed/sw.js', 'utf8').includes('scrabble-words'), 'word list is fetched when Scrabble opens, not precached');
 
-// 1.9.153 Scrabble rules and word checks (small word list here; tests/scrabble-sim.mjs plays full games with the real one)
+// 1.9.154 Scrabble rules and word checks (small word list here; tests/scrabble-sim.mjs plays full games with the real one)
 function loadScrabble() {
   const ctx = { console, Math, Object, Number, String, Array, Set, Map, JSON, Date, Uint8Array, Int8Array, Int32Array, setTimeout, parseInt };
   ctx.window = ctx; ctx.globalThis = ctx;
@@ -795,7 +796,7 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   execSync('node worker/test/scores.test.mjs', { stdio: 'pipe' });
 }
 
-// 1.9.153 Shane-only Tetris level picker (practice mode, not posted to the family scoreboard)
+// 1.9.154 Shane-only Tetris level picker (practice mode, not posted to the family scoreboard)
 {
   const names = ['Farmyard', 'Jeremiah was a bullfrog', 'Beach', 'Rainforest', 'Ocean', 'Bush walk', 'New Zealand', 'Snowy mountains', 'City', 'Night sky', 'Triangles', 'Space travel'];
   assert.deepStrictEqual(Array.from(tetGame.ORDER), [6, 11, 0, 1, 2, 3, 9, 10, 4, 5, 8, 7]);
@@ -841,6 +842,107 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   assert.ok(tetHtml.includes('id="levelpick"') && tetHtml.includes('id="practicelabel"') && tetHtml.includes('Practice'));
   assert.ok(tet.includes('IBScores.isShane()') && tet.includes('startPractice') && tet.includes('shouldSubmit(gm)'));
   assert.ok(tet.includes("newGame({ level: Math.max(1, level || 1), practice: true })"));
+}
+
+
+// 1.9.154 Tetris sounds follow the music (tempo/key), and Space bombs actually drop
+{
+  const almost = (a, b, eps) => assert.ok(Math.abs(a - b) <= (eps || 1e-6), a + ' != ' + b);
+  assert.strictEqual(tetGame.TRACKS.length, 12);
+  tetGame.TRACKS.forEach((tr, i) => {
+    assert.ok(tr.bpm > 50 && tr.bpm < 200, 'bpm m' + i);
+    assert.ok(tr.offset >= 0 && tr.offset < 60 / tr.bpm + 1e-6, 'offset phase m' + i);
+    assert.ok(tr.key && (tr.mode === 'major' || tr.mode === 'minor'), 'key m' + i);
+  });
+  const meta = { bpm: 120, offset: 0 };
+  almost(tetGame.quantizeDelay(0, 1, meta, 'next'), 0);
+  almost(tetGame.quantizeDelay(0.40, 1, meta, 'next'), 0.10);
+  almost(tetGame.quantizeDelay(0.20, 1, meta, 'next'), 0.05);
+  almost(tetGame.quantizeDelay(0.10, 1, meta, 'next'), 0, 1e-9); // 150ms would exceed 120ms cap
+  almost(tetGame.quantizeDelay(0.10, 2, meta, 'next'), 0.075); // faster playback shortens the wait
+  almost(tetGame.quantizeDelay(0.20, 1, meta, 'nearest8th'), 0.05);
+  almost(tetGame.quantizeDelay(0.05, 1, meta, 'nearest8th'), 0); // nearer the previous 8th, play now
+  almost(tetGame.quantizeDelay(0.50, 1, { bpm: 120, offset: 0.1 }, 'next'), 0.10);
+  almost(tetGame.quantizeDelay(0.4, 1, null, 'next'), 0);
+  almost(tetGame.quantizeDelay(0.4, 1, {}, 'next'), 0);
+  const pcOf = hz => {
+    const midi = 69 + 12 * Math.log2(hz / 440);
+    return ((Math.round(midi) % 12) + 12) % 12;
+  };
+  const PC = { C: 0, 'C#': 1, D: 2, 'D#': 3, E: 4, F: 5, 'F#': 6, G: 7, 'G#': 8, A: 9, 'A#': 10, B: 11 };
+  const IV = { major: [0, 2, 4, 5, 7, 9, 11], minor: [0, 2, 3, 5, 7, 8, 10] };
+  for (let i = 0; i < 12; i++) {
+    const tr = tetGame.TRACKS[i];
+    const scale = new Set(IV[tr.mode].map(n => (n + PC[tr.key]) % 12));
+    const rot = tetGame.sfxFreqs(i, 'rotate');
+    const land = tetGame.sfxFreqs(i, 'land');
+    const one = tetGame.sfxFreqs(i, 'clear', 1);
+    const two = tetGame.sfxFreqs(i, 'clear', 2);
+    const three = tetGame.sfxFreqs(i, 'clear', 3);
+    const tet = tetGame.sfxFreqs(i, 'tetris');
+    const lvl = tetGame.sfxFreqs(i, 'level');
+    for (const pack of [rot, land, one, two, three, tet, lvl]) {
+      assert.ok(pack && pack.length, 'notes for theme ' + i);
+      pack.forEach(f => {
+        assert.ok(f >= 40 && f <= 800, 'soft low register ' + f + ' theme ' + i);
+        assert.ok(scale.has(pcOf(f)), 'in-key ' + f + ' theme ' + i);
+      });
+    }
+    assert.ok(one.length < two.length && two.length < three.length, 'more lines, more notes');
+    assert.ok(tet.length >= 5, 'tetris is a short rising run');
+    for (let k = 1; k < tet.length; k++) assert.ok(tet[k] > tet[k - 1], 'tetris rises');
+  }
+  assert.strictEqual(tetGame.sfxFreqs(99, 'clear', 1), null);
+
+  function blocks(board) { return board.reduce((n, row) => n + row.filter(Boolean).length, 0); }
+  function stackOn(g) {
+    g.board = tetGame.emptyBoard();
+    for (let r = 16; r < 20; r++) g.board[r][4] = 3;
+    g.piece = { t: 4, m: [[4, 4], [4, 4]], x: 0, y: 0 }; // keep the falling piece off the stacked column
+  }
+  function simSpace(g) {
+    const inv = tetGame.resetInvaders(tetGame.newInvaders(), g.level);
+    const first = tetGame.bombWaitRange(g.level, true);
+    inv.wait = first[1] * 1000; // worst first wait (6s)
+    const before = blocks(g.board);
+    let t = 0, hitAt = null;
+    const dt = 16;
+    while (t < 12000) {
+      tetGame.stepInvaders(inv, g, dt, { started: true });
+      t += dt;
+      if (hitAt == null && blocks(g.board) < before) hitAt = t;
+    }
+    return { hitAt, left: blocks(g.board), before, inv };
+  }
+  const gPick = tetGame.newGame({ level: 12, practice: true });
+  assert.strictEqual(gPick.practice, true);
+  assert.strictEqual(tetGame.themeFor(gPick.level), tetGame.SPACE_THEME);
+  stackOn(gPick);
+  const pick = simSpace(gPick);
+  assert.ok(pick.hitAt != null && pick.hitAt <= 12000, 'picker: a settled block is destroyed within 12s, got ' + pick.hitAt);
+  assert.strictEqual(pick.left, pick.before - 1);
+
+  const gNat = tetGame.newGame();
+  gNat.lines = 110; gNat.level = 12;
+  assert.strictEqual(tetGame.themeFor(gNat.level), tetGame.SPACE_THEME);
+  stackOn(gNat);
+  const nat = simSpace(gNat);
+  assert.ok(nat.hitAt != null && nat.hitAt <= 12000, 'natural level 12: a settled block is destroyed within 12s, got ' + nat.hitAt);
+  assert.strictEqual(nat.left, nat.before - 1);
+
+  // Screenshot seed must still hold bombs back
+  const gDemo = tetGame.newGame({ level: 12, practice: true });
+  stackOn(gDemo);
+  const demo = tetGame.seedInvaders(tetGame.newInvaders(), gDemo, {});
+  const beforeD = blocks(gDemo.board);
+  for (let t = 0; t < 12000; t += 16) tetGame.stepInvaders(demo, gDemo, 16, { started: true });
+  assert.strictEqual(blocks(gDemo.board), beforeD, 'demo seed does not drop bombs');
+  assert.ok(demo.wait > 1e6);
+
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  const sp = src.split('function startPractice')[1].split('function showShanePicker')[0];
+  assert.ok(/invReset\(/.test(sp), 'Choose level resets bombs so they can drop');
+  assert.ok(!/invSeed\(/.test(sp), 'Choose level must not use the screenshot seed');
 }
 
 console.log('feed-info tests ok');
