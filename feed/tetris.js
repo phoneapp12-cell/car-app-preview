@@ -145,6 +145,8 @@
   // Level order (indexes into THEMES): Farmyard, Jeremiah was a bullfrog, Beach, Rainforest, Ocean, Bush walk, New Zealand, Snowy mountains, City, Night sky, Triangles, Space travel last.
   const ORDER = [6, 11, 0, 1, 2, 3, 9, 10, 4, 5, 8, 7];
   function themeFor(level) { return ORDER[(Math.max(1, level) - 1) % ORDER.length]; }
+  function stages() { return ORDER.map((ti, i) => ({ level: i + 1, theme: ti, name: THEMES[ti].name })); }
+  function shouldSubmit(gm) { return !!(gm && !gm.practice && gm.score > 0); }
   // 1.9.151 Triangle Tetris (theme 8, level 11, second to last): blocks are triangles, and only two colours at a time.
   // Red and blue for the first 5 lines of the level, then pink and lime after half the lines needed (5 of 10).
   const TRI_THEME = 8;
@@ -394,8 +396,11 @@
     return { t, m, x: Math.floor((COLS - m[0].length) / 2), y: t === 1 ? -1 : 0 };
   }
   function takeNext(g) { if (g.bag.length === 0) g.bag = refillBag(); return g.bag.shift(); }
-  function newGame() {
-    const g = { board: emptyBoard(), piece: spawn(1), bag: refillBag(), next: 0, hold: 0, canHold: true, score: 0, lines: 0, level: 1, over: false, paused: false, acc: 0, flashT: 0, popup: '', popupT: 0 };
+  function newGame(opt) {
+    opt = opt || {};
+    const level = Math.max(1, opt.level || 1);
+    const practice = !!opt.practice;
+    const g = { board: emptyBoard(), piece: spawn(1), bag: refillBag(), next: 0, hold: 0, canHold: true, score: 0, lines: (level - 1) * 10, level, over: false, paused: false, acc: 0, flashT: 0, popup: '', popupT: 0, practice, startLevel: level };
     g.piece = spawn(takeNext(g));
     g.next = takeNext(g);
     return g;
@@ -437,7 +442,12 @@
   function act(g, a) {
     ensureAudio();
     if (a === 'pause') { if (!g.over) g.paused = !g.paused; return g; }
-    if (a === 'restart') { noteIdx = 0; themeIdx = 0; return newGame(); }
+    if (a === 'restart') {
+      noteIdx = 0;
+      const next = newGame(g.practice ? { level: g.startLevel || 1, practice: true } : null);
+      themeIdx = themeFor(next.level);
+      return next;
+    }
     if (g.over || g.paused) return g;
     const p = g.piece;
     if (a === 'left' || a === 'right') {
@@ -491,7 +501,7 @@
     if (ac) { try { ac.close(); } catch (e) { } }
     ac = null; sfxGain = null; musicGain = null; melodyBus = null; noiseBuf = null;
   }
-  root.Tetris = { THEMES, LOOKS, PICS, themeFor, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state };
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state };
 
   if (!root.document) return;
   const doc = root.document;
@@ -508,20 +518,23 @@
     set('score', g.score);
     set('lines', g.lines);
     set('level', g.level);
-    set('best', Math.max(best, g.score));
+    set('best', g.practice ? best : Math.max(best, g.score));
     const pb = doc.getElementById('pausebtn'); if (pb) pb.textContent = g.paused ? 'Resume' : 'Pause';
     const rb = doc.getElementById('restartbtn'); if (rb) rb.textContent = g.over ? 'Play again' : 'Restart';
+    const pl = doc.getElementById('practicelabel'); if (pl) pl.hidden = !g.practice;
     if (g.over) {
-      best = Math.max(best, g.score);
-      try { root.localStorage.setItem('tetris-best', String(best)); } catch (e) { }
+      if (!g.practice) {
+        best = Math.max(best, g.score);
+        try { root.localStorage.setItem('tetris-best', String(best)); } catch (e) { }
+      }
       if (!g.scored) { g.scored = true; gameOverScores(g); }
     }
   }
   // 1.9.149 family scoreboard (scores.js): send the finished game once, then show the board over the game
   const SB = { acc: '#facc15', btn: '#3f3a12' };
   function gameOverScores(gm) {
-    const S = root.IBScores; if (!S || !started) return;
-    const sent = gm.score > 0 ? S.submit('tetris', { score: gm.score, lines: gm.lines, level: gm.level }, { note: gm.lines + ' lines' }) : null;
+    const S = root.IBScores; if (!S || !started || !shouldSubmit(gm)) return;
+    const sent = S.submit('tetris', { score: gm.score, lines: gm.lines, level: gm.level }, { note: gm.lines + ' lines' });
     setTimeout(() => { if (g === gm && gm.over) S.open('tetris', { ...SB, over: true, score: gm.score, detail: gm.lines + ' line' + (gm.lines === 1 ? '' : 's') + ' · level ' + gm.level, sent, onAgain: () => press('restart') }); }, 1200);
   }
   function openScores() {
@@ -536,7 +549,7 @@
     syncHud();
   }
   root.Tetris.press = press;
-  root.Tetris.view = () => ({ x: g.piece.x, y: g.piece.y, t: g.piece.t, score: g.score, lines: g.lines, paused: g.paused, over: g.over, started, musicOn, soundOn });
+  root.Tetris.view = () => ({ x: g.piece.x, y: g.piece.y, t: g.piece.t, score: g.score, lines: g.lines, level: g.level, practice: !!g.practice, startLevel: g.startLevel || 1, paused: g.paused, over: g.over, started, musicOn, soundOn });
   // Seed a still board (used for screenshots and checks). No overlay, no gravity, music off.
   root.Tetris.show = function (opts) {
     opts = opts || {};
@@ -568,6 +581,48 @@
   });
   { const sb = doc.getElementById('scoresbtn'); if (sb) sb.addEventListener('click', openScores); }
   if (/^#scores/.test(root.location && root.location.hash || '')) setTimeout(openScores, 0);
+  // 1.9.152 Shane-only level picker: start any stage in practice (not posted to the family scoreboard).
+  function meShane() { return !!(root.IBScores && root.IBScores.isShane()); }
+  function fillLevelList() {
+    const list = doc.getElementById('levellist'); if (!list) return;
+    list.innerHTML = stages().map(s => '<button type="button" data-level="' + s.level + '">' + s.level + '. ' + s.name + '</button>').join('');
+  }
+  function closePicker() { const el = doc.getElementById('levelpick'); if (el) el.hidden = true; }
+  function openPicker() {
+    if (!meShane()) return;
+    const el = doc.getElementById('levelpick'); if (!el) return;
+    if (started && !g.over && !g.paused) press('pause');
+    fillLevelList();
+    el.hidden = false;
+  }
+  function startPractice(level) {
+    closePicker();
+    if (root.IBScores) root.IBScores.close();
+    started = true;
+    noteIdx = 0;
+    g = newGame({ level: Math.max(1, level || 1), practice: true });
+    themeIdx = themeFor(g.level);
+    lookIdx = -1;
+    applyLook(themeIdx);
+    invSeed();
+    syncHud();
+  }
+  function showShanePicker(force) {
+    const btn = doc.getElementById('levelbtn');
+    if (btn) btn.hidden = !(force || meShane());
+  }
+  showShanePicker();
+  { const lb = doc.getElementById('levelbtn'); if (lb) lb.addEventListener('click', openPicker); }
+  { const pick = doc.getElementById('levelpick');
+    if (pick) pick.addEventListener('click', e => {
+      if (e.target === pick || (e.target.id === 'levelpickclose')) { closePicker(); return; }
+      const b = e.target.closest && e.target.closest('[data-level]');
+      if (b) startPractice(+b.dataset.level);
+    });
+  }
+  root.Tetris.startPractice = startPractice;
+  root.Tetris.showPicker = function () { showShanePicker(true); fillLevelList(); const el = doc.getElementById('levelpick'); if (el) el.hidden = false; };
+  root.Tetris.closePicker = closePicker;
   doc.getElementById('soundbtn').addEventListener('click', () => {
     soundOn = !soundOn; ensureAudio();
     doc.getElementById('soundbtn').textContent = soundOn ? 'Sound on' : 'Sound off';
@@ -575,6 +630,8 @@
   const map = { ArrowLeft: 'left', ArrowRight: 'right', ArrowDown: 'down', ArrowUp: 'rotate', x: 'rotate', X: 'rotate', z: 'rotateBack', Z: 'rotateBack', ' ': 'drop', c: 'hold', C: 'hold', Shift: 'hold', p: 'pause', P: 'pause', Escape: 'pause', r: 'restart', R: 'restart' };
   root.addEventListener('keydown', e => {
     if (e.key === 'm' || e.key === 'M') { musicOn = !musicOn; ensureAudio(); const b = doc.getElementById('musicbtn'); if (b) b.textContent = musicOn ? 'Music on' : 'Music off'; return; }
+    const pick = doc.getElementById('levelpick');
+    if (pick && !pick.hidden) { if (e.key === 'Escape') closePicker(); return; }
     if (root.IBScores && root.IBScores.isOpen()) { if (e.key === 'Escape') root.IBScores.close(); return; }
     const a = map[e.key];
     if (!a) return;
