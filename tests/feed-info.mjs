@@ -1562,7 +1562,9 @@ if (live) {
   assert.strictEqual(tetGame.themeFor(2), 11);
   assert.strictEqual(tetGame.TRACKS[6].bpm, 171);
   assert.strictEqual(tetGame.TRACKS[6].key, 'D');
-  assert.strictEqual(tetGame.TRACKS[11].bpm, 130);
+  assert.strictEqual(tetGame.TRACKS[11].bpm, 127.45);
+  assert.strictEqual(tetGame.TRACKS[11].offset, 0.266);
+  assert.strictEqual(tetGame.TRACKS[11].key, 'D');
   assert.strictEqual(tetGame.BGM_HASH[6], '7bc4ebcd');
   const beat = tetGame.musicBeat(6, 0.006);
   assert.ok(beat.on && beat.pulse > 0.8, 'offset sits on a Farmyard beat');
@@ -1654,4 +1656,36 @@ if (live) {
   assert.ok(lo.y > 300 && Math.abs(hi.y - 84.5) < 0.01 && Math.abs(hi.x - 136.9) < 0.01, 'sun rises from behind the barn to the painted sun');
   assert.ok(src177.includes("'deviceorientation'") && src177.includes('createRadialGradient') && src177.includes('destination-out'));
   assert.strictEqual(tetGame.isEffect(11), 'frog');
+}
+
+// 1.9.178 Bullfrog v4 music, painted singing frog, LEVEL UP lightning, block sparkle
+{
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.strictEqual(tetGame.BGM_HASH[11], '8afd517f');
+  assert.ok(fs.existsSync('feed/tetris-bg/m11-8afd517f.mp3'), 'new bullfrog track is shipped');
+  assert.ok(!fs.existsSync('feed/tetris-bg/m11-b61bc42a.mp3'), 'old bullfrog track is gone');
+  const beat = tetGame.musicBeat(11, 0.266);
+  assert.ok(beat.on && beat.pulse > 0.8, 'offset sits on a Bullfrog beat');
+  const mid = tetGame.musicBeat(11, 0.266 + (60 / 127.45) * 0.5);
+  assert.ok(!mid.on && mid.pulse < 0.2, 'halfway between beats is quiet');
+  const art = tetGame.frogArt();
+  assert.ok(/^tetris-bg\/frog-plate-[0-9a-f]{8}\.webp$/.test(art.plate), 'hashed plate');
+  assert.ok(/^tetris-bg\/frog-atlas-[0-9a-f]{8}\.webp$/.test(art.atlas), 'hashed atlas');
+  assert.ok(fs.existsSync('feed/' + art.plate) && fs.existsSync('feed/' + art.atlas));
+  const meta = tetGame.frogMeta();
+  assert.strictEqual(meta.w, 372);
+  assert.strictEqual(meta.h, 344);
+  assert.ok(meta.eyes && meta.eyes.length === 2 && meta.throat && meta.foot);
+  assert.ok(src.includes('function drawFrogScene') && src.includes('function frogVocal') && src.includes('createAnalyser'));
+  assert.ok(src.includes('The painted frog is drawn behind the board') && !src.includes('drawHopFrog(c);'), 'hopping cartoon frog is no longer drawn');
+  assert.ok(src.includes("hp.type = 'highpass'; hp.frequency.value = 300") && src.includes('clp.frequency.value = 2600'), 'thunder and crackle stay mid and low-passed');
+  assert.ok(src.includes('function makeLightning') && src.includes('function drawStorm') && src.includes('rgba(200,230,255,'));
+  const bolts = tetGame.makeLightning(280, 560);
+  assert.ok(Array.isArray(bolts) && bolts.length >= 6 && bolts[0].path.length >= 2, 'branching bolts for a board');
+  assert.ok(src.includes('function drawBlockGloss') && src.includes('function drawStarGlint') && src.includes('function tickBlockSpark') && src.includes('drawBlockSparks'));
+  assert.ok(src.includes('SPARK_DUR = 600') && src.includes('prefers-reduced-motion'));
+  // Existing farm 3D art and 1.9.177 sunrise stay intact
+  assert.ok(tetGame.farmArt && tetGame.farmArt().plate.indexOf('farm-plate-') >= 0);
+  assert.strictEqual(tetGame.farmDayTarget(0, 0), 0);
+  assert.strictEqual(tetGame.TRACKS[6].bpm, 171);
 }
