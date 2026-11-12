@@ -4583,7 +4583,7 @@
   }
 
   // Evaluate a C-infinity layered-sine path (plus a smooth porpoise) and its velocity at time t.
-  // Positions stay in the open water by construction, so they are never clamped.
+  // Analytic layered-sine path (no clamps). Displayed positions may wrap at the edges.
   function oceanEval(d, t) {
     const w = Math.PI * 2 / d.per;
     const a = w * t + d.ph;
@@ -4612,17 +4612,17 @@
   function oceanCast() {
     oceanReset();
     const M = OCEAN_META.dolphins;
-    // Layered sines: a slow primary orbit plus a smaller second harmonic, so the
-    // path is a continuous eased curve with no corners and no wrap-around pop.
+    // Wide, wandering layered-sine paths across the whole plate (same C-infinity
+    // construction as 1.9.182). Drift + wrap carries them off one edge and in the other.
     const paths = [
-      { cx: 195, cy: 225, per: 16, ph: 0.3, ax: 78, ay: 50, ax2: 16, ay2: 12, ph2: 1.1, ph4: 2.2, porpAmp: 20, phP: 0.0, z0: 1.05 },
-      { cx: 205, cy: 385, per: 19, ph: 2.0, ax: 90, ay: 40, ax2: 20, ay2: 11, ph2: 0.6, ph4: 0.9, porpAmp: 14, phP: 1.2, z0: 0.95 }
+      { cx: 270, cy: 400, per: 32, ph: 0.3, ax: 320, ay: 400, ax2: 70, ay2: 80, ph2: 1.1, ph4: 2.2, porpAmp: 24, phP: 0.0, z0: 1.05, driftX: 18, driftY: 6 },
+      { cx: 260, cy: 520, per: 41, ph: 2.4, ax: 300, ay: 380, ax2: 80, ay2: 70, ph2: 0.6, ph4: 0.9, porpAmp: 16, phP: 1.2, z0: 0.86, driftX: -14, driftY: -5 }
     ];
     ocean.dolphins = M.map(function (meta, i) {
       const p = paths[i];
       const d = { i: i, meta: meta, heading: meta.ang * Math.PI / 180, facing: 1, bank: 0, und: 0, tail: 0, porp: 0, z: p.z0, primed: false };
       for (const k in p) d[k] = p[k];
-      const e0 = oceanEval(d, 0);
+      const e0 = oceanDolphinPos(d, 0);
       d.x = e0.x; d.y = e0.y; d.heading = e0.heading; d.facing = e0.vx >= 0 ? 1 : -1;
       return d;
     });
@@ -4667,14 +4667,14 @@
         d.x = d.meta.px; d.y = d.meta.py; d.heading = d.meta.ang * Math.PI / 180; d.z = d.z0; d.und = 0; d.tail = 0; d.porp = 0; d.bank = 0; d.facing = 1;
         continue;
       }
-      const e = oceanEval(d, t);
+      const e = oceanDolphinPos(d, t);
       d.x = e.x;
       d.y = e.y;
       d.porp = e.porp;
       d.heading = snap ? e.heading : oceanLerpAngle(d.heading, e.heading, easeH);
       const v2 = e.vx * e.vx + e.vy * e.vy;
       // Analytic yaw rate → a slow bank into the turn (no sudden roll).
-      const e2 = oceanEval(d, t + 1 / 120);
+      const e2 = oceanDolphinPos(d, t + 1 / 120);
       const axv = (e2.vx - e.vx) * 120, ayv = (e2.vy - e.vy) * 120;
       const turn = (e.vx * ayv - e.vy * axv) / (v2 + 40);
       const bankT = Math.max(-0.38, Math.min(0.38, -0.22 * turn));
@@ -4710,24 +4710,36 @@
 
   // Wrap through a margin so a fish swims off one edge and back in the other, no pop.
   const FISH_W = 540, FISH_H = 960, FISH_MX = 90, FISH_MY = 100;
+  // Dolphins are much larger, so they get a wider off-screen margin before wrapping.
+  const DOLPHIN_MX = 180, DOLPHIN_MY = 200;
   function oceanWrap(v, span, m) {
     const s = span + 2 * m;
     return ((v + m) % s + s) % s - m;
   }
   function oceanWrapX(x) { return oceanWrap(x, FISH_W, FISH_MX); }
   function oceanWrapY(y) { return oceanWrap(y, FISH_H, FISH_MY); }
+  function oceanDolphinWrapX(x) { return oceanWrap(x, FISH_W, DOLPHIN_MX); }
+  function oceanDolphinWrapY(y) { return oceanWrap(y, FISH_H, DOLPHIN_MY); }
+  function oceanDolphinPos(d, t) {
+    const e = oceanEval(d, t);
+    const dx = (d.driftX || 0) * t, dy = (d.driftY || 0) * t;
+    const vx = e.vx + (d.driftX || 0), vy = e.vy + (d.driftY || 0);
+    return { x: oceanDolphinWrapX(e.x + dx), y: oceanDolphinWrapY(e.y + dy), vx: vx, vy: vy, heading: Math.atan2(vy, vx), porp: e.porp };
+  }
   function oceanFishPos(d, t) {
     const e = oceanEval(d, t);
     const dx = (d.driftX || 0) * t, dy = (d.driftY || 0) * t;
     const vx = e.vx + (d.driftX || 0), vy = e.vy + (d.driftY || 0);
     return { x: oceanWrapX(e.x + (d.lx || 0) + dx), y: oceanWrapY(e.y + (d.ly || 0) + dy), vx: vx, vy: vy, heading: Math.atan2(vy, vx), porp: e.porp };
   }
-  function oceanEdgeFade(x, y) {
+  function oceanEdgeFade(x, y, mx, my) {
+    mx = mx == null ? FISH_MX : mx;
+    my = my == null ? FISH_MY : my;
     let a = 1;
-    if (x < 0) a = Math.max(0, 1 + x / FISH_MX);
-    else if (x > FISH_W) a = Math.max(0, 1 - (x - FISH_W) / FISH_MX);
-    if (y < 0) a *= Math.max(0, 1 + y / FISH_MY);
-    else if (y > FISH_H) a *= Math.max(0, 1 - (y - FISH_H) / FISH_MY);
+    if (x < 0) a = Math.max(0, 1 + x / mx);
+    else if (x > FISH_W) a = Math.max(0, 1 - (x - FISH_W) / mx);
+    if (y < 0) a *= Math.max(0, 1 + y / my);
+    else if (y > FISH_H) a *= Math.max(0, 1 - (y - FISH_H) / my);
     return a;
   }
   function oceanFishSrc(name) {
@@ -4849,7 +4861,8 @@
   function drawOceanSprite(c, d, box) {
     const atlas = ocean.img.atlas;
     if (!atlas || !atlas.complete) return;
-    const fade = (d.school || d.clone || (d.kind && d.kind !== 'dolphin')) ? oceanEdgeFade(d.x, d.y) : 1;
+    const isDolphin = !d.school && !d.clone && (!d.kind || d.kind === 'dolphin');
+    const fade = isDolphin ? oceanEdgeFade(d.x, d.y, DOLPHIN_MX, DOLPHIN_MY) : oceanEdgeFade(d.x, d.y);
     if (fade <= 0.02) return;
     const M = d.meta;
     c.save();

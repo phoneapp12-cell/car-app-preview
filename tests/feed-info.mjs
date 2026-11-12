@@ -1985,11 +1985,18 @@ if (live) {
   assert.ok(tetGame.frogLittlePads().length >= 5);
   assert.ok(src.includes('function littleFrogAdvance') && src.includes('function drawLittleFrogs') && src.includes('function littleFrogCast'));
   assert.ok(src.includes('The painted frog is drawn behind the board') && !src.includes('drawHopFrog(c);'), 'cartoon hopper is still not drawn');
-  // Ocean fish roam the whole screen; dolphins unchanged
+  // Ocean fish roam the whole screen
   assert.ok(src.includes('oceanWrapX') && src.includes('oceanFishPos') && src.includes('driftX'));
   assert.ok(src.includes('cx: 270, cy: 500, per: 36, ax: 300, ay: 340') || (src.includes('ax: 300') && src.includes('ay: 340')));
-  assert.ok(src.includes('{ cx: 195, cy: 225, per: 16') && src.includes('{ cx: 205, cy: 385, per: 19'), 'dolphin paths stay');
   assert.ok(!src.includes('cx: 193, cy: 656'));
   assert.strictEqual(tetGame.oceanMeta().dolphins.length, 2);
+  // 1.9.186: the two painted dolphins roam the whole screen as well (same smooth 1.9.182 motion, plus wrap)
+  assert.ok(src.includes('function oceanDolphinPos') && src.includes('oceanDolphinWrapX') && src.includes('DOLPHIN_MX'));
+  assert.ok(src.includes('{ cx: 270, cy: 400, per: 32') && src.includes('{ cx: 260, cy: 520, per: 41'));
+  assert.ok(src.includes('ax: 320, ay: 400') && src.includes('ax: 300, ay: 380'));
+  assert.ok(!src.includes('{ cx: 195, cy: 225, per: 16') && !src.includes('{ cx: 205, cy: 385, per: 19'));
+  assert.ok(src.includes('d.und') && src.includes('d.tail') && src.includes('d.bank') && src.includes('Analytic velocity'));
+  assert.ok(!src.includes('Math.max(40, Math.min(PHOTO_W'));
 }
+
 
