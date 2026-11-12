@@ -210,7 +210,10 @@
     // 1.9.156 Sugar Rush level 1 (Shane only for now; the page itself checks too). ship-pages.sh sends SAMEORIGIN for /feed/sugar-rush.
     sugar: { url: gameUrl('sugar-rush'), title: 'Sugar Rush', host: 'Info Book', live: 'Levels 1–10 · soft sounds start when you tap', local: true }
   };
-  let artWin, artFrame, artScroll = 0, artHist = false, artBtn = null;
+  let artWin, artFrame, artScroll = 0, artHist = false, artBtn = null, artKind = null;
+  const ART_KEY = 'ib-art-open';
+  const TETRIS_LIVE_KEY = 'ib-tetris-live';
+  const ART_TTL = 36 * 3600 * 1000;
   function artParts() {
     if (artWin) return;
     artWin = root.document.createElement('div');
@@ -245,6 +248,51 @@
       else if (d.fullscreenElement || d.webkitFullscreenElement) { const ex = d.exitFullscreen || d.webkitExitFullscreen; if (ex) { const p = ex.call(d); if (p && p.catch) p.catch(() => { }); } }
     } catch (e) { }
     tellFrame(on);
+    if (artKind === 'tetris') persistArt();
+  }
+  function storePut(st, k, v) { try { if (st) st.setItem(k, v); } catch (e) { } }
+  function storeDel(st, k) { try { if (st) st.removeItem(k); } catch (e) { } }
+  function markArt(kind) {
+    try {
+      const el = root.document && root.document.documentElement;
+      if (!el) return;
+      if (kind) el.dataset.ibArt = kind;
+      else { try { delete el.dataset.ibArt; } catch (e) { el.dataset.ibArt = ''; } }
+    } catch (e) { }
+  }
+  function persistArt() {
+    if (!artWin || artWin.hidden || artKind !== 'tetris') return;
+    const payload = JSON.stringify({ v: 1, kind: 'tetris', full: !!artWin.classList.contains('artfull'), at: Date.now() });
+    storePut(root.sessionStorage, ART_KEY, payload);
+    storePut(root.localStorage, ART_KEY, payload);
+    markArt('tetris');
+    if (root.ibArt) root.ibArt._open = 'tetris';
+  }
+  function clearArtPersist() {
+    storeDel(root.sessionStorage, ART_KEY);
+    storeDel(root.localStorage, ART_KEY);
+    storeDel(root.sessionStorage, TETRIS_LIVE_KEY);
+    storeDel(root.localStorage, TETRIS_LIVE_KEY);
+    markArt('');
+    if (root.ibArt) root.ibArt._open = null;
+  }
+  function readArtPersist() {
+    for (const st of [root.sessionStorage, root.localStorage]) {
+      try {
+        const o = JSON.parse((st && st.getItem(ART_KEY)) || 'null');
+        if (o && o.v === 1 && o.kind === 'tetris' && Date.now() - (o.at || 0) < ART_TTL) return o;
+      } catch (e) { }
+    }
+    return null;
+  }
+  function isTetrisOpen() { return !!(artWin && !artWin.hidden && artKind === 'tetris'); }
+  function maybeRestoreArt() {
+    if (isTetrisOpen()) return true;
+    const saved = readArtPersist();
+    if (!saved) return false;
+    openArt('tetris');
+    if (saved.full) setFull(true);
+    return isTetrisOpen();
   }
   function pauseFeed() {
     root.document.querySelectorAll('.media.vid.playing, .media.vid.armed').forEach(el => { try { root.pauseVid(el); } catch (e) { } });
@@ -295,22 +343,31 @@
     if (spec.local) { site.hidden = true; site.removeAttribute('href'); }
     else { site.hidden = false; site.href = spec.url; site.textContent = spec.host; }
     artFrame.title = spec.local ? spec.title : spec.title + ' on ' + spec.host;
+    artKind = kind;
     artFrame.src = spec.url;
     artWin.querySelector('[data-artfs]').hidden = !spec.local;
     artWin.hidden = false;
     lockFeed(true);
-    if (kind === 'tetris' && typeof root.setTetrisChrome === 'function') root.setTetrisChrome(true);
-    else if (kind === 'tetris' && typeof setTetrisChrome === 'function') setTetrisChrome(true);
+    if (kind === 'tetris') {
+      if (typeof root.setTetrisChrome === 'function') root.setTetrisChrome(true);
+      else if (typeof setTetrisChrome === 'function') setTetrisChrome(true);
+      // Opening tap is a user gesture: request Fullscreen API, or fall back to the existing fill-the-phone layout (iOS / PWA).
+      setFull(true);
+      persistArt();
+    }
     const close = artWin.querySelector('[data-artclose]');
     if (close) close.focus();
     if (!artHist) { try { root.history.pushState({ ibArt: kind }, ''); artHist = true; } catch (e) { artHist = false; } }
   }
   function closeArt(fromPop) {
     if (!artWin || artWin.hidden) return;
+    const wasTetris = artKind === 'tetris';
     setFull(false);
     unloadArt();
     artWin.hidden = true;
+    artKind = null;
     lockFeed(false);
+    if (wasTetris) clearArtPersist();
     if (typeof root.setTetrisChrome === 'function') root.setTetrisChrome(false);
     else if (typeof setTetrisChrome === 'function') setTetrisChrome(false);
     const back = artHist && !fromPop;
@@ -320,8 +377,22 @@
   }
   root.addEventListener('keydown', e => { if (e.key === 'Escape' && artWin && !artWin.hidden) { e.preventDefault(); closeArt(false); } });
   root.addEventListener('popstate', () => { if (artWin && !artWin.hidden) closeArt(true); });
-  root.document.addEventListener('visibilitychange', () => { if (root.document.hidden && artWin && !artWin.hidden) closeArt(false); });
-  root.addEventListener('pagehide', unloadArt);
+  // 1.9.188: leaving Tetris open when Info Book is minimised. Other live windows still close so their sound stops.
+  root.document.addEventListener('visibilitychange', () => {
+    if (root.document.hidden) {
+      if (isTetrisOpen()) { persistArt(); return; }
+      if (artWin && !artWin.hidden) closeArt(false);
+      return;
+    }
+    maybeRestoreArt();
+  });
+  root.addEventListener('pagehide', () => {
+    if (isTetrisOpen()) { persistArt(); return; }
+    unloadArt();
+  });
+  root.addEventListener('pageshow', () => { maybeRestoreArt(); });
+  root.ibArt = { isTetris: isTetrisOpen, kind: () => (artWin && !artWin.hidden ? artKind : null), open: openArt, close: closeArt, persist: persistArt, restore: maybeRestoreArt, read: readArtPersist };
+  maybeRestoreArt();
   root.document.addEventListener('click', e => {
     const art = e.target && e.target.closest && e.target.closest('[data-art]');
     if (art) { e.preventDefault(); openArt(art.dataset.art, art); return; }

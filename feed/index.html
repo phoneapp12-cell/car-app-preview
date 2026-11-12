@@ -739,8 +739,14 @@ body[data-artopen] .artwin, body[data-artopen] .artbar{overscroll-behavior:none;
     f.insertAdjacentHTML('afterbegin', '<div class="empty" id="ibheal">😕 Info Book didn’t load properly.<br><br><button class="btn pri" id="ibfix">↻ Reload Info Book</button></div>');
     document.getElementById('ibfix').onclick = fix;
     if (window.__ibErr) {
+      var art = false;
+      try {
+        var raw = sessionStorage.getItem('ib-art-open') || localStorage.getItem('ib-art-open');
+        var o = raw ? JSON.parse(raw) : null;
+        art = !!(o && o.kind === 'tetris') || (document.documentElement && document.documentElement.dataset.ibArt === 'tetris');
+      } catch (e) { }
       var last = +localStorage.getItem('ibAutoFixAt') || 0;
-      if (Date.now() - last > 10 * 60 * 1000) { localStorage.setItem('ibAutoFixAt', String(Date.now())); fix(); }
+      if (!art && Date.now() - last > 10 * 60 * 1000) { localStorage.setItem('ibAutoFixAt', String(Date.now())); fix(); }
     }
   }, 9000);
   // 1.9.82: do NOT reload on controllerchange — that caused open-time restart loops on PWA cold starts
