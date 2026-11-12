@@ -86,6 +86,22 @@
   html.fs .row { margin-bottom: 0; }
   html.fs .play { margin-bottom: 6px; }
   html.fs button { min-height: 44px; }
+
+  /* 1.9.174 Tetris Effect look (Farmyard + Bullfrog only). Other levels unchanged. */
+  html.effect .stat { background: rgba(8,6,12,.55); border-color: rgba(255,255,255,.1); }
+  html.effect h1 { text-shadow: 0 0 18px rgba(255,200,140,.35); }
+  html.effect canvas#board {
+    border: 1px solid rgba(255,236,200,.22);
+    border-radius: 14px;
+    background: transparent;
+    box-shadow: 0 0 28px rgba(255,180,80,.28), 0 0 80px rgba(255,120,40,.12);
+  }
+  html.effect.fx-frog canvas#board {
+    border-color: rgba(160,255,220,.22);
+    box-shadow: 0 0 28px rgba(60,220,180,.28), 0 0 80px rgba(20,120,100,.14);
+  }
+  html.effect .side canvas { border-color: rgba(255,255,255,.1); background: transparent; }
+  html.effect button { background: rgba(8,6,12,.58); border-color: rgba(255,255,255,.12); }
   @media (orientation: landscape) {
     html.fs .wrap {
       grid-template-columns: minmax(0, 1fr) minmax(200px, 38%);
@@ -146,8 +162,8 @@
       <button type="button" id="levelpickclose" class="wide">Close</button>
     </div>
   </div>
-  <script src="scores.js?v=1.9.173"></script>
-  <script src="tetris.js?v=1.9.173"></script>
+  <script src="scores.js?v=1.9.174"></script>
+  <script src="tetris.js?v=1.9.174"></script>
   <p class="credit">Music chosen by Shane for every theme.</p>
 </body>
 </html>

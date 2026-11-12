@@ -359,12 +359,12 @@ for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 3, at.join(',
 const appSrc = fs.readFileSync('feed/app.js', 'utf8');
 for (const id of sights.TOPICS) assert.ok(appSrc.includes("'" + id + "'"), id);
 assert.ok(!/Math\.pow\(baseOf\(t\), 3\)/.test(appSrc));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.173'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.173'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.173'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.174'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.174'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.174'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.cdot.tv'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.bd ul.sum'));
-assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.173'"));
+assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.174'"));
 function swVersion(src) { const m = String(src).match(/const VERSION = '([^']+)'/); assert.ok(m, 'parent sw.js VERSION'); return m[1]; }
 const parentHere = swVersion(fs.readFileSync('sw.js', 'utf8'));
 let parentMain = parentHere;
@@ -403,10 +403,10 @@ assert.equal(artB.length, 1);
 assert.notEqual(artB[0].id, artA.id);
 seenArt.wasSeen = () => true;
 assert.equal(seenArt.ibArt.cards(0).length, 0);
-assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.173'"));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.174'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'art3d.js?v=' + VERSION"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'portal.js?v=' + VERSION"));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.173'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.174'));
 const portalSrc = fs.readFileSync('feed/portal.js', 'utf8');
 assert.ok(portalSrc.includes('prefers-reduced-motion'));
 assert.ok(portalSrc.includes("sessionStorage.getItem(KEY)"));
@@ -434,7 +434,7 @@ assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("cache: 'reload'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("u.pathname + '?v=' + VERSION"), 'game scripts are fetched at this VERSION, not from a stale unversioned cache');
 assert.ok(appSrc.includes('ibPortalRise'));
 assert.ok(!/portal-style\.jpg|attachments\/image/.test(portalSrc + fs.readFileSync('feed/index.html', 'utf8')));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.173'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.174'));
 assert.ok(appSrc.includes("['art3d', '3D art'"));
 assert.ok(appSrc.includes("['3D art', 'art3d'"));
 assert.ok(appSrc.includes("'art3d'"));
@@ -1550,4 +1550,43 @@ if (live) {
   assert.ok(tet.includes('createBufferSource()') && tet.includes('src.loop = true'));
   assert.ok(tet.includes('Watchdog:') || /bgmGain\.gain\.value < BGM_VOL/.test(tet));
   assert.ok(tet.includes("function setFull") && tet.includes("d.type !== 'ib-artfull'"));
+}
+
+// 1.9.174 Tetris Effect look on levels 1 (Farmyard) and 2 (Bullfrog) only
+{
+  assert.strictEqual(tetGame.isEffect(6), 'farm');
+  assert.strictEqual(tetGame.isEffect(11), 'frog');
+  assert.strictEqual(tetGame.isEffect(0), null);
+  assert.strictEqual(tetGame.isEffect(7), null);
+  assert.strictEqual(tetGame.themeFor(1), 6);
+  assert.strictEqual(tetGame.themeFor(2), 11);
+  assert.strictEqual(tetGame.TRACKS[6].bpm, 171);
+  assert.strictEqual(tetGame.TRACKS[6].key, 'D');
+  assert.strictEqual(tetGame.TRACKS[11].bpm, 130);
+  assert.strictEqual(tetGame.BGM_HASH[6], '7bc4ebcd');
+  const beat = tetGame.musicBeat(6, 0.006);
+  assert.ok(beat.on && beat.pulse > 0.8, 'offset sits on a Farmyard beat');
+  const mid = tetGame.musicBeat(6, 0.006 + (60 / 171) * 0.5);
+  assert.ok(!mid.on && mid.pulse < 0.2, 'halfway between beats is quiet');
+  assert.ok(tetGame.effectProg(0) === 0 && tetGame.effectProg(9) === 1 && tetGame.effectProg(14) > 0);
+  // Other themes and the existing clear contract stay the same.
+  const g1 = tetGame.newGame();
+  g1.board = tetGame.emptyBoard();
+  for (let c = 0; c < 9; c++) g1.board[19][c] = 2;
+  g1.piece = { t: 1, m: [[1]], x: 9, y: 19 };
+  g1.next = 4;
+  tetGame.lockPiece(g1);
+  assert.strictEqual(g1.clearFx.kind, 'sparkle');
+  assert.strictEqual(g1.clearFx.parts.length, tetGame.clearPartCount(1));
+  assert.ok(g1.clearFx.dur <= 400);
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.ok(src.includes('function effectStageDraw') && src.includes('drawFarmScene') && src.includes('drawFrogScene'));
+  assert.ok(src.includes('drawEffectCell') && src.includes('prefers-reduced-motion'));
+  assert.ok(src.includes('effectDropTrail') && src.includes('effectLand') && src.includes('effectOnClear'));
+  assert.ok(src.includes("function setFull") && src.includes("d.type !== 'ib-artfull'"));
+  assert.ok(src.includes('Watchdog:') || /bgmGain\.gain\.value < BGM_VOL/.test(src));
+  assert.ok(src.includes("bgmWantTi === ti"));
+  const html = fs.readFileSync('feed/tetris.html', 'utf8');
+  assert.ok(html.includes('html.effect canvas#board') && html.includes('html.fs canvas#board'));
+  // No Sugar Rush changes in this release beyond the version bump later.
 }

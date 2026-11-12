@@ -719,6 +719,195 @@
     return { t, m, x: Math.floor((COLS - m[0].length) / 2), y: t === 1 ? -1 : 0 };
   }
   function takeNext(g) { if (g.bag.length === 0) g.bag = refillBag(); return g.bag.shift(); }
+  // 1.9.174 Tetris Effect stage for Farmyard (6) and Bullfrog (11) only.
+  // Dark, beat-synced scenes; luminous tiles; action bursts. Other themes are unchanged.
+  const EFFECT_TI = { 6: 'farm', 11: 'frog' };
+  function isEffect(ti) { return EFFECT_TI[ti] || null; }
+  function reduceMotion() {
+    try { return !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; }
+  }
+  function effectProg(lines) { return Math.min(1, (Math.max(0, lines || 0) % 10) / 9); }
+  function musicBeat(ti, time) {
+    const tr = TRACKS[ti] || { bpm: 120, offset: 0 };
+    const bpm = tr.bpm > 0 ? tr.bpm : 120, offset = tr.offset || 0, period = 60 / bpm;
+    let t = time;
+    if (t == null) {
+      if (ac && bgmNode && musicOn) {
+        t = Math.max(0, (ac.currentTime - bgmAt) * (bgmRate || 1));
+        const buf = bgmBufs[ti];
+        if (buf && buf.duration) t = t % buf.duration;
+      } else t = (root.performance ? root.performance.now() / 1000 : 0);
+    }
+    const u = t - offset;
+    const phase = ((u % period) + period) % period;
+    const pulse = Math.max(0, 1 - phase / (period * 0.32));
+    return { t: t, period: period, phase: phase, pulse: pulse * pulse, on: phase < period * 0.1 };
+  }
+  const efx = { parts: [], pool: [], trails: [], ripples: [], zoom: 1, zoomV: 0, cap: 140, degrade: false, lastMs: 16 };
+  function efxTake() { return efx.pool.pop() || { typ: '', x: 0, y: 0, vx: 0, vy: 0, life: 0, max: 0, size: 0, color: '', spin: 0, tx: 0, ty: 0, ph: 0, a: 1 }; }
+  function efxKill(i) {
+    const p = efx.parts[i];
+    if (!p) return;
+    efx.parts[i] = efx.parts[efx.parts.length - 1];
+    efx.parts.pop();
+    if (efx.pool.length < 200) efx.pool.push(p);
+  }
+  function efxCap() {
+    if (reduceMotion()) return 48;
+    return efx.degrade ? 80 : efx.cap;
+  }
+  function efxEmit(spec) {
+    if (efx.parts.length >= efxCap()) {
+      // drop the oldest short spark first
+      let old = 0, best = 1e9;
+      for (let i = 0; i < efx.parts.length; i++) if (efx.parts[i].life < best) { best = efx.parts[i].life; old = i; }
+      efxKill(old);
+    }
+    const p = efxTake();
+    p.typ = spec.typ || 'spark';
+    p.x = spec.x || 0; p.y = spec.y || 0;
+    p.vx = spec.vx || 0; p.vy = spec.vy || 0;
+    p.max = spec.max || 0.6; p.life = p.max;
+    p.size = spec.size || 3; p.color = spec.color || '#fff';
+    p.spin = spec.spin || 0; p.ph = spec.ph || 0;
+    p.tx = spec.tx || 0; p.ty = spec.ty || 0;
+    p.a = 1;
+    efx.parts.push(p);
+    return p;
+  }
+  function efxClearAll() { while (efx.parts.length) efxKill(0); efx.trails.length = 0; efx.ripples.length = 0; }
+  function boardToScreen(x, y) {
+    const el = root.document && root.document.getElementById('board');
+    if (!el || !el.getBoundingClientRect) return null;
+    const r = el.getBoundingClientRect();
+    const sx = r.width / (COLS * CELL), sy = r.height / (ROWS * CELL);
+    return { x: r.left + x * sx, y: r.top + y * sy, sx: sx, sy: sy, r: r };
+  }
+  function effectAction(kind, g) {
+    if (!isEffect(themeFor(g && g.level)) || !root.document) return;
+    if (reduceMotion()) return;
+    const p = g.piece; if (!p) return;
+    const pal = (LOOKS[themeFor(g.level)] && LOOKS[themeFor(g.level)].colors) || ['#fff'];
+    const n = kind === 'rotate' ? 8 : 5;
+    for (let i = 0; i < n; i++) {
+      let cx = (p.x + 0.5) * CELL, cy = (p.y + 0.5) * CELL;
+      p.m.forEach((row, r) => row.forEach((v, c) => { if (v) { cx = (p.x + c + 0.5) * CELL; cy = (p.y + r + 0.5) * CELL; } }));
+      // pick a random filled cell
+      const cells = [];
+      p.m.forEach((row, r) => row.forEach((v, c) => { if (v && p.y + r >= 0) cells.push({ c: p.x + c, r: p.y + r }); }));
+      const cell = cells[(Math.random() * cells.length) | 0] || { c: p.x, r: Math.max(0, p.y) };
+      const s = boardToScreen((cell.c + 0.5) * CELL, (cell.r + 0.5) * CELL);
+      if (!s) return;
+      const ang = Math.random() * 6.28, spd = (kind === 'rotate' ? 40 : 28) + Math.random() * 40;
+      efxEmit({ typ: 'spark', x: s.x, y: s.y, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd - 16, max: 0.32 + Math.random() * 0.18, size: 1.6 + Math.random() * 2.2, color: pal[(Math.random() * pal.length) | 0], spin: (Math.random() - 0.5) * 8 });
+    }
+  }
+  function effectDropTrail(g, fromY, toY) {
+    if (!isEffect(themeFor(g.level)) || !root.document || reduceMotion()) return;
+    const p = g.piece; if (!p) return;
+    const color = blockColor(p.t, g.lines, g.level);
+    const cells = [];
+    p.m.forEach((row, r) => row.forEach((v, c) => { if (v) cells.push({ c: p.x + c, r: r }); }));
+    efx.trails.push({ cells: cells, fromY: fromY, toY: toY, color: color, t: 0, dur: 280 });
+  }
+  function effectLand(g) {
+    if (!isEffect(themeFor(g.level)) || !root.document) return;
+    const p = g.piece; if (!p) return;
+    const cells = [];
+    p.m.forEach((row, r) => row.forEach((v, c) => { if (v && p.y + r >= 0) cells.push({ c: p.x + c, r: p.y + r }); }));
+    const color = blockColor(p.t, g.lines, g.level);
+    cells.forEach(cell => {
+      efx.ripples.push({ x: (cell.c + 0.5) * CELL, y: (cell.r + 0.5) * CELL, t: 0, dur: reduceMotion() ? 220 : 420, color: color });
+    });
+  }
+  function effectOnClear(fx, ti) {
+    const kind = isEffect(ti);
+    if (!kind || !fx || !root.document) return;
+    fx.effect = true;
+    if (!reduceMotion() && (fx.n >= 3 || fx.banner)) {
+      efx.zoom = Math.max(efx.zoom, fx.n === 4 ? 1.085 : 1.045);
+      efx.zoomV = 0;
+    }
+    const pal = (LOOKS[ti] && LOOKS[ti].colors) || ['#fff'];
+    const reduce = reduceMotion();
+    const count = reduce ? 10 : Math.min(40, 16 + fx.n * 8);
+    const midX = COLS * CELL / 2, midY = ((fx.rows[0] + fx.rows[fx.rows.length - 1]) / 2 + 0.5) * CELL;
+    const origin = boardToScreen(midX, midY);
+    const board = origin && origin.r;
+    for (let i = 0; i < count; i++) {
+      const row = fx.rows[i % fx.rows.length];
+      const x0 = (i / Math.max(1, count - 1)) * COLS * CELL;
+      const s = boardToScreen(x0, row * CELL + CELL * 0.5);
+      if (!s) break;
+      const ang = -0.2 + Math.random() * 1.2 * (Math.random() < 0.5 ? 1 : -1) - Math.PI / 2;
+      const spd = 70 + fx.n * 18 + Math.random() * 90;
+      // swirl target: a background point around the board (or screen edges)
+      let tx, ty;
+      if (board) {
+        const side = Math.random();
+        if (side < 0.35) { tx = board.left - 20 - Math.random() * 80; ty = board.top + Math.random() * board.height; }
+        else if (side < 0.7) { tx = board.right + 20 + Math.random() * 80; ty = board.top + Math.random() * board.height; }
+        else { tx = board.left + Math.random() * board.width; ty = board.bottom + 10 + Math.random() * 70; }
+      } else { tx = s.x; ty = s.y; }
+      efxEmit({ typ: kind === 'farm' ? 'seed' : 'drop', x: s.x, y: s.y, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd, max: 0.9 + Math.random() * 0.6 + (fx.n === 4 ? 0.25 : 0), size: 3.2 + Math.random() * 4.5 + fx.n * 0.45, color: pal[(Math.random() * pal.length) | 0], spin: (Math.random() - 0.5) * 6, tx: tx, ty: ty, ph: 1 });
+    }
+  }
+  function effectOnLevelUp(ti) {
+    const kind = isEffect(ti);
+    if (!kind || !root.document) return;
+    if (!reduceMotion()) { efx.zoom = 1.07; efx.zoomV = 0; }
+    const pal = (LOOKS[ti] && LOOKS[ti].colors) || ['#fff'];
+    const el = root.document.getElementById('board');
+    if (!el || !el.getBoundingClientRect) return;
+    const r = el.getBoundingClientRect();
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    const n = reduceMotion() ? 12 : 48;
+    for (let i = 0; i < n; i++) {
+      const ang = (i / n) * 6.28 + Math.random() * 0.2;
+      const spd = 50 + Math.random() * 140;
+      efxEmit({ typ: 'glow', x: cx, y: cy, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd, max: 1.1 + Math.random() * 0.5, size: 3 + Math.random() * 5, color: pal[i % pal.length], spin: 0, tx: cx + Math.cos(ang) * (r.width * 0.8), ty: cy + Math.sin(ang) * (r.height * 0.8), ph: 1 });
+    }
+  }
+  function effectTick(dt) {
+    const sec = Math.min(0.05, dt / 1000);
+    efx.lastMs = dt;
+    efx.degrade = dt > 24;
+    // zoom ease back to 1
+    if (efx.zoom !== 1) {
+      efx.zoom += (1 - efx.zoom) * Math.min(1, sec * 5.5);
+      if (Math.abs(efx.zoom - 1) < 0.002) efx.zoom = 1;
+    }
+    for (let i = efx.trails.length - 1; i >= 0; i--) {
+      efx.trails[i].t += dt;
+      if (efx.trails[i].t >= efx.trails[i].dur) efx.trails.splice(i, 1);
+    }
+    for (let i = efx.ripples.length - 1; i >= 0; i--) {
+      efx.ripples[i].t += dt;
+      if (efx.ripples[i].t >= efx.ripples[i].dur) efx.ripples.splice(i, 1);
+    }
+    for (let i = efx.parts.length - 1; i >= 0; i--) {
+      const p = efx.parts[i];
+      p.life -= sec;
+      if (p.life <= 0) { efxKill(i); continue; }
+      const age = 1 - p.life / p.max;
+      if (p.ph) {
+        // fly out, then steer back toward a background target
+        if (age > 0.28) {
+          const k = 2.6;
+          p.vx += (p.tx - p.x) * k * sec;
+          p.vy += (p.ty - p.y) * k * sec;
+          p.vx *= 0.92; p.vy *= 0.92;
+        } else {
+          p.vy += 40 * sec;
+        }
+      } else {
+        p.vy += 30 * sec;
+      }
+      p.x += p.vx * sec;
+      p.y += p.vy * sec;
+    }
+  }
+
   // 1.9.158 Line-clear flourish: a soft coloured sweep, themed sparkles, a short pause, then the rows drop.
   // Pause stays under 400ms so the game still flows. More lines = a bigger burst; four lines get a soft banner.
   const CLEAR_KIND = { 1: 'leaves', 2: 'bubbles', 3: 'leaves', 5: 'stars', 7: 'stars', 10: 'snow', 11: 'frog' };
@@ -760,6 +949,7 @@
       });
     }
     g.clearFx = { t: 0, dur, rows: rows.slice(), snap, n, kind, parts, lines, level, hold: false, at: 0, banner: n === 4 };
+    if (isEffect(ti)) effectOnClear(g.clearFx, ti);
     return g.clearFx;
   }
   function tickClear(g, dt) {
@@ -842,6 +1032,7 @@
       lines: g.lines
     };
     playLevelUpSfx(ti);
+    if (isEffect(ti)) effectOnLevelUp(ti);
     return g.levelUp;
   }
   function tickLevelUp(g, dt) {
@@ -892,7 +1083,7 @@
       if (g.level > oldLevel) {
         g.pendingLevel = { from: oldLevel, to: g.level };
       }
-    } else sfx('lock');
+    } else { sfx('lock'); effectLand(g); }
     g.piece = spawn(g.next);
     g.next = takeNext(g);
     g.canHold = true;
@@ -913,22 +1104,24 @@
     const p = g.piece;
     if (a === 'left' || a === 'right') {
       const dx = a === 'left' ? -1 : 1;
-      if (!collides(g.board, p.m, p.x + dx, p.y)) { p.x += dx; sfx('move'); }
+      if (!collides(g.board, p.m, p.x + dx, p.y)) { p.x += dx; sfx('move'); effectAction('move', g); }
     } else if (a === 'down') {
       if (!collides(g.board, p.m, p.x, p.y + 1)) { p.y++; g.score += 1; g.acc = 0; sfx('soft'); }
       else lockPiece(g);
     } else if (a === 'drop') {
       let d = 0;
+      const fromY = p.y;
       while (!collides(g.board, p.m, p.x, p.y + 1)) { p.y++; d++; }
       g.score += d * 2;
       sfx('drop');
+      if (d) effectDropTrail(g, fromY, p.y);
       lockPiece(g);
     } else if (a === 'rotate' || a === 'rotateBack') {
       const m = a === 'rotate' ? rotateCW(p.m) : rotateCCW(p.m);
       const kicks = [0, -1, 1, -2, 2];
       for (const k of kicks) {
-        if (!collides(g.board, m, p.x + k, p.y)) { p.m = m; p.x += k; sfx('rotate'); break; }
-        if (!collides(g.board, m, p.x + k, p.y - 1)) { p.m = m; p.x += k; p.y -= 1; sfx('rotate'); break; }
+        if (!collides(g.board, m, p.x + k, p.y)) { p.m = m; p.x += k; sfx('rotate'); effectAction('rotate', g); break; }
+        if (!collides(g.board, m, p.x + k, p.y - 1)) { p.m = m; p.x += k; p.y -= 1; sfx('rotate'); effectAction('rotate', g); break; }
       }
     } else if (a === 'hold' && g.canHold) {
       const cur = p.t;
@@ -1034,7 +1227,7 @@
     ac = null; sfxGain = null; musicGain = null; bgmGain = null; melodyBus = null; noiseBuf = null;
     bgmBufs = {}; bgmLoading = {};
   }
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI };
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion };
 
   if (!root.document) return;
   const doc = root.document;
@@ -1250,6 +1443,7 @@
     return up;
   }
   function drawCell(ctx, x, y, color, size, alpha, col, row) {
+    if (isEffect(cellThemeIdx())) { drawEffectCell(ctx, x, y, color, size, alpha); return; }
     if (themeFor(g.level) === TRI_THEME) {
       ctx.globalAlpha = alpha;
       triPath(ctx, x, y, size, col, row);
@@ -1282,6 +1476,7 @@
     ctx.globalAlpha = 1;
   }
   function drawGhost(ctx, x, y, color, size, col, row) {
+    if (isEffect(cellThemeIdx())) { drawEffectGhost(ctx, x, y, color, size); return; }
     if (themeFor(g.level) === TRI_THEME) {
       ctx.globalAlpha = 0.55;
       ctx.strokeStyle = color;
@@ -1319,8 +1514,23 @@
     const L = LOOKS[i];
     for (let k = 1; k < COLORS.length; k++) COLORS[k] = L.colors[k - 1];
     boardBg = L.board;
-    doc.documentElement.style.background = 'linear-gradient(rgba(0,0,0,.28),rgba(0,0,0,.28)), url("' + PICS[i] + '") center / cover no-repeat, ' + L.bg;
-    try { const nx = new root.Image(); nx.src = PICS[(i + 1) % PICS.length]; } catch (e) { }
+    const kind = isEffect(i);
+    if (doc.documentElement) {
+      doc.documentElement.classList.toggle('effect', !!kind);
+      doc.documentElement.classList.toggle('fx-farm', kind === 'farm');
+      doc.documentElement.classList.toggle('fx-frog', kind === 'frog');
+    }
+    if (kind === 'farm') {
+      boardBg = 'rgba(12,8,6,0.38)';
+      doc.documentElement.style.background = 'linear-gradient(180deg,#0b0618 0%,#2a1030 50%,#c46a20 100%)';
+    } else if (kind === 'frog') {
+      boardBg = 'rgba(2,12,12,0.40)';
+      doc.documentElement.style.background = 'linear-gradient(180deg,#02080c 0%,#06241f 55%,#0a3a32 100%)';
+    } else {
+      doc.documentElement.style.background = 'linear-gradient(rgba(0,0,0,.28),rgba(0,0,0,.28)), url("' + PICS[i] + '") center / cover no-repeat, ' + L.bg;
+      try { const nx = new root.Image(); nx.src = PICS[(i + 1) % PICS.length]; } catch (e) { }
+    }
+    if (kind) efxClearAll();
     doc.documentElement.style.backgroundAttachment = 'fixed';
     doc.body.style.background = 'transparent';
     drawMini(doc.getElementById('next'), g.next, false);
@@ -1419,6 +1629,9 @@
     return g;
   }
   function fxDraw(now) {
+    if (isEffect(lookIdx < 0 ? themeIdx : lookIdx)) {
+      try { if (effectStageDraw(now)) return; } catch (e) { }
+    }
     if (fx.off) return;
     fxInit(); if (!fx.ctx) return;
     if (fx.theme !== lookIdx) fxTheme(lookIdx < 0 ? 0 : lookIdx);
@@ -1516,6 +1729,373 @@
     const n = parseInt(h.slice(1), 16);
     return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
   }
+  function rrPath(ctx, x, y, w, h, r) {
+    const p = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + p, y);
+    ctx.arcTo(x + w, y, x + w, y + h, p);
+    ctx.arcTo(x + w, y + h, x, y + h, p);
+    ctx.arcTo(x, y + h, x, y, p);
+    ctx.arcTo(x, y, x + w, y, p);
+    ctx.closePath();
+  }
+  function hexRgb(h) {
+    if (!h || h[0] !== '#') return [255, 255, 255];
+    const n = parseInt(h.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  function rgba(h, a) { const c = hexRgb(h); return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')'; }
+  function lighten(h, k) {
+    const c = hexRgb(h);
+    return 'rgb(' + Math.round(c[0] + (255 - c[0]) * k) + ',' + Math.round(c[1] + (255 - c[1]) * k) + ',' + Math.round(c[2] + (255 - c[2]) * k) + ')';
+  }
+  function cellThemeIdx() {
+    if (g.clearFx) return themeFor(g.clearFx.level);
+    if (g.levelUp) return g.levelUp.theme;
+    return themeFor(g.level);
+  }
+  function drawEffectGlyph(ctx, x, y, size, kind, color) {
+    const s = size;
+    ctx.save();
+    ctx.translate(x + s / 2, y + s / 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+    ctx.lineWidth = Math.max(0.8, s * 0.055);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    if (kind === 'farm') {
+      // small wheat-head chevron
+      ctx.beginPath();
+      ctx.moveTo(0, s * 0.22); ctx.lineTo(0, -s * 0.18);
+      ctx.moveTo(-s * 0.12, -s * 0.02); ctx.lineTo(0, -s * 0.18); ctx.lineTo(s * 0.12, -s * 0.02);
+      ctx.moveTo(-s * 0.14, s * 0.08); ctx.lineTo(0, -s * 0.04); ctx.lineTo(s * 0.14, s * 0.08);
+      ctx.stroke();
+    } else {
+      // lily-ripple arcs
+      ctx.beginPath(); ctx.arc(0, s * 0.04, s * 0.18, Math.PI * 1.05, Math.PI * 1.95); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, s * 0.06, s * 0.28, Math.PI * 1.12, Math.PI * 1.88); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  function drawEffectCell(ctx, x, y, color, size, alpha) {
+    const kind = isEffect(cellThemeIdx());
+    const pad = Math.max(1, size * 0.06);
+    const rad = Math.max(3, size * 0.18);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    // soft bloom (no shadowBlur — cheaper)
+    rrPath(ctx, x - 1, y - 1, size + 2, size + 2, rad + 1);
+    ctx.fillStyle = rgba(color, 0.22);
+    ctx.fill();
+    rrPath(ctx, x + pad, y + pad, size - pad * 2, size - pad * 2, rad);
+    const gdt = ctx.createLinearGradient(x, y, x + size * 0.2, y + size);
+    gdt.addColorStop(0, lighten(color, 0.55));
+    gdt.addColorStop(0.4, color);
+    gdt.addColorStop(1, rgba(color, 0.72));
+    ctx.fillStyle = gdt;
+    ctx.globalAlpha = alpha * 0.9;
+    ctx.fill();
+    // inner glass highlight
+    rrPath(ctx, x + pad + 1, y + pad + 1, size - pad * 2 - 2, (size - pad * 2) * 0.42, rad * 0.7);
+    ctx.fillStyle = 'rgba(255,255,255,0.28)';
+    ctx.fill();
+    ctx.globalAlpha = alpha * 0.85;
+    drawEffectGlyph(ctx, x, y, size, kind, color);
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+  function drawEffectGhost(ctx, x, y, color, size) {
+    const pad = Math.max(1.5, size * 0.08);
+    const rad = Math.max(3, size * 0.18);
+    ctx.save();
+    ctx.globalAlpha = 0.18;
+    rrPath(ctx, x + pad, y + pad, size - pad * 2, size - pad * 2, rad);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.globalAlpha = 0.55;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(1.2, size * 0.07);
+    rrPath(ctx, x + pad, y + pad, size - pad * 2, size - pad * 2, rad);
+    ctx.stroke();
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+  function drawEffectTrails(ctx) {
+    if (!efx.trails.length) return;
+    efx.trails.forEach(tr => {
+      const k = 1 - tr.t / tr.dur;
+      tr.cells.forEach(cell => {
+        const x = cell.c * CELL;
+        const y0 = (tr.fromY + cell.r) * CELL;
+        const y1 = (tr.toY + cell.r) * CELL;
+        const gdt = ctx.createLinearGradient(x, y0, x, y1);
+        gdt.addColorStop(0, rgba(tr.color, 0));
+        gdt.addColorStop(1, rgba(tr.color, 0.45 * k));
+        ctx.fillStyle = gdt;
+        ctx.fillRect(x + 4, y0, CELL - 8, Math.max(2, y1 - y0));
+      });
+    });
+  }
+  function drawEffectRipples(ctx) {
+    efx.ripples.forEach(rp => {
+      const p = rp.t / rp.dur;
+      const rad = 6 + p * 22;
+      ctx.save();
+      ctx.globalAlpha = (1 - p) * 0.7;
+      ctx.strokeStyle = rp.color;
+      ctx.lineWidth = 1.6 * (1 - p * 0.5);
+      ctx.beginPath(); ctx.arc(rp.x, rp.y, rad, 0, 6.283); ctx.stroke();
+      ctx.globalAlpha = (1 - p) * 0.25;
+      ctx.beginPath(); ctx.arc(rp.x, rp.y, rad * 0.55, 0, 6.283); ctx.stroke();
+      ctx.restore();
+    });
+  }
+  function drawEfxParts(ctx) {
+    // screen-space particles on the FX canvas
+    for (let i = 0; i < efx.parts.length; i++) {
+      const p = efx.parts[i];
+      const k = Math.max(0, p.life / p.max);
+      ctx.globalAlpha = k * 0.9;
+      if (p.typ === 'seed') {
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate((1 - k) * p.spin);
+        ctx.fillStyle = p.color;
+        ctx.beginPath(); ctx.ellipse(0, 0, p.size, p.size * 0.4, 0, 0, 6.283); ctx.fill();
+        ctx.restore();
+      } else if (p.typ === 'drop') {
+        ctx.fillStyle = p.color;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, 6.283); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.45)';
+        ctx.beginPath(); ctx.arc(p.x - p.size * 0.25, p.y - p.size * 0.25, p.size * 0.25, 0, 6.283); ctx.fill();
+      } else if (p.typ === 'glow') {
+        ctx.fillStyle = rgba(p.color, 0.35);
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 1.8, 0, 6.283); ctx.fill();
+        ctx.fillStyle = p.color;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 0.7, 0, 6.283); ctx.fill();
+      } else {
+        ctx.fillStyle = p.color;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, 6.283); ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  function effectWarm(prog, kind) {
+    return 0.35 + 0.65 * prog;
+  }
+  function drawFarmScene(c, w, h, t, pulse, prog, reduce) {
+    const warm = effectWarm(prog, 'farm');
+    const beat = reduce ? 0 : pulse;
+    // sky: deep indigo to sunset gold, warmer as the level builds
+    const sky = c.createLinearGradient(0, 0, 0, h);
+    sky.addColorStop(0, '#0b0618');
+    sky.addColorStop(0.28, '#1a0b28');
+    sky.addColorStop(0.55, 'rgb(' + Math.round(80 + 40 * warm) + ',' + Math.round(22 + 8 * warm) + ',' + Math.round(36 - 10 * warm) + ')');
+    sky.addColorStop(0.78, 'rgb(' + Math.round(160 + 50 * warm) + ',' + Math.round(70 + 20 * warm) + ',28)');
+    sky.addColorStop(1, 'rgb(' + Math.round(200 + 40 * warm) + ',' + Math.round(110 + 30 * warm + 20 * beat) + ',40)');
+    c.fillStyle = sky; c.fillRect(0, 0, w, h);
+    // sun glow on the horizon
+    const sx = w * 0.62, sy = h * 0.72;
+    const rg = c.createRadialGradient(sx, sy, 4, sx, sy, Math.max(w, h) * 0.55 * (0.85 + 0.2 * beat + 0.15 * warm));
+    rg.addColorStop(0, 'rgba(255,220,140,' + (0.55 + 0.25 * beat) + ')');
+    rg.addColorStop(0.25, 'rgba(255,140,50,' + (0.28 + 0.12 * beat) + ')');
+    rg.addColorStop(1, 'rgba(255,80,20,0)');
+    c.fillStyle = rg; c.fillRect(0, 0, w, h);
+    // distant hills
+    c.fillStyle = 'rgba(40,16,20,0.85)';
+    c.beginPath(); c.moveTo(0, h * 0.7);
+    c.quadraticCurveTo(w * 0.25, h * 0.62, w * 0.5, h * 0.68);
+    c.quadraticCurveTo(w * 0.75, h * 0.74, w, h * 0.64);
+    c.lineTo(w, h); c.lineTo(0, h); c.fill();
+    c.fillStyle = 'rgba(22,12,10,0.92)';
+    c.beginPath(); c.moveTo(0, h * 0.78);
+    c.quadraticCurveTo(w * 0.3, h * 0.72, w * 0.55, h * 0.8);
+    c.quadraticCurveTo(w * 0.8, h * 0.86, w, h * 0.76);
+    c.lineTo(w, h); c.lineTo(0, h); c.fill();
+    // barn silhouette
+    const bx = w * 0.14, by = h * 0.7, bw = Math.min(110, w * 0.22), bh = h * 0.12;
+    c.fillStyle = 'rgba(12,6,8,0.92)';
+    c.beginPath();
+    c.moveTo(bx, by + bh); c.lineTo(bx, by + bh * 0.2);
+    c.lineTo(bx + bw * 0.5, by - bh * 0.45); c.lineTo(bx + bw, by + bh * 0.2);
+    c.lineTo(bx + bw, by + bh); c.closePath(); c.fill();
+    c.fillStyle = 'rgba(0,0,0,0.55)';
+    c.fillRect(bx + bw * 0.4, by + bh * 0.35, bw * 0.2, bh * 0.65);
+    // windmill — sits in the lower-right margin, short blades so it stays out of the side panel
+    const mx = w * 0.9, my = h * 0.84, mh = Math.min(70, h * 0.08);
+    c.fillStyle = 'rgba(12,6,8,0.92)';
+    c.fillRect(mx - 4, my, 8, mh);
+    c.save(); c.translate(mx, my); c.rotate(reduce ? 0.4 : t * 0.35 + beat * 0.08);
+    c.fillStyle = 'rgba(12,6,8,0.92)';
+    for (let i = 0; i < 4; i++) {
+      c.rotate(Math.PI / 2);
+      c.beginPath(); c.moveTo(0, -2); c.lineTo(-3.5, -mh * 0.7); c.lineTo(3.5, -mh * 0.7); c.closePath(); c.fill();
+    }
+    c.restore();
+    // wheat field silhouettes
+    const stems = efx.degrade ? 22 : 40;
+    const fieldY = h * 0.82;
+    for (let i = 0; i < stems; i++) {
+      const x = (i + 0.4) / stems * w;
+      const ht = h * (0.08 + (i % 5) * 0.012);
+      const sway = reduce ? 0 : Math.sin(t * 1.3 + i * 0.55) * (5 + 7 * beat);
+      c.strokeStyle = i % 3 === 0 ? 'rgba(90,50,10,0.85)' : 'rgba(40,22,6,0.9)';
+      c.lineWidth = 1.6;
+      c.beginPath(); c.moveTo(x, h); c.quadraticCurveTo(x + sway * 0.4, fieldY + ht * 0.4, x + sway, fieldY - ht); c.stroke();
+      c.fillStyle = 'rgba(180,110,20,0.55)';
+      c.beginPath(); c.ellipse(x + sway, fieldY - ht, 3.2, 1.4, sway * 0.04, 0, 6.283); c.fill();
+    }
+    // seed puffs
+    if (!reduce) {
+      const n = efx.degrade ? 6 : 10;
+      for (let i = 0; i < n; i++) {
+        const px = (w * ((t * 0.03 + i * 0.17) % 1.2) - w * 0.1);
+        const py = h * (0.25 + (i % 5) * 0.1) + Math.sin(t * 0.6 + i) * 12;
+        c.globalAlpha = 0.35 + 0.2 * beat;
+        c.fillStyle = 'rgba(255,230,180,0.7)';
+        c.beginPath(); c.arc(px, py, 2 + (i % 3), 0, 6.283); c.fill();
+      }
+      c.globalAlpha = 1;
+    }
+    // fireflies — pulse on the beat
+    const flies = reduce ? 6 : (efx.degrade ? 10 : 16) + Math.round(prog * 8);
+    for (let i = 0; i < flies; i++) {
+      const fx = w * (0.08 + (Math.sin(i * 12.1) * 0.5 + 0.5) * 0.84);
+      const fy = h * (0.3 + (Math.cos(i * 7.7) * 0.5 + 0.5) * 0.55) + Math.sin(t * 0.5 + i) * 10;
+      const ph = 0.35 + 0.65 * (reduce ? 0.5 : Math.pow(0.5 + 0.5 * Math.sin((t / (musicBeat(6).period || 0.35)) * 6.28 + i * 1.3) * 0.5 + 0.5 * beat, 1.2));
+      // simpler pulse: use beat staggered
+      const glow = reduce ? 0.55 : 0.35 + 0.65 * (0.4 + 0.6 * beat * (0.5 + 0.5 * Math.sin(i * 2.1)));
+      const rad = 1.6 + (i % 3) * 0.6 + beat * 1.2;
+      const grd = c.createRadialGradient(fx, fy, 0, fx, fy, rad * 5);
+      grd.addColorStop(0, 'rgba(255,240,140,' + (0.85 * glow) + ')');
+      grd.addColorStop(0.35, 'rgba(255,200,60,' + (0.35 * glow) + ')');
+      grd.addColorStop(1, 'rgba(255,160,20,0)');
+      c.fillStyle = grd; c.beginPath(); c.arc(fx, fy, rad * 5, 0, 6.283); c.fill();
+      c.fillStyle = 'rgba(255,250,200,' + (0.9 * glow) + ')';
+      c.beginPath(); c.arc(fx, fy, rad, 0, 6.283); c.fill();
+    }
+  }
+  function drawFrogScene(c, w, h, t, pulse, prog, reduce) {
+    const warm = effectWarm(prog, 'frog');
+    const beat = reduce ? 0 : pulse;
+    const sky = c.createLinearGradient(0, 0, 0, h);
+    sky.addColorStop(0, '#02080c');
+    sky.addColorStop(0.3, '#042018');
+    sky.addColorStop(0.62, 'rgb(6,' + Math.round(40 + 30 * warm) + ',' + Math.round(36 + 20 * warm) + ')');
+    sky.addColorStop(1, 'rgb(8,' + Math.round(50 + 40 * warm + 10 * beat) + ',' + Math.round(48 + 20 * warm) + ')');
+    c.fillStyle = sky; c.fillRect(0, 0, w, h);
+    // pond glow
+    const cx = w * 0.5, cy = h * 0.7;
+    const rg = c.createRadialGradient(cx, cy, 8, cx, cy, Math.max(w, h) * 0.6);
+    rg.addColorStop(0, 'rgba(80,220,170,' + (0.28 + 0.16 * beat + 0.1 * warm) + ')');
+    rg.addColorStop(0.45, 'rgba(20,80,70,' + (0.18 + 0.08 * beat) + ')');
+    rg.addColorStop(1, 'rgba(0,20,20,0)');
+    c.fillStyle = rg; c.fillRect(0, 0, w, h);
+    // water surface ripples (beat-synced)
+    const rings = reduce ? 2 : 5;
+    for (let i = 0; i < rings; i++) {
+      const srcX = w * (0.25 + (i % 3) * 0.25), srcY = h * (0.62 + (i % 2) * 0.08);
+      const rp = ((t * 0.25 + i * 0.2 + (1 - beat) * 0.05) % 1);
+      c.strokeStyle = 'rgba(160,255,220,' + ((1 - rp) * (0.18 + 0.16 * beat)) + ')';
+      c.lineWidth = 1.4;
+      c.beginPath(); c.ellipse(srcX, srcY, 18 + rp * 90, 6 + rp * 22, 0, 0, 6.283); c.stroke();
+    }
+    // lily pads
+    const pads = [{ x: 0.18, y: 0.72, r: 22 }, { x: 0.32, y: 0.8, r: 16 }, { x: 0.7, y: 0.74, r: 20 }, { x: 0.82, y: 0.83, r: 14 }, { x: 0.5, y: 0.86, r: 18 }];
+    pads.forEach((p, i) => {
+      const bob = reduce ? 0 : Math.sin(t * 0.8 + i) * 3;
+      const px = w * p.x, py = h * p.y + bob;
+      c.fillStyle = 'rgba(30,90,50,0.85)';
+      c.beginPath(); c.ellipse(px, py, p.r, p.r * 0.45, 0.1, 0, 6.283); c.fill();
+      c.strokeStyle = 'rgba(10,40,20,0.5)'; c.lineWidth = 1;
+      c.beginPath(); c.moveTo(px, py); c.lineTo(px + p.r * 0.7, py - p.r * 0.1); c.stroke();
+    });
+    // glowing frogs on a couple of pads
+    const frogs = [{ x: 0.18, y: 0.72 }, { x: 0.7, y: 0.74 }, { x: 0.5, y: 0.86 }];
+    frogs.forEach((f, i) => {
+      const bob = reduce ? 0 : Math.sin(t * 0.8 + i) * 3;
+      const px = w * f.x, py = h * f.y + bob - 6;
+      const glow = reduce ? 0.5 : 0.4 + 0.6 * beat;
+      const grd = c.createRadialGradient(px, py, 1, px, py, 18);
+      grd.addColorStop(0, 'rgba(140,255,160,' + (0.55 * glow) + ')');
+      grd.addColorStop(1, 'rgba(40,180,80,0)');
+      c.fillStyle = grd; c.beginPath(); c.arc(px, py, 18, 0, 6.283); c.fill();
+      c.fillStyle = 'rgba(80,210,110,0.95)';
+      c.beginPath(); c.ellipse(px, py, 8, 6, 0, 0, 6.283); c.fill();
+      c.beginPath(); c.arc(px - 5, py - 5, 3.2, 0, 6.283); c.fill();
+      c.beginPath(); c.arc(px + 5, py - 5, 3.2, 0, 6.283); c.fill();
+      c.fillStyle = 'rgba(10,40,20,0.9)';
+      c.beginPath(); c.arc(px - 5, py - 5, 1.3, 0, 6.283); c.fill();
+      c.beginPath(); c.arc(px + 5, py - 5, 1.3, 0, 6.283); c.fill();
+    });
+    // reeds
+    const reeds = efx.degrade ? 8 : 14;
+    for (let i = 0; i < reeds; i++) {
+      const left = i < reeds / 2;
+      const x = left ? w * (0.01 + (i / (reeds / 2)) * 0.12) : w * (0.88 + ((i - reeds / 2) / (reeds / 2)) * 0.11);
+      const ht = h * (0.16 + (i % 4) * 0.03);
+      const sway = reduce ? 0 : Math.sin(t * 1.1 + i) * (4 + 6 * beat);
+      c.strokeStyle = 'rgba(10,40,24,0.9)'; c.lineWidth = 2;
+      c.beginPath(); c.moveTo(x, h); c.quadraticCurveTo(x + sway * 0.4, h - ht * 0.5, x + sway, h - ht); c.stroke();
+    }
+    // fireflies
+    const flies = reduce ? 5 : (efx.degrade ? 8 : 14) + Math.round(prog * 6);
+    for (let i = 0; i < flies; i++) {
+      const fx = w * (0.1 + (Math.sin(i * 9.3) * 0.5 + 0.5) * 0.8) + Math.sin(t * 0.4 + i) * 8;
+      const fy = h * (0.2 + (Math.cos(i * 5.1) * 0.5 + 0.5) * 0.5);
+      const glow = reduce ? 0.5 : 0.35 + 0.65 * (0.4 + 0.6 * beat * (0.5 + 0.5 * Math.sin(i * 1.7)));
+      const rad = 1.4 + (i % 3) * 0.5 + beat * 1.1;
+      const grd = c.createRadialGradient(fx, fy, 0, fx, fy, rad * 5);
+      grd.addColorStop(0, 'rgba(180,255,200,' + (0.85 * glow) + ')');
+      grd.addColorStop(0.4, 'rgba(80,220,150,' + (0.3 * glow) + ')');
+      grd.addColorStop(1, 'rgba(40,160,100,0)');
+      c.fillStyle = grd; c.beginPath(); c.arc(fx, fy, rad * 5, 0, 6.283); c.fill();
+      c.fillStyle = 'rgba(220,255,230,' + (0.9 * glow) + ')';
+      c.beginPath(); c.arc(fx, fy, rad, 0, 6.283); c.fill();
+    }
+  }
+  function drawBoardGlow(c, kind, pulse, reduce) {
+    const el = doc.getElementById('board');
+    if (!el || !el.getBoundingClientRect) return;
+    const r = el.getBoundingClientRect();
+    if (r.width < 8 || r.height < 8) return;
+    const beat = reduce ? 0 : pulse;
+    const col = kind === 'farm' ? [255, 180, 80] : [80, 230, 190];
+    const a = 0.18 + 0.14 * beat;
+    c.save();
+    c.strokeStyle = 'rgba(' + col[0] + ',' + col[1] + ',' + col[2] + ',' + a + ')';
+    c.lineWidth = 10 + 6 * beat;
+    c.beginPath();
+    const rad = 16;
+    c.moveTo(r.left + rad, r.top);
+    c.arcTo(r.right, r.top, r.right, r.bottom, rad);
+    c.arcTo(r.right, r.bottom, r.left, r.bottom, rad);
+    c.arcTo(r.left, r.bottom, r.left, r.top, rad);
+    c.arcTo(r.left, r.top, r.right, r.top, rad);
+    c.stroke();
+    c.restore();
+  }
+  function effectStageDraw(now) {
+    const kind = isEffect(lookIdx < 0 ? themeIdx : lookIdx);
+    if (!kind) return false;
+    const reduce = reduceMotion();
+    // Always init the FX canvas for effect themes, even with reduced motion (calm scene).
+    if (!fx.cv) {
+      const was = fx.off; fx.off = false; fxInit(); fx.off = was;
+    }
+    if (!fx.ctx) return true;
+    if (fx.w !== root.innerWidth || fx.h !== root.innerHeight) fxSize();
+    const t = now / 1000;
+    const ti = lookIdx < 0 ? themeIdx : lookIdx;
+    const beat = musicBeat(ti);
+    const lines = (g.clearFx ? g.clearFx.lines + g.clearFx.n : g.lines) || 0;
+    const prog = effectProg(lines);
+    const c = fx.ctx;
+    c.clearRect(0, 0, fx.w, fx.h);
+    if (kind === 'farm') drawFarmScene(c, fx.w, fx.h, t, beat.pulse, prog, reduce);
+    else drawFrogScene(c, fx.w, fx.h, t, beat.pulse, prog, reduce);
+    drawBoardGlow(c, kind, beat.pulse, reduce);
+    drawEfxParts(c);
+    return true;
+  }
+
   function drawStar(ctx, x, y, r) {
     ctx.beginPath();
     for (let i = 0; i < 8; i++) {
@@ -1694,14 +2274,15 @@
     const p = fx.hold ? fx.at : Math.min(1, fx.t / fx.dur);
     const n = fx.n;
     const fade = p < 0.12 ? p / 0.12 : (p > 0.82 ? Math.max(0, (1 - p) / 0.18) : 1);
+    const boost = fx.effect ? 1.55 : 1;
     fx.rows.forEach((row) => {
       const y = row * CELL;
       const rowCols = (fx.snap[row] || []).map(v => v ? blockColor(v, fx.lines, fx.level) : null);
       const mid = rowCols.find(Boolean) || '#ffffff';
       const mid2 = rowCols.filter(Boolean).slice(-1)[0] || mid;
-      ctx.fillStyle = rgbaHex(mid, (0.12 + 0.1 * n) * fade);
-      ctx.fillRect(0, y, COLS * CELL, CELL);
-      const bw = CELL * (1.5 + n * 0.35);
+      ctx.fillStyle = rgbaHex(mid, (0.12 + 0.1 * n) * fade * (fx.effect ? 1.25 : 1));
+      ctx.fillRect(0, y - (fx.effect ? 3 : 0), COLS * CELL, CELL + (fx.effect ? 6 : 0));
+      const bw = CELL * (1.5 + n * 0.35) * boost;
       const x = -bw + p * (COLS * CELL + bw);
       const g2 = ctx.createLinearGradient(x, y, x + bw, y);
       g2.addColorStop(0, 'rgba(255,255,255,0)');
@@ -1796,6 +2377,7 @@
     try { fxDraw(now); } catch (e) { fx.off = true; }
     const dt = now - last;
     last = now;
+    try { effectTick(dt); } catch (e) { }
     const clearing = tickClear(g, dt);
     const leveling = tickLevelUp(g, dt);
     const running = started && !g.over && !g.paused && !g.demo && !clearing && !leveling;
@@ -1813,6 +2395,12 @@
     if (g.popupT > 0) g.popupT -= dt;
     const ctx = board.getContext('2d');
     if (ctx) {
+      ctx.save();
+      if (efx.zoom !== 1 && !reduceMotion()) {
+        ctx.translate(board.width / 2, board.height / 2);
+        ctx.scale(efx.zoom, efx.zoom);
+        ctx.translate(-board.width / 2, -board.height / 2);
+      }
       ctx.clearRect(0, 0, board.width, board.height);
       ctx.fillStyle = boardBg;
       ctx.fillRect(0, 0, board.width, board.height);
@@ -1829,6 +2417,7 @@
         if (v) drawCell(ctx, c * CELL, r * CELL, blockColor(v, colLines, colLevel), CELL, 1, c, r);
       }
       try { invDraw(ctx); } catch (e) { }
+      try { drawEffectTrails(ctx); drawEffectRipples(ctx); } catch (e) { }
       if (!g.over && !fx) {
         const p = g.piece;
         let gy = p.y;
@@ -1866,6 +2455,7 @@
         ctx.fillStyle = 'rgba(255,255,255,0.75)';
         ctx.fillText(g.over ? 'Score ' + g.score + '. Tap to play again' : g.paused ? 'Tap or press P to resume' : 'Tap the board to start', board.width / 2, board.height / 2 + 14);
       }
+      ctx.restore();
     }
     drawMini(nextCv, g.next, false);
     drawMini(holdCv, g.hold, !g.canHold);
