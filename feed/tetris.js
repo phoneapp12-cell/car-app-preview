@@ -521,8 +521,121 @@
       }
     }
   }
+
+  // 1.9.181 Themed piece-movement sounds, pitched in the level's key, clearly louder than the music.
+  // Mellow: highpass ~300 Hz, lowpass ~3.5 kHz, soft attack, no harsh transients.
+  function moveKeyHz(name) {
+    const kind = (name === 'drop' || name === 'lock') ? 'land' : (name === 'soft' || name === 'move' ? 'rotate' : name);
+    const notes = sfxFreqs(themeIdx, kind);
+    let f = notes && notes[0];
+    if (!f) {
+      const tr = TRACKS[themeIdx] || { key: 'C' };
+      const pc = PC[tr.key] != null ? PC[tr.key] : 0;
+      f = midiHz(48 + pc + (tr.mode === 'minor' ? 3 : 4));
+    }
+    // Keep the tonal centre on a phone speaker (about 300–800 Hz).
+    while (f < 300) f *= 2;
+    while (f > 800) f /= 2;
+    return f;
+  }
+  function moveChain(dest) {
+    const hp = ac.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 300; hp.Q.value = 0.7;
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 3500; lp.Q.value = 0.5;
+    hp.connect(lp); lp.connect(dest);
+    return hp;
+  }
+  function moveTone(freq, dur, vol, dest, t0, glidesTo) {
+    const o = ac.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(Math.max(80, freq), t0);
+    if (glidesTo) o.frequency.exponentialRampToValueAtTime(Math.max(80, glidesTo), t0 + dur);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(vol, t0 + Math.min(0.018, dur * 0.25));
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(dest);
+    o.start(t0); o.stop(t0 + dur + 0.02);
+  }
+  function moveNoise(dur, vol, dest, t0, bpHz, q, startLp, endLp) {
+    if (!noiseBuf) return;
+    const src = ac.createBufferSource();
+    src.buffer = noiseBuf;
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = bpHz; bp.Q.value = q || 0.9;
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = startLp || 2800; lp.Q.value = 0.5;
+    if (endLp) lp.frequency.linearRampToValueAtTime(endLp, t0 + dur);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(vol, t0 + Math.min(0.016, dur * 0.22));
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    src.connect(bp); bp.connect(lp); lp.connect(g); g.connect(dest);
+    src.start(t0); src.stop(t0 + dur + 0.02);
+  }
+  function playMoveSfx(name) {
+    if (!soundOn || !ac || !sfxGain) return;
+    const dest = moveChain(sfxGain);
+    const t0 = ac.currentTime + 0.008;
+    const f = moveKeyHz(name);
+    const ti = themeIdx;
+    const kind = isEffect(ti) || '';
+    // Clearly louder than the music on a phone speaker: brief duck + a fuller SFX gain.
+    const duckDur = name === 'drop' || name === 'lock' ? 0.28 : (name === 'rotate' ? 0.22 : 0.2);
+    duckMusic(0, duckDur);
+    const farm = kind === 'farm' || ti === 6;
+    const frog = kind === 'frog' || ti === 11;
+    const beach = kind === 'beach' || ti === 0;
+    const fwth = kind === 'fireworks' || ti === 1;
+    const oceanTh = kind === 'ocean' || ti === 2;
+    const volMul = name === 'drop' ? 1 : (name === 'lock' ? 0.9 : (name === 'rotate' ? 0.85 : (name === 'soft' ? 0.62 : 0.7)));
+    if (farm) {
+      // Soft wooden clop / clucky tap.
+      moveNoise(name === 'rotate' ? 0.1 : 0.08, 0.38 * volMul, dest, t0, 640, 1.1, 2200, 1400);
+      moveTone(f, 0.11, 0.22 * volMul, dest, t0, f * 0.84);
+      if (name === 'rotate') moveTone(f * 1.25, 0.09, 0.12 * volMul, dest, t0 + 0.03, f);
+    } else if (frog) {
+      if (name === 'rotate') {
+        // Soft ribbit: mid sine glide, no rasp.
+        moveTone(f * 1.05, 0.22, 0.36, dest, t0, f * 0.72);
+        moveTone(f * 0.72, 0.16, 0.16, dest, t0 + 0.08, f * 0.9);
+        moveNoise(0.08, 0.08, dest, t0 + 0.02, 700, 0.8, 1600);
+      } else {
+        moveTone(f * 1.15, 0.11, 0.34 * volMul, dest, t0, f * 0.7);
+        moveNoise(0.06, 0.12 * volMul, dest, t0, 780, 1.0, 1800);
+      }
+    } else if (beach) {
+      if (name === 'move' || name === 'soft' || name === 'drop') {
+        moveNoise(name === 'drop' ? 0.18 : 0.12, 0.36 * volMul, dest, t0, 720, 0.7, 2400, 1100);
+        moveTone(f, 0.1, 0.14 * volMul, dest, t0, f * 0.9);
+      } else {
+        // Shell click
+        moveNoise(0.07, 0.34 * volMul, dest, t0, 1100, 1.4, 2800, 1600);
+        moveTone(f, 0.09, 0.2 * volMul, dest, t0, f * 0.92);
+      }
+    } else if (fwth) {
+      if (name === 'lock' || name === 'drop') {
+        moveTone(f, 0.12, 0.3 * volMul, dest, t0, f * 0.75);
+        moveNoise(0.08, 0.22 * volMul, dest, t0 + 0.01, 900, 0.8, 2600);
+      } else {
+        moveNoise(0.11, 0.32 * volMul, dest, t0, 1200, 0.7, 3200, 1800);
+        moveTone(f * 1.1, 0.08, 0.12 * volMul, dest, t0);
+      }
+    } else if (oceanTh) {
+      moveTone(f * 0.95, 0.1, 0.32 * volMul, dest, t0, f * 1.35);
+      moveNoise(0.07, 0.14 * volMul, dest, t0, 800, 0.9, 2000);
+      if (name === 'rotate' || name === 'drop') moveTone(f * 1.2, 0.08, 0.14 * volMul, dest, t0 + 0.04, f * 1.5);
+    } else {
+      // Sensible default: in-key soft tick, still themed by pitch.
+      moveTone(f, name === 'drop' ? 0.16 : 0.1, 0.32 * volMul, dest, t0, name === 'drop' ? f * 0.75 : f * 0.92);
+      moveNoise(0.07, 0.16 * volMul, dest, t0, 900, 0.9, 2600, 1600);
+    }
+  }
+
   function sfx(name, lines) {
     if (!soundOn || !ac) return;
+    if (name === 'move' || name === 'rotate' || name === 'soft' || name === 'drop' || name === 'lock') { playMoveSfx(name); return; }
     const d = sfxGain, T = THEMES[themeIdx], m = T.pitch * 0.5, w = 'sine', lo = f => nf(f) / 2;
     const musical = name === 'rotate' || name === 'lock' || name === 'drop' || name === 'clear' || name === 'tetris' || name === 'level';
     const notes = musical ? sfxFreqs(themeIdx, (name === 'drop' || name === 'lock') ? 'land' : name, lines) : null;
@@ -822,9 +935,17 @@
     [255, 214, 90], [255, 86, 128], [80, 220, 255], [186, 96, 255],
     [110, 255, 150], [255, 150, 56], [255, 244, 248], [255, 72, 196]
   ];
-  const fw = { ready: false, sil: null, loading: false, rockets: [], parts: [], flashes: [], lit: 0, litR: 1, litG: 1, litB: 1, beatLatch: false, beatN: 0, hold: null, posed: false };
+  const fw = { ready: false, sil: null, loading: false, rockets: [], parts: [], flashes: [], lit: 0, litR: 1, litG: 1, litB: 1, beatLatch: false, beatN: 0, hold: null, posed: false, prog: 0 };
 
-  const EFFECT_TI = { 0: 'beach', 1: 'fireworks', 6: 'farm', 11: 'frog' };
+  const OCEAN_ART = { plate: 'tetris-bg/ocean-plate-24aea8de.webp', atlas: 'tetris-bg/ocean-atlas-19544900.webp' };
+  const OCEAN_META = {
+    dolphins: [
+    { name: 'top', ax: 4, ay: 6, aw: 261, ah: 186, x: 21, y: 136, w: 261, h: 186, px: 154.56, py: 208.08, ox: 133.56, oy: 72.08, ang: -30.09 },
+    { name: 'mid', ax: 269, ay: 7, aw: 264, ah: 184, x: 13, y: 317, w: 264, h: 184, px: 152.33, py: 398.44, ox: 139.33, oy: 81.44, ang: -20.21 },
+    { name: 'low', ax: 537, ay: 4, aw: 177, ah: 190, x: 209, y: 489, w: 177, h: 190, px: 300.37, py: 562.48, ox: 91.37, oy: 73.48, ang: 49.43 }
+    ]
+  };
+  const EFFECT_TI = { 0: 'beach', 1: 'fireworks', 2: 'ocean', 6: 'farm', 11: 'frog' };
   function isEffect(ti) { return EFFECT_TI[ti] || null; }
   function reduceMotion() {
     try { return !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; }
@@ -1437,7 +1558,7 @@
     ac = null; sfxGain = null; musicGain = null; bgmGain = null; melodyBus = null; noiseBuf = null;
     bgmBufs = {}; bgmLoading = {};
   }
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, farmDayTarget, farmSunPos, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts };
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, farmDayTarget, farmSunPos, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts };
 
   if (!root.document) return;
   const doc = root.document;
@@ -1481,7 +1602,7 @@
   function press(a) {
     if (!started) started = true;
     const next = act(g, a);
-    if (a === 'restart') { g = next; invReset(); life.hold = null; life.singHold = null; life.beachHold = null; fw.hold = null; sparkHold = null; blockSparks = []; lifeReset(); if (isEffect(themeFor(g.level))) { lifeCast(isEffect(themeFor(g.level))); } if (root.IBScores) root.IBScores.close(); }
+    if (a === 'restart') { g = next; invReset(); life.hold = null; life.singHold = null; life.beachHold = null; fw.hold = null; ocean.hold = null; sparkHold = null; blockSparks = []; lifeReset(); if (isEffect(themeFor(g.level))) { lifeCast(isEffect(themeFor(g.level))); } if (root.IBScores) root.IBScores.close(); }
     syncHud();
   }
   root.Tetris.press = press;
@@ -1552,7 +1673,8 @@
         life.frog.blink = opts.frogSing.blink != null ? opts.frogSing.blink : 0;
       }
     } else life.singHold = null;
-    if (opts.fireworks) { fw.hold = opts.fireworks; fw.posed = false; } else { fw.hold = null; fw.posed = false; }
+    if (opts.fireworks) { fw.hold = opts.fireworks; fw.posed = false; if (opts.fireworks.prog != null) fw.prog = opts.fireworks.prog; if (opts.fireworks.size != null) fw.prog = Math.max(0, Math.min(1, (opts.fireworks.size - 0.30) / 0.85)); } else { fw.hold = null; fw.posed = false; }
+    if (opts.ocean) { ocean.hold = opts.ocean; ocean.posed = false; } else { ocean.hold = null; ocean.posed = false; }
     if (opts.sparkle) holdBlockSpark(opts.sparkle); else { sparkHold = null; }
     syncHud();
     const mb = doc.getElementById('musicbtn'); if (mb) mb.textContent = 'Music off';
@@ -1877,13 +1999,14 @@
       doc.documentElement.classList.toggle('fx-frog', kind === 'frog');
       doc.documentElement.classList.toggle('fx-beach', kind === 'beach');
       doc.documentElement.classList.toggle('fx-fireworks', kind === 'fireworks');
+      doc.documentElement.classList.toggle('fx-ocean', kind === 'ocean');
     }
     // 1.9.175: always the original theme photo (center / cover), including Farmyard and Bullfrog.
     // 1.9.180 Fireworks is the exception: a black night sky (Shane asked for a black background).
     if (kind === 'fireworks') doc.documentElement.style.background = L.bg;
     else doc.documentElement.style.background = 'linear-gradient(rgba(0,0,0,.28),rgba(0,0,0,.28)), url("' + PICS[i] + '") center / cover no-repeat, ' + L.bg;
     try { const nx = new root.Image(); nx.src = PICS[(i + 1) % PICS.length]; } catch (e) { }
-    if (kind) { efxClearAll(); lifeReset(); if (kind === 'farm') farmLoad(); if (kind === 'frog') frogLoad(); if (kind === 'beach') beachLoad(); if (kind === 'fireworks') fwLoad(); }
+    if (kind) { efxClearAll(); lifeReset(); if (kind === 'farm') farmLoad(); if (kind === 'frog') frogLoad(); if (kind === 'beach') beachLoad(); if (kind === 'fireworks') fwLoad(); if (kind === 'ocean') oceanLoad(); }
     doc.documentElement.style.backgroundAttachment = 'fixed';
     doc.body.style.background = 'transparent';
     drawMini(doc.getElementById('next'), g.next, false);
@@ -2386,6 +2509,8 @@
     } else if (kind === 'fireworks') {
       fwReset();
       fwLoad();
+    } else if (kind === 'ocean') {
+      oceanCast();
     } else {
       life.frog = { mouth: 0, puff: 0, blink: 0, blinkIn: 0, nextBlink: 2.4, sway: 0, vocal: 0, avg: 0.12, lev: 0 };
       frog.notes = [];
@@ -2418,7 +2543,9 @@
     } else if (life.kind === 'beach') {
       beachAdvance(dt, reduce);
     } else if (life.kind === 'fireworks') {
-      fwAdvance(dt, beat, reduce);
+      fwAdvance(dt, beat, reduce, prog);
+    } else if (life.kind === 'ocean') {
+      oceanAdvance(dt, reduce);
     } else if (life.frog) {
       const f = life.frog;
       if (beat && beat.on && !life.beatLatch) { life.beatN++; life.beatLatch = true; }
@@ -3262,7 +3389,7 @@
     fw.parts.push(p);
   }
   function fwFlash(x, y, z, col, scale) {
-    const pow = 0.32 * (scale || 1) * (z || 1);
+    const pow = 0.32 * Math.max(scale || 1, 0.4) * (z || 1);
     fw.flashes.push({ x: x, y: y, z: z || 1, r: col[0], g: col[1], b: col[2], t: 0, max: 0.55, pow: pow });
     const k = Math.min(1, pow * 1.4);
     const s = fw.lit + k;
@@ -3273,16 +3400,22 @@
     }
     fw.lit = Math.min(1, fw.lit + k);
   }
+  function fwSize(prog) {
+    // 1.9.181: start the level at about 30% size and grow to a full (or slightly bigger) show by the end.
+    const p = prog == null ? (fw.prog || 0) : Math.max(0, Math.min(1, prog));
+    return 0.30 + 0.85 * p;
+  }
   function fwBurst(x, y, z, typ, col, scale) {
     typ = typ || FW_KINDS[(Math.random() * FW_KINDS.length) | 0];
     col = col || fwPick();
     scale = scale || 1;
     z = z == null ? 0.55 + Math.random() * 0.9 : z;
     const base = typ === 'ring' ? 22 : typ === 'crackle' ? 16 : typ === 'willow' ? 30 : typ === 'chrys' ? 38 : 32;
-    const n = Math.max(8, Math.round(base * scale * (0.75 + 0.4 * z)));
+    const body = Math.max(scale, 0.45);
+    const n = Math.max(scale < 0.55 ? 14 : 8, Math.round(base * body * (0.75 + 0.4 * z)));
     const spd0 = (typ === 'ring' ? 150 : typ === 'willow' ? 130 : typ === 'chrys' ? 170 : typ === 'crackle' ? 120 : 160) * scale * (0.7 + 0.35 * z);
     const life0 = typ === 'willow' ? 1.35 : typ === 'chrys' ? 1.15 : typ === 'crackle' ? 0.85 : typ === 'ring' ? 0.9 : 0.95;
-    const size0 = (typ === 'willow' ? 1.7 : typ === 'crackle' ? 1.8 : 2.2) * scale * z;
+    const size0 = (typ === 'willow' ? 1.7 : typ === 'crackle' ? 1.8 : 2.2) * body * z;
     const tilt = (Math.random() - 0.5) * 0.55;
     for (let i = 0; i < n; i++) {
       let vx, vy, vz, spd;
@@ -3336,15 +3469,17 @@
     const typ = FW_KINDS[n % FW_KINDS.length];
     const col = fwPick();
     const big = (n % 4 === 0);
+    const grow = fwSize(fw.prog);
     const z = big ? 1.05 + Math.random() * 0.4 : 0.5 + Math.random() * 0.95;
-    const scale = big ? 1.15 + Math.random() * 0.25 : 0.7 + Math.random() * 0.45;
+    const scale = (big ? 1.15 + Math.random() * 0.25 : 0.7 + Math.random() * 0.45) * grow;
+    if (grow < 0.55 && busy >= 2 && n % 2) return;
     const pos = fwSkyPos(box, { x: 0.18 + ((n * 0.37) % 0.64), y: 0.12 + (n % 3) * 0.1 + Math.random() * 0.08 });
     // Burst on the pulse, and send a rocket that will burst a couple of beats later.
     fwBurst(pos.x, pos.y, z, typ, col, scale);
     if (!big && fw.parts.length > FW_MAX_P * 0.85) return;
-    if (n % 2 === 0 || big) {
+    if (grow >= 0.55 && (n % 2 === 0 || big)) {
       const later = fwSkyPos(box);
-      fwLaunch(box, later.x, later.y, FW_KINDS[(n + 2) % FW_KINDS.length], fwPick(), big ? 1.2 : 0.8, 0.6 + Math.random() * 0.7, 0.55 + Math.random() * 0.3);
+      fwLaunch(box, later.x, later.y, FW_KINDS[(n + 2) % FW_KINDS.length], fwPick(), (big ? 1.2 : 0.8) * grow, 0.6 + Math.random() * 0.7, 0.55 + Math.random() * 0.3);
     }
   }
   function fwOnClear(n) {
@@ -3352,7 +3487,8 @@
     if (!box || !box.dw) return;
     const tetris = n >= 4;
     const count = reduceMotion() ? (tetris ? 2 : 1) : (tetris ? 5 : (n >= 3 ? 3 : 2));
-    const scale = tetris ? 1.45 : (0.9 + n * 0.12);
+    const grow = fwSize(fw.prog);
+    const scale = (tetris ? 1.45 : (0.9 + n * 0.12)) * Math.max(grow, tetris ? 0.85 : 0.6);
     for (let i = 0; i < count; i++) {
       const pos = fwSkyPos(box, { x: 0.16 + (i / Math.max(1, count - 1)) * 0.68, y: 0.12 + (i % 2) * 0.12 + Math.random() * 0.06 });
       const typ = tetris ? FW_KINDS[i % FW_KINDS.length] : FW_KINDS[(Math.random() * FW_KINDS.length) | 0];
@@ -3421,7 +3557,8 @@
       fw.lit = Math.max(0, fw.lit - step * 1.35);
     }
   }
-  function fwAdvance(dt, beat, reduce) {
+  function fwAdvance(dt, beat, reduce, prog) {
+    if (prog != null) fw.prog = prog;
     if (fw.hold) {
       if (!fw.posed) fwPose(fw.hold);
       return;
@@ -3457,7 +3594,8 @@
       const x = box.left + (b.x != null ? b.x : 0.5) * box.dw;
       const y = box.top + (b.y != null ? b.y : 0.22) * box.dh;
       const col = b.col != null ? FW_COLS[b.col % FW_COLS.length] : fwPick();
-      fwBurst(x, y, b.z != null ? b.z : 1, b.typ || 'peony', col, b.scale || 1);
+      const grow = spec.size != null ? spec.size : fwSize(spec.prog != null ? spec.prog : fw.prog);
+      fwBurst(x, y, b.z != null ? b.z : 1, b.typ || 'peony', col, (b.scale || 1) * (spec.size != null || spec.prog != null ? grow : 1));
     }
     const rocks = spec.rockets || [];
     for (let i = 0; i < rocks.length; i++) {
@@ -3639,6 +3777,199 @@
   }
 
 
+
+  // 1.9.181 Ocean: the three big painted dolphins swim on arcs, porpoise, and undulate.
+  // The whale, turtle, fish and coral stay on the plate. No cartoon dolphins.
+  const ocean = { img: { plate: null, atlas: null }, ready: false, loading: false, dolphins: [], bubbles: [], ripples: [], hold: null, posed: false, t: 0 };
+
+  function oceanLoad() {
+    if (ocean.ready || ocean.loading || !root.Image) return;
+    ocean.loading = true;
+    let left = 2;
+    const done = function () { if (--left <= 0) { ocean.ready = true; ocean.loading = false; } };
+    Object.keys(OCEAN_ART).forEach(function (k) {
+      const im = new root.Image();
+      im.onload = done;
+      im.onerror = done;
+      im.src = OCEAN_ART[k];
+      ocean.img[k] = im;
+    });
+  }
+  function oceanReset() {
+    ocean.dolphins = []; ocean.bubbles = []; ocean.ripples = [];
+    ocean.t = 0; ocean.posed = false;
+  }
+  function oceanCast() {
+    oceanReset();
+    const M = OCEAN_META.dolphins;
+    // Swim loops stay in the open water, left and centre, above the coral, around the whale's left side.
+    const paths = [
+      { cx: 200, cy: 230, rx: 95, ry: 58, per: 13.5, ph: 0.2, z0: 1.05 },
+      { cx: 210, cy: 390, rx: 115, ry: 52, per: 16.5, ph: 2.1, z0: 0.95 },
+      { cx: 280, cy: 520, rx: 88, ry: 60, per: 14.5, ph: 4.0, z0: 1.12 }
+    ];
+    ocean.dolphins = M.map(function (d, i) {
+      const p = paths[i];
+      return { i: i, meta: d, cx: p.cx, cy: p.cy, rx: p.rx, ry: p.ry, per: p.per, ph: p.ph, z0: p.z0, x: d.px, y: d.py, heading: d.ang * Math.PI / 180, z: p.z0, und: 0, porp: 0, prevX: d.px, prevY: d.py };
+    });
+    oceanLoad();
+  }
+  function oceanPoseAt(t) {
+    ocean.t = t;
+    if (!ocean.dolphins.length) oceanCast();
+    oceanAdvance(0, false, true);
+    ocean.bubbles = [];
+    for (let i = 0; i < ocean.dolphins.length; i++) {
+      const d = ocean.dolphins[i];
+      const tail = d.heading + Math.PI;
+      for (let k = 0; k < 3; k++) oceanEmitBubble(d.x + Math.cos(tail) * (18 + k * 12) + (k - 1) * 6, d.y + Math.sin(tail) * (10 + k * 8) - k * 8, d.z);
+    }
+    ocean.posed = true;
+  }
+  function oceanEmitBubble(x, y, z) {
+    if (ocean.bubbles.length > 28) ocean.bubbles.shift();
+    ocean.bubbles.push({ x: x, y: y, z: z || 1, r: 1.4 + Math.random() * 2.2, vx: (Math.random() - 0.5) * 8, vy: -(16 + Math.random() * 22), t: 0, max: 1.4 + Math.random() * 0.8 });
+  }
+  function oceanEmitRipple(x, y) {
+    if (ocean.ripples.length > 8) ocean.ripples.shift();
+    ocean.ripples.push({ x: x, y: y, t: 0, max: 1.15 });
+  }
+  function oceanAdvance(dt, reduce, poseOnly) {
+    if (ocean.hold && !poseOnly) {
+      if (!ocean.posed) oceanPoseAt(ocean.hold.t != null ? ocean.hold.t : 0);
+      return;
+    }
+    if (!ocean.dolphins.length) oceanCast();
+    if (!poseOnly) ocean.t += dt;
+    const t = ocean.t;
+    for (let i = 0; i < ocean.dolphins.length; i++) {
+      const d = ocean.dolphins[i];
+      if (reduce && !poseOnly) {
+        d.x = d.meta.px; d.y = d.meta.py; d.heading = d.meta.ang * Math.PI / 180; d.z = d.z0; d.und = 0; d.porp = 0;
+        continue;
+      }
+      const u = (t / d.per) * Math.PI * 2 + d.ph;
+      const px = d.cx + d.rx * Math.cos(u);
+      // Porpoise: a rise toward the surface on the top of each other loop.
+      const loop = (t / d.per) + d.ph / (Math.PI * 2);
+      const porpGate = (Math.floor(loop) % 2 === 0);
+      const crest = Math.sin(u); // -1 bottom, +1 would be... wait cy+ry*sin, sin=-1 is up if we use minus
+      // Use -sin so u=0 is mid-right, u=pi/2 is up.
+      const baseY = d.cy - d.ry * Math.sin(u);
+      let porp = 0;
+      if (porpGate && Math.sin(u) > 0.45) {
+        porp = -28 * Math.pow((Math.sin(u) - 0.45) / 0.55, 1.2);
+      }
+      const x = Math.max(40, Math.min(PHOTO_W - 40, px));
+      const y = Math.max(80, Math.min(620, baseY + porp));
+      const dx = x - d.prevX, dy = y - d.prevY;
+      d.prevX = d.x; d.prevY = d.y;
+      d.x = x; d.y = y; d.porp = porp;
+      if (Math.abs(dx) + Math.abs(dy) > 0.05) d.heading = Math.atan2(dy, dx);
+      d.z = d.z0 + 0.12 * Math.sin(u * 0.5 + i);
+      d.und = Math.sin(t * 7.2 + i * 1.3);
+      // Bubbles from the tail
+      if (!poseOnly && !reduce && Math.random() < dt * 3.2) {
+        const tail = d.heading + Math.PI;
+        oceanEmitBubble(d.x + Math.cos(tail) * 36, d.y + Math.sin(tail) * 22, d.z);
+      }
+      // Ripple when a porpoise peaks near the surface
+      if (!poseOnly && !reduce && porp < -20 && y < 180 && Math.random() < dt * 4) oceanEmitRipple(d.x, Math.max(90, y - 16));
+    }
+    if (reduce && !poseOnly) return;
+    for (let i = ocean.bubbles.length - 1; i >= 0; i--) {
+      const b = ocean.bubbles[i];
+      if (!poseOnly) { b.t += dt; b.x += b.vx * dt; b.y += b.vy * dt; b.vx += Math.sin((ocean.t + i) * 3) * 4 * dt; }
+      if (b.t >= b.max || b.y < 60) ocean.bubbles.splice(i, 1);
+    }
+    for (let i = ocean.ripples.length - 1; i >= 0; i--) {
+      if (!poseOnly) ocean.ripples[i].t += dt;
+      if (ocean.ripples[i].t >= ocean.ripples[i].max) ocean.ripples.splice(i, 1);
+    }
+  }
+  function drawOceanSprite(c, d, box) {
+    const atlas = ocean.img.atlas;
+    if (!atlas || !atlas.complete) return;
+    const M = d.meta;
+    const sc = box.scale * (0.88 + 0.22 * d.z);
+    const x = box.left + d.x * box.scale;
+    const y = box.top + d.y * box.scale;
+    const flip = Math.cos(d.heading) < 0;
+    // Painted nose angle in sprite space; after an optional horizontal flip, rotate to the heading.
+    const painted = M.ang * Math.PI / 180;
+    const face = flip ? (Math.PI - painted) : painted;
+    const rot = d.heading - face;
+    // Soft contact shadow
+    c.save();
+    c.translate(x, y + 18 * box.scale);
+    c.scale(1, 0.32);
+    c.beginPath();
+    c.arc(0, 0, 48 * sc, 0, Math.PI * 2);
+    c.fillStyle = 'rgba(8,20,40,' + (0.18 * Math.min(1.1, d.z)) + ')';
+    c.fill();
+    c.restore();
+    // Body with a gentle undulation along the length (more at the tail).
+    c.save();
+    c.translate(x, y);
+    c.rotate(rot);
+    if (flip) c.scale(-1, 1);
+    c.scale(sc, sc);
+    const slices = 8;
+    const srcW = M.aw, srcH = M.ah;
+    for (let s = 0; s < slices; s++) {
+      const u0 = s / slices, u1 = (s + 1) / slices;
+      const sx = M.ax + srcW * u0, sw = Math.max(1, srcW * (u1 - u0));
+      const dx = -M.ox + srcW * u0, dw = srcW * (u1 - u0);
+      // Tail is the left of the painted sprites (rear). More wobble toward u=0.
+      const tail = 1 - (u0 + u1) * 0.5;
+      const wob = d.und * 7.5 * (0.25 + 0.75 * tail);
+      c.save();
+      c.translate(0, wob);
+      c.drawImage(atlas, sx, M.ay, sw, srcH, dx, -M.oy, dw, srcH);
+      c.restore();
+    }
+    c.restore();
+  }
+  function drawOceanScene(c, w, h, reduce) {
+    const box = photoBox();
+    if (!box || !box.dw) return;
+    if (!ocean.ready || !ocean.img.plate || !ocean.img.plate.complete) return;
+    if (ocean.hold && !ocean.posed) oceanPoseAt(ocean.hold.t != null ? ocean.hold.t : 0);
+    const sc = box.scale;
+    c.drawImage(ocean.img.plate, box.left, box.top, box.dw, box.dh);
+    // Ripples on the plate, under the dolphins
+    for (let i = 0; i < ocean.ripples.length; i++) {
+      const r = ocean.ripples[i];
+      const u = r.t / r.max;
+      const radX = (18 + u * 70) * sc, radY = radX * 0.28;
+      c.beginPath();
+      c.ellipse(box.left + r.x * sc, box.top + r.y * sc, radX, radY, 0, 0, Math.PI * 2);
+      c.strokeStyle = 'rgba(220,245,255,' + (0.28 * (1 - u)) + ')';
+      c.lineWidth = 1.6 * sc;
+      c.stroke();
+    }
+    const list = ocean.dolphins.slice().sort(function (a, b) { return a.z - b.z; });
+    for (let i = 0; i < list.length; i++) drawOceanSprite(c, list[i], box);
+    // Bubbles
+    for (let i = 0; i < ocean.bubbles.length; i++) {
+      const b = ocean.bubbles[i];
+      const fade = Math.max(0, 1 - b.t / b.max);
+      const rr = b.r * sc * (0.8 + 0.3 * b.z);
+      const bx = box.left + b.x * sc, by = box.top + b.y * sc;
+      c.beginPath();
+      c.arc(bx, by, rr, 0, Math.PI * 2);
+      c.strokeStyle = 'rgba(230,250,255,' + (0.55 * fade) + ')';
+      c.lineWidth = 1.1 * sc;
+      c.stroke();
+      c.beginPath();
+      c.arc(bx - rr * 0.25, by - rr * 0.3, rr * 0.28, 0, Math.PI * 2);
+      c.fillStyle = 'rgba(255,255,255,' + (0.35 * fade) + ')';
+      c.fill();
+    }
+    c.fillStyle = 'rgba(0,0,0,0.28)';
+    c.fillRect(box.left, box.top, box.dw, box.dh);
+  }
+
   function effectStageDraw(now) {
     const kind = isEffect(lookIdx < 0 ? themeIdx : lookIdx);
     if (!kind) {
@@ -3662,6 +3993,7 @@
     if (kind === 'farm') drawFarmScene(c0, fx.w, fx.h, reduce);
     else if (kind === 'beach') drawBeachScene(c0, fx.w, fx.h, reduce);
     else if (kind === 'fireworks') drawFireworksScene(c0, fx.w, fx.h, reduce);
+    else if (kind === 'ocean') drawOceanScene(c0, fx.w, fx.h, reduce);
     else {
       drawFrogScene(c0, fx.w, fx.h, reduce);
       // pond ripples + shimmer live on the photo, behind the board, so they show in the margins

@@ -1558,6 +1558,7 @@ if (live) {
   assert.strictEqual(tetGame.isEffect(11), 'frog');
   assert.strictEqual(tetGame.isEffect(0), 'beach');
   assert.strictEqual(tetGame.isEffect(1), 'fireworks');
+  assert.strictEqual(tetGame.isEffect(2), 'ocean');
   assert.strictEqual(tetGame.isEffect(7), null);
   assert.strictEqual(tetGame.themeFor(1), 6);
   assert.strictEqual(tetGame.themeFor(2), 11);
@@ -1715,7 +1716,7 @@ if (live) {
   assert.ok(meta.trees && meta.trees.big && meta.trees.mid && meta.flowers && meta.sea && meta.foamBox);
   assert.ok(meta.trees.big.px != null && meta.trees.big.py != null && meta.trees.big.crownY);
   assert.ok(src.includes('function drawBeachScene') && src.includes('function beachAdvance') && src.includes('function beachLoad'));
-  assert.ok(src.includes("EFFECT_TI = { 0: 'beach', 1: 'fireworks', 6: 'farm', 11: 'frog' }"));
+  assert.ok(src.includes("EFFECT_TI = { 0: 'beach', 1: 'fireworks', 2: 'ocean', 6: 'farm', 11: 'frog' }"));
   // 1.9.178 lightning, sparkle, singing frog, and 1.9.177 farm stay intact
   assert.ok(src.includes('function drawLightningBolts') && src.includes('function drawBlockGloss') && src.includes('function drawFrogScene'));
   assert.ok(tetGame.farmArt && tetGame.farmArt().plate.indexOf('farm-plate-') >= 0);
@@ -1759,5 +1760,36 @@ if (live) {
   assert.strictEqual(tetGame.BGM_HASH[0], 'da11a54a');
   assert.strictEqual(tetGame.BGM_HASH[11], '8afd517f');
   assert.strictEqual(tetGame.THEMES[1].ambient, 'none');
+}
+
+// 1.9.181 Ocean dolphins, fireworks that grow through the level, themed move sounds louder than the music
+{
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.strictEqual(tetGame.themeFor(5), 2);
+  assert.strictEqual(tetGame.THEMES[2].name, 'Ocean');
+  assert.strictEqual(tetGame.isEffect(2), 'ocean');
+  assert.ok(tetGame.fwSize(0) === 0.3 && Math.abs(tetGame.fwSize(1) - 1.15) < 1e-9, 'fireworks start at 30% and grow past full');
+  assert.ok(tetGame.fwSize(0) < tetGame.fwSize(0.5) && tetGame.fwSize(0.5) < tetGame.fwSize(1));
+  const art = tetGame.oceanArt();
+  assert.ok(/^tetris-bg\/ocean-plate-[0-9a-f]{8}\.webp$/.test(art.plate), 'hashed ocean plate');
+  assert.ok(/^tetris-bg\/ocean-atlas-[0-9a-f]{8}\.webp$/.test(art.atlas), 'hashed ocean atlas');
+  assert.ok(fs.existsSync('feed/' + art.plate) && fs.existsSync('feed/' + art.atlas));
+  const dols = tetGame.oceanMeta().dolphins;
+  assert.strictEqual(dols.length, 3, 'three big painted dolphins');
+  assert.ok(dols.every(d => d.px != null && d.py != null && d.ang != null && d.aw && d.ah));
+  assert.ok(src.includes('function drawOceanScene') && src.includes('function oceanAdvance') && src.includes('function oceanCast') && src.includes('function playMoveSfx'));
+  assert.ok(src.includes("name === 'move' || name === 'rotate' || name === 'soft' || name === 'drop' || name === 'lock'"));
+  assert.ok(src.includes('Soft wooden clop') && src.includes('Soft ribbit') && src.includes('Shell click') && src.includes('oceanTh'));
+  assert.ok(src.includes('lowpass') && src.includes('3500') && src.includes('highpass'));
+  // Current Ocean music stays (Shane's new file had not arrived for this release).
+  assert.strictEqual(tetGame.BGM_HASH[2], '9ca3b84e');
+  assert.ok(fs.existsSync('feed/tetris-bg/m2-9ca3b84e.mp3'));
+  // Prior releases stay intact
+  assert.ok(src.includes('function drawFireworksScene') && src.includes('function drawBeachScene') && src.includes('function drawFrogScene') && src.includes('function drawFarmScene'));
+  assert.strictEqual(tetGame.TRACKS[1].bpm, 131);
+  assert.strictEqual(tetGame.TRACKS[0].bpm, 115.5);
+  assert.strictEqual(tetGame.BGM_HASH[1], '9813c57a');
+  assert.strictEqual(tetGame.BGM_HASH[11], '8afd517f');
+  assert.strictEqual(tetGame.BGM_HASH[6], '7bc4ebcd');
 }
 
