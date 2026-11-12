@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.183';
+const APP_VERSION = '1.9.184';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -1288,7 +1288,7 @@ var MF = ls.get('mediaFilter', 'all'); if (!MF_OPTS.some(o => o[0] === MF)) MF =
 var SHOW_LIFE = ls.get('showLife', 1) !== 0; // default ON
 var APPEAR = ls.get('appear', null); if (!['light', 'dark', 'auto', 'ocean', 'spring', 'candy'].includes(APPEAR)) { APPEAR = 'dark'; ls.set('appear', 'dark'); } // default dark, including existing users
 
-// 1.9.183 Force a dark UI / status bar while Tetris is open, without changing or saving APPEAR.
+// 1.9.184 Force a dark UI / status bar while Tetris is open, without changing or saving APPEAR.
 // Auto (match-phone) and the weather/colour themes are left intact and restored on close.
 var TETRIS_DARK = false;
 function setTetrisChrome(on) {
