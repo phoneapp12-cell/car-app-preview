@@ -122,6 +122,7 @@ async function loadShares() {
 function shareItem(s) {
   const x = s.snap || {};
   if (s.up) return { id: s.card, t: x.t || '', s: '', photos: (x.photos || []).slice(0, 4), sn: s.name, topic: 'family', src: 'family', kind: 'upload', at: s.at, _share: s };
+  if (s.text || x.kind === 'text') return { id: s.card, t: x.t || s.caption || '', s: '', sn: s.name, topic: 'family', src: 'family', kind: 'text', at: s.at, _share: s };
   return { id: s.card, t: x.t, s: x.s, url: x.url, img: x.img, vid: x.vid, photos: x.kind === 'link' && Array.isArray(x.photos) ? x.photos.slice(0, 1) : undefined, sn: x.sn || 'Shared', topic: s.priv ? 'family' : (TOPIC[x.topic] ? x.topic : 'family'), src: x.src || 'family', kind: x.kind || (x.img ? 'photo' : 'news'), ev: x.ev || 0, at: s.at, _share: s };
 }
 function sharesFor(t) { // reposts shown to everyone, whatever they picked (newest first)
@@ -140,7 +141,7 @@ function drawFamily() {
   const m = $('#feed'), sh = sharesFor('family');
   setTimeout(() => { if (tab === 'family') { ls.set('likeSeen', Date.now()); document.querySelectorAll('.chip[data-tab="family"] .dot').forEach(d => d.remove()); } }, 2500);
   order = sh; shown = 0;
-  m.innerHTML = `<div class="upbs"><button class="btn pri upb" data-upload>📷 Share a photo</button><button class="btn pri upb" data-sharelink>🔗 Share a link</button></div><div class="load" style="padding-top:0">💬 Shared in the family · only people Shane invited can see this</div>` + (sh.length ? '' : '<div class="empty">Nothing shared yet. Share a photo, or tap 🔁 on any post to share it with the family.</div>');
+  m.innerHTML = `<div class="upbs"><button class="btn pri upb" data-upload>📷 Share a photo</button><button class="btn pri upb" data-sharelink>🔗 Share a link</button><button class="btn pri upb" data-sharetext>✏️ Write a post</button></div><div class="load" style="padding-top:0">💬 Shared in the family · only people Shane invited can see this</div>` + (sh.length ? '' : '<div class="empty">Nothing shared yet. Write a post, share a photo, or tap 🔁 on any post to share it with the family.</div>');
   more();
   fam('/recent').then(r => { // cards people have talked about, that aren't reposts
     const have = new Set(sh.map(i => i.id)), talk = r.filter(x => !have.has(x.card) && x.snap && x.snap.t).slice(0, 20).map(x => ({ id: x.card, ...x.snap, kind: x.snap.img ? 'photo' : 'news', at: x.last, topic: TOPIC[x.snap.topic] ? x.snap.topic : 'family' }));
@@ -167,8 +168,8 @@ async function shareCard(id, isLife) {
   try { const r = await fam('/shares', { method: 'POST', body: JSON.stringify({ orig: id, priv, snap, caption }) }); toast(r.dup ? 'Already shared' : '🔁 Shared with the family'); await loadShares(); }
   catch (e) { toast(e.message); }
 }
-async function unshare(sid, up) {
-  if (!confirm(up ? 'Delete this photo post for everyone?' : 'Stop sharing this with the family?')) return;
+async function unshare(sid, up, text) {
+  if (!confirm(up ? 'Delete this photo post for everyone?' : text ? 'Delete this post for everyone?' : 'Stop sharing this with the family?')) return;
   try { await fam('/shares/' + sid, { method: 'DELETE' }); toast('Not shared any more'); SHARES = SHARES.filter(s => s.id !== +sid); draw(); } catch (e) { toast(e.message); }
 }
 
@@ -177,12 +178,16 @@ function famBar(i) {
   if (!FAM_ON || !isPublicCard(i)) return '';
   const r = rxOf(i), lk = r ? likeBtn(r) : '';
   const c = COUNTS[i.id], n = c ? c[0] : 0, fresh = c && c[1] > (CSEEN[i.id] || 0);
-  return lk + `<button class="fb" data-cmt="${esc(i.id)}" aria-label="Comments">💬<span class="cc">${n || ''}</span>${fresh ? '<i class="dot"></i>' : ''}</button>${i.kind === 'upload' || (i._share && i._share.link) ? '' : `<button class="fb" data-share="${esc(i.id)}" aria-label="Share with the family">🔁</button>`}`;
+  return lk + `<button class="fb" data-cmt="${esc(i.id)}" aria-label="Comments">💬<span class="cc">${n || ''}</span>${fresh ? '<i class="dot"></i>' : ''}</button>${i.kind === 'upload' || i.kind === 'text' || (i._share && (i._share.link || i._share.text)) ? '' : `<button class="fb" data-share="${esc(i.id)}" aria-label="Share with the family">🔁</button>`}`;
 }
 function famLifeBar(x) { return canShareLife(x) ? `<button class="fb" data-share-life="${esc(x.id)}" aria-label="Share with the family">🔁</button>` : ''; }
 function shareHead(i) {
   const s = i._share; if (!s) return '';
   if (s.up) return `<div class="shby">📷 Photo from <b>${esc(s.name)}</b> · ${esc(nzTime(s.at))}${s.mine || IS_ADMIN ? `<button class="mini" data-unshare="${s.id}" data-up="1">Delete</button>` : ''}</div>`;
+  if (s.text || i.kind === 'text') {
+    const del = s.mine || IS_ADMIN ? `<button class="mini" data-unshare="${s.id}" data-text="1">Delete</button>` : '';
+    return `<div class="shby">✏️ Written by <b>${esc(s.mine ? 'You' : s.name)}</b> · ${esc(nzTime(s.at))}${del}${Array.isArray(s.to) && s.to.length ? `<small class="shto">🔒 Just for ${esc(s.to.join(', '))}${s.mine ? '' : ' (and ' + esc(s.name) + ')'}</small>` : ''}</div>`;
+  }
   const del = s.mine || IS_ADMIN ? `<button class="mini" data-unshare="${s.id}">Un-share</button>` : '';
   if (s.link) return `<div class="shby">🔗 Shared by <b>${esc(s.mine ? 'You' : s.name)}</b> · ${esc(nzTime(s.at))}${del}${Array.isArray(s.to) && s.to.length ? `<small class="shto">🔒 Just for ${esc(s.to.join(', '))}${s.mine ? '' : ' (and ' + esc(s.name) + ')'}</small>` : ''}${s.caption ? `<p>“${esc(s.caption)}”</p>` : ''}</div>`; // 1.9.16
   return `<div class="shby">🔁 Shared by <b>${esc(s.name)}</b> · ${esc(nzTime(s.at))}${del}${s.caption ? `<p>“${esc(s.caption)}”</p>` : ''}</div>`;
@@ -345,7 +350,7 @@ document.addEventListener('click', async e => {
   const cb = t.closest('[data-cmt]'); if (cb) { openThread(cb); return; }
   const sb = t.closest('[data-share]'); if (sb) { shareCard(sb.dataset.share, false); return; }
   const sl = t.closest('[data-share-life]'); if (sl) { shareCard(sl.dataset.shareLife, true); return; }
-  const us = t.closest('[data-unshare]'); if (us) { unshare(us.dataset.unshare, us.dataset.up); return; }
+  const us = t.closest('[data-unshare]'); if (us) { unshare(us.dataset.unshare, us.dataset.up, us.dataset.text); return; }
   const dc = t.closest('[data-delc]'); if (dc) { delComment(dc); return; }
   if (t.id === 'famaddb') { const n = $('#famname').value.trim(); if (!n) return; try { const r = await fam('/members', { method: 'POST', body: JSON.stringify({ name: n }) }); $('#famname').value = ''; showLink(r.name, r.token); famList(); } catch (er) { toast(er.message); } return; }
   const tk = t.closest('[data-famtok]'); if (tk) { if (!confirm('Make a new link for ' + tk.dataset.n + '? Their old link stops working.')) return; try { const r = await fam('/members/' + tk.dataset.famtok + '/token', { method: 'POST' }); showLink(tk.dataset.n, r.token); } catch (er) { toast(er.message); } return; }

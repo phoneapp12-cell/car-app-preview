@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.175';
+const APP_VERSION = '1.9.176';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -962,6 +962,15 @@ function stillFrame(w, h) {
 function card(i) {
   const T = TOPIC[i.topic] || TOPIC.all, v = VOTES[i.id] ? VOTES[i.id].v : 0;
   const style = `--c1:${T[3]};--c2:${T[4]}`;
+  if (i.kind === 'text') {
+    return `<article class="card shared words" data-id="${esc(i.id)}" style="${style}">${typeof shareHead === 'function' ? shareHead(i) : ''}
+    <div class="wdbody">${esc(i.t || '')}</div>
+    ${typeof rxLine === 'function' ? rxLine(i) : ''}<div class="ft">
+      <button class="vote up${(FAM_ON && rxOf(i) ? (rxOf(i).ups || []).some(isMe) : v > 0) ? ' on' : ''}" data-vote="1" aria-pressed="${v > 0}" aria-label="Thumbs up">${THUMB.up}</button>${typeof upNames === 'function' ? upNames(i) : ''}
+      <button class="vote dn${v < 0 ? ' on' : ''}" data-vote="-1" aria-pressed="${v < 0}" aria-label="Thumbs down">${THUMB.dn}</button>
+      ${typeof famBar === 'function' ? famBar(i) : ''}
+    </div></article>`;
+  }
   let media = '';
   if (i.photos) media = famPhotos(i);
   else if (i.vid) media = vidMedia(i.vid, i.img, i.t, '', /\/shorts\//.test(i.url || ''));
@@ -1305,7 +1314,9 @@ const mfAlways = i => !!(i.pin || (i.x && !['hometip', 'vlog', 'watch', 'concert
 function mfIsVid(i) { try { return !!(i.vid || (i.x === 'vlog' && i.h && i.h.vid) || (i.h && i.h.vid) || (i.img && vidOf(i)) || (i._share && (i._share.snap || {}).vid)); } catch (e) { return false; } }
 /* 1.9.43 strict: Videos only = only video cards (from every video source: the feed's clips and trailers, vlogs, Reddit/Vimeo,
    family shares – unseen first, then ones you've already seen so it's never empty); Pictures only = only picture cards
-   (no videos, no alerts, My App, birthdays, countdowns or text-only cards). Videos & pictures = the normal feed. */
+   (no videos, no alerts, My App, birthdays, countdowns or text-only cards). Videos & pictures = the normal feed.
+   1.9.176 family words posts (kind text) are excluded from Pictures only, which is fine; they still appear in the
+   normal All feed (MF === 'all' returns the order unchanged) and in the Family tab (drawFamily does not run this filter). */
 const mfContent = i => !!i && !i.pin && i.topic !== 'life' && !/^(life|app|ph|you|date|cd|alert|bd)[:-]/.test(String(i.id || '')) && (!i.x || ['hometip', 'vlog', 'watch', 'concert'].includes(i.x)) && i.kind !== 'alert' && i.topic !== 'alerts';
 const mfPic = i => !!(i.img || (i.photos && i.photos.length) || (i.h && i.h.img) || (i._share && ((i._share.snap || {}).img || (i._share.photos || []).length)));
 function mfOk(i) { if (!i) return false; if (VOTES[i.id] && VOTES[i.id].v < 0) return false; const t = (i.t || '') + ' ' + (i.s || ''); if (SPORT.test(t) || unsafe(i)) return false; if (typeof toneW === 'function' && !toneW(i)) return false; if (i.src && weights().drop(i.src)) return false; if (OPTIN.has(i.topic) && !optedIn(i.topic)) return false; return true; }

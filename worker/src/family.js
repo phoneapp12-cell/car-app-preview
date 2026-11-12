@@ -282,7 +282,7 @@ export class Family extends DurableObject {
     // ---- reposts: a card shared with the family ("Shared by …"), shown to everyone whatever their interests
     if (p === '/shares' && m === 'GET') {
       return J(this.all(`SELECT s.id, s.mid, m.name, s.orig, s.snap, s.caption, s.priv, s.at, s.tag, s.vis FROM shares s LEFT JOIN members m ON m.id=s.mid WHERE s.del=0 AND s.at>? AND (s.vis IS NULL OR s.mid=? OR instr(s.vis, ?) > 0) ORDER BY s.at DESC LIMIT 80`, now - 90 * 864e5, me.id, ',' + me.id + ',')
-        .map(r => { const card = r.priv ? 'sh' + r.id : r.orig; return { id: r.id, mid: r.mid, name: r.name || 'Former member', orig: r.orig, card, snap: JSON.parse(r.snap), caption: r.caption || '', priv: !!r.priv, up: r.priv === 2, link: r.priv === 3, to: r.vis ? r.vis.split(',').filter(x => x && x !== r.mid).map(x => (x === me.id ? 'You' : (this.one(`SELECT name FROM members WHERE id=?`, x) || {}).name)).filter(Boolean) : null, tag: r.tag || '', at: r.at, mine: r.mid === me.id, likes: this.reactsOf(card, 'love'), ups: this.reactsOf(card, 'up'), nc: (this.one(`SELECT COUNT(*) n FROM comments WHERE card=? AND del=0`, card) || {}).n || 0 }; }));
+        .map(r => { const card = r.priv ? 'sh' + r.id : r.orig; return { id: r.id, mid: r.mid, name: r.name || 'Former member', orig: r.orig, card, snap: JSON.parse(r.snap), caption: r.caption || '', priv: !!r.priv, up: r.priv === 2, link: r.priv === 3, text: r.priv === 4, to: r.vis ? r.vis.split(',').filter(x => x && x !== r.mid).map(x => (x === me.id ? 'You' : (this.one(`SELECT name FROM members WHERE id=?`, x) || {}).name)).filter(Boolean) : null, tag: r.tag || '', at: r.at, mine: r.mid === me.id, likes: this.reactsOf(card, 'love'), ups: this.reactsOf(card, 'up'), nc: (this.one(`SELECT COUNT(*) n FROM comments WHERE card=? AND del=0`, card) || {}).n || 0 }; }));
     }
     if (p === '/popular') { // 1.8.1 what the family has ❤️/👍'd in the last 4 days (ids, names, kind, time) – feeds everyone's ranking
       const rows = this.all(`SELECT l.card, l.kind, l.at, l.mid, m.name, l.emo FROM reacts l JOIN members m ON m.id=l.mid AND m.removed=0 WHERE l.at>? ORDER BY l.at DESC LIMIT 800`, now - 4 * 864e5), out = {};
@@ -391,6 +391,23 @@ export class Family extends DurableObject {
       const sid = this.one(`SELECT last_insert_rowid() id`).id;
       if (photos) this.sql.exec(`UPDATE photos SET post=? WHERE id=?`, sid, photos[0].id);
       try { const who = vis ? this.all(`SELECT id FROM members WHERE removed=0 AND instr(?, ',' || id || ',') > 0 AND id!=?`, vis, me.id) : this.all(`SELECT id FROM members WHERE removed=0 AND id!=?`, me.id); for (const r of who) await this.rt.note(r.id, 'photo', `🔗 ${me.name} shared${vis ? ' with you' : ''}: ${caption ? '“' + caption.slice(0, 50) + '” – ' : ''}${pv.t.slice(0, 60)}`, 'sh' + sid); } catch (e) { }
+      return J({ id: sid, at: now, card: 'sh' + sid, snap });
+    }
+
+    if (p === '/shares/text' && m === 'POST') { // 1.9.176 words-only family post
+      const b = await body(), text = clean(b.text || b.body || b.caption, MAX_TEXT + 1);
+      if (!text) return J({ err: 'Write a few words first' }, 400);
+      if (text.length > MAX_TEXT) return J({ err: `keep it under ${MAX_TEXT} characters` }, 400);
+      if (isUnsafe({ t: text })) return J({ err: 'please keep it family-friendly' }, 400);
+      const why = blockedWhy(text); if (why) return J({ blocked: why, err: BLOCK_MSG[why] }, 400);
+      if ((this.one(`SELECT COUNT(*) n FROM shares WHERE mid=? AND at>?`, me.id, now - RATE_MS) || {}).n >= RATE_N) return J({ err: 'slow down a little' }, 429);
+      let vis = null; const to = Array.isArray(b.to) ? [...new Set(b.to.map(String))] : [];
+      if (to.length) { const ok = this.all(`SELECT id FROM members WHERE removed=0 AND id IN (${to.map(() => '?').join(',')})`, ...to.slice(0, 20)).map(r => r.id).filter(x => x !== me.id); if (!ok.length) return J({ err: 'Pick at least one person' }, 400); vis = ',' + [me.id, ...ok].join(',') + ','; }
+      const snap = { t: text, s: '', topic: 'family', src: 'family', kind: 'text', sn: me.name };
+      this.sql.exec(`INSERT INTO shares (mid,orig,snap,caption,priv,at,vis) VALUES (?,?,?,?,4,?,?)`, me.id, 'tx' + now, JSON.stringify(snap), '', now, vis);
+      const sid = this.one(`SELECT last_insert_rowid() id`).id;
+      try { const who = vis ? this.all(`SELECT id FROM members WHERE removed=0 AND instr(?, ',' || id || ',') > 0 AND id!=?`, vis, me.id) : this.all(`SELECT id FROM members WHERE removed=0 AND id!=?`, me.id); const short = text.length > 70 ? text.slice(0, 68) + '…' : text; for (const r of who) await this.rt.note(r.id, 'photo', `✏️ ${me.name} wrote${vis ? ' to you' : ''}: “${short}”`, 'sh' + sid); } catch (e) { }
+      if (!this.bot.muted(me.id)) this.botReact('comment', 'sh' + sid, text, 0.4);
       return J({ id: sid, at: now, card: 'sh' + sid, snap });
     }
     if (p === '/shares' && m === 'POST') {
