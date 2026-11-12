@@ -1421,9 +1421,8 @@ if (live) {
   assert.strictEqual(last.levelUp.sub, 'You beat every level!');
 
   const src = fs.readFileSync('feed/tetris.js', 'utf8');
-  assert.ok(src.includes('playLevelUpSfx(ti)') && src.includes("bp.type = 'bandpass'") && src.includes('luBell'));
-  assert.ok(src.includes('frequency.value = 1100') || src.includes('frequency.value = 1200'));
-  assert.ok(src.includes('duckMusic(delay, 0.75)'));
+  // 1.9.184: Shane's recorded cue replaced the synthesized whoosh-to-chord.
+  assert.ok(src.includes('playLevelUpSfx(ti)'));
   assert.ok(src.includes("title: 'LEVEL UP!'") && src.includes("sub: 'You beat every level!'"));
   assert.ok(src.includes('musicTick(g.level, musicWanted(g.level, started, g))'), 'music keeps playing during the overlay');
   assert.ok(tetGame.musicWanted(3, true, { over: false, paused: false, demo: false, levelUp: { t: 0 } }), 'music is still wanted during LEVEL UP');
@@ -1845,3 +1844,35 @@ if (live) {
   assert.ok(src.includes('function drawFireworksScene') && src.includes('function drawBeachScene'));
 }
 
+// 1.9.184 Shane's recorded LEVEL UP cue on every level
+{
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.strictEqual(tetGame.LEVELUP_HASH, 'e8f84e6f');
+  assert.strictEqual(tetGame.levelUpSrc(), 'tetris-bg/levelup-e8f84e6f.mp3');
+  assert.ok(fs.existsSync('feed/tetris-bg/levelup-e8f84e6f.mp3'), 'hashed LEVEL UP mp3 is shipped');
+  const st = fs.statSync('feed/tetris-bg/levelup-e8f84e6f.mp3');
+  assert.ok(st.size > 20000 && st.size < 80000, 'LEVEL UP mp3 is a short sting, not a track');
+  assert.ok(src.includes('function loadLevelUp') && src.includes('decodeAudioData'));
+  assert.ok(src.includes('function playLuBuf') && src.includes('LEVELUP_VOL'));
+  assert.ok(src.includes('duckMusic(0, Math.max(0.75, LEVELUP_DUR - 0.1))'), 'duck covers the recording, no beat delay');
+  assert.ok(!src.includes('function luBell') && !src.includes('Rising whoosh'), 'synthesized whoosh-to-chord is gone');
+  // Thunder and crackle are softened, not removed, and stay mid / low-passed.
+  assert.ok(src.includes("hp.type = 'highpass'; hp.frequency.value = 300") && src.includes('clp.frequency.value = 2600'));
+  assert.ok(src.includes('linearRampToValueAtTime(0.055, t0 + 0.12)') && src.includes('linearRampToValueAtTime(0.03 - k * 0.004'));
+  // Lightning visuals stay; startLevelUp still builds bolts and plays the cue.
+  assert.ok(src.includes('bolts: reduce ? [] : makeLightning') && src.includes('playLevelUpSfx(ti)'));
+  assert.ok(src.includes('function makeLightning') && src.includes('function drawLightningBolts') && src.includes('function drawStorm'));
+  // Fireworks LEVEL UP visuals stay; the extra bangs are skipped so Shane's cue is the main sound.
+  assert.ok(src.includes('function fwOnLevelUp') && src.includes("Shane's LEVEL UP recording is the main cue"));
+  assert.ok(!/function fwOnLevelUp[\s\S]{0,600}playFwSfx\('big'\)/.test(src));
+  // Own bus, not the 1400 Hz SFX softener.
+  assert.ok(src.includes('luGain.connect(ac.destination)'));
+  assert.ok(src.includes('loadLevelUp()') && src.includes('ensureLuGain()'));
+  // Preload on AudioContext setup; drop the buffer when the context is closed.
+  assert.ok(src.includes('luBuf = null; luLoading = null; luGain = null'));
+  // Prior music and painted levels stay
+  assert.strictEqual(tetGame.BGM_HASH[2], '9ca3b84e');
+  assert.ok(fs.existsSync('feed/tetris-bg/m2-9ca3b84e.mp3'));
+  assert.strictEqual(tetGame.fwSize(0), 0.3);
+  assert.ok(src.includes('function drawOceanScene') && src.includes('function drawFireworksScene'));
+}

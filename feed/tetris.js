@@ -79,6 +79,8 @@
         const ch = noiseBuf.getChannelData(0);
         for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
         nextNoteTime = ac.currentTime + 0.1;
+        ensureLuGain();
+        loadLevelUp();
       }
       if (ac.state === 'suspended') ac.resume();
     } catch (e) { /* no audio */ }
@@ -415,9 +417,7 @@
     } catch (e) { return 0; }
   }
 
-  // Distinct LEVEL UP cue: a soft rising whoosh/shimmer into a warm in-key chord
-  // and bell flourish (~1.3s). Energy stays about 300–1200 Hz so a phone speaker
-  // can play it, with a gentle lowpass and no sharp highs.
+  // In-key mid notes used by tests and (historically) the whoosh-to-chord cue.
   const LU_LO = 300, LU_HI = 1200;
   function luHz(f) { return Math.max(LU_LO, Math.min(LU_HI, f)); }
   function levelUpNotes(ti) {
@@ -428,69 +428,65 @@
     const i0 = Math.max(0, Math.min(src.length - 4, Math.floor((src.length - 4) / 3)));
     return [0, 2, 4, 7].map(i => luHz(src[Math.max(0, Math.min(src.length - 1, i0 + Math.min(i, src.length - 1 - i0)))]));
   }
-  function luBell(freq, dur, vol, dest, at) {
-    if (!ac || !dest) return;
-    const f = luHz(freq);
-    const typ = 'sine';
-    function partial(hz, peak, attack) {
-      const o = ac.createOscillator(), g = ac.createGain(), lp = ac.createBiquadFilter();
-      lp.type = 'lowpass'; lp.frequency.value = 1200; lp.Q.value = 0.5;
-      o.type = typ;
-      o.frequency.setValueAtTime(hz, at);
-      g.gain.setValueAtTime(0.0001, at);
-      g.gain.linearRampToValueAtTime(Math.max(0.0001, peak), at + attack);
-      g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
-      o.connect(g); g.connect(lp); lp.connect(dest);
-      o.start(at); o.stop(at + dur + 0.05);
-    }
-    partial(f, vol, 0.028);
-    if (f * 2 <= LU_HI) partial(f * 2, vol * 0.16, 0.04); // quiet, still mellow octave
+
+  // 1.9.184 Shane's recorded LEVEL UP cue, on every level, at the LEVEL UP! moment.
+  // Content-hashed mp3 (ogg is unreliable on iOS Safari), decoded through the shared
+  // AudioContext. The file is already gently low-passed at ~3.8 kHz, highpassed so
+  // the body stays phone-speaker friendly, and loudness-matched to sit above the music.
+  // Played on its own bus so the 1400 Hz SFX softener does not dull it.
+  const LEVELUP_HASH = 'e8f84e6f';
+  const LEVELUP_VOL = 0.85;
+  const LEVELUP_DUR = 2.13;
+  function levelUpSrc() { return 'tetris-bg/levelup-' + LEVELUP_HASH + '.mp3'; }
+  let luBuf = null, luLoading = null, luGain = null;
+  function ensureLuGain() {
+    if (!ac || luGain) return;
+    luGain = ac.createGain();
+    luGain.gain.value = 1;
+    luGain.connect(ac.destination);
+  }
+  function loadLevelUp() {
+    if (luBuf) return Promise.resolve(luBuf);
+    if (luLoading) return luLoading;
+    if (!ac) return Promise.resolve(null);
+    luLoading = fetch(levelUpSrc()).then(r => r.arrayBuffer()).then(ab => ac.decodeAudioData(ab.slice(0))).then(b => { luBuf = b; return b; }).catch(() => { luLoading = null; return null; });
+    return luLoading;
+  }
+  function playLuBuf(buf, t0) {
+    if (!buf || !ac || !luGain) return;
+    const src = ac.createBufferSource();
+    src.buffer = buf;
+    const g = ac.createGain();
+    const dur = Math.max(0.2, buf.duration || LEVELUP_DUR);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(LEVELUP_VOL, t0 + 0.012);
+    g.gain.setValueAtTime(LEVELUP_VOL, t0 + Math.max(0.05, dur - 0.04));
+    g.gain.linearRampToValueAtTime(0.0001, t0 + dur);
+    src.connect(g); g.connect(luGain);
+    src.start(t0); src.stop(t0 + dur + 0.02);
   }
   function playLevelUpSfx(ti) {
-    if (!soundOn || !ac || !sfxGain) return;
-    const dest = sfxGain;
-    const delay = sfxDelay('level');
-    const t0 = ac.currentTime + delay;
-    duckMusic(delay, 0.75);
-    const notes = levelUpNotes(ti == null ? themeIdx : ti) || sfxFreqs(ti == null ? themeIdx : ti, 'level') || [];
-    // Rising whoosh: wide band-pass noise, centre glides 380 → 880 Hz, capped by a 1100 Hz lowpass.
-    if (noiseBuf) {
-      const src = ac.createBufferSource();
-      src.buffer = noiseBuf;
-      const bp = ac.createBiquadFilter();
-      bp.type = 'bandpass'; bp.Q.value = 0.9;
-      bp.frequency.setValueAtTime(380, t0);
-      bp.frequency.exponentialRampToValueAtTime(880, t0 + 0.42);
-      const lp = ac.createBiquadFilter();
-      lp.type = 'lowpass'; lp.frequency.value = 1100; lp.Q.value = 0.5;
-      const g = ac.createGain();
-      g.gain.setValueAtTime(0.0001, t0);
-      g.gain.linearRampToValueAtTime(0.26, t0 + 0.07);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.52);
-      src.connect(bp); bp.connect(lp); lp.connect(g); g.connect(dest);
-      src.start(t0); src.stop(t0 + 0.55);
+    if (!soundOn || !ac) return;
+    ensureLuGain();
+    loadLevelUp();
+    // Play at the LEVEL UP! moment, not quantized to the next music beat.
+    const t0 = ac.currentTime;
+    duckMusic(0, Math.max(0.75, LEVELUP_DUR - 0.1));
+    if (luBuf) playLuBuf(luBuf, t0);
+    else if (luLoading) {
+      const startedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : 0;
+      luLoading.then(b => {
+        if (!b || !soundOn || !ac) return;
+        if (startedAt && performance.now() - startedAt > 1800) return;
+        ensureLuGain();
+        playLuBuf(b, ac.currentTime);
+      });
     }
-    // Quiet in-key sine sweep under the whoosh (not a siren: short, soft, stays mid).
-    if (notes[0] && notes[2]) {
-      const o = ac.createOscillator(), g = ac.createGain(), lp = ac.createBiquadFilter();
-      lp.type = 'lowpass'; lp.frequency.value = 1100; lp.Q.value = 0.5;
-      o.type = 'sine';
-      o.frequency.setValueAtTime(luHz(notes[0]), t0);
-      o.frequency.exponentialRampToValueAtTime(luHz(notes[2]), t0 + 0.4);
-      g.gain.setValueAtTime(0.0001, t0);
-      g.gain.linearRampToValueAtTime(0.12, t0 + 0.08);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.5);
-      o.connect(g); g.connect(lp); lp.connect(dest);
-      o.start(t0); o.stop(t0 + 0.55);
-    }
-    // Warm chord + rising bell flourish land as the whoosh peaks.
-    const land = t0 + 0.34;
-    const chord = notes.slice(0, Math.min(4, notes.length));
-    chord.forEach((f, i) => luBell(f, 1.15, 0.30 * (1 - i * 0.04), dest, land + i * 0.018));
-    notes.forEach((f, i) => luBell(f, 0.62, 0.27, dest, land + 0.1 + i * 0.11));
-    // Soft rolling thunder + a gentle electric crackle. Content stays about 300–3000 Hz
-    // so a phone speaker can play it, with no harsh snaps. Quieter than the music peak.
-    if (noiseBuf) {
+    // Softened rolling thunder + a gentle electric crackle under Shane's cue.
+    // Content stays about 300–3000 Hz so a phone speaker can play it, with no
+    // harsh snaps. Quieter than before so they do not clash with the recording.
+    if (noiseBuf && sfxGain) {
+      const dest = sfxGain;
       const rum = ac.createBufferSource();
       rum.buffer = noiseBuf;
       const hp = ac.createBiquadFilter();
@@ -499,8 +495,8 @@
       lp.type = 'lowpass'; lp.frequency.value = 720; lp.Q.value = 0.5;
       const g = ac.createGain();
       g.gain.setValueAtTime(0.0001, t0);
-      g.gain.linearRampToValueAtTime(0.16, t0 + 0.12);
-      g.gain.setValueAtTime(0.14, t0 + 0.45);
+      g.gain.linearRampToValueAtTime(0.055, t0 + 0.12);
+      g.gain.setValueAtTime(0.045, t0 + 0.45);
       g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.45);
       rum.connect(hp); hp.connect(lp); lp.connect(g); g.connect(dest);
       rum.start(t0); rum.stop(t0 + 1.5);
@@ -514,7 +510,7 @@
         clp.type = 'lowpass'; clp.frequency.value = 2600; clp.Q.value = 0.5;
         const cg = ac.createGain();
         cg.gain.setValueAtTime(0.0001, at);
-        cg.gain.linearRampToValueAtTime(0.09 - k * 0.01, at + 0.018);
+        cg.gain.linearRampToValueAtTime(0.03 - k * 0.004, at + 0.018);
         cg.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
         src.connect(bp); bp.connect(clp); clp.connect(cg); cg.connect(dest);
         src.start(at); src.stop(at + 0.2);
@@ -1581,9 +1577,10 @@
     bgmIdx = -1;
     if (ac) { try { ac.close(); } catch (e) { } }
     ac = null; sfxGain = null; musicGain = null; bgmGain = null; melodyBus = null; noiseBuf = null;
+    luBuf = null; luLoading = null; luGain = null;
     bgmBufs = {}; bgmLoading = {};
   }
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, farmDayTarget, farmSunPos, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts };
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, farmDayTarget, farmSunPos, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts };
 
   if (!root.document) return;
   const doc = root.document;
@@ -3581,7 +3578,7 @@
       const pos = fwSkyPos(box, { x: 0.12 + (i / Math.max(1, count - 1)) * 0.76, y: 0.08 + (i % 3) * 0.1 });
       fwBurst(pos.x, pos.y, 1.05 + Math.random() * 0.4, FW_KINDS[i % FW_KINDS.length], FW_COLS[i % FW_COLS.length], reduceMotion() ? 1.1 : 1.55);
     }
-    playFwSfx('big');
+    // Shane's LEVEL UP recording is the main cue; skip the extra fireworks bangs.
   }
   function fwTickParticles(dt) {
     if (dt <= 0) return;
