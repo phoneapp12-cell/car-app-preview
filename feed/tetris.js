@@ -293,8 +293,9 @@
   // Offline analysis of tetris-bg/m0..m11.mp3: tempo, first-beat phase (loop-safe), key.
   // 1.9.173 m6 (Farmyard) re-analysed after Shane's new level-1 track.
   // 1.9.178 m11 (Bullfrog) re-analysed after Shane's new level-2 track (127.45 BPM, D major, loop-safe 440 beats).
+  // 1.9.179 m0 (Beach) re-analysed after Shane's new level-3 track (115.5 BPM, C major, loop-safe 392 beats).
   const TRACKS = [
-    { bpm: 143.5, offset: 0.069, key: 'E', mode: 'major' },
+    { bpm: 115.5, offset: 0.229, key: 'C', mode: 'major' },
     { bpm: 117.5, offset: 0.047, key: 'F#', mode: 'minor' },
     { bpm: 136, offset: 0, key: 'C#', mode: 'major' },
     { bpm: 117.5, offset: 0.348, key: 'G', mode: 'major' },
@@ -788,8 +789,31 @@
     throat: { x: 210, y: 168 }, belly: { x: 210, y: 210 }, foot: { x: 186, y: 330 }
   };
   const frog = { img: null, ready: false, spr: [], notes: [] };
+  // 1.9.179 Beach (theme 0, level 3): the painting itself moves — surf washes in and out,
+  // palms sway in the wind, a little parallax and contact shadow. No cartoon add-ons.
+  const BEACH_ART = {
+    plate: 'tetris-bg/beach-plate-5b8a360f.webp',
+    atlas: 'tetris-bg/beach-atlas-80e05e2c.webp',
+    water: 'tetris-bg/beach-water-bb1635ec.webp',
+    foam: 'tetris-bg/beach-foam-d4365f24.webp'
+  };
+  const BEACH_META = {
+    trees: {
+      mid: { ax: 0, ay: 0, aw: 134, ah: 150, x: 52, y: 311, w: 134, h: 150, px: 85, py: 454 },
+      big: { ax: 138, ay: 0, aw: 307, ah: 452, x: 0, y: 0, w: 307, h: 452, px: 8, py: 445, crownY: 210 }
+    },
+    flowers: { ax: 449, ay: 0, aw: 300, ah: 289, x: 0, y: 671, w: 300, h: 289, px: 90, py: 955 },
+    sea: { x: 181, y: 464, w: 359, h: 426 },
+    foamBox: { x: 227, y: 475, w: 313, h: 401 },
+    inland: [-0.64, 0.76],
+    washPx: 42,
+    horizon: 468,
+    sun: [414, 422]
+  };
+  const beach = { img: null, ready: false };
+
   const SPARK_DUR = 600, SPARK_MAX = 5, SPARK_MAX_REDUCE = 1;
-  const EFFECT_TI = { 6: 'farm', 11: 'frog' };
+  const EFFECT_TI = { 0: 'beach', 6: 'farm', 11: 'frog' };
   function isEffect(ti) { return EFFECT_TI[ti] || null; }
   function reduceMotion() {
     try { return !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; }
@@ -1302,7 +1326,7 @@
   // effects cannot pause or mute a separate HTML audio element on iOS/Android WebView.
   // Filenames include a content hash because some phone media caches ignore ?v= query strings
   // (1.9.163 busted the URL but Shane still heard the old bullfrog track).
-  const BGM_HASH = ['a719f241', '9711dc01', '9ca3b84e', '7776197f', '6a9bd0f6', '63c9eafe', '7bc4ebcd', 'b76dd1d3', 'fdec4369', '2b10c8ba', 'cdbe7d34', '8afd517f'];
+  const BGM_HASH = ['da11a54a', '9711dc01', '9ca3b84e', '7776197f', '6a9bd0f6', '63c9eafe', '7bc4ebcd', 'b76dd1d3', 'fdec4369', '2b10c8ba', 'cdbe7d34', '8afd517f'];
   function bgmSrc(ti) { return 'tetris-bg/m' + ti + '-' + BGM_HASH[ti] + '.mp3'; }
   let bgmGain = null, bgmNode = null, bgmIdx = -1, bgmBufs = {}, bgmLoading = {}, bgmAt = 0, bgmRate = 1, bgmWant = false, bgmWantTi = -1, bgmAnalyser = null, bgmBins = null;
   function silentUnlock() {
@@ -1396,7 +1420,7 @@
     ac = null; sfxGain = null; musicGain = null; bgmGain = null; melodyBus = null; noiseBuf = null;
     bgmBufs = {}; bgmLoading = {};
   }
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, farmDayTarget, farmSunPos, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogReady: () => frog.ready, frogLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts };
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, farmDayTarget, farmSunPos, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts };
 
   if (!root.document) return;
   const doc = root.document;
@@ -1440,7 +1464,7 @@
   function press(a) {
     if (!started) started = true;
     const next = act(g, a);
-    if (a === 'restart') { g = next; invReset(); life.hold = null; life.singHold = null; sparkHold = null; blockSparks = []; lifeReset(); if (isEffect(themeFor(g.level))) { lifeCast(isEffect(themeFor(g.level))); } if (root.IBScores) root.IBScores.close(); }
+    if (a === 'restart') { g = next; invReset(); life.hold = null; life.singHold = null; life.beachHold = null; sparkHold = null; blockSparks = []; lifeReset(); if (isEffect(themeFor(g.level))) { lifeCast(isEffect(themeFor(g.level))); } if (root.IBScores) root.IBScores.close(); }
     syncHud();
   }
   root.Tetris.press = press;
@@ -1499,6 +1523,10 @@
       g.levelUp.hold = true;
       g.levelUp.at = opts.levelUp.at != null ? opts.levelUp.at : 0.32;
     }
+    if (opts.beach) {
+      life.beachHold = opts.beach;
+      if (!life.beach) life.beach = { tide: 0.5, wet: 0.2, big: 0, mid: 0, fl: 0, gust: 0 };
+    } else life.beachHold = null;
     if (opts.frogSing) {
       life.singHold = opts.frogSing;
       if (life.frog) {
@@ -1829,11 +1857,12 @@
       doc.documentElement.classList.toggle('effect', !!kind);
       doc.documentElement.classList.toggle('fx-farm', kind === 'farm');
       doc.documentElement.classList.toggle('fx-frog', kind === 'frog');
+      doc.documentElement.classList.toggle('fx-beach', kind === 'beach');
     }
     // 1.9.175: always the original theme photo (center / cover), including Farmyard and Bullfrog.
     doc.documentElement.style.background = 'linear-gradient(rgba(0,0,0,.28),rgba(0,0,0,.28)), url("' + PICS[i] + '") center / cover no-repeat, ' + L.bg;
     try { const nx = new root.Image(); nx.src = PICS[(i + 1) % PICS.length]; } catch (e) { }
-    if (kind) { efxClearAll(); lifeReset(); if (kind === 'farm') farmLoad(); if (kind === 'frog') frogLoad(); }
+    if (kind) { efxClearAll(); lifeReset(); if (kind === 'farm') farmLoad(); if (kind === 'frog') frogLoad(); if (kind === 'beach') beachLoad(); }
     doc.documentElement.style.backgroundAttachment = 'fixed';
     doc.body.style.background = 'transparent';
     drawMini(doc.getElementById('next'), g.next, false);
@@ -2330,6 +2359,9 @@
     life.seeded = true;
     if (kind === 'farm') {
       farmCast();
+    } else if (kind === 'beach') {
+      life.beach = { tide: 0.5, wet: 0.2, big: 0, mid: 0, fl: 0, gust: 0 };
+      beachLoad();
     } else {
       life.frog = { mouth: 0, puff: 0, blink: 0, blinkIn: 0, nextBlink: 2.4, sway: 0, vocal: 0, avg: 0.12, lev: 0 };
       frog.notes = [];
@@ -2358,6 +2390,8 @@
     if (life.croak > 0) life.croak = Math.max(0, life.croak - dt);
     if (life.kind === 'farm') {
       farmAdvance(dt, prog, reduce);
+    } else if (life.kind === 'beach') {
+      beachAdvance(dt, reduce);
     } else if (life.frog) {
       const f = life.frog;
       if (beat && beat.on && !life.beatLatch) { life.beatN++; life.beatLatch = true; }
@@ -3016,6 +3050,170 @@
     c.restore();
   }
 
+
+  function beachLoad() {
+    if (beach.img || !root.Image) return;
+    beach.img = {};
+    let left = 4;
+    Object.keys(BEACH_ART).forEach(k => {
+      const im = new root.Image();
+      im.onload = () => { if (--left === 0) beach.ready = true; };
+      im.onerror = () => { if (--left === 0) beach.ready = !!beach.img.plate; };
+      im.src = BEACH_ART[k];
+      beach.img[k] = im;
+    });
+  }
+  function beachAdvance(dt, reduce) {
+    const b = life.beach;
+    if (!b) return;
+    const t = life.t;
+    if (life.beachHold) {
+      if (life.beachHold.wave != null) b.tide = life.beachHold.wave;
+      if (life.beachHold.big != null) b.big = life.beachHold.big;
+      if (life.beachHold.mid != null) b.mid = life.beachHold.mid;
+      if (life.beachHold.fl != null) b.fl = life.beachHold.fl;
+      b.wet = Math.max(b.wet, b.tide * 0.7);
+      return;
+    }
+    if (reduce) {
+      b.tide = 0.5; b.wet = 0.25; b.big = 0; b.mid = 0; b.fl = 0; b.gust = 0;
+      return;
+    }
+    // Slow, slightly irregular wash — about 8 seconds in and out, like a real beach.
+    b.tide = 0.5 + 0.42 * Math.sin(t * Math.PI * 2 / 8) + 0.08 * Math.sin(t * Math.PI * 2 / 11.5);
+    const wantWet = Math.max(0, (b.tide - 0.28) / 0.72);
+    b.wet += (wantWet - b.wet) * Math.min(1, dt * (wantWet > b.wet ? 2.4 : 0.35));
+    // Gusty wind: a slow lean plus faster flutter, a different mix on each tree.
+    const gust = Math.sin(t * 0.65) * 0.62 + Math.sin(t * 1.27 + 1.1) * 0.28 + Math.sin(t * 0.21 + 0.4) * 0.2;
+    b.gust = gust;
+    b.big = gust * 0.046 + Math.sin(t * 2.15) * 0.01;
+    b.mid = gust * 0.033 + Math.sin(t * 2.4 + 0.9) * 0.01;
+    b.fl = gust * 0.018 + Math.sin(t * 1.7 + 0.3) * 0.008;
+  }
+  function beachPhoto(c, box, px, py, sx, sy, dw, dh, parx, pary) {
+    c.drawImage(c._beachImg, px, py, sx, sy,
+      box.left + (px + parx) * box.scale, box.top + (py + pary) * box.scale,
+      dw * box.scale, dh * box.scale);
+  }
+  function drawBeachSprite(c, img, t, ang, box, parx, pary, flutter) {
+    const sc = box.scale;
+    const px = box.left + (t.px + parx) * sc;
+    const py = box.top + (t.py + pary) * sc;
+    c.save();
+    c.translate(px, py);
+    c.rotate(ang);
+    const dw = t.w * sc, dh = t.h * sc;
+    const ox = (t.x - t.px) * sc, oy = (t.y - t.py) * sc;
+    if (flutter && t.crownY != null && t.crownY > t.y && t.crownY < t.y + t.h) {
+      const split = t.crownY - t.y;
+      // Trunk leans less; fronds flutter more, both still pivot at the base.
+      c.drawImage(img, t.ax, t.ay + split, t.aw, t.ah - split, ox, oy + split * sc, dw, (t.h - split) * sc);
+      c.rotate(flutter);
+      c.drawImage(img, t.ax, t.ay, t.aw, split, ox, oy, dw, split * sc);
+    } else {
+      c.drawImage(img, t.ax, t.ay, t.aw, t.ah, ox, oy, dw, dh);
+    }
+    c.restore();
+  }
+  function drawBeachScene(c, w, h, reduce) {
+    beachLoad();
+    if (!beach.ready || !beach.img || !beach.img.plate || !beach.img.plate.complete) return;
+    const box = photoBox();
+    const M = BEACH_META, B = life.beach || { tide: 0.5, wet: 0.25, big: 0, mid: 0, fl: 0 };
+    const t = life.t;
+    const par = reduce ? 0 : Math.sin(t * 0.15) * 3.2;
+    const pPlate = par * 0.25, pWater = par * 0.5, pMid = par * 0.75, pBig = par * 1.0, pFl = par * 1.3;
+    const tide = B.tide;
+    const ix = M.inland[0] * M.washPx * (tide - 0.5);
+    const iy = M.inland[1] * M.washPx * (tide - 0.5);
+    const sc = box.scale;
+
+    // Plate (sky, headland, sand) — only once the art is ready, so 0.webp is not doubled.
+    c.drawImage(beach.img.plate, 0, 0, PHOTO_W, PHOTO_H,
+      box.left + pPlate * sc, box.top + pPlate * 0.15 * sc, PHOTO_W * sc, PHOTO_H * sc);
+
+    // Wet sand left behind as the water recedes: a soft darkening along the wash.
+    if (B.wet > 0.02) {
+      c.save();
+      c.beginPath();
+      c.rect(box.left, box.top, PHOTO_W * sc, PHOTO_H * sc);
+      c.clip();
+      const foam = M.foamBox;
+      const wx = box.left + (foam.x + ix * 0.4 + pWater) * sc;
+      const wy = box.top + (foam.y + iy * 0.4 + pWater * 0.15) * sc;
+      const g = c.createLinearGradient(wx, wy, wx + M.inland[0] * 70 * sc, wy + M.inland[1] * 70 * sc);
+      const a = 0.16 * Math.min(1, B.wet);
+      g.addColorStop(0, 'rgba(40,70,90,' + (a * 0.15) + ')');
+      g.addColorStop(0.35, 'rgba(30,60,80,' + a + ')');
+      g.addColorStop(1, 'rgba(30,60,80,0)');
+      c.fillStyle = g;
+      c.fillRect(box.left + (foam.x - 20) * sc, box.top + (foam.y - 20) * sc, (foam.w + 80) * sc, (foam.h + 80) * sc);
+      c.restore();
+    }
+
+    // Sea surface, with a cheap strip shimmer (not a heavy displacement).
+    const sea = M.sea;
+    const sx = box.left + (sea.x + ix * 0.55 + pWater) * sc;
+    const sy = box.top + (sea.y + iy * 0.55 + pWater * 0.15) * sc;
+    const sw = sea.w * sc, sh = sea.h * sc;
+    if (beach.img.water && beach.img.water.complete) {
+      if (reduce) {
+        c.drawImage(beach.img.water, 0, 0, sea.w, sea.h, sx, sy, sw, sh);
+      } else {
+        const strips = 14;
+        const sh0 = sea.h / strips;
+        for (let i = 0; i < strips; i++) {
+          const wob = Math.sin(t * 1.35 + i * 0.55) * 1.15 * sc;
+          const srcY = Math.round(i * sh0);
+          const srcH = Math.max(1, Math.round((i === strips - 1 ? sea.h : (i + 1) * sh0) - srcY));
+          c.drawImage(beach.img.water, 0, srcY, sea.w, srcH, sx + wob, sy + srcY * sc, sw, srcH * sc);
+        }
+        // Soft highlight sweeping along the sun path.
+        const sunx = box.left + (M.sun[0] + pWater) * sc;
+        const suny = box.top + (M.horizon + pWater * 0.15) * sc;
+        const hg = c.createLinearGradient(sunx, suny, sunx, suny + 280 * sc);
+        const tw = 0.07 + 0.05 * Math.sin(t * 1.1);
+        hg.addColorStop(0, 'rgba(255,240,180,' + tw + ')');
+        hg.addColorStop(0.55, 'rgba(255,230,160,' + (tw * 0.45) + ')');
+        hg.addColorStop(1, 'rgba(255,230,160,0)');
+        c.fillStyle = hg;
+        c.fillRect(sunx - 18 * sc, suny, 36 * sc, 300 * sc);
+      }
+    }
+    // Foam edge travels with the wash, a little further than the sea body.
+    if (beach.img.foam && beach.img.foam.complete) {
+      const fb = M.foamBox;
+      const fx_ = box.left + (fb.x + ix + pWater) * sc;
+      const fy_ = box.top + (fb.y + iy + pWater * 0.15) * sc;
+      c.drawImage(beach.img.foam, 0, 0, fb.w, fb.h, fx_, fy_, fb.w * sc, fb.h * sc);
+    }
+
+    // Contact shadows (trunk bases, flower clump) — a gentle 3D sit.
+    function trunkShadow(px, py, rx, ry, a) {
+      c.save();
+      c.translate(box.left + (px + pBig) * sc, box.top + (py + pBig * 0.15) * sc);
+      c.scale(1, 0.45);
+      c.beginPath();
+      c.arc(0, 0, rx * sc, 0, Math.PI * 2);
+      c.fillStyle = 'rgba(20,10,0,' + a + ')';
+      c.fill();
+      c.restore();
+    }
+    const atlas = beach.img.atlas;
+    if (atlas && atlas.complete) {
+      trunkShadow(M.trees.mid.px, M.trees.mid.py, 16, 8, 0.16);
+      trunkShadow(M.trees.big.px + 6, M.trees.big.py, 22, 10, 0.2);
+      // Mid palm (further back) then the big foreground palm, then the flowers.
+      drawBeachSprite(c, atlas, M.trees.mid, B.mid, box, pMid, pMid * 0.15, 0);
+      drawBeachSprite(c, atlas, M.trees.big, B.big * 0.7, box, pBig, pBig * 0.15, B.big * 0.55);
+      drawBeachSprite(c, atlas, M.flowers, B.fl, box, pFl, pFl * 0.2, 0);
+    }
+
+    // Same 28% veil as the CSS photo, so the board stays readable.
+    c.fillStyle = 'rgba(0,0,0,0.28)';
+    c.fillRect(box.left + pPlate * sc, box.top + pPlate * 0.15 * sc, PHOTO_W * sc, PHOTO_H * sc);
+  }
+
   function effectStageDraw(now) {
     const kind = isEffect(lookIdx < 0 ? themeIdx : lookIdx);
     if (!kind) {
@@ -3037,6 +3235,7 @@
     const c0 = fx.ctx;
     c0.clearRect(0, 0, fx.w, fx.h);
     if (kind === 'farm') drawFarmScene(c0, fx.w, fx.h, reduce);
+    else if (kind === 'beach') drawBeachScene(c0, fx.w, fx.h, reduce);
     else {
       drawFrogScene(c0, fx.w, fx.h, reduce);
       // pond ripples + shimmer live on the photo, behind the board, so they show in the margins
@@ -3048,7 +3247,7 @@
     c.clearRect(0, 0, life.w, life.h);
     c.save();
     clipAroundBoard(c, life.w, life.h);
-    if (kind !== 'farm') {
+    if (kind === 'frog') {
       drawFlies(c, reduce);
       drawFishJump(c);
       // The painted frog is drawn behind the board (drawFrogScene) so it shows through empty cells.
