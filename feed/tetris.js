@@ -2005,7 +2005,7 @@
   // place a single block cell on top of the stack. A "brick" is one cell.
   const CITY_THEME = 4;
   // Seconds between placements (first and later). Modest and easy to tune.
-  const CITY_BUILD_EVERY = [9, 15];
+  const CITY_BUILD_EVERY = [6, 10];
   const CITY_SAFE_TOP = 6; // never build in the top 6 rows — keep it a fun challenge, not unfair
   const CITY_CREW_N = 2;
   function cityBuildWait() {
