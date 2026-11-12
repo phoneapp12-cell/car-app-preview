@@ -1552,11 +1552,11 @@ if (live) {
   assert.ok(tet.includes("function setFull") && tet.includes("d.type !== 'ib-artfull'"));
 }
 
-// 1.9.174 Tetris Effect look on levels 1 (Farmyard) and 2 (Bullfrog) only
+// 1.9.174 Tetris Effect look on painted levels (Farmyard, Bullfrog, and 1.9.179 Beach)
 {
   assert.strictEqual(tetGame.isEffect(6), 'farm');
   assert.strictEqual(tetGame.isEffect(11), 'frog');
-  assert.strictEqual(tetGame.isEffect(0), null);
+  assert.strictEqual(tetGame.isEffect(0), 'beach');
   assert.strictEqual(tetGame.isEffect(7), null);
   assert.strictEqual(tetGame.themeFor(1), 6);
   assert.strictEqual(tetGame.themeFor(2), 11);
@@ -1688,4 +1688,37 @@ if (live) {
   assert.ok(tetGame.farmArt && tetGame.farmArt().plate.indexOf('farm-plate-') >= 0);
   assert.strictEqual(tetGame.farmDayTarget(0, 0), 0);
   assert.strictEqual(tetGame.TRACKS[6].bpm, 171);
+}
+
+// 1.9.179 Beach: Shane's new song, painted waves wash in and out, palms sway in the wind
+{
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.strictEqual(tetGame.TRACKS[0].bpm, 115.5);
+  assert.strictEqual(tetGame.TRACKS[0].offset, 0.229);
+  assert.strictEqual(tetGame.TRACKS[0].key, 'C');
+  assert.strictEqual(tetGame.BGM_HASH[0], 'da11a54a');
+  assert.ok(fs.existsSync('feed/tetris-bg/m0-da11a54a.mp3'), 'new beach track is shipped');
+  assert.ok(!fs.existsSync('feed/tetris-bg/m0-a719f241.mp3'), 'old beach track is gone');
+  const beat = tetGame.musicBeat(0, 0.229);
+  assert.ok(beat.on && beat.pulse > 0.8, 'offset sits on a Beach beat');
+  const mid = tetGame.musicBeat(0, 0.229 + (60 / 115.5) * 0.5);
+  assert.ok(!mid.on && mid.pulse < 0.2, 'halfway between beats is quiet');
+  const art = tetGame.beachArt();
+  assert.ok(/^tetris-bg\/beach-plate-[0-9a-f]{8}\.webp$/.test(art.plate), 'hashed plate');
+  assert.ok(/^tetris-bg\/beach-atlas-[0-9a-f]{8}\.webp$/.test(art.atlas), 'hashed atlas');
+  assert.ok(/^tetris-bg\/beach-water-[0-9a-f]{8}\.webp$/.test(art.water), 'hashed water');
+  assert.ok(/^tetris-bg\/beach-foam-[0-9a-f]{8}\.webp$/.test(art.foam), 'hashed foam');
+  assert.ok(fs.existsSync('feed/' + art.plate) && fs.existsSync('feed/' + art.atlas));
+  assert.ok(fs.existsSync('feed/' + art.water) && fs.existsSync('feed/' + art.foam));
+  const meta = tetGame.beachMeta();
+  assert.ok(meta.trees && meta.trees.big && meta.trees.mid && meta.flowers && meta.sea && meta.foamBox);
+  assert.ok(meta.trees.big.px != null && meta.trees.big.py != null && meta.trees.big.crownY);
+  assert.ok(src.includes('function drawBeachScene') && src.includes('function beachAdvance') && src.includes('function beachLoad'));
+  assert.ok(src.includes("EFFECT_TI = { 0: 'beach', 6: 'farm', 11: 'frog' }"));
+  // 1.9.178 lightning, sparkle, singing frog, and 1.9.177 farm stay intact
+  assert.ok(src.includes('function drawLightningBolts') && src.includes('function drawBlockGloss') && src.includes('function drawFrogScene'));
+  assert.ok(tetGame.farmArt && tetGame.farmArt().plate.indexOf('farm-plate-') >= 0);
+  assert.strictEqual(tetGame.TRACKS[11].bpm, 127.45);
+  assert.strictEqual(tetGame.TRACKS[6].bpm, 171);
+  assert.strictEqual(tetGame.BGM_HASH[11], '8afd517f');
 }
