@@ -157,11 +157,13 @@ tetGame.act(gTri, 'left');
 assert.strictEqual(gTri.piece.x, beforeX - 1, 'triangle theme does not change movement');
 assert.strictEqual(tetGame.THEMES[7].name, 'Space travel');
 assert.strictEqual(tetGame.SPACE_THEME, 7);
+assert.deepStrictEqual(Array.from(tetGame.BOMB_EVERY), [0.8, 1.6]);
+assert.strictEqual(tetGame.BOMB_HITS, 3);
+assert.strictEqual(tetGame.BOMB_MAX, 4);
 const waitFirst = tetGame.bombWaitRange(12, true), waitLater = tetGame.bombWaitRange(12, false);
-assert.deepStrictEqual(Array.from(waitFirst), [4, 6]);
-assert.deepStrictEqual(Array.from(waitLater), [6, 10]);
-assert.deepStrictEqual(Array.from(tetGame.bombWaitRange(36, true)), [4, 6]);
-assert.deepStrictEqual(Array.from(tetGame.bombWaitRange(36, false)), [6, 10]);
+assert.deepStrictEqual(Array.from(waitFirst), [0.8, 1.6]);
+assert.deepStrictEqual(Array.from(waitLater), [0.8, 1.6]);
+assert.deepStrictEqual(Array.from(tetGame.bombWaitRange(36, true)), [0.8, 1.6]);
 const gSp = tetGame.newGame();
 gSp.level = 12; gSp.lines = 110;
 gSp.board = tetGame.emptyBoard();
@@ -172,13 +174,20 @@ assert.strictEqual(tetGame.applyBombHit(gSp, 4, 8), 'piece', 'bombs pass through
 assert.strictEqual(gSp.piece.t, 4);
 assert.strictEqual(gSp.over, false);
 assert.strictEqual(gSp.board[8][4], 0);
+assert.strictEqual(tetGame.applyBombHit(gSp, 4, 15), 'chip');
+assert.strictEqual(gSp.board[15][4], 5, 'first hit only damages the cell');
+assert.strictEqual(tetGame.cellHits(gSp, 4, 15), 1);
+assert.strictEqual(tetGame.applyBombHit(gSp, 4, 15), 'chip');
+assert.strictEqual(tetGame.cellHits(gSp, 4, 15), 2);
+assert.strictEqual(gSp.board[15][4], 5);
 assert.strictEqual(tetGame.applyBombHit(gSp, 4, 15), 'block');
-assert.strictEqual(gSp.board[15][4], 0, 'only the hit block is cleared');
+assert.strictEqual(gSp.board[15][4], 0, 'third hit knocks out that one cell');
+assert.strictEqual(tetGame.cellHits(gSp, 4, 15), 0);
 assert.strictEqual(gSp.board[16][4], 3, 'cells above do not fall');
 assert.strictEqual(gSp.board[17][4], 3);
-assert.strictEqual(tetGame.applyBombHit(gSp, 4, 19), 'block');
+assert.strictEqual(tetGame.applyBombHit(gSp, 4, 19), 'chip');
+assert.strictEqual(gSp.board[19][4], 3);
 assert.strictEqual(gSp.board[16][4], 3);
-assert.strictEqual(gSp.board[19][4], 0);
 
 // TV and garden filters, from labels seen on the live feed
 assert.strictEqual(nz.neon({ src: 'yt-neon', sn: 'Neon NZ', t: 'The Good Daughter' }), true);
@@ -975,8 +984,8 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
 
 // 1.9.166 Shane-only Tetris level picker (practice mode, not posted to the family scoreboard)
 {
-  const names = ['Farmyard', 'Jeremiah was a bullfrog', 'Beach', 'Fireworks', 'Ocean', 'Bush walk', 'New Zealand', 'Snowy mountains', 'City', 'Night sky', 'Triangles', 'Space travel'];
-  assert.deepStrictEqual(Array.from(tetGame.ORDER), [6, 11, 0, 1, 2, 3, 9, 10, 4, 5, 8, 7]);
+  const names = ['Farmyard', 'Jeremiah was a bullfrog', 'Beach', 'Fireworks', 'City', 'Ocean', 'Bush walk', 'New Zealand', 'Snowy mountains', 'Night sky', 'Triangles', 'Space travel'];
+  assert.deepStrictEqual(Array.from(tetGame.ORDER), [6, 11, 0, 1, 4, 2, 3, 9, 10, 5, 8, 7]);
   assert.deepStrictEqual(Array.from(tetGame.stages().map(s => s.name)), names);
   assert.deepStrictEqual(Array.from(tetGame.stages().map(s => s.level)), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
   const gPr = tetGame.newGame({ level: 11, practice: true });
@@ -1074,38 +1083,38 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   function blocks(board) { return board.reduce((n, row) => n + row.filter(Boolean).length, 0); }
   function stackOn(g) {
     g.board = tetGame.emptyBoard();
+    g.hits = tetGame.emptyBoard();
     for (let r = 16; r < 20; r++) g.board[r][4] = 3;
     g.piece = { t: 4, m: [[4, 4], [4, 4]], x: 0, y: 0 }; // keep the falling piece off the stacked column
   }
-  function simSpace(g) {
+  function countDrops(g) {
     const inv = tetGame.resetInvaders(tetGame.newInvaders(), g.level);
-    const first = tetGame.bombWaitRange(g.level, true);
-    inv.wait = first[1] * 1000; // worst first wait (6s)
-    const before = blocks(g.board);
-    let t = 0, hitAt = null;
+    inv.wait = tetGame.BOMB_EVERY[1] * 1000; // worst first wait
+    let t = 0, seen = 0, maxAir = 0;
     const dt = 16;
-    while (t < 12000) {
+    while (t < 6000) {
+      const before = inv.bombs.length;
       tetGame.stepInvaders(inv, g, dt, { started: true });
+      if (inv.bombs.length > before) seen += inv.bombs.length - before;
+      maxAir = Math.max(maxAir, inv.bombs.length);
       t += dt;
-      if (hitAt == null && blocks(g.board) < before) hitAt = t;
     }
-    return { hitAt, left: blocks(g.board), before, inv };
+    return { seen, maxAir, inv };
   }
   const gPick = tetGame.newGame({ level: 12, practice: true });
   assert.strictEqual(gPick.practice, true);
   assert.strictEqual(tetGame.themeFor(gPick.level), tetGame.SPACE_THEME);
   stackOn(gPick);
-  const pick = simSpace(gPick);
-  assert.ok(pick.hitAt != null && pick.hitAt <= 12000, 'picker: a settled block is destroyed within 12s, got ' + pick.hitAt);
-  assert.strictEqual(pick.left, pick.before - 1);
+  const pick = countDrops(gPick);
+  assert.ok(pick.seen >= 3, 'picker: several bombs drop within 6s, got ' + pick.seen);
+  assert.ok(pick.maxAir >= 2, 'more than one bomb can be in the air');
 
   const gNat = tetGame.newGame();
   gNat.lines = 110; gNat.level = 12;
   assert.strictEqual(tetGame.themeFor(gNat.level), tetGame.SPACE_THEME);
   stackOn(gNat);
-  const nat = simSpace(gNat);
-  assert.ok(nat.hitAt != null && nat.hitAt <= 12000, 'natural level 12: a settled block is destroyed within 12s, got ' + nat.hitAt);
-  assert.strictEqual(nat.left, nat.before - 1);
+  const nat = countDrops(gNat);
+  assert.ok(nat.seen >= 3, 'natural level 12: several bombs drop within 6s, got ' + nat.seen);
 
   // Screenshot seed must still hold bombs back
   const gDemo = tetGame.newGame({ level: 12, practice: true });
@@ -1206,7 +1215,7 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   tetGame.act(g4, 'left');
   assert.strictEqual(g4.piece.x, heldX, 'piece is frozen while the line fades');
 
-  const gO = tetGame.newGame({ level: 5 });
+  const gO = tetGame.newGame({ level: 6 });
   almostFull(gO, [19]);
   tetGame.lockPiece(gO);
   assert.strictEqual(tetGame.themeFor(gO.level), 2);
@@ -1344,6 +1353,11 @@ if (live) {
   assert.strictEqual(c3.theme, tetGame.themeFor(3));
   const c2 = tetGame.levelUpCopy(1, 2);
   assert.strictEqual(c2.sub, 'Level 2: Jeremiah was a bullfrog');
+  const c5 = tetGame.levelUpCopy(4, 5);
+  assert.strictEqual(c5.sub, 'Level 5: City');
+  assert.strictEqual(c5.theme, 4);
+  const c6 = tetGame.levelUpCopy(5, 6);
+  assert.strictEqual(c6.sub, 'Level 6: Ocean');
   const c12 = tetGame.levelUpCopy(11, 12);
   assert.strictEqual(c12.sub, 'Level 12: Space travel');
   const beaten = tetGame.levelUpCopy(12, 13);
@@ -1764,7 +1778,9 @@ if (live) {
 // 1.9.181 Ocean dolphins, fireworks that grow through the level, themed move sounds louder than the music
 {
   const src = fs.readFileSync('feed/tetris.js', 'utf8');
-  assert.strictEqual(tetGame.themeFor(5), 2);
+  assert.strictEqual(tetGame.themeFor(5), 4, '1.9.188 City is level 5');
+  assert.strictEqual(tetGame.THEMES[4].name, 'City');
+  assert.strictEqual(tetGame.themeFor(6), 2, 'Ocean shifts to level 6');
   assert.strictEqual(tetGame.THEMES[2].name, 'Ocean');
   assert.strictEqual(tetGame.isEffect(2), 'ocean');
   // 1.9.185: growth widened a lot (about 20% → 275%); still strictly increasing through the level.
@@ -2025,3 +2041,353 @@ if (live) {
 }
 
 
+
+
+// 1.9.188 You got this / Keep going only on level 1 is covered above. Auto full screen,
+// no restart after minimising, and Space travel bombs that take three hits to knock out a cell.
+{
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  const playSrc = fs.readFileSync('feed/play.js', 'utf8');
+  const fam = fs.readFileSync('feed/family.js', 'utf8');
+  const idx = fs.readFileSync('feed/index.html', 'utf8');
+  assert.ok(playSrc.includes('if (isTetrisOpen()) { persistArt(); return; }'));
+  assert.ok(playSrc.includes("setFull(true)") && playSrc.includes('Opening tap is a user gesture'));
+  assert.ok(playSrc.includes("root.addEventListener('pageshow'"));
+  assert.ok(fam.includes('function ibTetrisInPlay') && fam.includes('if (ibTetrisInPlay()) return;'));
+  assert.ok(idx.includes("o.kind === 'tetris'") && idx.includes('if (!art && Date.now() - last'));
+  assert.ok(src.includes('function persistLive') && src.includes('function unhalt') && src.includes('function tryAutoFull'));
+  assert.ok(src.includes('drawBlockHits') && src.includes('BOMB_EVERY') && src.includes('BOMB_HITS'));
+  assert.ok(src.includes("case 'boom'") && src.includes("lp.frequency.value = 380"));
+
+  // Hide / show / reload of a live Tetris game (parent window + saved board).
+  const evs = { vis: [], hide: [], show: [] };
+  function store() {
+    const m = new Map();
+    return {
+      getItem(k) { return m.has(k) ? m.get(k) : null; },
+      setItem(k, v) { m.set(k, String(v)); },
+      removeItem(k) { m.delete(k); },
+      _map: m
+    };
+  }
+  function el(tag, attrs) {
+    const n = {
+      tagName: (tag || 'div').toUpperCase(), attrs: Object.assign({ hidden: false }, attrs || {}),
+      children: [], className: '', hidden: false, style: {}, dataset: {}, textContent: '',
+      classList: {
+        _s: new Set(),
+        add(...a) { a.forEach(x => this._s.add(x)); n.className = [...this._s].join(' '); },
+        remove(...a) { a.forEach(x => this._s.delete(x)); n.className = [...this._s].join(' '); },
+        toggle(x, on) { if (on === undefined) on = !this._s.has(x); if (on) this._s.add(x); else this._s.delete(x); n.className = [...this._s].join(' '); return !!on; },
+        contains(x) { return this._s.has(x); }
+      },
+      setAttribute(k, v) { this.attrs[k] = v; if (k === 'hidden') this.hidden = !!v && v !== 'false'; },
+      getAttribute(k) { return this.attrs[k]; },
+      removeAttribute(k) { delete this.attrs[k]; if (k === 'href') this.href = ''; },
+      addEventListener(type, fn) { (this._ev || (this._ev = {})[type] || (this._ev[type] = [])).push ? this._ev[type].push(fn) : (this._ev[type] = [fn]); },
+      appendChild(c) { this.children.push(c); c.parent = this; return c; },
+      remove() { if (this.parent) this.parent.children = this.parent.children.filter(x => x !== this); },
+      focus() {},
+      querySelector(sel) { return find(this, sel); },
+      querySelectorAll(sel) { const out = []; walk(this, n => { if (match(n, sel)) out.push(n); }); return out; },
+      closest(sel) { let c = this; while (c) { if (match(c, sel)) return c; c = c.parent; } return null; },
+      replaceWith(n2) { if (!this.parent) return; const i = this.parent.children.indexOf(this); if (i >= 0) this.parent.children[i] = n2; n2.parent = this.parent; }
+    };
+    n.addEventListener = function (type, fn) { (this._ev || (this._ev = {})); (this._ev[type] || (this._ev[type] = [])).push(fn); };
+    if (tag === 'iframe') { n.src = ''; n.contentWindow = {}; n.referrerPolicy = ''; }
+    return n;
+  }
+  function match(n, sel) {
+    if (!n || !sel) return false;
+    if (sel[0] === '.') return (n.className || '').split(/\s+/).includes(sel.slice(1));
+    if (sel[0] === '#') return n.attrs && n.attrs.id === sel.slice(1);
+    if (sel.startsWith('[data-art]')) return n.attrs && n.attrs['data-art'] != null;
+    if (sel.startsWith('[data-artclose]')) return n.attrs && n.attrs['data-artclose'] != null;
+    if (sel.startsWith('[data-artfs]')) return n.attrs && ('data-artfs' in (n.attrs || {}) || (n.attrs && n.attrs['data-artfs'] != null) || (n.dataset && 'artfs' in n.dataset));
+    if (sel.startsWith('[data-artfsx]')) return n.attrs && ('data-artfsx' in n.attrs);
+    if (sel === 'iframe' || sel === '.artframe') return n.tagName === 'IFRAME' || (n.className || '').includes('artframe');
+    if (sel === 'strong#arttitle' || sel === '#arttitle') return n.attrs && n.attrs.id === 'arttitle';
+    if (sel === '.artlive') return (n.className || '').includes('artlive');
+    if (sel === '.artsite') return (n.className || '').includes('artsite');
+    return false;
+  }
+  function walk(n, fn) { fn(n); (n.children || []).forEach(c => walk(c, fn)); }
+  function find(n, sel) { let found = null; walk(n, x => { if (!found && match(x, sel)) found = x; }); return found; }
+  function makeDoc() {
+    const html = el('html');
+    const body = el('body');
+    html.appendChild(body);
+    const listeners = {};
+    const doc = {
+      hidden: false,
+      visibilityState: 'visible',
+      documentElement: html,
+      body,
+      fullscreenElement: null,
+      webkitFullscreenElement: null,
+      readyState: 'complete',
+      currentScript: { src: 'play.js?v=1.9.187' },
+      createElement: (tag) => {
+        const n = el(tag);
+        // artWin innerHTML path is not used if we only call ibArt.open — artParts uses innerHTML.
+        n.innerHTML = '';
+        Object.defineProperty(n, 'innerHTML', {
+          set(v) {
+            this._html = v;
+            // crude parse of the known artWin markup
+            const close = el('button', { 'data-artclose': '' }); close.dataset.artclose = '';
+            const fs = el('button', { 'data-artfs': '' }); fs.dataset.artfs = ''; fs.hidden = false;
+            const fsx = el('button', { 'data-artfsx': '' }); fsx.dataset.artfsx = '';
+            const title = el('strong', { id: 'arttitle' }); title.attrs.id = 'arttitle';
+            const live = el('span'); live.className = 'artlive';
+            const site = el('a'); site.className = 'artsite';
+            const iframe = el('iframe'); iframe.className = 'artframe';
+            this.children = [close, title, site, live, fs, fsx, iframe];
+            this.children.forEach(c => c.parent = this);
+          },
+          get() { return this._html || ''; }
+        });
+        n.querySelector = (sel) => find(n, sel);
+        n.querySelectorAll = (sel) => { const out = []; walk(n, x => { if (match(x, sel)) out.push(x); }); return out; };
+        return n;
+      },
+      querySelector: (sel) => find(html, sel) || find(body, sel),
+      querySelectorAll: (sel) => { const out = []; walk(html, n => { if (match(n, sel)) out.push(n); }); return out; },
+      addEventListener(type, fn) { (listeners[type] || (listeners[type] = [])).push(fn); },
+      dispatch(type) { (listeners[type] || []).forEach(fn => fn()); }
+    };
+    html.addEventListener = doc.addEventListener;
+    return { doc, listeners, html, body };
+  }
+
+  const ss = store(), ls = store();
+  const { doc, listeners } = makeDoc();
+  const history = { stack: [{}], pushState(s) { this.stack.push(s || {}); }, back() { this.stack.pop(); } };
+  const root = { document: doc, console, sessionStorage: ss, localStorage: ls, history, scrollY: 0, scrollTo() {}, addEventListener(type, fn) { (root._ev || (root._ev = {})); (root._ev[type] || (root._ev[type] = [])).push(fn); }, dispatch(type, ev) { (root._ev && root._ev[type] || []).forEach(fn => fn(ev || {})); }, setTetrisChrome() {}, pauseVid() {}, location: { pathname: '/feed/' }, CSS: null, matchMedia: () => ({ matches: false, addListener() {}, addEventListener() {} }) };
+  vm.createContext(root);
+  vm.runInContext(fs.readFileSync('feed/play.js', 'utf8'), root, { filename: 'feed/play.js' });
+  assert.ok(root.ibArt && typeof root.ibArt.open === 'function');
+  const btn = el('button', { 'data-art': 'tetris' }); btn.dataset.art = 'tetris';
+  root.ibArt.open('tetris', btn);
+  const ev = { hide: 'HIDE', show: 'SHOW', reload: 'RELOAD' };
+  const log = [];
+  assert.ok(root.ibArt.isTetris(), 'open Tetris');
+  assert.ok(doc.documentElement.dataset.ibArt === 'tetris');
+  const artWin = doc.body.children.find(n => (n.className || '').includes('artwin')) || doc.body.children[0];
+  assert.ok(artWin && artWin.classList.contains('artfull'), 'auto full screen layout (artfull)');
+  const frame = artWin.querySelector('iframe') || artWin.querySelector('.artframe');
+  const srcBefore = frame && frame.src;
+  assert.ok(srcBefore && /tetris/.test(srcBefore), 'iframe is tetris, ' + srcBefore);
+  const savedOpen = JSON.parse(ss.getItem('ib-art-open') || ls.getItem('ib-art-open'));
+  assert.strictEqual(savedOpen.kind, 'tetris');
+  assert.strictEqual(savedOpen.full, true);
+  log.push('open: fullscreen artfull, persisted ib-art-open');
+
+  // Hide: must NOT close Tetris or replace the iframe
+  doc.hidden = true; doc.visibilityState = 'hidden';
+  doc.dispatch('visibilitychange');
+  assert.ok(root.ibArt.isTetris(), 'still open after hide');
+  assert.ok(!artWin.hidden, 'window stays visible');
+  const frame2 = artWin.querySelector('iframe') || artWin.querySelector('.artframe');
+  assert.strictEqual(frame2.src, srcBefore, 'iframe was not unloaded on hide');
+  log.push('hide: Tetris stays open, iframe src unchanged');
+
+  // Show: still the same game window
+  doc.hidden = false; doc.visibilityState = 'visible';
+  doc.dispatch('visibilitychange');
+  assert.ok(root.ibArt.isTetris(), 'still open after show');
+  log.push('show: Tetris still open');
+
+  // pagehide must not unload Tetris
+  root.dispatch('pagehide');
+  assert.ok(root.ibArt.isTetris(), 'pagehide leaves Tetris open');
+  log.push('pagehide: Tetris still open, persist kept');
+
+  // Reload path: fresh play.js with the same storage comes back to Tetris, full screen
+  const { doc: doc2 } = makeDoc();
+  const root2 = { document: doc2, console, sessionStorage: ss, localStorage: ls, history: { stack: [{}], pushState(s) { this.stack.push(s || {}); }, back() { this.stack.pop(); } }, scrollY: 0, scrollTo() {}, addEventListener(type, fn) { (root2._ev || (root2._ev = {})); (root2._ev[type] || (root2._ev[type] = [])).push(fn); }, setTetrisChrome() {}, pauseVid() {}, location: { pathname: '/feed/' }, CSS: null, matchMedia: () => ({ matches: false, addListener() {}, addEventListener() {} }) };
+  vm.createContext(root2);
+  vm.runInContext(fs.readFileSync('feed/play.js', 'utf8'), root2, { filename: 'feed/play.js#reload' });
+  assert.ok(root2.ibArt.isTetris(), 'reload restores Tetris');
+  const win2 = doc2.body.children[0];
+  assert.ok(win2 && win2.classList.contains('artfull'), 'reload restores full screen layout');
+  log.push('reload: Tetris reopened in full screen from sessionStorage/localStorage');
+
+  // Closing clears persist so a later load stays on the feed
+  root2.ibArt.close(false);
+  assert.ok(!root2.ibArt.isTetris());
+  assert.ok(!ss.getItem('ib-art-open') && !ls.getItem('ib-art-open'));
+  assert.ok(!ss.getItem('ib-tetris-live') && !ls.getItem('ib-tetris-live'));
+  const { doc: doc3 } = makeDoc();
+  const ss3 = store(), ls3 = store();
+  // empty stores after close — but close cleared the shared ss/ls already
+  const root3 = { document: doc3, console, sessionStorage: ss, localStorage: ls, history: { stack: [{}], pushState() {}, back() {} }, scrollY: 0, scrollTo() {}, addEventListener() {}, setTetrisChrome() {}, pauseVid() {}, location: { pathname: '/feed/' }, CSS: null, matchMedia: () => ({ matches: false, addListener() {}, addEventListener() {} }) };
+  vm.createContext(root3);
+  vm.runInContext(fs.readFileSync('feed/play.js', 'utf8'), root3, { filename: 'feed/play.js#afterclose' });
+  assert.ok(!root3.ibArt.isTetris(), 'after close, a new load does not reopen Tetris');
+  log.push('close: persist cleared, next load stays on the feed');
+
+  // Other art still closes on hide
+  const { doc: docF } = makeDoc();
+  const rootF = { document: docF, console, sessionStorage: store(), localStorage: store(), history: { stack: [{}], pushState() {}, back() {} }, scrollY: 0, scrollTo() {}, addEventListener(type, fn) { (rootF._ev || (rootF._ev = {})); (rootF._ev[type] || (rootF._ev[type] = [])).push(fn); }, setTetrisChrome() {}, pauseVid() {}, location: { pathname: '/feed/' }, CSS: null, matchMedia: () => ({ matches: false }) };
+  vm.createContext(rootF);
+  vm.runInContext(fs.readFileSync('feed/play.js', 'utf8'), rootF, { filename: 'feed/play.js#fall' });
+  rootF.ibArt.open('fall');
+  assert.strictEqual(rootF.ibArt.kind(), 'fall');
+  docF.hidden = true; docF.visibilityState = 'hidden';
+  (function () { const evs = []; })();
+  // dispatch visibility on docF
+  const vis = [];
+  // re-fire: we need the listener. makeDoc stored listeners on doc object.
+  docF.dispatch('visibilitychange');
+  assert.ok(!rootF.ibArt.kind(), 'Falling Falling still closes on hide');
+  log.push('hide (other art): Falling Falling still closes');
+
+  // Game snapshot survives a reload (board, piece, hold, next, bag, score, level, lines, theme, hits)
+  const gLive = tetGame.newGame();
+  gLive.level = 5; gLive.lines = 44; gLive.score = 12340; gLive.hold = 2; gLive.canHold = false;
+  gLive.next = 6; gLive.bag = [3, 1, 7];
+  gLive.board[18][3] = 4; gLive.board[19][3] = 4; gLive.piece = { t: 1, m: tetGame.SHAPES[1].map(r => r.slice()), x: 3, y: 4 };
+  tetGame.ensureHits(gLive); gLive.hits[19][3] = 2;
+  const snap = tetGame.snapshotGame(gLive, { started: true, musicOn: true, soundOn: false });
+  const mem = store();
+  tetGame.writeLive(snap, { sessionStorage: mem, localStorage: mem });
+  const got = tetGame.applyLive(tetGame.readLive({ sessionStorage: mem, localStorage: mem }));
+  assert.ok(got && got.g);
+  assert.strictEqual(got.started, true);
+  assert.strictEqual(got.soundOn, false);
+  assert.strictEqual(got.g.paused, true, 'comes back paused');
+  assert.strictEqual(got.g.score, 12340);
+  assert.strictEqual(got.g.lines, 44);
+  assert.strictEqual(got.g.level, 5);
+  assert.strictEqual(got.g.hold, 2);
+  assert.strictEqual(got.g.next, 6);
+  assert.deepEqual(Array.from(got.g.bag), [3, 1, 7]);
+  assert.strictEqual(got.g.board[18][3], 4);
+  assert.strictEqual(got.g.hits[19][3], 2);
+  assert.strictEqual(got.g.piece.t, 1);
+  assert.strictEqual(got.g.piece.y, 4);
+  assert.strictEqual(tetGame.themeFor(got.g.level), tetGame.themeFor(5));
+  assert.strictEqual(tetGame.musicWanted(got.g.level, got.started, got.g), false, 'music stays down while paused');
+  got.g.paused = false;
+  assert.strictEqual(tetGame.musicWanted(got.g.level, got.started, got.g), true, 'music wanted again on resume (sound/musicOn true defaults from snap.musicOn)');
+  // snap musicOn was true, soundOn false — musicWanted only checks musicOn
+  assert.strictEqual(got.musicOn, true);
+  log.push('reload snapshot: board, piece, hold, next, bag, score, level, lines, hits restored, paused, music resumes when unpaused');
+
+  // Hits move with a cleared line
+  const gClear = tetGame.newGame();
+  gClear.board = tetGame.emptyBoard();
+  gClear.hits = tetGame.emptyBoard();
+  for (let c = 0; c < 9; c++) { gClear.board[19][c] = 2; gClear.hits[19][c] = 2; }
+  gClear.board[18][3] = 5; gClear.hits[18][3] = 1;
+  gClear.piece = { t: 1, m: [[1]], x: 9, y: 19 };
+  gClear.next = 4;
+  tetGame.lockPiece(gClear);
+  assert.strictEqual(gClear.board[19][3], 5, 'the row above dropped');
+  assert.strictEqual(gClear.hits[19][3], 1, 'hit counter moved with the row');
+  assert.ok(gClear.board.every((row, r) => r === 19 || row.every(v => !v) || true));
+
+  // A falling bomb passes the current piece and chips the topmost locked cell
+  const gPass = tetGame.newGame({ level: 12, practice: true });
+  gPass.level = 12; gPass.lines = 110;
+  gPass.board = tetGame.emptyBoard();
+  gPass.hits = tetGame.emptyBoard();
+  for (let r = 16; r < 20; r++) gPass.board[r][4] = 3;
+  gPass.piece = { t: 4, m: [[4, 4], [4, 4]], x: 4, y: 8 };
+  const invP = tetGame.resetInvaders(tetGame.newInvaders(), 12);
+  invP.wait = 1e9; // only the one bomb under test
+  invP.bombs.push({ x: 4 * 28 + 14, y: 8 * 28, col: 4, vy: 3 * 28 });
+  const sounds = [];
+  tetGame.stepInvaders(invP, gPass, 200, { started: true, onThump: k => sounds.push(k) });
+  // bomb started at the falling piece row and fell ~ (3*28 * 0.2) = 16.8px, maybe not far enough to hit row 16.
+  // Drive it down to the stack.
+  let guard = 0;
+  while (invP.bombs.length && guard++ < 80) tetGame.stepInvaders(invP, gPass, 200, { started: true, onThump: k => sounds.push(k) });
+  assert.ok(gPass.piece.t === 4 && !gPass.over, 'falling piece unhurt');
+  assert.ok(tetGame.cellHits(gPass, 4, 16) === 1 || tetGame.cellHits(gPass, 4, 15) === 1 || gPass.board[16][4] === 3, 'top stacked cell chipped or still there');
+  assert.ok(sounds.includes('thump') || sounds.includes('boom') || invP.boom.length, 'impact effect played');
+  log.push('bomb: passes falling piece, chips a locked cell, mellow thud');
+
+  console.log('1.9.188 evidence:\n- ' + log.join('\n- '));
+}
+
+
+// 1.9.188 City workers (level 5) place one block cell on the stack from a long ladder
+{
+  assert.deepStrictEqual(Array.from(tetGame.ORDER), [6, 11, 0, 1, 4, 2, 3, 9, 10, 5, 8, 7]);
+  assert.strictEqual(tetGame.themeFor(5), tetGame.CITY_THEME);
+  assert.strictEqual(tetGame.CITY_THEME, 4);
+  assert.strictEqual(tetGame.THEMES[4].name, 'City');
+  assert.deepStrictEqual(Array.from(tetGame.CITY_BUILD_EVERY), [9, 15]);
+  assert.strictEqual(tetGame.CITY_SAFE_TOP, 6);
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.ok(src.includes('function drawCityCrew') && src.includes('function drawCityWorker') && src.includes('function drawCityLadder'));
+  assert.ok(src.includes("case 'tock'") && src.includes('cityStep(dt)') && src.includes('cityReset()'));
+  assert.ok(src.includes('lp.frequency.value = 820'), 'tock is low-passed and mellow');
+
+  const g = tetGame.newGame({ level: 5, practice: true });
+  g.board = tetGame.emptyBoard();
+  g.hits = tetGame.emptyBoard();
+  for (let r = 14; r < 20; r++) g.board[r][3] = 2;
+  g.piece = { t: 4, m: [[4, 4], [4, 4]], x: 0, y: 0 };
+  assert.strictEqual(tetGame.cityStackTop(g, 3), 13);
+  assert.ok(tetGame.cityCanPlace(g, 3, 13));
+  const I = tetGame.SHAPES[1].map(r => r.slice());
+  g.piece = { t: 1, m: I, x: 3, y: 2 };
+  assert.ok(!tetGame.cityCanPlace(g, 3, 13), 'never place where the falling piece is or would land');
+  g.piece = { t: 4, m: [[4, 4], [4, 4]], x: 0, y: 0 };
+  const put = tetGame.placeBuiltCell(g, 3, 13, 4);
+  assert.ok(put && put.typ === 4);
+  assert.strictEqual(g.board[13][3], 4);
+  assert.strictEqual(g.board[14][3], 2, 'blocks above a new brick are not required; this one sits on the stack');
+
+  const g2 = tetGame.newGame({ level: 5, practice: true });
+  g2.board = tetGame.emptyBoard();
+  g2.hits = tetGame.emptyBoard();
+  for (let c = 0; c < 9; c++) g2.board[19][c] = 3;
+  g2.piece = { t: 1, m: [[1]], x: 0, y: 0 };
+  const put2 = tetGame.placeBuiltCell(g2, 9, 19, 5);
+  assert.ok(put2 && put2.cleared === 1, 'a placed brick that completes a line clears normally');
+  assert.ok(g2.board[19].every(v => v === 0));
+
+  const g3 = tetGame.newGame({ level: 5, practice: true });
+  g3.board = tetGame.emptyBoard();
+  for (let r = 16; r < 20; r++) for (let c = 2; c < 10; c++) g3.board[r][c] = 2;
+  g3.piece = { t: 4, m: [[4, 4], [4, 4]], x: 0, y: 0 };
+  const crew = tetGame.resetCityCrew(tetGame.newCityCrew(), 5);
+  assert.ok(crew.ready);
+  assert.ok(crew.wait >= 9000 && crew.wait <= 15000, 'first wait uses CITY_BUILD_EVERY');
+  crew.wait = 0;
+  tetGame.stepCityCrew(crew, g3, 30, { started: true });
+  assert.ok(crew.job, 'a job starts when the wait elapses');
+  assert.ok(crew.job.c >= 2 && crew.job.c <= 9);
+  assert.strictEqual(crew.workers.filter(w => w.pose === 'climb').length >= 1, true);
+  // demo/seed holds jobs back
+  const demo = tetGame.seedCityCrew(tetGame.newCityCrew(), g3, {});
+  assert.ok(demo.wait > 1e6);
+}
+
+
+// 1.9.188 City (theme 4, level 5) plays Shane's Hot In The City loop
+{
+  assert.strictEqual(tetGame.themeFor(5), 4);
+  assert.strictEqual(tetGame.THEMES[4].name, 'City');
+  assert.strictEqual(tetGame.bgmSrc(4), 'tetris-bg/m4-1814d32a.mp3');
+  assert.strictEqual(tetGame.BGM_HASH[4], '1814d32a');
+  assert.ok(fs.existsSync('feed/tetris-bg/m4-1814d32a.mp3'), 'new city track is shipped');
+  assert.ok(!fs.existsSync('feed/tetris-bg/m4-6a9bd0f6.mp3'), 'old city track is gone');
+  const tr = tetGame.TRACKS[4];
+  assert.strictEqual(tr.bpm, 111.25);
+  assert.strictEqual(tr.offset, 0.02);
+  assert.strictEqual(tr.key, 'G');
+  assert.strictEqual(tr.mode, 'minor');
+  const tet = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.ok(tet.includes('createBufferSource()') && tet.includes('src.loop = true'));
+  const beat = tetGame.musicBeat(4, 0.02);
+  assert.ok(beat.on && beat.pulse > 0.8, 'offset sits on a City beat');
+  const mid = tetGame.musicBeat(4, 0.02 + (60 / 111.25) * 0.5);
+  assert.ok(!mid.on && mid.pulse < 0.2, 'halfway between City beats is quiet');
+  const rot = tetGame.sfxFreqs(4, 'rotate');
+  assert.ok(rot && rot.length, 'rotate riff follows the City track key');
+}

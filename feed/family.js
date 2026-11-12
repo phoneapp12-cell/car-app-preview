@@ -596,9 +596,19 @@ async function famFresh(force) { // Family tab, ↻ and coming back to the app: 
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { famFresh(); checkUpdate(); } });
 // A phone that keeps the app open (or an iPhone Home Screen app) can sit on old code: tell them, one tap reloads.
+function ibTetrisInPlay() {
+  try {
+    if (typeof ibArt !== 'undefined' && ibArt.isTetris && ibArt.isTetris()) return true;
+    if (document.documentElement && document.documentElement.dataset.ibArt === 'tetris') return true;
+    const raw = (sessionStorage.getItem('ib-art-open') || localStorage.getItem('ib-art-open') || '');
+    const o = raw ? JSON.parse(raw) : null;
+    return !!(o && o.kind === 'tetris');
+  } catch (e) { return false; }
+}
 async function checkUpdate() {
   try {
     const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); if (reg) reg.update().catch(() => { });
+    if (ibTetrisInPlay()) return; // never reload or offer a refresh mid-Tetris; the new SW waits until the next open
     const t = await (await fetch('sw.js?x=' + Date.now(), { cache: 'no-store' })).text(), v = (t.match(/VERSION = '([\d.]+)'/) || [])[1];
     if (v && v !== APP_VERSION && !document.querySelector('#updbar')) {
       const b = document.createElement('button'); b.id = 'updbar'; b.className = 'updbar'; b.textContent = '✨ Update available — tap to refresh';

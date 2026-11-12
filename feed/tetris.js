@@ -173,8 +173,9 @@
   // Colourful picture behind each theme (same order as THEMES), softened with a dark veil so the blocks stand out.
   const PICS = THEMES.map((_, i) => 'tetris-bg/' + i + '.webp');
   let themeIdx = 0;
-  // Level order (indexes into THEMES): Farmyard, Jeremiah was a bullfrog, Beach, Fireworks, Ocean, Bush walk, New Zealand, Snowy mountains, City, Night sky, Triangles, Space travel last.
-  const ORDER = [6, 11, 0, 1, 2, 3, 9, 10, 4, 5, 8, 7];
+  // Level order (indexes into THEMES): Farmyard, Jeremiah was a bullfrog, Beach, Fireworks, City, Ocean, Bush walk, New Zealand, Snowy mountains, Night sky, Triangles, Space travel last.
+  // 1.9.188: City (theme 4) moved to level 5; Ocean and the levels after it shift down one.
+  const ORDER = [6, 11, 0, 1, 4, 2, 3, 9, 10, 5, 8, 7];
   function themeFor(level) { return ORDER[(Math.max(1, level) - 1) % ORDER.length]; }
   function stages() { return ORDER.map((ti, i) => ({ level: i + 1, theme: ti, name: THEMES[ti].name })); }
   function shouldSubmit(gm) { return !!(gm && !gm.practice && gm.score > 0); }
@@ -196,14 +197,32 @@
   // never the falling piece, and blocks above do not drop.
   // 1.9.154 First bomb comes in 4–6s, then every 6–10s, aiming at columns with blocks.
   const SPACE_THEME = 7;
-  // First bomb 4–6s after the Space level starts, then every 6–10s.
+  // 1.9.188 Space travel bomb cadence, easy to tune. Seconds between drops
+  // (first and later use the same window). Up to BOMB_MAX bombs in the air.
+  // A locked block cell is knocked out after BOMB_HITS hits (a "piece" here is one cell).
+  const BOMB_EVERY = [0.8, 1.6];
+  const BOMB_MAX = 4;
+  const BOMB_HITS = 3;
   function bombWaitRange(level, first) {
-    if (first) return [4, 6];
-    return [6, 10];
+    return BOMB_EVERY.slice();
   }
   function bombWait(level, first) {
     const [lo, hi] = bombWaitRange(level, first);
-    return (lo + Math.random() * (hi - lo)) * 1000;
+    return (lo + Math.random() * Math.max(0, hi - lo)) * 1000;
+  }
+  function ensureHits(g) {
+    if (!g.hits || g.hits.length !== ROWS) g.hits = emptyBoard();
+    return g.hits;
+  }
+  function cellHits(g, c, r) {
+    if (!g || !g.hits || r < 0 || r >= ROWS || c < 0 || c >= COLS) return 0;
+    return g.hits[r][c] || 0;
+  }
+  function dropRows(grid, rows, fill) {
+    fill = fill || 0;
+    const next = (grid || emptyBoard()).filter((_, i) => rows.indexOf(i) < 0);
+    while (next.length < ROWS) next.unshift(Array(COLS).fill(fill));
+    return next;
   }
   function pieceCovers(g, c, r) {
     const p = g.piece;
@@ -215,7 +234,16 @@
     if (r < 0) return 'sky';
     if (r >= ROWS || c < 0 || c >= COLS) return 'gone';
     if (pieceCovers(g, c, r)) return 'piece';
-    if (g.board[r][c]) { g.board[r][c] = 0; return 'block'; }
+    if (g.board[r][c]) {
+      const hits = ensureHits(g);
+      hits[r][c] = (hits[r][c] || 0) + 1;
+      if (hits[r][c] >= BOMB_HITS) {
+        g.board[r][c] = 0;
+        hits[r][c] = 0;
+        return 'block';
+      }
+      return 'chip';
+    }
     return 'empty';
   }
   // Invader motion and bombs, kept here so tests can run it without a page.
@@ -237,20 +265,26 @@
     inv.wait = 1e9; // still picture for screenshots: no bombs drop
     if (opts.invX != null) inv.x = opts.invX;
     if (opts.bomb) inv.bombs.push(opts.bomb);
+    if (opts.bombs) inv.bombs = inv.bombs.concat(opts.bombs);
     if (opts.boom) inv.boom = opts.boom.slice();
     return inv;
   }
-  function dropBomb(inv, g) {
-    const choices = [];
-    for (let i = 0; i < INV_COUNT; i++) {
-      const cx = inv.x + i * INV_GAP + INV_W / 2;
-      const col = Math.max(0, Math.min(COLS - 1, Math.floor(cx / CELL)));
-      choices.push({ cx, col, stacked: g.board.some(row => row[col]) });
+  function makeBombParts(c, r) {
+    const parts = [];
+    const cx = c * CELL + CELL / 2, cy = r * CELL + CELL / 2;
+    for (let i = 0; i < 11; i++) {
+      const a = (i / 11) * 6.283 + Math.random() * 0.35;
+      const sp = 36 + Math.random() * 80;
+      parts.push({ x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 18, t: 1, col: i % 2 ? '#f3d7a0' : '#e8b86a', sz: 1.6 + Math.random() * 1.8 });
     }
-    const stacked = choices.filter(c => c.stacked);
-    const pool = stacked.length ? stacked : choices;
-    const pick = pool[Math.floor(Math.random() * pool.length)];
-    inv.bombs.push({ x: pick.cx, y: INV_H + 10, col: pick.col, vy: BOMB_VY });
+    return parts;
+  }
+  function dropBomb(inv, g) {
+    // Random invader, so the column varies with their drift; empty columns miss harmlessly.
+    const i = (Math.random() * INV_COUNT) | 0;
+    const cx = inv.x + i * INV_GAP + INV_W / 2;
+    const col = Math.max(0, Math.min(COLS - 1, Math.floor(cx / CELL)));
+    inv.bombs.push({ x: cx, y: INV_H + 10, col: col, vy: BOMB_VY, from: i });
   }
   function moveBombs(inv, g, dt, onThump) {
     const keep = [];
@@ -261,13 +295,19 @@
       let dead = false;
       for (let r = from; r <= to; r++) {
         const hit = applyBombHit(g, b.col, r);
-        if (hit === 'block') {
-          inv.boom.push({ c: b.col, r: r, t: 420 });
-          if (onThump) onThump();
+        if (hit === 'block' || hit === 'chip') {
+          if (hit === 'block') {
+            inv.boom.push({ c: b.col, r: r, t: 480, kind: 'out', parts: makeBombParts(b.col, r) });
+            if (onThump) onThump('boom');
+          } else {
+            inv.boom.push({ c: b.col, r: r, t: 240, kind: 'chip' });
+            if (onThump) onThump('thump');
+          }
           dead = true;
           break;
         }
         if (hit === 'gone') { dead = true; break; }
+        // 'piece' and 'empty' and 'sky': the bomb keeps falling (never hits the falling piece).
       }
       if (!dead && b.y < ROWS * CELL + 10) keep.push(b);
     }
@@ -280,7 +320,13 @@
     inv.t += dt;
     if (flags.demo || g.demo) return inv;
     if (inv.boom.length) {
-      for (const e of inv.boom) e.t -= dt;
+      for (const e of inv.boom) {
+        e.t -= dt;
+        if (e.parts) {
+          const k = dt / 1000;
+          for (const p of e.parts) { p.x += p.vx * k; p.y += p.vy * k; p.vy += 90 * k; }
+        }
+      }
       inv.boom = inv.boom.filter(e => e.t > 0);
     }
     const moving = flags.started !== false && !g.over && !g.paused;
@@ -289,7 +335,7 @@
     inv.x += inv.dir * 22 * (dt / 1000);
     if (inv.x < 4) { inv.x = 4; inv.dir = 1; }
     if (inv.x > span - 4) { inv.x = span - 4; inv.dir = -1; }
-    if (inv.bombs.length === 0) {
+    if (inv.bombs.length < BOMB_MAX) {
       inv.wait -= dt;
       if (inv.wait <= 0) {
         dropBomb(inv, g);
@@ -306,12 +352,13 @@
   // 1.9.178 m11 (Bullfrog) re-analysed after Shane's new level-2 track (127.45 BPM, D major, loop-safe 440 beats).
   // 1.9.179 m0 (Beach) re-analysed after Shane's new level-3 track (115.5 BPM, C major, loop-safe 392 beats).
   // 1.9.180 m1 (Fireworks) re-analysed after Shane's level-4 soundscape (131 BPM, F# minor kept for chimes, loop-safe 905 beats).
+  // 1.9.188 m4 (City, now level 5) re-analysed after Shane's Hot In The City track (111.25 BPM, G minor, loop-safe 420 beats).
   const TRACKS = [
     { bpm: 115.5, offset: 0.229, key: 'C', mode: 'major' },
     { bpm: 131, offset: 0.083, key: 'F#', mode: 'minor' },
     { bpm: 136, offset: 0, key: 'C#', mode: 'major' },
     { bpm: 117.5, offset: 0.348, key: 'G', mode: 'major' },
-    { bpm: 99.5, offset: 0.096, key: 'C', mode: 'major' },
+    { bpm: 111.25, offset: 0.02, key: 'G', mode: 'minor' },
     { bpm: 117.5, offset: 0.282, key: 'D', mode: 'minor' },
     { bpm: 171, offset: 0.006, key: 'D', mode: 'major' },
     { bpm: 123, offset: 0.163, key: 'D', mode: 'minor' },
@@ -1164,12 +1211,30 @@
       case 'level': [1, 2, 3, 5].forEach((k, i) => tone(lo(T.bells[k]), 0.6, w, 0.25, i * 0.12, 0, d)); break;
       case 'over': [5, 3, 2, 0].forEach((k, i) => tone(nf(T.bells[k]) / 2, 0.9, 'sine', 0.28, i * 0.3, 0, d)); break;
       case 'thump': {
-        // Muffled low thump for a space-invader bomb (extra-low lowpass, no zap or chirp).
+        // Muffled low thud when a bomb chips a locked cell (extra-low lowpass, no zap or chirp).
         const lp = ac.createBiquadFilter();
         lp.type = 'lowpass'; lp.frequency.value = 400;
         lp.connect(d);
         tone(88, 0.28, 'sine', 0.22, 0, 46, lp);
         tone(56, 0.36, 'triangle', 0.14, 0.03, 34, lp);
+        break;
+      }
+      case 'boom': {
+        // Soft low boom when a cell is knocked out on the third hit. Still mellow, nothing sharp.
+        const lp = ac.createBiquadFilter();
+        lp.type = 'lowpass'; lp.frequency.value = 380;
+        lp.connect(d);
+        tone(64, 0.42, 'sine', 0.26, 0, 38, lp);
+        tone(44, 0.55, 'triangle', 0.16, 0.02, 26, lp);
+        break;
+      }
+      case 'tock': {
+        // Soft mellow hammer tock when a city worker places a brick. Low-passed, no sharp click.
+        const lp = ac.createBiquadFilter();
+        lp.type = 'lowpass'; lp.frequency.value = 820;
+        lp.connect(d);
+        tone(196, 0.1, 'sine', 0.17, 0, 140, lp);
+        tone(262, 0.08, 'triangle', 0.1, 0.012, 160, lp);
         break;
       }
       default: break;
@@ -1678,7 +1743,7 @@
   function clearDuration(n) { return Math.min(400, 240 + 40 * Math.max(1, Math.min(4, n || 1))); }
   function clearKind(ti) { return CLEAR_KIND[ti] || 'sparkle'; }
   function clearPartCount(n) { return Math.min(36, 8 + 8 * Math.max(1, Math.min(4, n || 1))); }
-  function startClear(g, rows, snap, lines, level) {
+  function startClear(g, rows, snap, lines, level, snapHits) {
     const n = rows.length;
     const ti = themeFor(level);
     const kind = clearKind(ti);
@@ -1712,7 +1777,7 @@
         hop: 18 + Math.random() * 16
       });
     }
-    g.clearFx = { t: 0, dur, rows: rows.slice(), snap, n, kind, parts, lines, level, hold: false, at: 0, banner: n === 4 };
+    g.clearFx = { t: 0, dur, rows: rows.slice(), snap, snapHits: snapHits ? snapHits.map(r => r.slice()) : null, n, kind, parts, lines, level, hold: false, at: 0, banner: n === 4 };
     if (isEffect(ti)) { effectOnClear(g.clearFx, ti); lifeReact(); }
     return g.clearFx;
   }
@@ -1898,14 +1963,241 @@
     opt = opt || {};
     const level = Math.max(1, opt.level || 1);
     const practice = !!opt.practice;
-    const g = { board: emptyBoard(), piece: spawn(1), bag: refillBag(), next: 0, hold: 0, canHold: true, score: 0, lines: (level - 1) * 10, level, over: false, paused: false, acc: 0, flashT: 0, popup: '', popupT: 0, practice, startLevel: level, clearFx: null, pendingLevel: null, levelUp: null, callout: null, clearCombo: 0, lastWasTetris: false, familyHigh: 0, highNoted: false, highScore: null, pendingHigh: false };
+    const g = { board: emptyBoard(), hits: emptyBoard(), piece: spawn(1), bag: refillBag(), next: 0, hold: 0, canHold: true, score: 0, lines: (level - 1) * 10, level, over: false, paused: false, acc: 0, flashT: 0, popup: '', popupT: 0, practice, startLevel: level, clearFx: null, pendingLevel: null, levelUp: null, callout: null, clearCombo: 0, lastWasTetris: false, familyHigh: 0, highNoted: false, highScore: null, pendingHigh: false };
     g.piece = spawn(takeNext(g));
     g.next = takeNext(g);
     seedHighBar(g);
     return g;
   }
   function dropInterval(level) { return Math.max(60, 800 * Math.pow(0.85, level - 1)); }
+
+  function findFullRows(g) {
+    const full = [];
+    for (let r = 0; r < ROWS; r++) if (g.board[r].every(v => v !== 0)) full.push(r);
+    return full;
+  }
+  function applyClear(g, full) {
+    if (!full || !full.length) return 0;
+    const oldLevel = g.level;
+    const snap = g.board.map(r => r.slice());
+    const snapHits = ensureHits(g).map(r => r.slice());
+    startClear(g, full, snap, g.lines, g.level, snapHits);
+    g.board = dropRows(g.board, full, 0);
+    g.hits = dropRows(g.hits, full, 0);
+    const pts = LINE_POINTS[full.length] * g.level;
+    g.lines += full.length;
+    g.score += pts;
+    g.level = Math.floor(g.lines / 10) + 1;
+    g.flashT = g.clearFx.dur;
+    g.popup = LINE_WORDS[full.length] + ' +' + pts;
+    g.popupT = 1100;
+    sfx(full.length === 4 ? 'tetris' : 'clear', full.length);
+    if (g.level > oldLevel) g.pendingLevel = { from: oldLevel, to: g.level };
+    g.clearCombo = (g.clearCombo || 0) + 1;
+    const b2b = !!(g.lastWasTetris && full.length === 4);
+    g.lastWasTetris = full.length === 4;
+    const high = g.board.some((row, r) => r <= 7 && row.some(v => v));
+    maybeCallout(g, { n: full.length, combo: g.clearCombo, b2b: b2b, high: high, near: false, level: g.level });
+    return full.length;
+  }
+
+  // 1.9.188 City (theme 4, level 5): construction workers climb a long ladder and
+  // place a single block cell on top of the stack. A "brick" is one cell.
+  const CITY_THEME = 4;
+  // Seconds between placements (first and later). Modest and easy to tune.
+  const CITY_BUILD_EVERY = [9, 15];
+  const CITY_SAFE_TOP = 6; // never build in the top 6 rows — keep it a fun challenge, not unfair
+  const CITY_CREW_N = 2;
+  function cityBuildWait() {
+    const lo = CITY_BUILD_EVERY[0], hi = CITY_BUILD_EVERY[1];
+    return (lo + Math.random() * Math.max(0, hi - lo)) * 1000;
+  }
+  function pieceDropCovers(g, c, r) {
+    const p = g.piece;
+    if (!p || g.over || r < 0) return false;
+    if (pieceCovers(g, c, r)) return true;
+    let gy = p.y;
+    while (!collides(g.board, p.m, p.x, gy + 1)) gy++;
+    const mr = r - gy, mc = c - p.x;
+    return !!(p.m[mr] && p.m[mr][mc]);
+  }
+  function cityStackTop(g, c) {
+    if (c < 0 || c >= COLS) return -1;
+    for (let r = 0; r < ROWS; r++) if (g.board[r][c]) return r - 1;
+    return ROWS - 1;
+  }
+  function cityCanPlace(g, c, r) {
+    if (!g || g.over || g.clearFx || g.levelUp || g.highScore) return false;
+    if (r < CITY_SAFE_TOP || r >= ROWS || c < 0 || c >= COLS) return false;
+    if (g.board[r][c]) return false;
+    if (r < ROWS - 1 && !g.board[r + 1][c]) return false;
+    if (pieceCovers(g, c, r) || pieceDropCovers(g, c, r)) return false;
+    return true;
+  }
+  function cityPickCol(g) {
+    const opts = [];
+    for (let c = 0; c < COLS; c++) {
+      const r = cityStackTop(g, c);
+      if (cityCanPlace(g, c, r)) opts.push({ c: c, r: r });
+    }
+    if (!opts.length) return null;
+    return opts[(Math.random() * opts.length) | 0];
+  }
+  function placeBuiltCell(g, c, r, typ) {
+    typ = typ || (1 + ((Math.random() * 7) | 0));
+    if (!cityCanPlace(g, c, r)) return null;
+    g.board[r][c] = typ;
+    ensureHits(g)[r][c] = 0;
+    const n = applyClear(g, findFullRows(g));
+    maybeHighScore(g);
+    return { typ: typ, c: c, r: r, cleared: n };
+  }
+  function newCityCrew() {
+    return { ready: false, t: 0, wait: 0, ladderC: 1, workers: [], dust: [], job: null };
+  }
+  function cityWorker(i) {
+    return { id: i, x: 28 + i * 70, y: ROWS * CELL - 8, dir: i % 2 ? 1 : -1, walk: i * 0.4, pose: 'wander', brick: 0, climb: 0 };
+  }
+  function resetCityCrew(crew, level) {
+    crew.ready = themeFor(level) === CITY_THEME;
+    crew.t = 0;
+    crew.wait = crew.ready ? cityBuildWait() : 0;
+    crew.ladderC = 1;
+    crew.workers = [];
+    for (let i = 0; i < CITY_CREW_N; i++) crew.workers.push(cityWorker(i));
+    crew.dust = [];
+    crew.job = null;
+    return crew;
+  }
+  function seedCityCrew(crew, g, opts) {
+    opts = opts || {};
+    if (themeFor(g.level) !== CITY_THEME) { crew.ready = false; crew.workers = []; crew.dust = []; crew.job = null; return crew; }
+    resetCityCrew(crew, g.level);
+    crew.wait = 1e9; // still picture for screenshots: no new jobs
+    if (opts.ladderC != null) crew.ladderC = opts.ladderC;
+    if (opts.workers) {
+      opts.workers.forEach((src, i) => {
+        const w = crew.workers[i] || cityWorker(i);
+        Object.assign(w, src);
+        crew.workers[i] = w;
+      });
+    }
+    if (opts.job) crew.job = Object.assign({}, opts.job);
+    if (opts.dust) crew.dust = opts.dust.slice();
+    return crew;
+  }
+  function cityLadderFoot(crew) {
+    const mid = (crew.ladderC + 0.5) * CELL;
+    return { x: mid + 18, y: ROWS * CELL - 2 };
+  }
+  function cityLadderTop(crew, g) {
+    const mid = (crew.ladderC + 0.5) * CELL;
+    let r = crew.job ? crew.job.r : cityStackTop(g, crew.ladderC);
+    if (r < 0 || r > ROWS - 1) r = Math.max(CITY_SAFE_TOP, ROWS - 8);
+    return { x: mid, y: (r + 1) * CELL };
+  }
+  function cityAddDust(crew, c, r) {
+    const cx = (c + 0.5) * CELL, cy = (r + 0.5) * CELL;
+    for (let i = 0; i < 9; i++) {
+      const a = -2.6 + Math.random() * 2.0;
+      const sp = 18 + Math.random() * 38;
+      crew.dust.push({ x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 8, t: 0, life: 320 + Math.random() * 180, sz: 1.2 + Math.random() * 1.8 });
+    }
+  }
+  function stepCityCrew(crew, g, dt, flags) {
+    flags = flags || {};
+    if (themeFor(g.level) !== CITY_THEME) {
+      if (crew.ready) { crew.ready = false; crew.workers = []; crew.dust = []; crew.job = null; }
+      return crew;
+    }
+    if (!crew.ready) resetCityCrew(crew, g.level);
+    crew.t += dt;
+    if (crew.dust.length) {
+      const k = dt / 1000;
+      for (const d of crew.dust) { d.t += dt; d.x += d.vx * k; d.y += d.vy * k; d.vy += 70 * k; }
+      crew.dust = crew.dust.filter(d => d.t < d.life);
+    }
+    if (flags.demo || g.demo) return crew;
+    const moving = flags.started !== false && !g.over && !g.paused;
+    if (!moving) return crew;
+    // Wanderers amble along the bottom of the well.
+    for (const w of crew.workers) {
+      if (crew.job && crew.job.wid === w.id) continue;
+      w.pose = 'wander';
+      w.brick = 0;
+      w.walk += dt / 260;
+      w.x += w.dir * 18 * (dt / 1000);
+      if (w.x < 16) { w.x = 16; w.dir = 1; }
+      if (w.x > COLS * CELL - 16) { w.x = COLS * CELL - 16; w.dir = -1; }
+      w.y = ROWS * CELL - 8 + Math.sin(w.walk) * 0.6;
+      if (Math.random() < 0.002) w.dir *= -1;
+    }
+    if (!crew.job) {
+      crew.wait -= dt;
+      if (crew.wait <= 0) {
+        const pick = cityPickCol(g);
+        if (!pick) crew.wait = 1800;
+        else {
+          const wr = crew.workers[0] || cityWorker(0);
+          if (!crew.workers.length) crew.workers.push(wr);
+          crew.ladderC = pick.c;
+          crew.job = { c: pick.c, r: pick.r, typ: 1 + ((Math.random() * 7) | 0), stage: 'climb', p: 0, dur: 1500, wid: wr.id };
+          wr.pose = 'climb';
+          wr.brick = crew.job.typ;
+          wr.dir = 1;
+        }
+      }
+    } else {
+      const job = crew.job;
+      const wr = crew.workers.find(w => w.id === job.wid) || crew.workers[0];
+      job.p += dt / job.dur;
+      const foot = cityLadderFoot(crew);
+      const top = cityLadderTop(crew, g);
+      if (job.stage === 'climb') {
+        wr.pose = 'climb';
+        wr.brick = job.typ;
+        const u = Math.max(0, Math.min(1, job.p));
+        wr.x = foot.x + (top.x - foot.x) * u;
+        wr.y = foot.y + (top.y - foot.y) * u;
+        wr.walk += dt / 180;
+        if (job.p >= 1) { job.stage = 'place'; job.p = 0; job.dur = 420; wr.pose = 'hammer'; }
+      } else if (job.stage === 'place') {
+        wr.pose = 'hammer';
+        wr.x = top.x;
+        wr.y = top.y;
+        if (job.p >= 0.35 && !job.done) {
+          // Re-check at the moment of placement so we never overlap the falling piece.
+          const rNow = cityStackTop(g, job.c);
+          const put = (rNow === job.r || rNow >= CITY_SAFE_TOP) ? placeBuiltCell(g, job.c, rNow, job.typ) : null;
+          job.done = true;
+          wr.brick = 0;
+          if (put) {
+            job.r = put.r;
+            cityAddDust(crew, put.c, put.r);
+            if (flags.onTock) flags.onTock();
+          }
+        }
+        if (job.p >= 1) { job.stage = 'down'; job.p = 0; job.dur = 1300; wr.pose = 'climb'; wr.brick = 0; }
+      } else if (job.stage === 'down') {
+        wr.pose = 'climb';
+        wr.brick = 0;
+        const u = Math.max(0, Math.min(1, job.p));
+        wr.x = top.x + (foot.x - top.x) * u;
+        wr.y = top.y + (foot.y - top.y) * u;
+        wr.walk += dt / 180;
+        if (job.p >= 1) {
+          wr.pose = 'wander';
+          wr.y = ROWS * CELL - 8;
+          crew.job = null;
+          crew.wait = cityBuildWait();
+        }
+      }
+    }
+    return crew;
+  }
+
   function lockPiece(g) {
+
     const p = g.piece;
     for (let r = 0; r < p.m.length; r++) {
       for (let c = 0; c < p.m[r].length; c++) {
@@ -1917,32 +2209,11 @@
     }
     if (g.over) { sfx('over'); return g; }
     resetRotRiff();
-    const full = [];
-    for (let r = 0; r < ROWS; r++) if (g.board[r].every(v => v !== 0)) full.push(r);
+    const full = findFullRows(g);
     const highBefore = g.board.some((row, r) => r <= 7 && row.some(v => v));
     const nearMiss = g.board.some((row, r) => row.filter(v => v).length === 9 && full.indexOf(r) < 0);
     if (full.length) {
-      const oldLevel = g.level;
-      const snap = g.board.map(r => r.slice());
-      startClear(g, full, snap, g.lines, g.level);
-      g.board = g.board.filter((_, i) => full.indexOf(i) < 0);
-      while (g.board.length < ROWS) g.board.unshift(Array(COLS).fill(0));
-      const pts = LINE_POINTS[full.length] * g.level;
-      g.lines += full.length;
-      g.score += pts;
-      g.level = Math.floor(g.lines / 10) + 1;
-      g.flashT = g.clearFx.dur;
-      g.popup = LINE_WORDS[full.length] + ' +' + pts;
-      g.popupT = 1100;
-      sfx(full.length === 4 ? 'tetris' : 'clear', full.length);
-      if (g.level > oldLevel) {
-        g.pendingLevel = { from: oldLevel, to: g.level };
-      }
-      g.clearCombo = (g.clearCombo || 0) + 1;
-      const b2b = !!(g.lastWasTetris && full.length === 4);
-      g.lastWasTetris = full.length === 4;
-      const high = g.board.some((row, r) => r <= 7 && row.some(v => v));
-      maybeCallout(g, { n: full.length, combo: g.clearCombo, b2b: b2b, high: high, near: false, level: g.level });
+      applyClear(g, full);
     } else {
       sfx('lock'); effectLand(g);
       g.clearCombo = 0;
@@ -2005,12 +2276,13 @@
     return g;
   }
   // 1.9.145 Real recorded music, one track per theme (tetris-bg/m<theme>-<hash>.mp3, Kevin MacLeod, CC BY 4.0).
+  // 1.9.188 m4 is Shane's Hot In The City loop (theme 4 / level 5).
   // It speeds up a little each level, and the old generated music is no longer played.
   // 1.9.164 Music plays through the shared AudioContext (decoded loop), so line-clear
   // effects cannot pause or mute a separate HTML audio element on iOS/Android WebView.
   // Filenames include a content hash because some phone media caches ignore ?v= query strings
   // (1.9.163 busted the URL but Shane still heard the old bullfrog track).
-  const BGM_HASH = ['da11a54a', '9813c57a', '9ca3b84e', '7776197f', '6a9bd0f6', '63c9eafe', '7bc4ebcd', 'b76dd1d3', 'fdec4369', '2b10c8ba', 'cdbe7d34', '8afd517f'];
+  const BGM_HASH = ['da11a54a', '9813c57a', '9ca3b84e', '7776197f', '1814d32a', '63c9eafe', '7bc4ebcd', 'b76dd1d3', 'fdec4369', '2b10c8ba', 'cdbe7d34', '8afd517f'];
   function bgmSrc(ti) { return 'tetris-bg/m' + ti + '-' + BGM_HASH[ti] + '.mp3'; }
   let bgmGain = null, bgmNode = null, bgmIdx = -1, bgmBufs = {}, bgmLoading = {}, bgmAt = 0, bgmRate = 1, bgmWant = false, bgmWantTi = -1, bgmAnalyser = null, bgmBins = null;
   function silentUnlock() {
@@ -2112,7 +2384,109 @@
     bgmFading = false;
     bgmBufs = {}; bgmLoading = {};
   }
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, maybeHighScore, startHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, farmDayTarget, farmSunPos, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts };
+
+  const LIVE_KEY = 'ib-tetris-live';
+  const LIVE_TTL = 36 * 3600 * 1000;
+  function cloneBoard(b) { return (b || []).map(r => (r || []).slice()); }
+  function clonePiece(p) {
+    if (!p) return null;
+    return { t: p.t, x: p.x, y: p.y, m: (p.m || []).map(r => r.slice()) };
+  }
+  function snapshotGame(g, extra) {
+    extra = extra || {};
+    if (!g || g.demo) return null;
+    return {
+      v: 1,
+      at: Date.now(),
+      started: !!extra.started,
+      musicOn: extra.musicOn !== false,
+      soundOn: extra.soundOn !== false,
+      g: {
+        board: cloneBoard(g.board),
+        piece: clonePiece(g.piece),
+        bag: (g.bag || []).slice(),
+        next: g.next,
+        hold: g.hold || 0,
+        canHold: g.canHold !== false,
+        score: g.score || 0,
+        lines: g.lines || 0,
+        level: g.level || 1,
+        over: !!g.over,
+        practice: !!g.practice,
+        startLevel: g.startLevel || 1,
+        acc: g.acc || 0,
+        clearCombo: g.clearCombo || 0,
+        lastWasTetris: !!g.lastWasTetris,
+        familyHigh: g.familyHigh || 0,
+        highNoted: !!g.highNoted,
+        scored: !!g.scored,
+        hits: cloneBoard(ensureHits(g))
+      }
+    };
+  }
+  function readLiveFrom(store) {
+    if (!store || !store.getItem) return null;
+    try {
+      const snap = JSON.parse(store.getItem(LIVE_KEY) || 'null');
+      if (!snap || snap.v !== 1 || !snap.g || !Array.isArray(snap.g.board) || snap.g.board.length !== 20) return null;
+      if (Date.now() - (snap.at || 0) > LIVE_TTL) return null;
+      return snap;
+    } catch (e) { return null; }
+  }
+  function readLive(rootObj) {
+    const r = rootObj || root;
+    return readLiveFrom(r.sessionStorage) || readLiveFrom(r.localStorage);
+  }
+  function writeLive(snap, rootObj) {
+    if (!snap) return;
+    const r = rootObj || root;
+    const raw = JSON.stringify(snap);
+    try { if (r.sessionStorage) r.sessionStorage.setItem(LIVE_KEY, raw); } catch (e) { }
+    try { if (r.localStorage) r.localStorage.setItem(LIVE_KEY, raw); } catch (e) { }
+  }
+  function clearLive(rootObj) {
+    const r = rootObj || root;
+    try { if (r.sessionStorage) r.sessionStorage.removeItem(LIVE_KEY); } catch (e) { }
+    try { if (r.localStorage) r.localStorage.removeItem(LIVE_KEY); } catch (e) { }
+  }
+  function applyLive(snap) {
+    if (!snap || snap.v !== 1 || !snap.g || !Array.isArray(snap.g.board) || snap.g.board.length !== 20) return null;
+    if (Date.now() - (snap.at || 0) > LIVE_TTL) return null;
+    const s = snap.g;
+    const g = newGame(s.practice ? { level: s.startLevel || 1, practice: true } : { level: 1 });
+    g.board = cloneBoard(s.board);
+    g.piece = clonePiece(s.piece) || g.piece;
+    g.bag = (s.bag || []).slice();
+    g.next = s.next;
+    g.hold = s.hold || 0;
+    g.canHold = s.canHold !== false;
+    g.score = s.score || 0;
+    g.lines = s.lines || 0;
+    g.level = s.level || 1;
+    g.over = !!s.over;
+    g.practice = !!s.practice;
+    g.startLevel = s.startLevel || 1;
+    g.acc = s.acc || 0;
+    g.clearCombo = s.clearCombo || 0;
+    g.lastWasTetris = !!s.lastWasTetris;
+    g.familyHigh = s.familyHigh || 0;
+    g.highNoted = !!s.highNoted;
+    g.scored = !!s.scored;
+    g.hits = s.hits ? cloneBoard(s.hits) : emptyBoard();
+    g.paused = true;
+    g.clearFx = null;
+    g.pendingLevel = null;
+    g.levelUp = null;
+    g.callout = null;
+    g.highScore = null;
+    g.pendingHigh = false;
+    g.popup = '';
+    g.popupT = 0;
+    g.flashT = 0;
+    return { g: g, started: !!snap.started, musicOn: snap.musicOn !== false, soundOn: snap.soundOn !== false };
+  }
+
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_SAFE_TOP, CITY_CREW_N, cityBuildWait, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, maybeHighScore, startHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, farmDayTarget, farmSunPos, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts };
 
   if (!root.document) return;
   const doc = root.document;
@@ -2168,8 +2542,9 @@
   function press(a) {
     if (!started) started = true;
     const next = act(g, a);
-    if (a === 'restart') { g = next; invReset(); life.hold = null; life.singHold = null; life.beachHold = null; fw.hold = null; ocean.hold = null; sparkHold = null; blockSparks = []; lifeReset(); if (isEffect(themeFor(g.level))) { lifeCast(isEffect(themeFor(g.level))); } if (root.IBScores) root.IBScores.close(); }
+    if (a === 'restart') { g = next; invReset(); cityReset(); life.hold = null; life.singHold = null; life.beachHold = null; fw.hold = null; ocean.hold = null; sparkHold = null; blockSparks = []; lifeReset(); if (isEffect(themeFor(g.level))) { lifeCast(isEffect(themeFor(g.level))); } if (root.IBScores) root.IBScores.close(); }
     syncHud();
+    try { persistLive(); } catch (e) { }
   }
   root.Tetris.press = press;
   root.Tetris.live = () => g;
@@ -2184,6 +2559,8 @@
     g.score = opts.score || 0;
     g.paused = false; g.over = false; g.demo = true; g.acc = 0; g.popupT = 0; g.flashT = 0; g.levelUp = null; g.callout = null; g.highScore = null; g.pendingHigh = false; goPlaying = false; resetRotRiff();
     if (opts.board) g.board = opts.board;
+    if (opts.hits) g.hits = opts.hits;
+    else if (opts.board) g.hits = emptyBoard();
     if (opts.piece) g.piece = opts.piece;
     if (opts.next != null) g.next = opts.next;
     if (opts.hold != null) { g.hold = opts.hold; g.canHold = true; }
@@ -2209,7 +2586,8 @@
     if (opts.clear) {
       const rows = (opts.clear.rows || []).slice();
       const snap = g.board.map(r => r.slice());
-      startClear(g, rows, snap, g.lines, g.level);
+      const snapHits = ensureHits(g).map(r => r.slice());
+      startClear(g, rows, snap, g.lines, g.level, snapHits);
       g.clearFx.hold = true;
       g.clearFx.at = opts.clear.at != null ? opts.clear.at : 0.45;
       if (g.clearFx.n === 4) {
@@ -2217,8 +2595,8 @@
         g.popup = 'TETRIS! +' + pts;
         g.popupT = 1100;
       }
-      g.board = g.board.filter((_, i) => rows.indexOf(i) < 0);
-      while (g.board.length < ROWS) g.board.unshift(Array(COLS).fill(0));
+      g.board = dropRows(g.board, rows, 0);
+      g.hits = dropRows(g.hits, rows, 0);
     }
     if (opts.levelUp) {
       const from = opts.levelUp.from != null ? opts.levelUp.from : Math.max(1, g.level - 1);
@@ -2276,6 +2654,7 @@
     const mb = doc.getElementById('musicbtn'); if (mb) mb.textContent = 'Music off';
     const sb = doc.getElementById('soundbtn'); if (sb) sb.textContent = 'Sound off';
     invSeed(opts);
+    citySeed(opts);
   };
   doc.addEventListener('click', e => {
     const b = e.target.closest && e.target.closest('[data-act]');
@@ -2311,6 +2690,7 @@
     lookIdx = -1;
     applyLook(themeIdx);
     invReset();
+    cityReset();
     syncHud();
   }
   function showShanePicker(force) {
@@ -2516,7 +2896,36 @@
       dur: SPARK_DUR, rot: -0.15 + i * 0.12, ox: 0.45, oy: 0.35
     }));
   }
+  function drawBlockHits(ctx, x, y, size, hits, now) {
+    if (!hits) return;
+    const flicker = hits >= 2 ? 0.82 + 0.18 * Math.sin((now || 0) / 80) : 1;
+    ctx.save();
+    ctx.globalAlpha = (hits === 1 ? 0.22 : 0.4) * flicker;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(x + 1, y + 1, size - 2, size - 2);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = 'rgba(18, 14, 10,' + (0.5 + hits * 0.18) + ')';
+    ctx.lineWidth = Math.max(1.1, size * 0.07);
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x + size * 0.18, y + size * 0.16);
+    ctx.lineTo(x + size * 0.48, y + size * 0.5);
+    ctx.lineTo(x + size * 0.3, y + size * 0.86);
+    if (hits >= 2) {
+      ctx.moveTo(x + size * 0.78, y + size * 0.14);
+      ctx.lineTo(x + size * 0.52, y + size * 0.48);
+      ctx.lineTo(x + size * 0.86, y + size * 0.84);
+      ctx.moveTo(x + size * 0.12, y + size * 0.52);
+      ctx.lineTo(x + size * 0.72, y + size * 0.6);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255, 230, 180,' + (0.22 * flicker + (hits >= 2 ? 0.12 : 0)) + ')';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+  }
   function drawCell(ctx, x, y, color, size, alpha, col, row) {
+
     if (themeFor(g.level) === TRI_THEME) {
       ctx.globalAlpha = alpha;
       triPath(ctx, x, y, size, col, row);
@@ -2799,9 +3208,13 @@
      ['...#.#.....','..#####....','.#######...','#.#.#.#.#..','#########..','.#.#####...','..#...#.#..','.......#.#.']]
   ];
   const inv = newInvaders();
+  const city = newCityCrew();
   function invReset() { resetInvaders(inv, g.level); }
   function invSeed(opts) { seedInvaders(inv, g, opts); }
-  function invStep(dt) { stepInvaders(inv, g, dt, { started: started, onThump: () => sfx('thump') }); }
+  function invStep(dt) { stepInvaders(inv, g, dt, { started: started, onThump: (k) => sfx(k || 'thump') }); }
+  function cityReset() { resetCityCrew(city, g.level); }
+  function citySeed(opts) { seedCityCrew(city, g, (opts && opts.city) || {}); }
+  function cityStep(dt) { stepCityCrew(city, g, dt, { started: started, onTock: () => sfx('tock') }); }
   function invSprite(ctx, rows, x, y, color) {
     const px = INV_PX;
     ctx.fillStyle = color;
@@ -2829,16 +3242,243 @@
       ctx.fillRect(bx - 1, by + 6, 2, 5);
     }
     for (const e of inv.boom) {
-      const k = Math.max(0, e.t / 420), cx = e.c * CELL + CELL / 2, cy = e.r * CELL + CELL / 2;
-      const rad = 5 + 12 * (1 - k);
+      const life = e.kind === 'out' ? 480 : 240;
+      const k = Math.max(0, e.t / life), cx = e.c * CELL + CELL / 2, cy = e.r * CELL + CELL / 2;
+      const rad = (e.kind === 'out' ? 7 : 4) + (e.kind === 'out' ? 16 : 8) * (1 - k);
       ctx.globalAlpha = 0.35 * k;
-      ctx.fillStyle = '#f3d7a0';
+      ctx.fillStyle = e.kind === 'out' ? '#f3d7a0' : '#d9c48a';
       ctx.beginPath(); ctx.arc(cx, cy, rad, 0, 6.283); ctx.fill();
       ctx.globalAlpha = 0.7 * k;
       ctx.fillStyle = '#e8b86a';
       ctx.beginPath(); ctx.arc(cx, cy, rad * 0.45, 0, 6.283); ctx.fill();
+      if (e.parts) {
+        for (const p of e.parts) {
+          ctx.globalAlpha = 0.85 * k;
+          ctx.fillStyle = p.col || '#f3d7a0';
+          ctx.fillRect(p.x - p.sz / 2, p.y - p.sz / 2, p.sz, p.sz);
+        }
+      }
       ctx.globalAlpha = 1;
     }
+  }
+
+
+  function drawCityLadder(ctx, crew, gm) {
+    const foot = cityLadderFoot(crew);
+    const top = cityLadderTop(crew, gm);
+    const x0 = foot.x, y0 = ROWS * CELL - 1;
+    const x1 = top.x, y1 = Math.min(top.y, ROWS * CELL - 24);
+    const dx = x1 - x0, dy = y1 - y0;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len, uy = dy / len;
+    const px = -uy, py = ux;
+    const half = 6.2;
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    // Grounded shadow
+    ctx.strokeStyle = 'rgba(8,0,28,0.4)';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(x0 + px * half + 3, y0 + 3);
+    ctx.lineTo(x1 + px * half + 3, y1 + 3);
+    ctx.moveTo(x0 - px * half + 3, y0 + 3);
+    ctx.lineTo(x1 - px * half + 3, y1 + 3);
+    ctx.stroke();
+    function rail(side, w, dark) {
+      const s = side * half;
+      ctx.beginPath();
+      ctx.moveTo(x0 + px * s, y0 + py * s);
+      ctx.lineTo(x1 + px * s, y1 + py * s);
+      ctx.strokeStyle = dark ? '#2a1a3c' : '#d4c4e8';
+      ctx.lineWidth = w;
+      ctx.stroke();
+    }
+    rail(-1, 4.2, true); rail(1, 4.2, true);
+    rail(-1, 2.4, false); rail(1, 2.4, false);
+    // Cyan rim on the near rail, warm edge on the far one — matches the skyline lights.
+    ctx.strokeStyle = 'rgba(80, 220, 255, 0.55)';
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    ctx.moveTo(x0 + px * (-half + 1.4), y0); ctx.lineTo(x1 + px * (-half + 1.4), y1);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255, 140, 80, 0.45)';
+    ctx.beginPath();
+    ctx.moveTo(x0 + px * (half - 1.2), y0); ctx.lineTo(x1 + px * (half - 1.2), y1);
+    ctx.stroke();
+    const rungs = Math.max(6, Math.floor(len / 16));
+    for (let i = 1; i < rungs; i++) {
+      const t = i / rungs;
+      const x = x0 + dx * t, y = y0 + dy * t;
+      ctx.beginPath();
+      ctx.moveTo(x - px * (half - 0.6), y - py * (half - 0.6));
+      ctx.lineTo(x + px * (half - 0.6), y + py * (half - 0.6));
+      ctx.strokeStyle = '#1a1028';
+      ctx.lineWidth = 2.6;
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(232, 214, 255, 0.85)';
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+    }
+    // Feet at the bottom of the screen
+    ctx.fillStyle = '#2a1a3c';
+    ctx.beginPath(); ctx.arc(x0 - px * half, y0, 3.2, 0, 6.283); ctx.fill();
+    ctx.beginPath(); ctx.arc(x0 + px * half, y0, 3.2, 0, 6.283); ctx.fill();
+    ctx.fillStyle = 'rgba(80, 220, 255, 0.5)';
+    ctx.beginPath(); ctx.arc(x0 - px * half, y0, 1.5, 0, 6.283); ctx.fill();
+    ctx.restore();
+  }
+  function drawCityBrick(ctx, x, y, typ, s) {
+    s = s || 9;
+    const col = COLORS[typ] || '#facc15';
+    ctx.save();
+    ctx.translate(x, y);
+    // isometric-ish cube
+    ctx.fillStyle = 'rgba(8,0,24,0.35)';
+    ctx.fillRect(-s * 0.4 + 1.5, -s * 0.15 + 1.5, s * 0.85, s * 0.7);
+    const gdt = ctx.createLinearGradient(-s * 0.5, -s * 0.6, s * 0.5, s * 0.5);
+    gdt.addColorStop(0, 'rgba(255,255,255,0.55)');
+    gdt.addColorStop(0.35, col);
+    gdt.addColorStop(1, 'rgba(0,0,0,0.45)');
+    ctx.fillStyle = gdt;
+    ctx.beginPath();
+    ctx.moveTo(0, -s * 0.55);
+    ctx.lineTo(s * 0.55, -s * 0.2);
+    ctx.lineTo(s * 0.55, s * 0.35);
+    ctx.lineTo(0, s * 0.62);
+    ctx.lineTo(-s * 0.55, s * 0.35);
+    ctx.lineTo(-s * 0.55, -s * 0.2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.moveTo(0, -s * 0.55); ctx.lineTo(0, s * 0.62); ctx.stroke();
+    ctx.restore();
+  }
+  function drawCityWorker(ctx, w, t) {
+    const x = w.x, y = w.y;
+    const dir = w.dir >= 0 ? 1 : -1;
+    const climb = w.pose === 'climb';
+    const hammer = w.pose === 'hammer';
+    const walk = w.walk || 0;
+    const swing = climb ? Math.sin(walk * 2.2) * 0.35 : (hammer ? Math.sin(t / 50) * 0.9 : Math.sin(walk) * 0.45);
+    const bob = climb ? 0 : Math.abs(Math.sin(walk)) * 0.8;
+    ctx.save();
+    ctx.translate(x, y - bob);
+    ctx.scale(dir, 1);
+    // Contact shadow
+    ctx.fillStyle = 'rgba(8,0,30,0.35)';
+    ctx.beginPath(); ctx.ellipse(0, 2, 8, 2.2, 0, 0, 6.283); ctx.fill();
+    function limb(x1, y1, x2, y2, wdt, col) {
+      ctx.strokeStyle = col;
+      ctx.lineWidth = wdt;
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
+    const pant = '#2a2040';
+    const pantHi = '#4a3a62';
+    const skin = '#e8b898';
+    const boot = '#1a1428';
+    // Legs
+    const lA = climb ? 0.55 + swing : 0.35 + swing;
+    const lB = climb ? 0.55 - swing : 0.35 - swing;
+    limb(-2.2, -9, -3.5 - swing * 2, -2, 3.4, pant);
+    limb(2.2, -9, 3.2 + swing * 2, -2, 3.4, pant);
+    limb(-3.5 - swing * 2, -2, -4.2 - swing * 2, 1.5, 3.1, boot);
+    limb(3.2 + swing * 2, -2, 4.0 + swing * 2, 1.5, 3.1, boot);
+    // Torso / hi-vis, with a 3D vest fold
+    const vest = ctx.createLinearGradient(-7, -22, 8, -8);
+    vest.addColorStop(0, '#fff3a0');
+    vest.addColorStop(0.25, '#f5d031');
+    vest.addColorStop(0.7, '#c9a40e');
+    vest.addColorStop(1, '#6b4a10');
+    ctx.fillStyle = vest;
+    ctx.beginPath();
+    ctx.moveTo(-6.2, -21);
+    ctx.lineTo(6.4, -21);
+    ctx.lineTo(7.2, -9);
+    ctx.lineTo(-6.8, -9);
+    ctx.closePath();
+    ctx.fill();
+    // Magenta bounce light on the vest edge (city neon)
+    ctx.strokeStyle = 'rgba(255, 70, 180, 0.55)';
+    ctx.lineWidth = 1.1;
+    ctx.beginPath(); ctx.moveTo(6.2, -20.5); ctx.lineTo(7.0, -9.2); ctx.stroke();
+    ctx.strokeStyle = 'rgba(80, 220, 255, 0.4)';
+    ctx.beginPath(); ctx.moveTo(-6.0, -20.5); ctx.lineTo(-6.6, -9.2); ctx.stroke();
+    // Reflective silver stripes
+    ctx.fillStyle = 'rgba(230, 245, 255, 0.85)';
+    ctx.fillRect(-5.4, -17.2, 11, 1.6);
+    ctx.fillRect(-5.6, -13.2, 11.4, 1.6);
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.fillRect(-5.4, -17.2, 11, 0.5);
+    // Arms
+    const armCol = '#f5d031';
+    if (hammer) {
+      limb(-5.5, -18.5, -8 - swing * 2, -14, 2.6, skin);
+      limb(4.5, -18.5, 7, -12 + swing * 6, 2.6, skin);
+      // hammer
+      ctx.save();
+      ctx.translate(7, -12 + swing * 6);
+      ctx.rotate(0.9 + swing);
+      ctx.fillStyle = '#3a2a20';
+      ctx.fillRect(-1, -7, 2, 8);
+      ctx.fillStyle = '#8a7a90';
+      ctx.fillRect(-3.2, -10, 6.4, 3.4);
+      ctx.fillStyle = 'rgba(180, 230, 255, 0.5)';
+      ctx.fillRect(-3.2, -10, 6.4, 1);
+      ctx.restore();
+    } else if (climb) {
+      limb(-5.2, -18.5, -7.5, -24 - swing * 3, 2.6, skin);
+      limb(4.8, -18.5, 6.5, -22 + swing * 3, 2.6, skin);
+    } else {
+      limb(-5.2, -18.5, -7.5, -12 - swing * 4, 2.6, skin);
+      limb(4.8, -18.5, 6.8, -12 + swing * 4, 2.6, skin);
+    }
+    // Head
+    ctx.fillStyle = skin;
+    ctx.beginPath(); ctx.arc(0.2, -25.2, 4.3, 0, 6.283); ctx.fill();
+    // Hard hat — glossy yellow with a brim, sunset highlight, cyan rim
+    ctx.fillStyle = '#c9a00a';
+    ctx.beginPath(); ctx.ellipse(0.2, -27.4, 6.2, 2.1, 0, 0, 6.283); ctx.fill(); // brim
+    const hat = ctx.createLinearGradient(-4, -34, 4, -26);
+    hat.addColorStop(0, '#fff4b0');
+    hat.addColorStop(0.35, '#ffd84a');
+    hat.addColorStop(1, '#c98910');
+    ctx.fillStyle = hat;
+    ctx.beginPath(); ctx.ellipse(0.2, -29.2, 5.1, 4.3, 0, Math.PI, 0, true); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0.2, -29.0, 5.1, 3.2, 0, 0, Math.PI, true); ctx.fill();
+    ctx.strokeStyle = 'rgba(80, 220, 255, 0.55)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.ellipse(0.2, -27.6, 6.0, 1.7, 0, 0, 3.2); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.beginPath(); ctx.ellipse(-1.3, -30.6, 1.7, 1.0, -0.5, 0, 6.283); ctx.fill();
+    // Brick under the arm / on the shoulder while climbing
+    if (w.brick) {
+      const bx = climb ? 8.5 : 9;
+      const by = climb ? -20 : -14;
+      drawCityBrick(ctx, bx, by, w.brick, 8);
+    }
+    ctx.restore();
+  }
+  function drawCityDust(ctx, crew) {
+    for (const d of crew.dust) {
+      const k = 1 - d.t / d.life;
+      ctx.globalAlpha = 0.55 * k;
+      ctx.fillStyle = 'rgba(220, 190, 150, 1)';
+      ctx.beginPath(); ctx.arc(d.x, d.y, d.sz * k, 0, 6.283); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  function drawCityCrew(ctx) {
+    if (themeFor(g.level) !== CITY_THEME) return;
+    if (!city.ready) cityReset();
+    drawCityLadder(ctx, city, g);
+    drawCityDust(ctx, city);
+    const list = city.workers.slice();
+    // Painters: draw farther (higher y is closer? y down is toward camera at bottom). Sort by y.
+    list.sort((a, b) => a.y - b.y);
+    for (const w of list) drawCityWorker(ctx, w, city.t);
   }
 
   function rgbaHex(h, a) {
@@ -5311,6 +5951,7 @@
       }
     }
     try { if (!clearing) invStep(dt); } catch (e) { }
+    try { if (!clearing) cityStep(dt); } catch (e) { }
     musicTick(g.level, musicWanted(g.level, started, g));
     if (g.flashT > 0) g.flashT -= dt;
     if (g.popupT > 0) g.popupT -= dt;
@@ -5337,12 +5978,18 @@
       const drawBoard = fx ? fx.snap : g.board;
       const colLines = fx ? fx.lines : g.lines;
       const colLevel = fx ? fx.level : g.level;
+      const hitBoard = fx && fx.snapHits ? fx.snapHits : (g.hits || null);
       for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
         const v = drawBoard[r][c];
-        if (v) drawCell(ctx, c * CELL, r * CELL, blockColor(v, colLines, colLevel), CELL, 1, c, r);
+        if (v) {
+          drawCell(ctx, c * CELL, r * CELL, blockColor(v, colLines, colLevel), CELL, 1, c, r);
+          const hits = hitBoard && hitBoard[r] ? (hitBoard[r][c] || 0) : 0;
+          if (hits) drawBlockHits(ctx, c * CELL, r * CELL, CELL, hits, now);
+        }
       }
       try { if (!sparkHold) tickBlockSpark(now, drawBoard, (!g.over && !fx) ? g.piece : null, reduceMotion()); } catch (e) { }
       try { invDraw(ctx); } catch (e) { }
+      try { drawCityCrew(ctx); } catch (e) { }
       try { drawEffectTrails(ctx); drawEffectRipples(ctx); } catch (e) { }
       if (!g.over && !fx) {
         const p = g.piece;
@@ -5406,10 +6053,46 @@
     drawMini(holdCv, g.hold, !g.canHold);
     raf = requestAnimationFrame(loop);
   }
+  function persistLive() {
+    if (!g || g.demo) return;
+    writeLive(snapshotGame(g, { started: started, musicOn: musicOn, soundOn: soundOn }));
+  }
+  function bootLive() {
+    const snap = readLive(root);
+    if (!snap) return;
+    const got = applyLive(snap);
+    if (!got) return;
+    g = got.g;
+    started = got.started;
+    musicOn = got.musicOn;
+    soundOn = got.soundOn;
+    g.paused = !g.over;
+    themeIdx = themeFor(g.level);
+    lookIdx = -1;
+    applyLook(themeIdx);
+    if (isEffect(themeIdx)) {
+      try { lifeCast(isEffect(themeIdx)); lifeFastForward(0, effectProg(g.lines)); } catch (e) { }
+    }
+    const mb = doc.getElementById('musicbtn'); if (mb) mb.textContent = musicOn ? 'Music on' : 'Music off';
+    const sb = doc.getElementById('soundbtn'); if (sb) sb.textContent = soundOn ? 'Sound on' : 'Sound off';
+  }
+  bootLive();
   syncHud();
   raf = requestAnimationFrame(loop);
-  function halt() { if (raf) cancelAnimationFrame(raf); raf = 0; g.paused = true; stopAudio(); }
-  doc.addEventListener('visibilitychange', () => { if (doc.hidden) halt(); });
+  function halt() {
+    persistLive();
+    if (raf) cancelAnimationFrame(raf); raf = 0;
+    if (g && !g.over && !g.demo) g.paused = true;
+    stopAudio();
+    try { syncHud(); } catch (e) { }
+  }
+  function unhalt() {
+    if (g && !g.demo && started && !g.over) g.paused = true;
+    if (!raf) raf = requestAnimationFrame(loop);
+    try { syncHud(); } catch (e) { }
+  }
+  doc.addEventListener('visibilitychange', () => { if (doc.hidden) halt(); else unhalt(); });
+
   // 1.9.172 Full screen: fill the phone edge to edge. Driven by the parent
   // Full screen button (postMessage) or by the page itself. If the Fullscreen
   // API is missing (iPhone), a fixed 100dvw × 100dvh overlay is used instead.
@@ -5474,4 +6157,19 @@
   root.Tetris.layoutBoard = layoutBoard;
   root.Tetris.isFull = isFull;
   root.addEventListener('pagehide', halt);
+  root.addEventListener('pageshow', ev => { if (ev && ev.persisted) unhalt(); else unhalt(); });
+  function tryAutoFull() {
+    if (isFull()) return;
+    setFull(true, 'auto');
+  }
+  if (board) board.addEventListener('pointerdown', tryAutoFull, { capture: true });
+  root.Tetris.persistLive = persistLive;
+  root.Tetris.bootLive = bootLive;
+  root.Tetris.halt = halt;
+  root.Tetris.unhalt = unhalt;
+  root.Tetris.tryAutoFull = tryAutoFull;
+  root.Tetris.city = () => city;
+  root.Tetris.cityReset = cityReset;
+  root.Tetris.citySeed = citySeed;
 })(typeof window !== 'undefined' ? window : globalThis);
+
