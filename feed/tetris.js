@@ -723,7 +723,8 @@
     if (info.n >= 4) return pick(idsPraiseBig);
     if (info.n === 3) return pick(idsPraiseBig);
     if (info.combo >= 3) return pick(idsBigger);
-    if (info.n === 0 && (info.high || info.near)) return pick(idsEncourage);
+    // You got this / Keep going are only for level 1 (Farmyard, the first level of a run).
+    if (info.n === 0 && (info.high || info.near) && info.level === 1) return pick(idsEncourage);
     return null;
   }
   function playCallout(g, id, delay) {
@@ -760,6 +761,7 @@
     }
     if (info.n === 0 && Math.random() > 0.45) return;
     if (info.n === 3 && Math.random() > 0.7) return;
+    if (info.level == null) info = Object.assign({}, info, { level: g.level });
     const id = pickCallout(info);
     if (!id) return;
     // Voice sits just after the clear attack so the sting is heard first, then ducked under the voice.
@@ -1940,14 +1942,14 @@
       const b2b = !!(g.lastWasTetris && full.length === 4);
       g.lastWasTetris = full.length === 4;
       const high = g.board.some((row, r) => r <= 7 && row.some(v => v));
-      maybeCallout(g, { n: full.length, combo: g.clearCombo, b2b: b2b, high: high, near: false });
+      maybeCallout(g, { n: full.length, combo: g.clearCombo, b2b: b2b, high: high, near: false, level: g.level });
     } else {
       sfx('lock'); effectLand(g);
       g.clearCombo = 0;
       g.lastWasTetris = false;
       const high = highBefore;
       const near = nearMiss || (g.piece && g.piece.y <= 2);
-      maybeCallout(g, { n: 0, combo: 0, b2b: false, high: high, near: near });
+      maybeCallout(g, { n: 0, combo: 0, b2b: false, high: high, near: near, level: g.level });
     }
     maybeHighScore(g);
     g.piece = spawn(g.next);
