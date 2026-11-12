@@ -947,7 +947,7 @@
   // (1.9.163 busted the URL but Shane still heard the old bullfrog track).
   const BGM_HASH = ['a719f241', '9711dc01', '9ca3b84e', '7776197f', '6a9bd0f6', '63c9eafe', 'ef3f9675', 'b76dd1d3', 'fdec4369', '2b10c8ba', 'cdbe7d34', 'b61bc42a'];
   function bgmSrc(ti) { return 'tetris-bg/m' + ti + '-' + BGM_HASH[ti] + '.mp3'; }
-  let bgmGain = null, bgmNode = null, bgmIdx = -1, bgmBufs = {}, bgmLoading = {}, bgmAt = 0, bgmRate = 1, bgmWant = false;
+  let bgmGain = null, bgmNode = null, bgmIdx = -1, bgmBufs = {}, bgmLoading = {}, bgmAt = 0, bgmRate = 1, bgmWant = false, bgmWantTi = -1;
   function silentUnlock() {
     if (!ac) return;
     try { const z = ac.createBuffer(1, 1, ac.sampleRate || 44100); const s = ac.createBufferSource(); s.buffer = z; s.connect(ac.destination); s.start(0); } catch (e) { }
@@ -993,7 +993,7 @@
   }
   function musicTick(level, want) {
     if (!want || !musicOn) {
-      if (bgmWant) { bgmWant = false; stopBgmNode(); }
+      if (bgmWant) { bgmWant = false; bgmWantTi = -1; stopBgmNode(); }
       return;
     }
     ensureAudio();
@@ -1004,8 +1004,11 @@
     const ti = themeFor(level || 1);
     const lv = Math.max(1, level || 1), rate = Math.min(1.25, 1 + (lv - 1) * 0.02);
     bgmWant = true;
+    bgmWantTi = ti;
     if (ti !== bgmIdx || !bgmNode) {
-      loadBgm(ti).then(b => { if (b && musicOn && bgmWant && themeFor(level || 1) === ti) startBgm(ti, rate); });
+      // Use bgmWantTi (the latest requested theme), not the closed-over level,
+      // so a slow decode of the previous theme cannot start after a level-up.
+      loadBgm(ti).then(b => { if (b && musicOn && bgmWant && bgmWantTi === ti) startBgm(ti, rate); });
       return;
     }
     if (Math.abs(bgmRate - rate) > 0.001 && bgmNode) { bgmRate = rate; try { bgmNode.playbackRate.value = rate; } catch (e) { } }
