@@ -88,6 +88,8 @@
         ensureVoGain();
         loadCallouts();
         ensureRotGain();
+        ensureHsGain();
+        loadHighScore();
       }
       if (ac.state === 'suspended') ac.resume();
     } catch (e) { /* no audio */ }
@@ -490,6 +492,7 @@
     duckMusic(0, Math.max(0.75, LEVELUP_DUR - 0.1));
     duckBus(ccGain, 0.08, LEVELUP_DUR, 0.05, 0.18);
     duckBus(voGain, 0.05, LEVELUP_DUR, 0.04, 0.12);
+    duckBus(hsGain, 0.08, LEVELUP_DUR, 0.05, 0.16);
     if (luBuf) playLuBuf(luBuf, t0);
     else if (luLoading) {
       const startedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : 0;
@@ -693,6 +696,7 @@
     fadeBgmOut(0.28);
     duckBus(ccGain, 0.06, GAMEOVER_DUR, 0.05, 0.12);
     duckBus(voGain, 0.04, GAMEOVER_DUR, 0.04, 0.1);
+    duckBus(hsGain, 0.06, GAMEOVER_DUR, 0.05, 0.12);
     const start = (buf) => {
       const dur = playDecoded(buf, goGain, GAMEOVER_VOL, ac.currentTime);
       setTimeout(() => { goPlaying = false; }, Math.max(400, dur * 1000 + 40));
@@ -728,7 +732,7 @@
     const wait = Math.max(0, delay || 0);
     const dur = CALLOUT_DUR;
     const arm = () => {
-      if (g.over || g.levelUp || g.pendingLevel) return;
+      if (g.over || g.levelUp || g.pendingLevel || g.highScore) return;
       g.callout = { text: text, t: dur, dur: dur, id: id };
       calloutAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
       calloutBusy = true;
@@ -746,7 +750,7 @@
     else arm();
   }
   function maybeCallout(g, info) {
-    if (!g || g.over || g.pendingLevel || g.levelUp) return;
+    if (!g || g.over || g.pendingLevel || g.levelUp || g.highScore) return;
     const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
     if (calloutBusy) return;
     if (now - calloutAt < CALLOUT_GAP) return;
@@ -768,6 +772,155 @@
     g.callout.t -= dt;
     if (g.callout.t <= 0) g.callout = null;
   }
+
+  // 1.9.185 Shane's NEW HIGH SCORE message: overall family top, once per game, not on an empty board.
+  const HIGHSCORE_HASH = 'f7bf7066';
+  const HIGHSCORE_VOL = 0.85;
+  const HIGHSCORE_DUR = 2.09;
+  const HIGH_SCORE_MS = 2200;
+  function highScoreSrc() { return 'tetris-bg/highscore-' + HIGHSCORE_HASH + '.mp3'; }
+  let hsBuf = null, hsLoading = null, hsGain = null;
+  function ensureHsGain() {
+    if (!ac || hsGain) return;
+    hsGain = ac.createGain();
+    hsGain.gain.value = 1;
+    hsGain.connect(ac.destination);
+  }
+  function loadHighScore() {
+    if (hsBuf) return Promise.resolve(hsBuf);
+    if (hsLoading) return hsLoading;
+    if (!ac) return Promise.resolve(null);
+    hsLoading = fetch(highScoreSrc()).then(r => r.arrayBuffer()).then(ab => ac.decodeAudioData(ab.slice(0))).then(b => { hsBuf = b; return b; }).catch(() => { hsLoading = null; return null; });
+    return hsLoading;
+  }
+  function playHighScoreSfx() {
+    if (!soundOn || !ac) return;
+    ensureHsGain();
+    loadHighScore();
+    duckMusic(0, Math.max(0.8, HIGHSCORE_DUR - 0.1));
+    duckBus(ccGain, 0.08, HIGHSCORE_DUR, 0.05, 0.18);
+    duckBus(voGain, 0.05, HIGHSCORE_DUR, 0.04, 0.12);
+    const start = (buf) => { playDecoded(buf, hsGain, HIGHSCORE_VOL, ac.currentTime); };
+    if (hsBuf) start(hsBuf);
+    else if (hsLoading) hsLoading.then(b => { if (b && soundOn && ac) { ensureHsGain(); start(b); } });
+  }
+  function boardOccupied(g) {
+    return !!(g && g.board && g.board.some(function (row) { return row.some(function (v) { return v; }); }));
+  }
+  function familyHighFrom(data) {
+    if (!data || !Array.isArray(data.top)) return null;
+    let n = 0;
+    for (let i = 0; i < data.top.length; i++) n = Math.max(n, data.top[i].score || 0);
+    return n;
+  }
+  function localHighFallback() {
+    let n = 0;
+    try { n = Math.max(n, parseInt(root.localStorage && root.localStorage.getItem('tetris-best'), 10) || 0); } catch (e) { }
+    try {
+      if (root.IBScores && root.IBScores.localBests) {
+        const list = root.IBScores.localBests('tetris') || [];
+        for (let i = 0; i < list.length; i++) n = Math.max(n, list[i].score || 0);
+      }
+    } catch (e) { }
+    return n;
+  }
+  function seedHighBar(g) {
+    if (!g) return g;
+    g.familyHigh = localHighFallback();
+    g.highNoted = false;
+    g.highScore = null;
+    g.pendingHigh = false;
+    const S = root.IBScores;
+    if (!S || !S.load) return g;
+    const p = (S.who && S.who()) ? S.load('tetris') : null;
+    Promise.resolve(p).then(function (data) {
+      if (!g || g.highNoted) return;
+      if (data && Array.isArray(data.top)) g.familyHigh = familyHighFrom(data);
+      maybeHighScore(g);
+    }).catch(function () { });
+    return g;
+  }
+  function startHighScore(g) {
+    if (!g || g.highScore) return g && g.highScore;
+    g.highNoted = true;
+    g.pendingHigh = false;
+    const pal = ['#fde68a', '#fbbf24', '#f59e0b', '#fff7ed', '#facc15', '#eab308'];
+    const ti = themeFor(g.level);
+    const parts = burstParts(ti, 4, pal, true, null);
+    let reduce = false;
+    try { reduce = !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { }
+    g.highScore = {
+      t: 0, dur: HIGH_SCORE_MS, hold: false, at: 0,
+      title: 'NEW HIGH SCORE', sub: String(g.score || 0),
+      parts: parts, n: 4, reduce: reduce, score: g.score, theme: ti
+    };
+    playHighScoreSfx();
+    return g.highScore;
+  }
+  function tickHighScore(g, dt) {
+    const hs = g && g.highScore;
+    if (!hs) return false;
+    if (hs.hold) return true;
+    hs.t += dt;
+    if (hs.t >= hs.dur) { g.highScore = null; return false; }
+    return true;
+  }
+  function maybeHighScore(g) {
+    if (!g || g.demo || g.over || g.highNoted || g.highScore) return false;
+    if (!boardOccupied(g)) return false;
+    const bar = g.familyHigh != null ? g.familyHigh : 0;
+    if (!(g.score > bar)) return false;
+    if (g.clearFx || g.pendingLevel || g.levelUp) { g.pendingHigh = true; return false; }
+    startHighScore(g);
+    return true;
+  }
+  function drawHighScore(ctx, hs) {
+    if (!hs) return;
+    const p = hs.hold ? (hs.at || 0) : Math.min(1, hs.t / hs.dur);
+    const fade = candyFade(p);
+    const scale = candyScale(p, hs.reduce);
+    const tSec = p * (hs.dur / 1000);
+    ctx.save();
+    ctx.globalAlpha = 0.26 * fade;
+    ctx.fillStyle = '#1a0e04';
+    ctx.fillRect(0, 0, board.width, board.height);
+    ctx.restore();
+    if (!hs.reduce) {
+      const glowA = 0.42 * fade * (p < 0.2 ? p / 0.2 : (p > 0.75 ? Math.max(0, (1 - p) / 0.25) : 1));
+      const cx0 = board.width / 2, cy0 = board.height / 2 - 18;
+      const rg = ctx.createRadialGradient(cx0, cy0, 8, cx0, cy0, board.width * 0.75);
+      rg.addColorStop(0, 'rgba(255, 210, 80,' + glowA + ')');
+      rg.addColorStop(0.4, 'rgba(250, 180, 40,' + (glowA * 0.4) + ')');
+      rg.addColorStop(1, 'rgba(250, 180, 40, 0)');
+      ctx.fillStyle = rg;
+      ctx.fillRect(0, 0, board.width, board.height);
+    }
+    const sw = board.width * 0.48;
+    const sx = -sw + Math.min(1, p / 0.55) * (board.width + sw * 2);
+    const sg = ctx.createLinearGradient(sx, 0, sx + sw, board.height * 0.15);
+    sg.addColorStop(0, 'rgba(255,255,255,0)');
+    sg.addColorStop(0.45, 'rgba(255, 236, 180,' + (0.28 * fade) + ')');
+    sg.addColorStop(0.5, 'rgba(255,255,255,' + (0.45 * fade) + ')');
+    sg.addColorStop(0.55, 'rgba(255, 210, 120,' + (0.28 * fade) + ')');
+    sg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = sg;
+    ctx.fillRect(0, 0, board.width, board.height);
+    for (const o of hs.parts) drawPart(ctx, o, tSec, fade, hs.n || 4);
+    const cx = board.width / 2, cy = board.height / 2 - 18;
+    drawCandyWord(ctx, hs.title, cx, cy, 26, fade, scale, { shadow: 'rgba(255, 190, 40, 0.95)', stops: ['#fffbeb', '#fde68a', '#fbbf24', '#f59e0b', '#b45309'] });
+    ctx.save();
+    ctx.globalAlpha = fade * (p < 0.14 ? Math.max(0, (p - 0.06) / 0.08) : 1);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '700 18px ' + FONT;
+    ctx.shadowColor = 'rgba(40, 20, 0, 0.65)';
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = '#fff7ed';
+    ctx.fillText(hs.sub, cx, cy + 36);
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
+
   function resetRotRiff() { rotStep = 0; rotAt = 0; }
   // Theme timbres for the rotate riff: musical, mellow, distinct from the move taps.
   const ROT_KIND = ['pluck', 'bellpad', 'harp', 'wood', 'city', 'bellpad', 'marimba', 'space', 'triangle', 'pluck', 'ice', 'marimba'];
@@ -1233,13 +1386,22 @@
   };
   const farm = { img: null, ready: false, spr: {}, lit: {}, st: {}, stars: [], tilt: { x: 0, y: 0, at: -9, gx: 0, gy: 0 }, listen: false, crowed: false };
   // 1.9.178 Painted bullfrog cut-out (the frog in theme 11's photo) sings to the new track.
-  const FROG_ART = { plate: 'tetris-bg/frog-plate-18aed091.webp', atlas: 'tetris-bg/frog-atlas-26f38e61.webp' };
+  const FROG_ART = { plate: 'tetris-bg/frog-plate-e01ea4ca.webp', atlas: 'tetris-bg/frog-atlas-26f38e61.webp', little: 'tetris-bg/frog-little-4dcdd4dc.webp' };
+  // 1.9.185 Painted little frogs from 11.webp, hopping between lily pads. The big singer stays put.
+  const FROG_LITTLE = [
+    { name: 'left', ax: 2, ay: 2, aw: 105, ah: 95, px: 103.7, py: 390.0, ox: 54.7, oy: 82.0 },
+    { name: 'right', ax: 109, ay: 2, aw: 89, ah: 92, px: 487.6, py: 403.0, ox: 44.6, oy: 68.0 }
+  ];
+  const FROG_LITTLE_PADS = [
+    { x: 104, y: 390 }, { x: 200, y: 348 }, { x: 350, y: 368 },
+    { x: 488, y: 403 }, { x: 505, y: 348 }, { x: 425, y: 515 }
+  ];
   const FROG_META = {
     x: 46, y: 355, w: 372, h: 344, fw: 372, fh: 344,
     eyes: [{ x: 168, y: 52, r: 22 }, { x: 252, y: 48, r: 22 }],
     throat: { x: 210, y: 168 }, belly: { x: 210, y: 210 }, foot: { x: 186, y: 330 }
   };
-  const frog = { img: null, ready: false, spr: [], notes: [] };
+  const frog = { img: null, ready: false, spr: [], little: null, notes: [] };
   // 1.9.179 Beach (theme 0, level 3): the painting itself moves — surf washes in and out,
   // palms sway in the wind, a little parallax and contact shadow. No cartoon add-ons.
   const BEACH_ART = {
@@ -1266,7 +1428,7 @@
   const SPARK_DUR = 600, SPARK_MAX = 5, SPARK_MAX_REDUCE = 1;
   const FW_ART = { sil: 'tetris-bg/fw-sil-947b87d3.webp', silY: 588 };
   const FW_META = { y: 588, h: 372, w: 540 };
-  const FW_MAX_P = 480, FW_MAX_R = 10;
+  const FW_MAX_P = 900, FW_MAX_R = 14;
   const FW_KINDS = ['peony', 'chrys', 'willow', 'ring', 'crackle'];
   const FW_COLS = [
     [255, 214, 90], [255, 86, 128], [80, 220, 255], [186, 96, 255],
@@ -1563,7 +1725,7 @@
         const pl = g.pendingLevel;
         g.pendingLevel = null;
         startLevelUp(g, pl.from, pl.to);
-      }
+      } else if (g.pendingHigh) startHighScore(g);
       return false;
     }
     return true;
@@ -1727,16 +1889,17 @@
     if (!lu) return false;
     if (lu.hold) return true;
     lu.t += dt;
-    if (lu.t >= lu.dur) { g.levelUp = null; return false; }
+    if (lu.t >= lu.dur) { g.levelUp = null; if (g.pendingHigh) startHighScore(g); return false; }
     return true;
   }
   function newGame(opt) {
     opt = opt || {};
     const level = Math.max(1, opt.level || 1);
     const practice = !!opt.practice;
-    const g = { board: emptyBoard(), piece: spawn(1), bag: refillBag(), next: 0, hold: 0, canHold: true, score: 0, lines: (level - 1) * 10, level, over: false, paused: false, acc: 0, flashT: 0, popup: '', popupT: 0, practice, startLevel: level, clearFx: null, pendingLevel: null, levelUp: null, callout: null, clearCombo: 0, lastWasTetris: false };
+    const g = { board: emptyBoard(), piece: spawn(1), bag: refillBag(), next: 0, hold: 0, canHold: true, score: 0, lines: (level - 1) * 10, level, over: false, paused: false, acc: 0, flashT: 0, popup: '', popupT: 0, practice, startLevel: level, clearFx: null, pendingLevel: null, levelUp: null, callout: null, clearCombo: 0, lastWasTetris: false, familyHigh: 0, highNoted: false, highScore: null, pendingHigh: false };
     g.piece = spawn(takeNext(g));
     g.next = takeNext(g);
+    seedHighBar(g);
     return g;
   }
   function dropInterval(level) { return Math.max(60, 800 * Math.pow(0.85, level - 1)); }
@@ -1786,6 +1949,7 @@
       const near = nearMiss || (g.piece && g.piece.y <= 2);
       maybeCallout(g, { n: 0, combo: 0, b2b: false, high: high, near: near });
     }
+    maybeHighScore(g);
     g.piece = spawn(g.next);
     g.next = takeNext(g);
     g.canHold = true;
@@ -1802,13 +1966,13 @@
       return next;
     }
     if (g.over || g.paused) return g;
-    if (g.clearFx || g.levelUp) return g;
+    if (g.clearFx || g.levelUp || g.highScore) return g;
     const p = g.piece;
     if (a === 'left' || a === 'right') {
       const dx = a === 'left' ? -1 : 1;
       if (!collides(g.board, p.m, p.x + dx, p.y)) { p.x += dx; sfx('move'); effectAction('move', g); }
     } else if (a === 'down') {
-      if (!collides(g.board, p.m, p.x, p.y + 1)) { p.y++; g.score += 1; g.acc = 0; sfx('soft'); }
+      if (!collides(g.board, p.m, p.x, p.y + 1)) { p.y++; g.score += 1; g.acc = 0; sfx('soft'); maybeHighScore(g); }
       else lockPiece(g);
     } else if (a === 'drop') {
       let d = 0;
@@ -1942,14 +2106,27 @@
     ccBuf = null; ccLoading = null; ccGain = null;
     voBufs = {}; voLoading = {}; voGain = null;
     rotGain = null; resetRotRiff();
+    hsBuf = null; hsLoading = null; hsGain = null;
     bgmFading = false;
     bgmBufs = {}; bgmLoading = {};
   }
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, farmDayTarget, farmSunPos, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts };
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, maybeHighScore, startHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, farmDayTarget, farmSunPos, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts };
 
   if (!root.document) return;
   const doc = root.document;
   let g = newGame();
+  const SHANE_BEST_CLEAR = 'ib-tetris-best-cleared-20261113';
+  function clearShaneLocalBestOnce() {
+    try {
+      if (!root.IBScores || !root.IBScores.isShane) return;
+      const me = root.IBScores.who && root.IBScores.who();
+      if (!me || !root.IBScores.isShane(me) || !me.admin) return;
+      if (root.localStorage.getItem(SHANE_BEST_CLEAR)) return;
+      root.localStorage.removeItem('tetris-best');
+      root.localStorage.setItem(SHANE_BEST_CLEAR, '1');
+    } catch (e) { }
+  }
+  clearShaneLocalBestOnce();
   let best = 0;
   let started = false;
   let raf = 0;
@@ -2003,7 +2180,7 @@
     g.lines = opts.lines || 0;
     g.level = Math.floor(g.lines / 10) + 1;
     g.score = opts.score || 0;
-    g.paused = false; g.over = false; g.demo = true; g.acc = 0; g.popupT = 0; g.flashT = 0; g.levelUp = null; g.callout = null; goPlaying = false; resetRotRiff();
+    g.paused = false; g.over = false; g.demo = true; g.acc = 0; g.popupT = 0; g.flashT = 0; g.levelUp = null; g.callout = null; g.highScore = null; g.pendingHigh = false; goPlaying = false; resetRotRiff();
     if (opts.board) g.board = opts.board;
     if (opts.piece) g.piece = opts.piece;
     if (opts.next != null) g.next = opts.next;
@@ -2052,6 +2229,22 @@
       life.beachHold = opts.beach;
       if (!life.beach) life.beach = { tide: 0.5, wet: 0.2, big: 0, mid: 0, fl: 0, gust: 0 };
     } else life.beachHold = null;
+    if (opts.littleFrog) {
+      life.littleHold = true;
+      if (!life.little) littleFrogCast();
+      const list = Array.isArray(opts.littleFrog) ? opts.littleFrog : [opts.littleFrog];
+      list.forEach(function (h, i) {
+        const d = life.little[h.i != null ? h.i : i];
+        if (!d) return;
+        d.from = h.from != null ? h.from : d.from;
+        d.to = h.to != null ? h.to : d.to;
+        d.pad = h.to != null && (h.p == null || h.p >= 1) ? h.to : (h.from != null ? h.from : d.pad);
+        if (h.p == null || h.p < 0) { d.hop = -1; littleFrogPose(d, -1); }
+        else { d.hop = (h.p) * (d.hopDur || 0.48); littleFrogPose(d, h.p); }
+        if (h.dir) d.dir = h.dir;
+      });
+    }
+    else life.littleHold = null;
     if (opts.frogSing) {
       life.singHold = opts.frogSing;
       if (life.frog) {
@@ -2060,13 +2253,21 @@
         life.frog.blink = opts.frogSing.blink != null ? opts.frogSing.blink : 0;
       }
     } else life.singHold = null;
-    if (opts.fireworks) { fw.hold = opts.fireworks; fw.posed = false; if (opts.fireworks.prog != null) fw.prog = opts.fireworks.prog; if (opts.fireworks.size != null) fw.prog = Math.max(0, Math.min(1, (opts.fireworks.size - 0.30) / 0.85)); } else { fw.hold = null; fw.posed = false; }
+    if (opts.fireworks) { fw.hold = opts.fireworks; fw.posed = false; if (opts.fireworks.prog != null) fw.prog = opts.fireworks.prog; if (opts.fireworks.size != null) { const s0 = (opts.fireworks.size - 0.20) / 2.55; fw.prog = Math.max(0, Math.min(1, s0)); } } else { fw.hold = null; fw.posed = false; }
     if (opts.ocean) { ocean.hold = opts.ocean; ocean.posed = false; } else { ocean.hold = null; ocean.posed = false; }
     if (opts.sparkle) holdBlockSpark(opts.sparkle); else { sparkHold = null; }
     if (opts.callout) {
       const text = opts.callout.text || 'Amazing!';
       const dur = opts.callout.dur != null ? opts.callout.dur : CALLOUT_DUR;
       g.callout = { text: text, t: dur, dur: dur, hold: true, at: opts.callout.at != null ? opts.callout.at : 0.35, id: opts.callout.id || 'amazing' };
+    }
+    if (opts.highScore) {
+      startHighScore(g);
+      if (g.highScore) {
+        g.highScore.hold = true;
+        g.highScore.at = opts.highScore.at != null ? opts.highScore.at : 0.32;
+        if (opts.highScore.sub != null) g.highScore.sub = String(opts.highScore.sub);
+      }
     }
     if (opts.popup) { g.popup = opts.popup; g.popupT = opts.popupT != null ? opts.popupT : 1100; }
     syncHud();
@@ -2960,6 +3161,7 @@
       life.frog = { mouth: 0, puff: 0, blink: 0, blinkIn: 0, nextBlink: 2.4, sway: 0, vocal: 0, avg: 0.12, lev: 0 };
       frog.notes = [];
       frogLoad();
+      littleFrogCast();
       life.flies = [
         { nx: 0.28, ny: 0.16, ph: 0, sp: 0.08 },
         { nx: 0.62, ny: 0.20, ph: 2.1, sp: 0.07 }
@@ -2974,6 +3176,7 @@
     life.seeded = false;
     life.actors = [];
     life.frog = null;
+    life.little = null;
     life.ripples = [];
     life.kind = '';
     fwReset();
@@ -2993,8 +3196,10 @@
       oceanAdvance(dt, reduce);
     } else if (life.frog) {
       const f = life.frog;
-      if (beat && beat.on && !life.beatLatch) { life.beatN++; life.beatLatch = true; }
+      let beatEdge = false;
+      if (beat && beat.on && !life.beatLatch) { life.beatN++; life.beatLatch = true; beatEdge = true; }
       if (beat && !beat.on) life.beatLatch = false;
+      littleFrogAdvance(dt, beat, reduce, beatEdge);
       if (life.singHold) {
         f.mouth = life.singHold.mouth != null ? life.singHold.mouth : f.mouth;
         f.puff = life.singHold.puff != null ? life.singHold.puff : f.puff;
@@ -3109,7 +3314,9 @@
       farm.stars.push({ x: x, y: 6 + rnd() * Math.max(10, hz - 26), r: 0.5 + rnd() * 1.1, ph: rnd() * 6.28, sp: 0.6 + rnd() * 1.6 });
     }
   }
-  function farmDayTarget(prog, t) { return Math.max(0, Math.min(1, prog * 0.9 + t / 420)); }
+  // 1.9.185: sunrise is much quicker — full daylight about 40% of the way through
+  // level 1, while still starting in darkness. A slow time term is only a gentle assist.
+  function farmDayTarget(prog, t) { return Math.max(0, Math.min(1, (prog || 0) / 0.4 + (t || 0) / 800)); }
   function smooth01(v) { v = Math.max(0, Math.min(1, v)); return v * v * (3 - 2 * v); }
   function farmSunPos(day) {
     const t = Math.max(0, Math.min(1, (day - 0.16) / 0.84));
@@ -3402,10 +3609,11 @@
   function frogLoad() {
     if (frog.img || !root.Image) return;
     frog.img = {};
-    let left = 2;
+    let left = Object.keys(FROG_ART).length;
     Object.keys(FROG_ART).forEach(k => {
       const im = new root.Image();
       im.onload = () => { if (--left === 0) { frog.ready = true; frogSprites(); } };
+      im.onerror = () => { if (--left === 0) { frog.ready = !!frog.img.plate; frogSprites(); } };
       im.src = FROG_ART[k];
       frog.img[k] = im;
     });
@@ -3451,6 +3659,126 @@
     c.beginPath(); c.moveTo(2.8 * s, -8 * s); c.quadraticCurveTo(7 * s, -10 * s, 6 * s, -5 * s); c.stroke();
     c.restore();
   }
+
+  function littleFrogCast() {
+    const pads = FROG_LITTLE_PADS;
+    life.little = FROG_LITTLE.map(function (meta, i) {
+      const home = i === 0 ? 0 : 3;
+      return {
+        i: i, meta: meta, pad: home, from: home, to: home,
+        hop: -1, hopDur: 0.48, squat: 0, land: 0, wait: 1.4 + i * 1.8,
+        dir: i === 0 ? 1 : -1, x: meta.px, y: meta.py, sx: 1, sy: 1
+      };
+    });
+  }
+  function littleFrogPose(d, p) {
+    const pads = FROG_LITTLE_PADS;
+    const a = pads[d.from], b = pads[d.to];
+    if (p < 0 || !a || !b) {
+      const sit = pads[d.pad] || a || b;
+      d.x = sit.x; d.y = sit.y; d.sx = 1; d.sy = 1;
+      return;
+    }
+    const e = p * p * (3 - 2 * p);
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const amp = 36 + Math.min(70, dist * 0.35);
+    d.x = a.x + dx * e;
+    d.y = a.y + dy * e - amp * 4 * p * (1 - p);
+    if (dx) d.dir = dx >= 0 ? 1 : -1;
+    const mid = 4 * p * (1 - p);
+    d.sx = 1 - 0.12 * mid;
+    d.sy = 1 + 0.22 * mid;
+  }
+  function littleFrogAdvance(dt, beat, reduce, beatEdge) {
+    if (!life.little || life.littleHold) return;
+    const pads = FROG_LITTLE_PADS;
+    for (let i = 0; i < life.little.length; i++) {
+      const d = life.little[i];
+      if (reduce) {
+        d.hop = -1; d.squat = 0; d.land = 0; d.pad = d.i === 0 ? 0 : 3;
+        d.from = d.pad; d.to = d.pad;
+        d.x = d.meta.px; d.y = d.meta.py; d.sx = 1; d.sy = 1;
+        continue;
+      }
+      if (d.hop >= 0) {
+        d.hop += dt;
+        const p = Math.min(1, d.hop / d.hopDur);
+        littleFrogPose(d, p);
+        if (p >= 1) {
+          d.pad = d.to; d.from = d.to; d.hop = -1; d.land = 0.16;
+          d.x = pads[d.pad].x; d.y = pads[d.pad].y;
+          d.sx = 1.14; d.sy = 0.82;
+          life.ripples.push({ nx: d.x / PHOTO_W, ny: d.y / PHOTO_H, t: 0, max: 0.9, big: false });
+          d.wait = 1.3 + Math.random() * 2.6;
+        }
+        continue;
+      }
+      if (d.land > 0) {
+        d.land -= dt;
+        const u = Math.max(0, d.land / 0.16);
+        d.sx = 1 + 0.14 * u; d.sy = 1 - 0.18 * u;
+        continue;
+      }
+      d.sx = 1; d.sy = 1;
+      d.x = pads[d.pad].x; d.y = pads[d.pad].y;
+      if (d.squat > 0) {
+        d.squat -= dt;
+        const u = 1 - Math.max(0, d.squat) / 0.14;
+        d.sx = 1 + 0.12 * Math.min(1, u * 1.2);
+        d.sy = 1 - 0.16 * Math.min(1, u * 1.2);
+        if (d.squat <= 0 && (beatEdge || d.wait <= -0.2)) {
+          let to = d.pad;
+          let guard = 0;
+          while (to === d.pad && guard++ < 8) to = (Math.random() * pads.length) | 0;
+          if (to === d.pad) to = (d.pad + 2) % pads.length;
+          d.from = d.pad; d.to = to; d.hop = 0;
+          d.hopDur = 0.42 + Math.random() * 0.12;
+          if (pads[to].x !== pads[d.pad].x) d.dir = pads[to].x >= pads[d.pad].x ? 1 : -1;
+        }
+        continue;
+      }
+      d.wait -= dt;
+      // Time a hop to the music's beat now and then, with a pause in between.
+      if (d.wait <= 0 && beatEdge) d.squat = 0.14;
+    }
+  }
+  function drawLittleFrogs(c, box, reduce) {
+    if (!life.little || !frog.img || !frog.img.little || !frog.img.little.complete) return;
+    const img = frog.img.little;
+    // Back to front (smaller y first) so a frog closer to us sits over one further up the pond.
+    const list = life.little.slice().sort(function (a, b) { return a.y - b.y; });
+    for (let i = 0; i < list.length; i++) {
+      const d = list[i], M = d.meta;
+      const x = box.left + d.x * box.scale;
+      const y = box.top + d.y * box.scale;
+      const sc = box.scale;
+      const dw = M.aw * sc, dh = M.ah * sc;
+      // Contact shadow (3D sit); thinner and lighter mid-hop.
+      const inAir = d.hop >= 0;
+      const shS = inAir ? 0.45 : 1;
+      c.save();
+      c.translate(x, y);
+      c.scale(1, 0.28);
+      const rg = c.createRadialGradient(0, 0, 2, 0, 0, 28 * sc * shS);
+      rg.addColorStop(0, 'rgba(10,20,8,' + (inAir ? 0.14 : 0.32) + ')');
+      rg.addColorStop(1, 'rgba(10,20,8,0)');
+      c.fillStyle = rg; c.beginPath(); c.arc(0, 0, 28 * sc * shS, 0, 6.283); c.fill();
+      c.restore();
+      c.save();
+      c.translate(x, y);
+      c.scale((d.dir < 0 ? -1 : 1) * (d.sx || 1), (d.sy || 1));
+      c.drawImage(img, M.ax, M.ay, M.aw, M.ah, -M.ox * sc, -M.oy * sc, dw, dh);
+      // Soft sun-side highlight and a little body shade (the sprite already has painted 3D form).
+      c.globalCompositeOperation = 'lighter';
+      const lg = c.createRadialGradient(-M.ox * sc + dw * 0.7, -M.oy * sc + dh * 0.18, 2, -M.ox * sc + dw * 0.4, -M.oy * sc + dh * 0.45, dw * 0.7);
+      lg.addColorStop(0, 'rgba(255, 220, 160, 0.16)');
+      lg.addColorStop(1, 'rgba(255, 220, 160, 0)');
+      c.fillStyle = lg;
+      c.beginPath(); c.ellipse(-M.ox * sc + dw * 0.55, -M.oy * sc + dh * 0.4, dw * 0.42, dh * 0.38, 0, 0, 6.283); c.fill();
+      c.restore();
+    }
+  }
   // Painted frog + inpainted plate, drawn behind the board so the singer shows through empty cells.
   function drawFrogScene(c, w, h, reduce) {
     frogLoad();
@@ -3463,6 +3791,8 @@
     // Match the 28% CSS veil so the frog and the pond share the same look.
     c.fillStyle = 'rgba(0,0,0,0.28)';
     c.fillRect(box.left, box.top, box.dw, box.dh);
+    // Little painted frogs hop behind the singer (further up the pond).
+    drawLittleFrogs(c, box, reduce);
     const f = life.frog;
     const mouth = f ? Math.max(0, Math.min(1, f.mouth)) : 0;
     const puff = f ? Math.max(0, Math.min(1, f.puff)) : 0;
@@ -3834,9 +4164,10 @@
     fw.parts.push(p);
   }
   function fwFlash(x, y, z, col, scale) {
-    const pow = 0.32 * Math.max(scale || 1, 0.4) * (z || 1);
-    fw.flashes.push({ x: x, y: y, z: z || 1, r: col[0], g: col[1], b: col[2], t: 0, max: 0.55, pow: pow });
-    const k = Math.min(1, pow * 1.4);
+    const sc = Math.max(scale || 1, 0.4);
+    const pow = 0.32 * sc * (z || 1);
+    fw.flashes.push({ x: x, y: y, z: z || 1, r: col[0], g: col[1], b: col[2], t: 0, max: 0.55 + 0.12 * Math.min(2, sc), pow: pow, sc: sc });
+    const k = Math.min(1, pow * 1.05);
     const s = fw.lit + k;
     if (s > 0.001) {
       fw.litR = (fw.litR * fw.lit + (col[0] / 255) * k) / s;
@@ -3846,9 +4177,10 @@
     fw.lit = Math.min(1, fw.lit + k);
   }
   function fwSize(prog) {
-    // 1.9.181: start the level at about 30% size and grow to a full (or slightly bigger) show by the end.
+    // 1.9.185: start around 20% and grow to about 275% by the end, easing so it keeps building.
     const p = prog == null ? (fw.prog || 0) : Math.max(0, Math.min(1, prog));
-    return 0.30 + 0.85 * p;
+    const e = p * p * 0.62 + p * 0.38; // still rising at the end (no flatten-out)
+    return 0.20 + 2.55 * e;
   }
   function fwBurst(x, y, z, typ, col, scale) {
     typ = typ || FW_KINDS[(Math.random() * FW_KINDS.length) | 0];
@@ -3915,9 +4247,10 @@
     const col = fwPick();
     const big = (n % 4 === 0);
     const grow = fwSize(fw.prog);
-    const z = big ? 1.05 + Math.random() * 0.4 : 0.5 + Math.random() * 0.95;
+    const depth = 0.65 + 0.55 * Math.min(2.4, grow); // boom depth grows with the show
+    const z = (big ? 1.05 + Math.random() * 0.4 : 0.5 + Math.random() * 0.95) * depth;
     const scale = (big ? 1.15 + Math.random() * 0.25 : 0.7 + Math.random() * 0.45) * grow;
-    if (grow < 0.55 && busy >= 2 && n % 2) return;
+    if (grow < 0.45 && busy >= 2 && n % 2) return;
     const pos = fwSkyPos(box, { x: 0.18 + ((n * 0.37) % 0.64), y: 0.12 + (n % 3) * 0.1 + Math.random() * 0.08 });
     // Burst on the pulse, and send a rocket that will burst a couple of beats later.
     fwBurst(pos.x, pos.y, z, typ, col, scale);
@@ -3937,7 +4270,7 @@
     for (let i = 0; i < count; i++) {
       const pos = fwSkyPos(box, { x: 0.16 + (i / Math.max(1, count - 1)) * 0.68, y: 0.12 + (i % 2) * 0.12 + Math.random() * 0.06 });
       const typ = tetris ? FW_KINDS[i % FW_KINDS.length] : FW_KINDS[(Math.random() * FW_KINDS.length) | 0];
-      fwBurst(pos.x, pos.y, tetris ? 1.15 + Math.random() * 0.3 : 0.8 + Math.random() * 0.4, typ, fwPick(), scale);
+      fwBurst(pos.x, pos.y, (tetris ? 1.15 + Math.random() * 0.3 : 0.8 + Math.random() * 0.4) * (0.7 + 0.45 * Math.min(2.4, grow)), typ, fwPick(), scale);
     }
     // Shane's line-clear recording is the main cue; skip the extra fireworks bangs.
   }
@@ -4070,8 +4403,10 @@
     if (kind === 'clear' && hot) return;
     const dest = sfxGain;
     const t0 = ac.currentTime + 0.01;
-    const boom = kind === 'big' ? (hot ? 0.07 : 0.13) : 0.09;
-    const crack = kind === 'big' ? (hot ? 0.04 : 0.07) : 0.055;
+    const grow = fwSize(fw.prog);
+    const depth = 0.85 + 0.2 * Math.min(1.6, Math.max(0.5, grow)); // a little more body on late bursts, still mellow
+    const boom = (kind === 'big' ? (hot ? 0.07 : 0.13) : 0.09) * Math.min(1.15, depth);
+    const crack = (kind === 'big' ? (hot ? 0.04 : 0.07) : 0.055) * Math.min(1.1, depth);
     const rum = ac.createBufferSource();
     rum.buffer = noiseBuf;
     const hp = ac.createBiquadFilter();
@@ -4125,7 +4460,7 @@
       const fade = Math.max(0, 1 - f.t / f.max);
       const a = fade * fade * f.pow;
       if (a < 0.01) continue;
-      const rad = (90 + 140 * f.z) * sc * (0.85 + 0.4 * fade);
+      const rad = (90 + 140 * f.z) * sc * (0.85 + 0.4 * fade) * Math.min(2.6, 0.7 + 0.45 * (f.sc || 1));
       const rg = c.createRadialGradient(f.x, f.y, 0, f.x, f.y, rad);
       rg.addColorStop(0, 'rgba(' + f.r + ',' + f.g + ',' + f.b + ',' + (0.55 * a) + ')');
       rg.addColorStop(0.35, 'rgba(' + f.r + ',' + f.g + ',' + f.b + ',' + (0.18 * a) + ')');
@@ -4373,6 +4708,28 @@
     }
   }
 
+  // Wrap through a margin so a fish swims off one edge and back in the other, no pop.
+  const FISH_W = 540, FISH_H = 960, FISH_MX = 90, FISH_MY = 100;
+  function oceanWrap(v, span, m) {
+    const s = span + 2 * m;
+    return ((v + m) % s + s) % s - m;
+  }
+  function oceanWrapX(x) { return oceanWrap(x, FISH_W, FISH_MX); }
+  function oceanWrapY(y) { return oceanWrap(y, FISH_H, FISH_MY); }
+  function oceanFishPos(d, t) {
+    const e = oceanEval(d, t);
+    const dx = (d.driftX || 0) * t, dy = (d.driftY || 0) * t;
+    const vx = e.vx + (d.driftX || 0), vy = e.vy + (d.driftY || 0);
+    return { x: oceanWrapX(e.x + (d.lx || 0) + dx), y: oceanWrapY(e.y + (d.ly || 0) + dy), vx: vx, vy: vy, heading: Math.atan2(vy, vx), porp: e.porp };
+  }
+  function oceanEdgeFade(x, y) {
+    let a = 1;
+    if (x < 0) a = Math.max(0, 1 + x / FISH_MX);
+    else if (x > FISH_W) a = Math.max(0, 1 - (x - FISH_W) / FISH_MX);
+    if (y < 0) a *= Math.max(0, 1 + y / FISH_MY);
+    else if (y > FISH_H) a *= Math.max(0, 1 - (y - FISH_H) / FISH_MY);
+    return a;
+  }
   function oceanFishSrc(name) {
     const list = OCEAN_META.fish;
     for (let i = 0; i < list.length; i++) if (list[i].name === name) return list[i];
@@ -4380,9 +4737,11 @@
   }
   function oceanCastFish() {
     const list = OCEAN_META.fish || [];
+    // 1.9.185: roam the whole photo (540×960), not a tight corner of the reef.
+    // Shared school path + local offsets keep the school together. driftX/Y wrap off the edges.
     const schools = {
-      orange: { cx: 193, cy: 656, per: 22, ax: 46, ay: 24, ax2: 10, ay2: 8, ph2: 0.8, ph4: 1.6, porpAmp: 6, phP: 0.4, z0: 0.92, dartPer: 7.5, dartAmp: 14 },
-      yellow: { cx: 92, cy: 560, per: 18, ax: 30, ay: 16, ax2: 8, ay2: 6, ph2: 1.3, ph4: 2.1, porpAmp: 5, phP: 1.0, z0: 1.02, dartPer: 8.5, dartAmp: 10 }
+      orange: { cx: 270, cy: 500, per: 36, ax: 300, ay: 340, ax2: 80, ay2: 70, ph2: 0.8, ph4: 1.6, porpAmp: 10, phP: 0.4, z0: 0.92, dartPer: 7.5, dartAmp: 28, driftX: 16, driftY: 5 },
+      yellow: { cx: 260, cy: 390, per: 28, ax: 280, ay: 360, ax2: 70, ay2: 60, ph2: 1.3, ph4: 2.1, porpAmp: 8, phP: 1.0, z0: 1.08, dartPer: 8.5, dartAmp: 22, driftX: -14, driftY: 7 }
     };
     const fish = [];
     list.forEach(function (meta, i) {
@@ -4410,28 +4769,38 @@
           orange_L: { per: 18, ax: 22, ay: 11, ax2: 6, ay2: 5, porpAmp: 4, z0: 1.06 },
           orange_M: { per: 17, ax: 20, ay: 10, ax2: 6, ay2: 4, porpAmp: 4, z0: 1.1 }
         }[meta.name] || { per: 18, ax: 18, ay: 10, ax2: 5, ay2: 4, porpAmp: 4, z0: 1 };
-        d.cx = meta.px; d.cy = meta.py;
-        d.per = orbit.per; d.ph = i * 0.9; d.ax = orbit.ax; d.ay = orbit.ay;
-        d.ax2 = orbit.ax2; d.ay2 = orbit.ay2; d.ph2 = 0.7 + i * 0.3; d.ph4 = 1.5 + i * 0.2;
-        d.porpAmp = orbit.porpAmp; d.phP = i * 0.5; d.z0 = orbit.z0;
-        d.lx = 0; d.ly = 0; d.dartPer = 9 + (i % 4); d.dartAmp = 8;
+        // Solo fish wander widely from mid-water, not a tight loop on their painted home.
+        d.cx = 120 + ((i * 97) % 300);
+        d.cy = 160 + ((i * 131) % 560);
+        d.per = 16 + (i % 7) * 4;
+        d.ph = i * 0.9;
+        d.ax = 200 + (i % 5) * 32;
+        d.ay = 230 + (i % 4) * 40;
+        d.ax2 = 48 + (i % 3) * 10;
+        d.ay2 = 36 + (i % 3) * 8;
+        d.ph2 = 0.7 + i * 0.3; d.ph4 = 1.5 + i * 0.2;
+        d.porpAmp = (orbit.porpAmp || 4) + 4; d.phP = i * 0.5;
+        d.z0 = 0.7 + (i % 6) * 0.1;
+        d.lx = 0; d.ly = 0; d.dartPer = 9 + (i % 4); d.dartAmp = 18;
+        d.driftX = (8 + (i % 5) * 3) * (i % 2 ? 1 : -1);
+        d.driftY = (3 + (i % 3) * 2) * (i % 3 === 0 ? -1 : 1);
       }
-      const e0 = oceanEval(d, 0);
-      d.x = e0.x + (d.lx || 0); d.y = e0.y + (d.ly || 0);
+      const e0 = oceanFishPos(d, 0);
+      d.x = e0.x; d.y = e0.y;
       d.heading = e0.heading; d.facing = (e0.vx >= 0 ? 1 : -1);
       fish.push(d);
     });
-    // Extra small school of painted anthias on the right reef (deeper, slower) so the reef feels lively without crowding the board.
+    // A third school, deeper and slower, also roams the whole screen (not stuck on the right reef).
     const srcNames = ['anthias_8', 'anthias_11', 'anthias_13', 'anthias_14', 'anthias_18', 'orange_L'];
     const homes = [[360, 600], [400, 630], [430, 610], [380, 670], [455, 655], [340, 650], [415, 690], [350, 625]];
     homes.forEach(function (h, i) {
       const src = oceanFishSrc(srcNames[i % srcNames.length]);
       if (!src) return;
       const d = { i: fish.length, meta: src, kind: 'orange', school: 'right', heading: 0, facing: src.nose || 1, bank: 0, und: 0, tail: 0, porp: 0, z: 0.72, primed: false, nose: src.nose || 1, clone: true, sc: 0.72 + (i % 4) * 0.07,
-        cx: 390, cy: 640, per: 26, ph: i * 0.55, ax: 32, ay: 16, ax2: 8, ay2: 6, ph2: 1.1, ph4: 2.0, porpAmp: 5, phP: i * 0.3, z0: 0.7 + (i % 3) * 0.04,
-        lx: h[0] - 390, ly: h[1] - 640, dartPer: 9.5, dartAmp: 11 };
-      const e0 = oceanEval(d, 0);
-      d.x = e0.x + d.lx; d.y = e0.y + d.ly; d.heading = e0.heading; d.facing = e0.vx >= 0 ? 1 : -1;
+        cx: 280, cy: 560, per: 44, ph: i * 0.55, ax: 310, ay: 300, ax2: 60, ay2: 80, ph2: 1.1, ph4: 2.0, porpAmp: 7, phP: i * 0.3, z0: 0.62 + (i % 3) * 0.05,
+        lx: (h[0] - 390) * 0.85, ly: (h[1] - 640) * 0.85, dartPer: 9.5, dartAmp: 20, driftX: 11, driftY: -6 };
+      const e0 = oceanFishPos(d, 0);
+      d.x = e0.x; d.y = e0.y; d.heading = e0.heading; d.facing = e0.vx >= 0 ? 1 : -1;
       fish.push(d);
     });
     ocean.fish = fish;
@@ -4452,14 +4821,14 @@
         d.und = 0; d.tail = 0; d.porp = 0; d.bank = 0; d.z = d.z0;
         continue;
       }
-      const e = oceanEval(d, t);
+      const e = oceanFishPos(d, t);
       const dart = poseOnly ? 0 : oceanFishDart(d, t);
       const hd = e.heading;
-      d.x = e.x + (d.lx || 0) + Math.cos(hd) * dart;
-      d.y = e.y + (d.ly || 0) + Math.sin(hd) * dart;
+      d.x = oceanWrapX(e.x + Math.cos(hd) * dart);
+      d.y = oceanWrapY(e.y + Math.sin(hd) * dart);
       d.porp = e.porp;
       d.heading = snap ? hd : oceanLerpAngle(d.heading, hd, easeH);
-      const e2 = oceanEval(d, t + 1 / 120);
+      const e2 = oceanFishPos(d, t + 1 / 120);
       const v2 = e.vx * e.vx + e.vy * e.vy;
       const axv = (e2.vx - e.vx) * 120, ayv = (e2.vy - e.vy) * 120;
       const turn = (e.vx * ayv - e.vy * axv) / (v2 + 40);
@@ -4480,7 +4849,11 @@
   function drawOceanSprite(c, d, box) {
     const atlas = ocean.img.atlas;
     if (!atlas || !atlas.complete) return;
+    const fade = (d.school || d.clone || (d.kind && d.kind !== 'dolphin')) ? oceanEdgeFade(d.x, d.y) : 1;
+    if (fade <= 0.02) return;
     const M = d.meta;
+    c.save();
+    if (fade < 0.999) c.globalAlpha = fade;
     const sc = box.scale * (0.88 + 0.22 * d.z) * (d.sc == null ? 1 : d.sc);
     const x = box.left + d.x * box.scale;
     const y = box.top + d.y * box.scale;
@@ -4520,6 +4893,7 @@
       c.restore();
     }
     c.restore();
+      c.restore();
   }
 
   function drawOceanScene(c, w, h, reduce) {
@@ -4540,7 +4914,7 @@
       c.lineWidth = 1.6 * sc;
       c.stroke();
     }
-    const list = ocean.dolphins.concat(ocean.fish || []).filter(function (o) { return o.x > -200; }).sort(function (a, b) { return a.z - b.z; });
+    const list = ocean.dolphins.concat(ocean.fish || []).filter(function (o) { return o.x > -400 && o.y > -400; }).sort(function (a, b) { return a.z - b.z; });
     for (let i = 0; i < list.length; i++) drawOceanSprite(c, list[i], box);
     // Bubbles
     for (let i = 0; i < ocean.bubbles.length; i++) {
@@ -4706,7 +5080,8 @@
     if (p > 0.72) return Math.max(0, (1 - p) / 0.28);
     return 1;
   }
-  function drawCandyWord(ctx, text, x, y, size, alpha, scale) {
+  function drawCandyWord(ctx, text, x, y, size, alpha, scale, pal) {
+    pal = pal || null;
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(scale, scale);
@@ -4716,17 +5091,18 @@
     ctx.font = '800 ' + size + 'px ' + FONT;
     ctx.lineJoin = 'round';
     ctx.miterLimit = 2;
-    ctx.shadowColor = 'rgba(255,110,200,0.9)';
+    ctx.shadowColor = pal && pal.shadow ? pal.shadow : 'rgba(255,110,200,0.9)';
     ctx.shadowBlur = 26;
     ctx.lineWidth = Math.max(6, size * 0.18);
     ctx.strokeStyle = 'rgba(255,255,255,0.95)';
     ctx.strokeText(text, 0, 0);
     const fill = ctx.createLinearGradient(0, -size * 0.7, 0, size * 0.65);
-    fill.addColorStop(0, '#fff7fb');
-    fill.addColorStop(0.22, '#ffd6ee');
-    fill.addColorStop(0.48, '#ff6bb5');
-    fill.addColorStop(0.78, '#f472b6');
-    fill.addColorStop(1, '#fb7185');
+    const stops = pal && pal.stops ? pal.stops : ['#fff7fb', '#ffd6ee', '#ff6bb5', '#f472b6', '#fb7185'];
+    fill.addColorStop(0, stops[0]);
+    fill.addColorStop(0.22, stops[1]);
+    fill.addColorStop(0.48, stops[2]);
+    fill.addColorStop(0.78, stops[3]);
+    fill.addColorStop(1, stops[4]);
     ctx.shadowBlur = 10;
     ctx.fillStyle = fill;
     ctx.fillText(text, 0, 0);
@@ -4909,7 +5285,8 @@
     try { effectTick(dt); } catch (e) { }
     const clearing = tickClear(g, dt);
     const leveling = tickLevelUp(g, dt);
-    const running = started && !g.over && !g.paused && !g.demo && !clearing && !leveling;
+    const highing = tickHighScore(g, dt);
+    const running = started && !g.over && !g.paused && !g.demo && !clearing && !leveling && !highing;
     if (running) {
       g.acc += dt;
       if (g.acc >= dropInterval(g.level)) {
@@ -4966,6 +5343,7 @@
       try { drawBlockSparks(ctx, now, CELL); } catch (e) { }
       if (fx) drawClearFx(ctx, fx);
       if (g.levelUp) drawLevelUp(ctx, g.levelUp);
+      if (g.highScore) drawHighScore(ctx, g.highScore);
       try { drawWellFrame(ctx, board.width, board.height); } catch (e) { }
       ctx.textAlign = 'right';
       ctx.font = '600 16px ' + FONT;
@@ -4980,7 +5358,7 @@
         ctx.fillText(g.popup, board.width / 2, board.height / 2 - 40 - (1 - k) * 40);
         ctx.globalAlpha = 1;
       }
-      if (g.callout && g.callout.t > 0 && !g.levelUp) {
+      if (g.callout && g.callout.t > 0 && !g.levelUp && !g.highScore) {
         const cu = g.callout;
         const ck = cu.hold && cu.at != null ? (1 - cu.at) : (cu.t / (cu.dur || CALLOUT_DUR));
         ctx.globalAlpha = Math.min(1, Math.max(0.15, ck * 2));
@@ -4995,7 +5373,7 @@
         ctx.fillText(cu.text, board.width / 2, cy);
         ctx.globalAlpha = 1;
       }
-      if (!g.demo && !g.levelUp && (!started || g.over || g.paused)) {
+      if (!g.demo && !g.levelUp && !g.highScore && (!started || g.over || g.paused)) {
         ctx.fillStyle = 'rgba(10,11,14,0.72)';
         ctx.fillRect(0, 0, board.width, board.height);
         ctx.fillStyle = '#ffffff';

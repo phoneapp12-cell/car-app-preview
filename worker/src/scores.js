@@ -35,6 +35,7 @@ export function scoresInit(sql) {
     CREATE INDEX IF NOT EXISTS s_game ON scores(game, score DESC);
     CREATE INDEX IF NOT EXISTS s_mid ON scores(mid, game, at);`);
   clearShaneTetrisOnce(sql);
+  clearShaneTetrisOnce20261113(sql);
 }
 
 /* One-off, 12 Nov 2026: Shane asked to be cleared from the Tetris high-score table only.
@@ -63,6 +64,35 @@ export function clearShaneTetrisOnce(sql) {
     return rec;
   } catch (e) {
     return { err: 'pending' }; // e.g. members table not ready yet; flag is not set, so a later call can retry
+  }
+}
+
+/* One-off, 13 Nov 2026: Shane asked again to be cleared from the Tetris high-score table.
+   A new meta flag, so the 12 Nov clear (already run) is left alone. Other games and other
+   members are left alone. After it has run, new Tetris scores Shane posts later are kept. */
+export const CLEAR_SHANE_TETRIS_KEY2 = 'clear_shane_tetris_20261113';
+export function clearShaneTetrisOnce20261113(sql) {
+  try {
+    sql.exec(`CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT)`);
+    const prev = rows(sql, `SELECT v FROM meta WHERE k=?`, CLEAR_SHANE_TETRIS_KEY2)[0];
+    if (prev) {
+      try { return { already: true, ...JSON.parse(prev.v) }; } catch (e) { return { already: true }; }
+    }
+    const shane = rows(sql, `SELECT id, name FROM members WHERE role='admin' AND removed=0`)
+      .filter(m => /^Shane\b/i.test(String(m.name || '').trim()));
+    const deleted = [];
+    for (const m of shane) {
+      const existing = rows(sql, `SELECT score, lines, level, at FROM scores WHERE game='tetris' AND mid=? ORDER BY score DESC, at ASC`, m.id);
+      sql.exec(`DELETE FROM scores WHERE game='tetris' AND mid=?`, m.id);
+      deleted.push({ name: m.name, n: existing.length, top: existing.length ? existing[0].score : 0, scores: existing });
+    }
+    const leader = rows(sql, `SELECT m.name, s.score FROM scores s JOIN members m ON m.id=s.mid AND m.removed=0 WHERE s.game='tetris' ORDER BY s.score DESC, s.at ASC LIMIT 1`)[0] || null;
+    const rec = { at: Date.now(), matched: shane.length, deleted, newLeader: leader ? { name: leader.name, score: leader.score } : null };
+    sql.exec(`INSERT OR REPLACE INTO meta (k,v) VALUES (?,?)`, CLEAR_SHANE_TETRIS_KEY2, JSON.stringify(rec));
+    try { console.log('clear_shane_tetris_20261113', JSON.stringify({ matched: rec.matched, deleted: rec.deleted.map(d => ({ name: d.name, n: d.n, top: d.top })), newLeader: rec.newLeader })); } catch (e) { }
+    return rec;
+  } catch (e) {
+    return { err: 'pending' };
   }
 }
 

@@ -142,5 +142,17 @@
     if (!who()) return Promise.resolve(null);
     return Promise.resolve(opt.sent).catch(() => null).then(sent => { opt.sent = sent; return load(game); }).then(data => { el.innerHTML = html(game, data || null, opt); return data; });
   }
-  root.IBScores = { fill, API, who, isShane, submit, load, open, close, localBests, nzDate, isOpen: () => !!cur };
+  const SHANE_BEST_CLEAR = 'ib-tetris-best-cleared-20261113';
+  function clearShaneLocalBestOnce() {
+    try {
+      const me = who();
+      if (!isShane(me) || !me.admin) return false;
+      if (root.localStorage.getItem(SHANE_BEST_CLEAR)) return false;
+      root.localStorage.removeItem('tetris-best');
+      root.localStorage.setItem(SHANE_BEST_CLEAR, '1');
+      return true;
+    } catch (e) { return false; }
+  }
+  clearShaneLocalBestOnce();
+  root.IBScores = { fill, API, who, isShane, submit, load, open, close, localBests, nzDate, isOpen: () => !!cur, clearShaneLocalBestOnce };
 })(typeof window !== 'undefined' ? window : globalThis);
