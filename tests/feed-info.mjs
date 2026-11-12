@@ -2319,7 +2319,7 @@ if (live) {
   assert.strictEqual(tetGame.themeFor(5), tetGame.CITY_THEME);
   assert.strictEqual(tetGame.CITY_THEME, 4);
   assert.strictEqual(tetGame.THEMES[4].name, 'City');
-  assert.deepStrictEqual(Array.from(tetGame.CITY_BUILD_EVERY), [9, 15]);
+  assert.deepStrictEqual(Array.from(tetGame.CITY_BUILD_EVERY), [6, 10]);
   assert.strictEqual(tetGame.CITY_SAFE_TOP, 6);
   const src = fs.readFileSync('feed/tetris.js', 'utf8');
   assert.ok(src.includes('function drawCityCrew') && src.includes('function drawCityWorker') && src.includes('function drawCityLadder'));
@@ -2357,7 +2357,7 @@ if (live) {
   g3.piece = { t: 4, m: [[4, 4], [4, 4]], x: 0, y: 0 };
   const crew = tetGame.resetCityCrew(tetGame.newCityCrew(), 5);
   assert.ok(crew.ready);
-  assert.ok(crew.wait >= 9000 && crew.wait <= 15000, 'first wait uses CITY_BUILD_EVERY');
+  assert.ok(crew.wait >= 6000 && crew.wait <= 10000, 'first wait uses CITY_BUILD_EVERY');
   crew.wait = 0;
   tetGame.stepCityCrew(crew, g3, 30, { started: true });
   assert.ok(crew.job, 'a job starts when the wait elapses');
