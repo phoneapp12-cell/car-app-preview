@@ -81,6 +81,13 @@
         nextNoteTime = ac.currentTime + 0.1;
         ensureLuGain();
         loadLevelUp();
+        ensureGoGain();
+        loadGameOver();
+        ensureCcGain();
+        loadLineClear();
+        ensureVoGain();
+        loadCallouts();
+        ensureRotGain();
       }
       if (ac.state === 'suspended') ac.resume();
     } catch (e) { /* no audio */ }
@@ -341,6 +348,15 @@
       if (wall > 0 && wall <= MAX_Q) return wall;
       return 0;
     }
+    // 1.9.185 Rotate: nearest 16th, capped ~48ms so it locks to the beat without lag.
+    if (mode === 'nearest16th') {
+      const grid16 = period / 4;
+      const k = Math.round(t / grid16);
+      const target = offset + k * grid16;
+      const wall = (target - currentTime) / rate;
+      if (wall > 0 && wall <= 0.048) return wall;
+      return 0;
+    }
     const behind = ((t % grid) + grid) % grid;
     if (behind < 0.004 || grid - behind < 0.004) return 0;
     const kCeil = Math.ceil(t / grid - 1e-9);
@@ -354,7 +370,7 @@
     if (!scale || !scale.length) return null;
     const mid = Math.max(0, scale.findIndex(m => m >= 55));
     const hz = i => midiHz(scale[Math.max(0, Math.min(scale.length - 1, mid + i))]);
-    if (name === 'rotate') return [hz(2)];
+    if (name === 'rotate') return rotateRun(ti);
     if (name === 'land') return [hz(-2)];
     if (name === 'level') {
       const inRange = scale.filter(m => { const f = midiHz(m); return f >= 300 && f <= 800; });
@@ -413,7 +429,7 @@
     if (!tr) return 0;
     try {
       const pos = Math.max(0, (ac.currentTime - bgmAt) * (bgmRate || 1));
-      return quantizeDelay(pos, bgmRate || 1, tr, kind === 'rotate' ? 'nearest8th' : 'next');
+      return quantizeDelay(pos, bgmRate || 1, tr, kind === 'rotate' ? 'nearest16th' : 'next');
     } catch (e) { return 0; }
   }
 
@@ -472,6 +488,8 @@
     // Play at the LEVEL UP! moment, not quantized to the next music beat.
     const t0 = ac.currentTime;
     duckMusic(0, Math.max(0.75, LEVELUP_DUR - 0.1));
+    duckBus(ccGain, 0.08, LEVELUP_DUR, 0.05, 0.18);
+    duckBus(voGain, 0.05, LEVELUP_DUR, 0.04, 0.12);
     if (luBuf) playLuBuf(luBuf, t0);
     else if (luLoading) {
       const startedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : 0;
@@ -515,6 +533,325 @@
         src.connect(bp); bp.connect(clp); clp.connect(cg); cg.connect(dest);
         src.start(at); src.stop(at + 0.2);
       }
+    }
+  }
+
+  // 1.9.185 In-key rotate riff (Tetris Effect style): a short arpeggio in the
+  // level's scale, one step per spin, lightly quantised to a 16th.
+  function rotateRun(ti) {
+    const scale = scaleMidi(TRACKS[ti]);
+    if (!scale || !scale.length) return [440];
+    const mid = scale.filter(m => { const f = midiHz(m); return f >= 300 && f <= 800; });
+    const src = mid.length >= 5 ? mid : scale;
+    const i0 = Math.max(0, Math.min(src.length - 1, Math.floor((src.length - 1) * 0.2)));
+    const steps = [0, 2, 4, 7, 4, 2, 0, 7];
+    return steps.map(st => {
+      let f = midiHz(src[Math.max(0, Math.min(src.length - 1, i0 + st))]);
+      while (f < 300) f *= 2;
+      while (f > 800) f /= 2;
+      return f;
+    });
+  }
+
+  // 1.9.185 Shane's recorded game-over and line-clear stings, plus spoken callouts.
+  // Content-hashed mp3s, decoded through the shared AudioContext on their own buses
+  // so the 1400 Hz SFX softener does not dull them. Same mellow treatment as LEVEL UP.
+  const GAMEOVER_HASH = '5f3dda37';
+  const GAMEOVER_VOL = 0.85;
+  const GAMEOVER_DUR = 1.98;
+  function gameOverSrc() { return 'tetris-bg/gameover-' + GAMEOVER_HASH + '.mp3'; }
+  const LINECLEAR_HASH = 'c3b333cd';
+  const LINECLEAR_VOL = 0.85;
+  const LINECLEAR_DUR = 1.67;
+  function lineClearSrc() { return 'tetris-bg/lineclear-' + LINECLEAR_HASH + '.mp3'; }
+  const CALLOUT_VOICES = {
+    amazing: 'c4d7ae5c', brilliant: '225b6d4c', fantastic: 'e2da3afd',
+    awesome: '20dd28a7', yougotthis: 'aee779f3', keepgoing: '6b1d8446'
+  };
+  const CALLOUT_TEXT = {
+    amazing: 'Amazing!', brilliant: 'Brilliant!', fantastic: 'Fantastic!',
+    awesome: 'Awesome!', yougotthis: 'You got this!', keepgoing: 'Keep going!'
+  };
+  const CALLOUT_DUR = 1400;
+  const CALLOUT_GAP = 7000;
+  function calloutSrc(id) { return 'tetris-bg/vo-' + id + '-' + CALLOUT_VOICES[id] + '.mp3'; }
+  let goBuf = null, goLoading = null, goGain = null, goPlaying = false;
+  let ccBuf = null, ccLoading = null, ccGain = null;
+  let voBufs = {}, voLoading = {}, voGain = null;
+  let calloutAt = 0, calloutBusy = false;
+  let rotGain = null, rotStep = 0, rotAt = 0;
+  function ensureGoGain() {
+    if (!ac || goGain) return;
+    goGain = ac.createGain();
+    goGain.gain.value = 1;
+    goGain.connect(ac.destination);
+  }
+  function ensureCcGain() {
+    if (!ac || ccGain) return;
+    ccGain = ac.createGain();
+    ccGain.gain.value = 1;
+    const comp = ac.createDynamicsCompressor();
+    comp.threshold.value = -8; comp.knee.value = 6; comp.ratio.value = 4;
+    comp.attack.value = 0.003; comp.release.value = 0.12;
+    ccGain.connect(comp); comp.connect(ac.destination);
+  }
+  function ensureVoGain() {
+    if (!ac || voGain) return;
+    voGain = ac.createGain();
+    voGain.gain.value = 1;
+    voGain.connect(ac.destination);
+  }
+  function ensureRotGain() {
+    if (!ac || rotGain) return;
+    rotGain = ac.createGain();
+    rotGain.gain.value = 1;
+    const hp = ac.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 300; hp.Q.value = 0.7;
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 3800; lp.Q.value = 0.5;
+    rotGain.connect(hp); hp.connect(lp); lp.connect(ac.destination);
+  }
+  function loadGameOver() {
+    if (goBuf) return Promise.resolve(goBuf);
+    if (goLoading) return goLoading;
+    if (!ac) return Promise.resolve(null);
+    goLoading = fetch(gameOverSrc()).then(r => r.arrayBuffer()).then(ab => ac.decodeAudioData(ab.slice(0))).then(b => { goBuf = b; return b; }).catch(() => { goLoading = null; return null; });
+    return goLoading;
+  }
+  function loadLineClear() {
+    if (ccBuf) return Promise.resolve(ccBuf);
+    if (ccLoading) return ccLoading;
+    if (!ac) return Promise.resolve(null);
+    ccLoading = fetch(lineClearSrc()).then(r => r.arrayBuffer()).then(ab => ac.decodeAudioData(ab.slice(0))).then(b => { ccBuf = b; return b; }).catch(() => { ccLoading = null; return null; });
+    return ccLoading;
+  }
+  function loadCallouts() {
+    if (!ac) return Promise.resolve(null);
+    return Promise.all(Object.keys(CALLOUT_VOICES).map(id => {
+      if (voBufs[id]) return voBufs[id];
+      if (voLoading[id]) return voLoading[id];
+      voLoading[id] = fetch(calloutSrc(id)).then(r => r.arrayBuffer()).then(ab => ac.decodeAudioData(ab.slice(0))).then(b => { voBufs[id] = b; return b; }).catch(() => { voLoading[id] = null; return null; });
+      return voLoading[id];
+    }));
+  }
+  function duckBus(gain, toVal, hold, attack, release) {
+    if (!gain || !ac) return;
+    const t0 = ac.currentTime;
+    const a = attack != null ? attack : 0.06;
+    const rls = release != null ? release : 0.2;
+    const h = Math.max(0.05, hold || 0.4);
+    try {
+      const cur = Math.max(0.0001, gain.gain.value);
+      gain.gain.cancelScheduledValues(t0);
+      gain.gain.setValueAtTime(cur, t0);
+      gain.gain.linearRampToValueAtTime(Math.max(0.0001, toVal), t0 + a);
+      gain.gain.setValueAtTime(Math.max(0.0001, toVal), t0 + a + h);
+      gain.gain.linearRampToValueAtTime(1, t0 + a + h + rls);
+    } catch (e) { }
+  }
+  let bgmFading = false;
+  function fadeBgmOut(dur) {
+    if (!ac || !bgmGain || !bgmNode) { bgmWant = false; bgmWantTi = -1; return; }
+    bgmFading = true;
+    bgmWant = false;
+    bgmWantTi = -1;
+    const t0 = ac.currentTime;
+    const d = Math.max(0.1, dur || 0.28);
+    try {
+      bgmGain.gain.cancelScheduledValues(t0);
+      bgmGain.gain.setValueAtTime(Math.max(0.0001, bgmGain.gain.value), t0);
+      bgmGain.gain.linearRampToValueAtTime(0.0001, t0 + d);
+    } catch (e) { }
+    const node = bgmNode;
+    setTimeout(() => {
+      if (bgmNode === node) stopBgmNode();
+      bgmFading = false;
+      if (bgmGain && ac) {
+        try { bgmGain.gain.cancelScheduledValues(ac.currentTime); bgmGain.gain.setValueAtTime(BGM_VOL, ac.currentTime); } catch (e) { }
+      }
+    }, (d + 0.06) * 1000);
+  }
+  function playDecoded(buf, dest, vol, t0) {
+    if (!buf || !ac || !dest) return 0;
+    const src = ac.createBufferSource();
+    src.buffer = buf;
+    const g = ac.createGain();
+    const dur = Math.max(0.2, buf.duration || 0.8);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(vol, t0 + 0.012);
+    g.gain.setValueAtTime(vol, t0 + Math.max(0.05, dur - 0.04));
+    g.gain.linearRampToValueAtTime(0.0001, t0 + dur);
+    src.connect(g); g.connect(dest);
+    src.start(t0); src.stop(t0 + dur + 0.02);
+    return dur;
+  }
+  function playGameOverSfx() {
+    if (!soundOn || !ac || goPlaying) return;
+    ensureGoGain();
+    loadGameOver();
+    goPlaying = true;
+    fadeBgmOut(0.28);
+    duckBus(ccGain, 0.06, GAMEOVER_DUR, 0.05, 0.12);
+    duckBus(voGain, 0.04, GAMEOVER_DUR, 0.04, 0.1);
+    const start = (buf) => {
+      const dur = playDecoded(buf, goGain, GAMEOVER_VOL, ac.currentTime);
+      setTimeout(() => { goPlaying = false; }, Math.max(400, dur * 1000 + 40));
+    };
+    if (goBuf) start(goBuf);
+    else if (goLoading) goLoading.then(b => { if (b && soundOn && ac) start(b); else goPlaying = false; });
+    else goPlaying = false;
+  }
+  function playLineClearSfx(n) {
+    if (!soundOn || !ac) return;
+    ensureCcGain();
+    loadLineClear();
+    duckMusic(0, Math.max(0.45, LINECLEAR_DUR - 0.12));
+    // Overlaps are allowed: a new source is started without stopping earlier ones.
+    if (ccBuf) playDecoded(ccBuf, ccGain, LINECLEAR_VOL, ac.currentTime);
+    else if (ccLoading) ccLoading.then(b => { if (b && soundOn && ac) { ensureCcGain(); playDecoded(b, ccGain, LINECLEAR_VOL, ac.currentTime); } });
+  }
+  function pickCallout(info) {
+    const idsPraiseBig = ['amazing', 'brilliant'];
+    const idsBigger = ['fantastic', 'awesome'];
+    const idsEncourage = ['yougotthis', 'keepgoing'];
+    const pick = arr => arr[(Math.random() * arr.length) | 0];
+    if (info.n >= 4 && info.b2b) return pick(idsBigger);
+    if (info.n >= 4) return pick(idsPraiseBig);
+    if (info.n === 3) return pick(idsPraiseBig);
+    if (info.combo >= 3) return pick(idsBigger);
+    if (info.n === 0 && (info.high || info.near)) return pick(idsEncourage);
+    return null;
+  }
+  function playCallout(g, id, delay) {
+    if (!id || !CALLOUT_VOICES[id] || !g) return;
+    const text = CALLOUT_TEXT[id];
+    const wait = Math.max(0, delay || 0);
+    const dur = CALLOUT_DUR;
+    const arm = () => {
+      if (g.over || g.levelUp || g.pendingLevel) return;
+      g.callout = { text: text, t: dur, dur: dur, id: id };
+      calloutAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      calloutBusy = true;
+      if (soundOn && ac) {
+        ensureVoGain();
+        duckBus(ccGain, 0.28, 0.85, 0.05, 0.22);
+        const buf = voBufs[id];
+        const start = (b) => { playDecoded(b, voGain, 0.78, ac.currentTime); };
+        if (buf) start(buf);
+        else loadCallouts().then(() => { if (voBufs[id] && soundOn && ac) start(voBufs[id]); });
+      }
+      setTimeout(() => { calloutBusy = false; }, dur + 80);
+    };
+    if (wait > 0) setTimeout(arm, wait * 1000);
+    else arm();
+  }
+  function maybeCallout(g, info) {
+    if (!g || g.over || g.pendingLevel || g.levelUp) return;
+    const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    if (calloutBusy) return;
+    if (now - calloutAt < CALLOUT_GAP) return;
+    // Occasional, not every clear: singles never praise; triples often; encouragement is rarer.
+    if (info.n === 1 || info.n === 2) {
+      if (!(info.combo >= 3)) return;
+    }
+    if (info.n === 0 && Math.random() > 0.45) return;
+    if (info.n === 3 && Math.random() > 0.7) return;
+    const id = pickCallout(info);
+    if (!id) return;
+    // Voice sits just after the clear attack so the sting is heard first, then ducked under the voice.
+    const delay = info.n > 0 ? 0.42 : 0.05;
+    playCallout(g, id, delay);
+  }
+  function tickCallout(g, dt) {
+    if (!g.callout) return;
+    if (g.callout.hold) return;
+    g.callout.t -= dt;
+    if (g.callout.t <= 0) g.callout = null;
+  }
+  function resetRotRiff() { rotStep = 0; rotAt = 0; }
+  // Theme timbres for the rotate riff: musical, mellow, distinct from the move taps.
+  const ROT_KIND = ['pluck', 'bellpad', 'harp', 'wood', 'city', 'bellpad', 'marimba', 'space', 'triangle', 'pluck', 'ice', 'marimba'];
+  function rotNote(freq, dur, vol, dest, t0, kind, shimmer) {
+    const f = Math.max(300, Math.min(800, freq));
+    const att = 0.014;
+    function tone(type, hz, peak, decay, detune) {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(hz, t0);
+      if (detune) o.detune.setValueAtTime(detune, t0);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.linearRampToValueAtTime(peak, t0 + att);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + decay);
+      o.connect(g); g.connect(dest);
+      o.start(t0); o.stop(t0 + decay + 0.03);
+    }
+    if (kind === 'marimba') {
+      tone('sine', f, vol, dur, 0);
+      tone('sine', f * 4, vol * 0.1, dur * 0.35, 0);
+    } else if (kind === 'pluck' || kind === 'harp' || kind === 'wood') {
+      tone('sine', f, vol, dur, 0);
+      tone('triangle', f, vol * 0.22, dur * 0.55, 0);
+      if (kind === 'harp') tone('sine', f, vol * 0.28, dur * 1.05, 0);
+    } else if (kind === 'bellpad' || kind === 'ice') {
+      tone('sine', f, vol, dur * 1.15, 0);
+      tone('sine', f * 2, vol * 0.12, dur * 0.8, 0);
+      if (kind === 'ice') tone('sine', f * 2.76, vol * 0.06, dur * 0.5, 0);
+    } else if (kind === 'city' || kind === 'synth') {
+      tone('sine', f, vol, dur, -4);
+      tone('sine', f, vol * 0.7, dur, 5);
+    } else if (kind === 'space') {
+      tone('sine', f, vol * 0.95, dur * 1.2, 0);
+      tone('sine', f * 2, vol * 0.08, dur, 0);
+    } else if (kind === 'triangle') {
+      tone('triangle', f, vol * 0.7, dur, 0);
+      tone('sine', f, vol * 0.45, dur, 0);
+    } else {
+      tone('sine', f, vol, dur, 0);
+    }
+    if (shimmer) {
+      const o = ac.createOscillator(), g = ac.createGain(), lp = ac.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 2400; lp.Q.value = 0.4;
+      o.type = 'sine';
+      o.frequency.setValueAtTime(Math.min(800, f * 2), t0);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.linearRampToValueAtTime(vol * 0.1, t0 + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur * 1.35);
+      o.connect(g); g.connect(lp); lp.connect(dest);
+      o.start(t0); o.stop(t0 + dur * 1.4);
+    }
+  }
+  function playRotateSfx(ok) {
+    if (!soundOn || !ac) return;
+    ensureRotGain();
+    const dest = rotGain;
+    const delay = ok ? sfxDelay('rotate') : 0;
+    const t0 = ac.currentTime + delay;
+    if (ok) duckMusic(delay, 0.16);
+    if (!ok) {
+      // Soft muted tick for a failed rotation, still mid and low-passed.
+      const f = 330;
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(f, t0);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.linearRampToValueAtTime(0.09, t0 + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.09);
+      o.connect(g); g.connect(dest);
+      o.start(t0); o.stop(t0 + 0.12);
+      return;
+    }
+    const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    if (!rotAt || now - rotAt > 850) rotStep = 0;
+    rotAt = now;
+    const run = rotateRun(themeIdx);
+    const f = run[rotStep % run.length];
+    rotStep++;
+    const kind = ROT_KIND[themeIdx] || 'pluck';
+    rotNote(f, 0.28, 0.42, dest, t0, kind, true);
+    // A quiet chord tone under later steps makes a spinning riff feel bigger.
+    if (rotStep > 1 && run.length > 2) {
+      const under = run[(rotStep + 2) % run.length];
+      rotNote(under, 0.2, 0.12, dest, t0 + 0.018, kind, false);
     }
   }
 
@@ -631,7 +968,11 @@
 
   function sfx(name, lines) {
     if (!soundOn || !ac) return;
-    if (name === 'move' || name === 'rotate' || name === 'soft' || name === 'drop' || name === 'lock') { playMoveSfx(name); return; }
+    if (name === 'over') { playGameOverSfx(); return; }
+    if (name === 'clear' || name === 'tetris') { playLineClearSfx(name === 'tetris' ? 4 : (lines || 1)); return; }
+    if (name === 'rotate') { playRotateSfx(true); return; }
+    if (name === 'rotateFail') { playRotateSfx(false); return; }
+    if (name === 'move' || name === 'soft' || name === 'drop' || name === 'lock') { playMoveSfx(name); return; }
     const d = sfxGain, T = THEMES[themeIdx], m = T.pitch * 0.5, w = 'sine', lo = f => nf(f) / 2;
     const musical = name === 'rotate' || name === 'lock' || name === 'drop' || name === 'clear' || name === 'tetris' || name === 'level';
     const notes = musical ? sfxFreqs(themeIdx, (name === 'drop' || name === 'lock') ? 'land' : name, lines) : null;
@@ -1393,7 +1734,7 @@
     opt = opt || {};
     const level = Math.max(1, opt.level || 1);
     const practice = !!opt.practice;
-    const g = { board: emptyBoard(), piece: spawn(1), bag: refillBag(), next: 0, hold: 0, canHold: true, score: 0, lines: (level - 1) * 10, level, over: false, paused: false, acc: 0, flashT: 0, popup: '', popupT: 0, practice, startLevel: level, clearFx: null, pendingLevel: null, levelUp: null };
+    const g = { board: emptyBoard(), piece: spawn(1), bag: refillBag(), next: 0, hold: 0, canHold: true, score: 0, lines: (level - 1) * 10, level, over: false, paused: false, acc: 0, flashT: 0, popup: '', popupT: 0, practice, startLevel: level, clearFx: null, pendingLevel: null, levelUp: null, callout: null, clearCombo: 0, lastWasTetris: false };
     g.piece = spawn(takeNext(g));
     g.next = takeNext(g);
     return g;
@@ -1410,8 +1751,11 @@
       }
     }
     if (g.over) { sfx('over'); return g; }
+    resetRotRiff();
     const full = [];
     for (let r = 0; r < ROWS; r++) if (g.board[r].every(v => v !== 0)) full.push(r);
+    const highBefore = g.board.some((row, r) => r <= 7 && row.some(v => v));
+    const nearMiss = g.board.some((row, r) => row.filter(v => v).length === 9 && full.indexOf(r) < 0);
     if (full.length) {
       const oldLevel = g.level;
       const snap = g.board.map(r => r.slice());
@@ -1429,7 +1773,19 @@
       if (g.level > oldLevel) {
         g.pendingLevel = { from: oldLevel, to: g.level };
       }
-    } else { sfx('lock'); effectLand(g); }
+      g.clearCombo = (g.clearCombo || 0) + 1;
+      const b2b = !!(g.lastWasTetris && full.length === 4);
+      g.lastWasTetris = full.length === 4;
+      const high = g.board.some((row, r) => r <= 7 && row.some(v => v));
+      maybeCallout(g, { n: full.length, combo: g.clearCombo, b2b: b2b, high: high, near: false });
+    } else {
+      sfx('lock'); effectLand(g);
+      g.clearCombo = 0;
+      g.lastWasTetris = false;
+      const high = highBefore;
+      const near = nearMiss || (g.piece && g.piece.y <= 2);
+      maybeCallout(g, { n: 0, combo: 0, b2b: false, high: high, near: near });
+    }
     g.piece = spawn(g.next);
     g.next = takeNext(g);
     g.canHold = true;
@@ -1465,16 +1821,19 @@
     } else if (a === 'rotate' || a === 'rotateBack') {
       const m = a === 'rotate' ? rotateCW(p.m) : rotateCCW(p.m);
       const kicks = [0, -1, 1, -2, 2];
+      let turned = false;
       for (const k of kicks) {
-        if (!collides(g.board, m, p.x + k, p.y)) { p.m = m; p.x += k; sfx('rotate'); effectAction('rotate', g); break; }
-        if (!collides(g.board, m, p.x + k, p.y - 1)) { p.m = m; p.x += k; p.y -= 1; sfx('rotate'); effectAction('rotate', g); break; }
+        if (!collides(g.board, m, p.x + k, p.y)) { p.m = m; p.x += k; sfx('rotate'); effectAction('rotate', g); turned = true; break; }
+        if (!collides(g.board, m, p.x + k, p.y - 1)) { p.m = m; p.x += k; p.y -= 1; sfx('rotate'); effectAction('rotate', g); turned = true; break; }
       }
+      if (!turned) sfx('rotateFail');
     } else if (a === 'hold' && g.canHold) {
       const cur = p.t;
       if (g.hold) g.piece = spawn(g.hold);
       else { g.piece = spawn(g.next); g.next = takeNext(g); }
       g.hold = cur;
       g.canHold = false;
+      resetRotRiff();
       sfx('hold');
     }
     return g;
@@ -1539,6 +1898,7 @@
   }
   function musicTick(level, want) {
     if (!want || !musicOn) {
+      if (bgmFading) { bgmWant = false; bgmWantTi = -1; return; }
       if (bgmWant) { bgmWant = false; bgmWantTi = -1; stopBgmNode(); }
       return;
     }
@@ -1578,9 +1938,14 @@
     if (ac) { try { ac.close(); } catch (e) { } }
     ac = null; sfxGain = null; musicGain = null; bgmGain = null; melodyBus = null; noiseBuf = null;
     luBuf = null; luLoading = null; luGain = null;
+    goBuf = null; goLoading = null; goGain = null; goPlaying = false;
+    ccBuf = null; ccLoading = null; ccGain = null;
+    voBufs = {}; voLoading = {}; voGain = null;
+    rotGain = null; resetRotRiff();
+    bgmFading = false;
     bgmBufs = {}; bgmLoading = {};
   }
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, farmDayTarget, farmSunPos, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts };
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, farmDayTarget, farmSunPos, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts };
 
   if (!root.document) return;
   const doc = root.document;
@@ -1638,7 +2003,7 @@
     g.lines = opts.lines || 0;
     g.level = Math.floor(g.lines / 10) + 1;
     g.score = opts.score || 0;
-    g.paused = false; g.over = false; g.demo = true; g.acc = 0; g.popupT = 0; g.flashT = 0; g.levelUp = null;
+    g.paused = false; g.over = false; g.demo = true; g.acc = 0; g.popupT = 0; g.flashT = 0; g.levelUp = null; g.callout = null; goPlaying = false; resetRotRiff();
     if (opts.board) g.board = opts.board;
     if (opts.piece) g.piece = opts.piece;
     if (opts.next != null) g.next = opts.next;
@@ -1698,6 +2063,12 @@
     if (opts.fireworks) { fw.hold = opts.fireworks; fw.posed = false; if (opts.fireworks.prog != null) fw.prog = opts.fireworks.prog; if (opts.fireworks.size != null) fw.prog = Math.max(0, Math.min(1, (opts.fireworks.size - 0.30) / 0.85)); } else { fw.hold = null; fw.posed = false; }
     if (opts.ocean) { ocean.hold = opts.ocean; ocean.posed = false; } else { ocean.hold = null; ocean.posed = false; }
     if (opts.sparkle) holdBlockSpark(opts.sparkle); else { sparkHold = null; }
+    if (opts.callout) {
+      const text = opts.callout.text || 'Amazing!';
+      const dur = opts.callout.dur != null ? opts.callout.dur : CALLOUT_DUR;
+      g.callout = { text: text, t: dur, dur: dur, hold: true, at: opts.callout.at != null ? opts.callout.at : 0.35, id: opts.callout.id || 'amazing' };
+    }
+    if (opts.popup) { g.popup = opts.popup; g.popupT = opts.popupT != null ? opts.popupT : 1100; }
     syncHud();
     const mb = doc.getElementById('musicbtn'); if (mb) mb.textContent = 'Music off';
     const sb = doc.getElementById('soundbtn'); if (sb) sb.textContent = 'Sound off';
@@ -3568,7 +3939,7 @@
       const typ = tetris ? FW_KINDS[i % FW_KINDS.length] : FW_KINDS[(Math.random() * FW_KINDS.length) | 0];
       fwBurst(pos.x, pos.y, tetris ? 1.15 + Math.random() * 0.3 : 0.8 + Math.random() * 0.4, typ, fwPick(), scale);
     }
-    playFwSfx(tetris ? 'big' : 'clear');
+    // Shane's line-clear recording is the main cue; skip the extra fireworks bangs.
   }
   function fwOnLevelUp() {
     const box = photoBox();
@@ -4551,6 +4922,7 @@
     musicTick(g.level, musicWanted(g.level, started, g));
     if (g.flashT > 0) g.flashT -= dt;
     if (g.popupT > 0) g.popupT -= dt;
+    tickCallout(g, dt);
     const ctx = board.getContext('2d');
     if (ctx) {
       ctx.save();
@@ -4606,6 +4978,21 @@
         ctx.font = '700 ' + (g.clearFx && g.clearFx.n >= 2 ? '26' : '24') + 'px ' + FONT;
         ctx.fillStyle = '#facc15';
         ctx.fillText(g.popup, board.width / 2, board.height / 2 - 40 - (1 - k) * 40);
+        ctx.globalAlpha = 1;
+      }
+      if (g.callout && g.callout.t > 0 && !g.levelUp) {
+        const cu = g.callout;
+        const ck = cu.hold && cu.at != null ? (1 - cu.at) : (cu.t / (cu.dur || CALLOUT_DUR));
+        ctx.globalAlpha = Math.min(1, Math.max(0.15, ck * 2));
+        ctx.textAlign = 'center';
+        ctx.font = '800 28px ' + FONT;
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+        ctx.lineWidth = 5;
+        ctx.fillStyle = '#fff7ed';
+        const cy = board.height / 2 + 22 - (1 - ck) * 22;
+        ctx.strokeText(cu.text, board.width / 2, cy);
+        ctx.fillText(cu.text, board.width / 2, cy);
         ctx.globalAlpha = 1;
       }
       if (!g.demo && !g.levelUp && (!started || g.over || g.paused)) {

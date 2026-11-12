@@ -1777,7 +1777,8 @@ if (live) {
   assert.strictEqual(dols.length, 2, 'two big painted dolphins (1.9.183)');
   assert.ok(dols.every(d => d.px != null && d.py != null && d.ang != null && d.aw && d.ah));
   assert.ok(src.includes('function drawOceanScene') && src.includes('function oceanAdvance') && src.includes('function oceanCast') && src.includes('function playMoveSfx'));
-  assert.ok(src.includes("name === 'move' || name === 'rotate' || name === 'soft' || name === 'drop' || name === 'lock'"));
+  // 1.9.185: rotate is its own musical riff; move/soft/drop/lock still go through playMoveSfx.
+  assert.ok(src.includes("name === 'move' || name === 'soft' || name === 'drop' || name === 'lock'") || src.includes("name === 'move' || name === 'rotate' || name === 'soft' || name === 'drop' || name === 'lock'"));
   assert.ok(src.includes('Soft wooden clop') && src.includes('Soft ribbit') && src.includes('Shell click') && src.includes('oceanTh'));
   assert.ok(src.includes('lowpass') && src.includes('3500') && src.includes('highpass'));
   // Current Ocean music stays (Shane's new file had not arrived for this release).
@@ -1874,5 +1875,77 @@ if (live) {
   assert.strictEqual(tetGame.BGM_HASH[2], '9ca3b84e');
   assert.ok(fs.existsSync('feed/tetris-bg/m2-9ca3b84e.mp3'));
   assert.strictEqual(tetGame.fwSize(0), 0.3);
+  assert.ok(src.includes('function drawOceanScene') && src.includes('function drawFireworksScene'));
+}
+
+// 1.9.185 Shane's game-over and line-clear stings, spoken callouts, musical rotate riff
+{
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.strictEqual(tetGame.GAMEOVER_HASH, '5f3dda37');
+  assert.strictEqual(tetGame.gameOverSrc(), 'tetris-bg/gameover-5f3dda37.mp3');
+  assert.ok(fs.existsSync('feed/tetris-bg/gameover-5f3dda37.mp3'), 'hashed game-over mp3 is shipped');
+  assert.strictEqual(tetGame.LINECLEAR_HASH, 'c3b333cd');
+  assert.strictEqual(tetGame.lineClearSrc(), 'tetris-bg/lineclear-c3b333cd.mp3');
+  assert.ok(fs.existsSync('feed/tetris-bg/lineclear-c3b333cd.mp3'), 'hashed line-clear mp3 is shipped');
+  assert.ok(src.includes('function playGameOverSfx') && src.includes('function playLineClearSfx'));
+  assert.ok(src.includes("if (name === 'over') { playGameOverSfx()"));
+  assert.ok(src.includes("if (name === 'clear' || name === 'tetris') { playLineClearSfx"));
+  assert.ok(src.includes('fadeBgmOut') && src.includes('duckBus(ccGain') && src.includes('Overlaps are allowed'));
+  assert.ok(src.includes("Shane's line-clear recording is the main cue"));
+  assert.ok(src.includes("const LINE_WORDS = ['', 'Single', 'Double', 'Triple', 'TETRIS!']"));
+  assert.ok(src.includes("title: 'LEVEL UP!'"));
+  assert.strictEqual(tetGame.CALLOUT_TEXT.amazing, 'Amazing!');
+  assert.strictEqual(tetGame.CALLOUT_TEXT.brilliant, 'Brilliant!');
+  assert.strictEqual(tetGame.CALLOUT_TEXT.fantastic, 'Fantastic!');
+  assert.strictEqual(tetGame.CALLOUT_TEXT.awesome, 'Awesome!');
+  assert.strictEqual(tetGame.CALLOUT_TEXT.yougotthis, 'You got this!');
+  assert.strictEqual(tetGame.CALLOUT_TEXT.keepgoing, 'Keep going!');
+  ['amazing','brilliant','fantastic','awesome','yougotthis','keepgoing'].forEach(id => {
+    assert.ok(tetGame.CALLOUT_VOICES[id] && /^[0-9a-f]{8}$/.test(tetGame.CALLOUT_VOICES[id]));
+    assert.ok(fs.existsSync('feed/' + tetGame.calloutSrc(id)), 'voice ' + id);
+  });
+  assert.ok(src.includes('function maybeCallout') && src.includes('function playCallout') && src.includes('voGain'));
+  const praise = new Set();
+  for (let i = 0; i < 24; i++) praise.add(tetGame.pickCallout({ n: 4, b2b: false, combo: 1, high: false, near: false }));
+  assert.ok(praise.has('amazing') || praise.has('brilliant'), 'tetris praise');
+  const bigger = new Set();
+  for (let i = 0; i < 24; i++) bigger.add(tetGame.pickCallout({ n: 4, b2b: true, combo: 2, high: false, near: false }));
+  assert.ok(bigger.has('fantastic') || bigger.has('awesome'), 'back-to-back bigger callout');
+  const enc = new Set();
+  for (let i = 0; i < 24; i++) enc.add(tetGame.pickCallout({ n: 0, b2b: false, combo: 0, high: true, near: true }));
+  assert.ok(enc.has('yougotthis') || enc.has('keepgoing'), 'encouragement when the stack is high');
+  const g = tetGame.newGame();
+  assert.strictEqual(g.callout, null);
+  assert.strictEqual(g.clearCombo, 0);
+  assert.ok(src.includes('function playRotateSfx') && src.includes('function rotateRun') && src.includes('nearest16th'));
+  assert.ok(src.includes("if (name === 'rotate') { playRotateSfx(true)"));
+  assert.ok(src.includes("if (!turned) sfx('rotateFail')"));
+  assert.ok(Array.isArray(tetGame.ROT_KIND) && tetGame.ROT_KIND.length === 12);
+  const meta16 = { bpm: 120, offset: 0 };
+  const almost16 = (a, b, eps) => assert.ok(Math.abs(a - b) <= (eps || 1e-9), '16th got ' + a + ' want ' + b);
+  almost16(tetGame.quantizeDelay(0.22, 1, meta16, 'nearest16th'), 0.03);
+  almost16(tetGame.quantizeDelay(0.10, 1, meta16, 'nearest16th'), 0.025);
+  almost16(tetGame.quantizeDelay(0.20, 1, meta16, 'nearest16th'), 0);
+  almost16(tetGame.quantizeDelay(0.08, 1, meta16, 'nearest16th'), 0.045);
+  almost16(tetGame.quantizeDelay(0.06, 1, meta16, 'nearest16th'), 0); // 65ms to the 16th would exceed the 48ms cap
+  for (let i = 0; i < 12; i++) {
+    const run = tetGame.rotateRun(i);
+    assert.ok(run && run.length >= 6, 'rotate run theme ' + i);
+    const tr = tetGame.TRACKS[i];
+    const PC = { C: 0, 'C#': 1, D: 2, 'D#': 3, E: 4, F: 5, 'F#': 6, G: 7, 'G#': 8, A: 9, 'A#': 10, B: 11 };
+    const IV = { major: [0, 2, 4, 5, 7, 9, 11], minor: [0, 2, 3, 5, 7, 8, 10] };
+    const scale = new Set(IV[tr.mode].map(n => (n + PC[tr.key]) % 12));
+    run.forEach(f => {
+      assert.ok(f >= 300 && f <= 800, 'rotate Hz ' + f);
+      const midi = 69 + 12 * Math.log2(f / 440);
+      const pc = ((Math.round(midi) % 12) + 12) % 12;
+      assert.ok(scale.has(pc), 'rotate in-key ' + f + ' theme ' + i);
+    });
+  }
+  assert.ok(src.includes('function playMoveSfx') && src.includes('Soft wooden clop') && src.includes('Shell click'));
+  assert.strictEqual(tetGame.LEVELUP_HASH, 'e8f84e6f');
+  assert.ok(fs.existsSync('feed/tetris-bg/levelup-e8f84e6f.mp3'));
+  assert.strictEqual(tetGame.BGM_HASH[2], '9ca3b84e');
+  assert.ok(src.includes('function playLevelUpSfx') && src.includes('function makeLightning'));
   assert.ok(src.includes('function drawOceanScene') && src.includes('function drawFireworksScene'));
 }
