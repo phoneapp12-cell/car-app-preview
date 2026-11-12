@@ -359,12 +359,12 @@ for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 3, at.join(',
 const appSrc = fs.readFileSync('feed/app.js', 'utf8');
 for (const id of sights.TOPICS) assert.ok(appSrc.includes("'" + id + "'"), id);
 assert.ok(!/Math\.pow\(baseOf\(t\), 3\)/.test(appSrc));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.171'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.171'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.171'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.172'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.172'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.172'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.cdot.tv'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.bd ul.sum'));
-assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.171'"));
+assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.172'"));
 function swVersion(src) { const m = String(src).match(/const VERSION = '([^']+)'/); assert.ok(m, 'parent sw.js VERSION'); return m[1]; }
 const parentHere = swVersion(fs.readFileSync('sw.js', 'utf8'));
 let parentMain = parentHere;
@@ -403,10 +403,10 @@ assert.equal(artB.length, 1);
 assert.notEqual(artB[0].id, artA.id);
 seenArt.wasSeen = () => true;
 assert.equal(seenArt.ibArt.cards(0).length, 0);
-assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.171'"));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.172'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'art3d.js?v=' + VERSION"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'portal.js?v=' + VERSION"));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.171'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.172'));
 const portalSrc = fs.readFileSync('feed/portal.js', 'utf8');
 assert.ok(portalSrc.includes('prefers-reduced-motion'));
 assert.ok(portalSrc.includes("sessionStorage.getItem(KEY)"));
@@ -434,7 +434,7 @@ assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("cache: 'reload'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("u.pathname + '?v=' + VERSION"), 'game scripts are fetched at this VERSION, not from a stale unversioned cache');
 assert.ok(appSrc.includes('ibPortalRise'));
 assert.ok(!/portal-style\.jpg|attachments\/image/.test(portalSrc + fs.readFileSync('feed/index.html', 'utf8')));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.171'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.172'));
 assert.ok(appSrc.includes("['art3d', '3D art'"));
 assert.ok(appSrc.includes("['3D art', 'art3d'"));
 assert.ok(appSrc.includes("'art3d'"));
@@ -1508,4 +1508,26 @@ if (live) {
   const tet = fs.readFileSync('feed/tetris.js', 'utf8');
   assert.ok(tet.includes('bgmWantTi === ti') && tet.includes('bgmWantTi = ti'), 'Tetris must not start a previous theme after a level-up');
   assert.ok(tet.includes('playLevelUpSfx(ti)') && !/sfx\(\'level\'\)/.test(tet) || tet.includes('playLevelUpSfx(ti)'));
+}
+
+// 1.9.172 Tetris full screen fills the phone edge to edge
+{
+  const html = fs.readFileSync('feed/tetris.html', 'utf8');
+  const js = fs.readFileSync('feed/tetris.js', 'utf8');
+  const play = fs.readFileSync('feed/play.js', 'utf8');
+  assert.ok(html.includes('html.fs') && html.includes('100dvh') && html.includes('100dvw'));
+  assert.ok(html.includes('env(safe-area-inset-top)') && html.includes('env(safe-area-inset-bottom)'));
+  assert.ok(html.includes('env(safe-area-inset-left)') && html.includes('env(safe-area-inset-right)'));
+  assert.ok(html.includes('html.fs-overlay') && html.includes('position: fixed'));
+  assert.ok(html.includes('@media (orientation: landscape)'));
+  // Ordinary layout is unchanged.
+  assert.ok(html.includes('body { box-sizing: border-box; padding: 16px;'));
+  assert.ok(html.includes('.wrap { max-width: 440px; margin: 0 auto; }'));
+  assert.ok(html.includes('max-width: min(280px, 100%)'));
+  assert.ok(js.includes("d.type !== 'ib-artfull'") && js.includes('function setFull') && js.includes('function layoutBoard'));
+  assert.ok(js.includes("from === 'parent'") && js.includes("html.classList.add('fs-overlay')"));
+  assert.ok(play.includes("postMessage({ type: 'ib-artfull'") && play.includes('tellFrame'));
+  assert.ok(play.includes('allow="autoplay; fullscreen"') && play.includes("setAttribute('allow', 'autoplay; fullscreen')"));
+  const idx = fs.readFileSync('feed/index.html', 'utf8');
+  assert.ok(idx.includes('.artwin.artfull{inset:0;width:100dvw;height:100dvh'));
 }
