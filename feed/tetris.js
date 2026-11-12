@@ -291,6 +291,7 @@
   }
 
   // Offline analysis of tetris-bg/m0..m11.mp3: tempo, first-beat phase (loop-safe), key.
+  // 1.9.173 m6 (Farmyard) re-analysed after Shane's new level-1 track.
   const TRACKS = [
     { bpm: 143.5, offset: 0.069, key: 'E', mode: 'major' },
     { bpm: 117.5, offset: 0.047, key: 'F#', mode: 'minor' },
@@ -298,7 +299,7 @@
     { bpm: 117.5, offset: 0.348, key: 'G', mode: 'major' },
     { bpm: 99.5, offset: 0.096, key: 'C', mode: 'major' },
     { bpm: 117.5, offset: 0.282, key: 'D', mode: 'minor' },
-    { bpm: 161.5, offset: 0.279, key: 'D', mode: 'major' },
+    { bpm: 171, offset: 0.006, key: 'D', mode: 'major' },
     { bpm: 123, offset: 0.163, key: 'D', mode: 'minor' },
     { bpm: 117.5, offset: 0.209, key: 'A', mode: 'major' },
     { bpm: 112.5, offset: 0.468, key: 'D#', mode: 'major' },
@@ -945,7 +946,7 @@
   // effects cannot pause or mute a separate HTML audio element on iOS/Android WebView.
   // Filenames include a content hash because some phone media caches ignore ?v= query strings
   // (1.9.163 busted the URL but Shane still heard the old bullfrog track).
-  const BGM_HASH = ['a719f241', '9711dc01', '9ca3b84e', '7776197f', '6a9bd0f6', '63c9eafe', 'ef3f9675', 'b76dd1d3', 'fdec4369', '2b10c8ba', 'cdbe7d34', 'b61bc42a'];
+  const BGM_HASH = ['a719f241', '9711dc01', '9ca3b84e', '7776197f', '6a9bd0f6', '63c9eafe', '7bc4ebcd', 'b76dd1d3', 'fdec4369', '2b10c8ba', 'cdbe7d34', 'b61bc42a'];
   function bgmSrc(ti) { return 'tetris-bg/m' + ti + '-' + BGM_HASH[ti] + '.mp3'; }
   let bgmGain = null, bgmNode = null, bgmIdx = -1, bgmBufs = {}, bgmLoading = {}, bgmAt = 0, bgmRate = 1, bgmWant = false, bgmWantTi = -1;
   function silentUnlock() {
