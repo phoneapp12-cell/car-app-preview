@@ -1874,5 +1874,68 @@
   raf = requestAnimationFrame(loop);
   function halt() { if (raf) cancelAnimationFrame(raf); raf = 0; g.paused = true; stopAudio(); }
   doc.addEventListener('visibilitychange', () => { if (doc.hidden) halt(); });
+  // 1.9.172 Full screen: fill the phone edge to edge. Driven by the parent
+  // Full screen button (postMessage) or by the page itself. If the Fullscreen
+  // API is missing (iPhone), a fixed 100dvw × 100dvh overlay is used instead.
+  function isFull() { return !!(doc.documentElement && doc.documentElement.classList.contains('fs')); }
+  function layoutBoard() {
+    const cv = doc.getElementById('board');
+    const row = doc.querySelector('.boardrow');
+    const side = doc.querySelector('.side');
+    if (!cv || !row) return;
+    if (!isFull()) { cv.style.width = ''; cv.style.height = ''; return; }
+    const r = row.getBoundingClientRect();
+    const sideW = side && !row.classList.contains('no-side') ? side.getBoundingClientRect().width : 0;
+    const gap = 8;
+    const availW = Math.max(48, r.width - sideW - gap);
+    const availH = Math.max(48, r.height);
+    let h = availH, w = h / 2;
+    if (w > availW) { w = availW; h = w * 2; }
+    cv.style.width = Math.floor(w) + 'px';
+    cv.style.height = Math.floor(h) + 'px';
+  }
+  function setFull(on, from) {
+    const html = doc.documentElement, body = doc.body;
+    on = !!on;
+    html.classList.toggle('fs', on);
+    if (body) body.classList.toggle('fs', on);
+    if (from === 'parent') {
+      html.classList.toggle('fs-from-parent', on);
+      html.classList.toggle('fs-overlay', on);
+    } else if (on) {
+      const can = html.requestFullscreen || html.webkitRequestFullscreen;
+      const inFs = !!(doc.fullscreenElement || doc.webkitFullscreenElement);
+      if (can && !inFs) {
+        const p = can.call(html);
+        if (p && p.catch) p.catch(() => { html.classList.add('fs-overlay'); });
+      } else if (!can) html.classList.add('fs-overlay');
+    } else {
+      html.classList.remove('fs-overlay', 'fs-from-parent');
+      if (doc.fullscreenElement || doc.webkitFullscreenElement) {
+        const ex = doc.exitFullscreen || doc.webkitExitFullscreen;
+        if (ex) { const p = ex.call(doc); if (p && p.catch) p.catch(() => { }); }
+      }
+    }
+    layoutBoard();
+    if (root.requestAnimationFrame) root.requestAnimationFrame(layoutBoard);
+  }
+  root.addEventListener('message', e => {
+    const d = e && e.data;
+    if (!d || d.type !== 'ib-artfull') return;
+    setFull(!!d.on, 'parent');
+  });
+  doc.addEventListener('fullscreenchange', () => {
+    if (doc.documentElement.classList.contains('fs-from-parent')) return;
+    setFull(!!doc.fullscreenElement, 'event');
+  });
+  doc.addEventListener('webkitfullscreenchange', () => {
+    if (doc.documentElement.classList.contains('fs-from-parent')) return;
+    setFull(!!doc.webkitFullscreenElement, 'event');
+  });
+  root.addEventListener('resize', layoutBoard);
+  if (root.visualViewport) root.visualViewport.addEventListener('resize', layoutBoard);
+  root.Tetris.setFull = setFull;
+  root.Tetris.layoutBoard = layoutBoard;
+  root.Tetris.isFull = isFull;
   root.addEventListener('pagehide', halt);
 })(typeof window !== 'undefined' ? window : globalThis);

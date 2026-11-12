@@ -40,6 +40,65 @@
   .lp-list button { flex: none; width: 100%; min-height: 46px; text-align: left; padding: 10px 14px; }
   #levelpickclose { width: 100%; flex: none; }
   #levelbtn[hidden], #practicelabel[hidden] { display: none; }
+
+  /* 1.9.172 Full screen: edge-to-edge. Ordinary layout above is unchanged. */
+  html.fs, html.fs body {
+    width: 100dvw; height: 100dvh; max-width: 100dvw; max-height: 100dvh;
+    background: #0a0b0e; overflow: hidden; margin: 0;
+  }
+  html.fs body { padding: 0; }
+  html.fs-overlay, html.fs-overlay body {
+    position: fixed; inset: 0; z-index: 80;
+    width: 100dvw; height: 100dvh;
+    background: #0a0b0e;
+  }
+  html.fs .wrap {
+    max-width: none; margin: 0; width: 100%; height: 100%;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  html.fs .help, html.fs .credit { display: none; }
+  html.fs h1 { font-size: 18px; margin: 0; padding: 6px 10px 0; }
+  html.fs .stats { margin: 4px 8px 6px; gap: 6px; }
+  html.fs .stat { padding: 4px 8px; }
+  html.fs .stat span { font-size: 10px; }
+  html.fs .stat strong { font-size: 16px; line-height: 20px; }
+  html.fs .stat.big strong { font-size: 20px; line-height: 24px; }
+  html.fs .boardrow {
+    min-height: 0; margin: 0 8px; gap: 8px;
+    align-items: center; justify-content: center;
+    flex-wrap: nowrap;
+  }
+  html.fs canvas#board {
+    flex: none;
+    width: auto; height: auto;
+    max-width: none; max-height: none;
+    aspect-ratio: 10 / 20;
+  }
+  html.fs .side { flex: 0 0 auto; min-width: 72px; max-width: 96px; }
+  html.fs .side canvas { max-width: 72px; }
+  html.fs .side button { min-height: 40px; margin-bottom: 6px; }
+  html.fs .row, html.fs .play {
+    margin: 6px 8px 0; gap: 6px;
+  }
+  html.fs .row { margin-bottom: 0; }
+  html.fs .play { margin-bottom: 6px; }
+  html.fs button { min-height: 44px; }
+  @media (orientation: landscape) {
+    html.fs .wrap {
+      grid-template-columns: minmax(0, 1fr) minmax(200px, 38%);
+      grid-template-rows: auto auto minmax(0, 1fr) auto;
+      column-gap: 8px;
+    }
+    html.fs .boardrow { grid-row: 1 / -1; grid-column: 1; margin: 0 0 0 8px; }
+    html.fs h1 { grid-column: 2; padding-top: 4px; }
+    html.fs .stats { grid-column: 2; }
+    html.fs .row { grid-column: 2; }
+    html.fs .play { grid-column: 2; }
+    html.fs .boardrow { flex-direction: row; }
+  }
 </style>
 </head>
 <body>
@@ -87,8 +146,8 @@
       <button type="button" id="levelpickclose" class="wide">Close</button>
     </div>
   </div>
-  <script src="scores.js?v=1.9.171"></script>
-  <script src="tetris.js?v=1.9.171"></script>
+  <script src="scores.js?v=1.9.172"></script>
+  <script src="tetris.js?v=1.9.172"></script>
   <p class="credit">Music chosen by Shane for every theme.</p>
 </body>
 </html>
