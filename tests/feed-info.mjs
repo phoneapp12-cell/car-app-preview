@@ -1793,3 +1793,20 @@ if (live) {
   assert.strictEqual(tetGame.BGM_HASH[6], '7bc4ebcd');
 }
 
+// 1.9.182 Smoother painted-dolphin motion on the Ocean level
+{
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.ok(src.includes('function oceanEval') && src.includes('function oceanLerpAngle') && src.includes('function oceanWrapAngle'));
+  assert.ok(src.includes('Analytic velocity') && src.includes('path closes exactly each period'));
+  assert.ok(!src.includes('Math.floor(loop)') && !src.includes('Math.max(40, Math.min(PHOTO_W'));
+  assert.ok(src.includes('d.facing') && src.includes('d.bank') && src.includes('d.tail') && src.includes('slices = 20'));
+  assert.strictEqual(tetGame.isEffect(2), 'ocean');
+  assert.strictEqual(tetGame.oceanMeta().dolphins.length, 3);
+  assert.ok(tetGame.oceanArt().plate.indexOf('ocean-plate-24aea8de') >= 0);
+  assert.strictEqual(tetGame.BGM_HASH[2], '9ca3b84e');
+  // Prior 1.9.181 art and other levels stay intact
+  assert.ok(src.includes('function drawOceanScene') && src.includes('function drawFireworksScene') && src.includes('function drawBeachScene'));
+  assert.strictEqual(tetGame.fwSize(0), 0.3);
+  assert.strictEqual(tetGame.TRACKS[1].bpm, 131);
+}
+
