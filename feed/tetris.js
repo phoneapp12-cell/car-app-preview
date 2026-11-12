@@ -937,12 +937,37 @@
   ];
   const fw = { ready: false, sil: null, loading: false, rockets: [], parts: [], flashes: [], lit: 0, litR: 1, litG: 1, litB: 1, beatLatch: false, beatN: 0, hold: null, posed: false, prog: 0 };
 
-  const OCEAN_ART = { plate: 'tetris-bg/ocean-plate-24aea8de.webp', atlas: 'tetris-bg/ocean-atlas-19544900.webp' };
+  const OCEAN_ART = { plate: 'tetris-bg/ocean-plate-51d83ca2.webp', atlas: 'tetris-bg/ocean-atlas-fb01ff38.webp' };
   const OCEAN_META = {
     dolphins: [
-    { name: 'top', ax: 4, ay: 6, aw: 261, ah: 186, x: 21, y: 136, w: 261, h: 186, px: 154.56, py: 208.08, ox: 133.56, oy: 72.08, ang: -30.09 },
-    { name: 'mid', ax: 269, ay: 7, aw: 264, ah: 184, x: 13, y: 317, w: 264, h: 184, px: 152.33, py: 398.44, ox: 139.33, oy: 81.44, ang: -20.21 },
-    { name: 'low', ax: 537, ay: 4, aw: 177, ah: 190, x: 209, y: 489, w: 177, h: 190, px: 300.37, py: 562.48, ox: 91.37, oy: 73.48, ang: 49.43 }
+    { name: 'top', ax: 2, ay: 2, aw: 261, ah: 186, x: 21, y: 136, w: 261, h: 186, px: 154.56, py: 208.08, ox: 133.56, oy: 72.08, ang: -30.09 },
+    { name: 'mid', ax: 265, ay: 2, aw: 264, ah: 184, x: 13, y: 317, w: 264, h: 184, px: 152.33, py: 398.44, ox: 139.33, oy: 81.44, ang: -20.21 }
+    ],
+    fish: [
+    { name: 'idol', ax: 531, ay: 2, aw: 40, ah: 42, x: 14, y: 368, w: 40, h: 42, px: 33.31, py: 390.69, ox: 19.31, oy: 22.69, ang: 65.74, kind: 'solo', nose: 1 },
+    { name: 'yell_L', ax: 573, ay: 2, aw: 54, ah: 40, x: 10, y: 518, w: 54, h: 40, px: 35.28, py: 537.47, ox: 25.28, oy: 19.47, ang: 9.21, kind: 'yellow', nose: 1 },
+    { name: 'yell_M', ax: 629, ay: 2, aw: 34, ah: 31, x: 101, y: 557, w: 34, h: 31, px: 119.46, py: 571.99, ox: 18.46, oy: 14.99, ang: -20.9, kind: 'yellow', nose: 1 },
+    { name: 'yell_R', ax: 665, ay: 2, aw: 47, ah: 23, x: 101, y: 557, w: 47, h: 23, px: 122.64, py: 569.03, ox: 21.64, oy: 12.03, ang: 1.01, kind: 'yellow', nose: 1 },
+    { name: 'butterfly', ax: 714, ay: 2, aw: 59, ah: 43, x: 375, y: 670, w: 59, h: 43, px: 405.96, py: 690.8, ox: 30.96, oy: 20.8, ang: -2.64, kind: 'solo', nose: -1 },
+    { name: 'clown', ax: 775, ay: 2, aw: 61, ah: 28, x: 272, y: 716, w: 61, h: 28, px: 300.34, py: 731.47, ox: 28.34, oy: 15.47, ang: 7.41, kind: 'solo', nose: 1 },
+    { name: 'orange_L', ax: 838, ay: 2, aw: 39, ah: 24, x: 86, y: 666, w: 39, h: 24, px: 105.62, py: 677.0, ox: 19.62, oy: 11.0, ang: 17.64, kind: 'solo', nose: 1 },
+    { name: 'orange_M', ax: 879, ay: 2, aw: 36, ah: 25, x: 145, y: 693, w: 36, h: 25, px: 163.04, py: 706.41, ox: 18.04, oy: 13.41, ang: 21.4, kind: 'solo', nose: 1 },
+    { name: 'tang', ax: 917, ay: 2, aw: 95, ah: 47, x: 395, y: 576, w: 95, h: 47, px: 444.0, py: 600.0, ox: 49.0, oy: 24.0, ang: -7.9, kind: 'solo', nose: -1 },
+    { name: 'purp_u', ax: 2, ay: 190, aw: 73, ah: 42, x: 430, y: 630, w: 73, h: 42, px: 474.27, py: 660.29, ox: 44.27, oy: 30.29, ang: 13.82, kind: 'solo', nose: -1 },
+    { name: 'purp_l', ax: 77, ay: 190, aw: 75, ah: 47, x: 385, y: 720, w: 75, h: 47, px: 435.34, py: 749.14, ox: 50.34, oy: 29.14, ang: -8.78, kind: 'solo', nose: -1 },
+    { name: 'gold', ax: 154, ay: 190, aw: 16, ah: 12, x: 449, y: 539, w: 16, h: 12, px: 468.0, py: 552.0, ox: 19.0, oy: 13.0, ang: 7.73, kind: 'solo', nose: -1 },
+    { name: 'anthias_4', ax: 172, ay: 190, aw: 22, ah: 15, x: 180, y: 602, w: 22, h: 15, px: 190.91, py: 608.94, ox: 10.91, oy: 6.94, ang: 7.49, kind: 'orange', nose: 1 },
+    { name: 'anthias_6', ax: 196, ay: 190, aw: 16, ah: 12, x: 164, y: 618, w: 16, h: 12, px: 171.15, py: 623.4, ox: 7.15, oy: 5.4, ang: -9.12, kind: 'orange', nose: -1 },
+    { name: 'anthias_7', ax: 214, ay: 190, aw: 18, ah: 14, x: 181, y: 630, w: 18, h: 14, px: 189.47, py: 636.63, ox: 8.47, oy: 6.63, ang: 26.98, kind: 'orange', nose: -1 },
+    { name: 'anthias_8', ax: 234, ay: 190, aw: 21, ah: 15, x: 149, y: 632, w: 21, h: 15, px: 159.22, py: 639.02, ox: 10.22, oy: 7.02, ang: 17.42, kind: 'orange', nose: 1 },
+    { name: 'anthias_9', ax: 257, ay: 190, aw: 18, ah: 13, x: 181, y: 648, w: 18, h: 13, px: 189.52, py: 654.08, ox: 8.52, oy: 6.08, ang: 12.04, kind: 'orange', nose: -1 },
+    { name: 'anthias_10', ax: 277, ay: 190, aw: 14, ah: 12, x: 168, y: 653, w: 14, h: 12, px: 174.53, py: 658.45, ox: 6.53, oy: 5.45, ang: 23.88, kind: 'orange', nose: -1 },
+    { name: 'anthias_11', ax: 293, ay: 190, aw: 19, ah: 16, x: 203, y: 653, w: 19, h: 16, px: 212.05, py: 660.21, ox: 9.05, oy: 7.21, ang: 30.48, kind: 'orange', nose: -1 },
+    { name: 'anthias_12', ax: 314, ay: 190, aw: 19, ah: 14, x: 153, y: 656, w: 19, h: 14, px: 162.34, py: 662.06, ox: 9.34, oy: 6.06, ang: 16.99, kind: 'orange', nose: 1 },
+    { name: 'anthias_13', ax: 335, ay: 190, aw: 22, ah: 14, x: 220, y: 664, w: 22, h: 14, px: 230.54, py: 670.52, ox: 10.54, oy: 6.52, ang: 12.97, kind: 'orange', nose: -1 },
+    { name: 'anthias_14', ax: 359, ay: 190, aw: 20, ah: 14, x: 181, y: 666, w: 20, h: 14, px: 190.78, py: 672.63, ox: 9.78, oy: 6.63, ang: 8.75, kind: 'orange', nose: 1 },
+    { name: 'anthias_18', ax: 381, ay: 190, aw: 18, ah: 12, x: 235, y: 682, w: 18, h: 12, px: 243.45, py: 687.53, ox: 8.45, oy: 5.53, ang: 16.3, kind: 'orange', nose: -1 },
+    { name: 'anthias_20', ax: 401, ay: 190, aw: 17, ah: 13, x: 192, y: 687, w: 17, h: 13, px: 200.11, py: 692.95, ox: 8.11, oy: 5.95, ang: 11.95, kind: 'orange', nose: -1 }
     ]
   };
   const EFFECT_TI = { 0: 'beach', 1: 'fireworks', 2: 'ocean', 6: 'farm', 11: 'frog' };
@@ -1955,19 +1980,64 @@
     ctx.globalAlpha = 1;
   }
   function drawGhost(ctx, x, y, color, size, col, row) {
+    // 1.9.183 Stronger landing preview: see-through fill, colour outline, faint glow.
+    // No gloss or bevel, so it is never mistaken for a locked block.
+    ctx.save();
     if (themeFor(g.level) === TRI_THEME) {
-      ctx.globalAlpha = 0.55;
+      ctx.globalAlpha = 0.28;
+      ctx.fillStyle = color;
+      triPath(ctx, x, y, size, col, row);
+      ctx.fill();
+      ctx.globalAlpha = 0.4;
       ctx.strokeStyle = color;
-      ctx.lineWidth = Math.max(1.5, size * 0.08);
+      ctx.lineWidth = Math.max(3.5, size * 0.16);
       triPath(ctx, x, y, size, col, row);
       ctx.stroke();
-      ctx.globalAlpha = 1;
+      ctx.globalAlpha = 0.95;
+      ctx.lineWidth = Math.max(2.2, size * 0.11);
+      triPath(ctx, x, y, size, col, row);
+      ctx.stroke();
+      ctx.globalAlpha = 0.7;
+      ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+      ctx.lineWidth = Math.max(1, size * 0.045);
+      triPath(ctx, x, y, size, col, row);
+      ctx.stroke();
+      ctx.restore();
       return;
     }
+    const pad = Math.max(1.6, size * 0.08);
+    const ix = x + pad, iy = y + pad, iw = size - pad * 2, ih = size - pad * 2;
+    ctx.globalAlpha = 0.26;
+    ctx.fillStyle = color;
+    ctx.fillRect(ix, iy, iw, ih);
+    ctx.globalAlpha = 0.4;
     ctx.strokeStyle = color;
-    ctx.globalAlpha = 0.5;
-    ctx.strokeRect(x + 2.5, y + 2.5, size - 5, size - 5);
-    ctx.globalAlpha = 1;
+    ctx.lineWidth = Math.max(4, size * 0.18);
+    ctx.strokeRect(ix + 0.5, iy + 0.5, iw - 1, ih - 1);
+    ctx.globalAlpha = 0.95;
+    ctx.lineWidth = Math.max(2.2, size * 0.11);
+    ctx.strokeRect(ix + 0.5, iy + 0.5, iw - 1, ih - 1);
+    ctx.globalAlpha = 0.7;
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(ix - 0.5, iy - 0.5, iw + 1, ih + 1);
+    ctx.restore();
+  }
+  function drawWellFrame(ctx, w, h) {
+    // 1.9.183 Crisp well frame on every theme, so the playfield stays distinct
+    // from the animated photo without hiding it. Drawn last (under HUD).
+    ctx.save();
+    ctx.lineJoin = 'miter';
+    ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+    ctx.lineWidth = 5;
+    ctx.strokeRect(2.5, 2.5, w - 5, h - 5);
+    ctx.strokeStyle = 'rgba(255,255,255,0.82)';
+    ctx.lineWidth = 2.25;
+    ctx.strokeRect(3.25, 3.25, w - 6.5, h - 6.5);
+    ctx.strokeStyle = 'rgba(180,220,255,0.35)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(5, 5, w - 10, h - 10);
+    ctx.restore();
   }
   function drawMini(cv, t, dim) {
     if (!cv) return;
@@ -2280,17 +2350,24 @@
     ctx.globalAlpha = 1;
   }
   function drawEffectGhost(ctx, x, y, color, size) {
-    const pad = Math.max(1.5, size * 0.08);
+    const pad = Math.max(1.6, size * 0.08);
     const rad = Math.max(3, size * 0.18);
     ctx.save();
-    ctx.globalAlpha = 0.18;
+    ctx.globalAlpha = 0.26;
     rrPath(ctx, x + pad, y + pad, size - pad * 2, size - pad * 2, rad);
     ctx.fillStyle = color;
     ctx.fill();
-    ctx.globalAlpha = 0.55;
+    ctx.globalAlpha = 0.4;
     ctx.strokeStyle = color;
-    ctx.lineWidth = Math.max(1.2, size * 0.07);
+    ctx.lineWidth = Math.max(3.5, size * 0.16);
     rrPath(ctx, x + pad, y + pad, size - pad * 2, size - pad * 2, rad);
+    ctx.stroke();
+    ctx.globalAlpha = 0.95;
+    ctx.lineWidth = Math.max(2.2, size * 0.11);
+    ctx.stroke();
+    ctx.globalAlpha = 0.7;
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 1;
     ctx.stroke();
     ctx.restore();
     ctx.globalAlpha = 1;
@@ -3778,10 +3855,11 @@
 
 
 
-  // 1.9.181 Ocean: the three big painted dolphins swim on arcs, porpoise, and undulate.
-  // The whale, turtle, fish and coral stay on the plate. No cartoon dolphins.
+  // 1.9.181 Ocean: the big painted dolphins swim on arcs, porpoise, and undulate.
   // 1.9.182: smooth, eased, continuous motion (layered sines, analytic velocity, no wrap pop).
-  const ocean = { img: { plate: null, atlas: null }, ready: false, loading: false, dolphins: [], bubbles: [], ripples: [], hold: null, posed: false, t: 0 };
+  // 1.9.183: two painted dolphins (the mid-reef one is gone, plate cleaned) and more
+  // painted reef fish, cut from 2.webp and swimming in small schools and as individuals.
+  const ocean = { img: { plate: null, atlas: null }, ready: false, loading: false, dolphins: [], fish: [], bubbles: [], ripples: [], hold: null, posed: false, t: 0 };
 
   function oceanLoad() {
     if (ocean.ready || ocean.loading || !root.Image) return;
@@ -3797,7 +3875,7 @@
     });
   }
   function oceanReset() {
-    ocean.dolphins = []; ocean.bubbles = []; ocean.ripples = [];
+    ocean.dolphins = []; ocean.fish = []; ocean.bubbles = []; ocean.ripples = [];
     ocean.t = 0; ocean.posed = false;
   }
 
@@ -3835,8 +3913,7 @@
     // path is a continuous eased curve with no corners and no wrap-around pop.
     const paths = [
       { cx: 195, cy: 225, per: 16, ph: 0.3, ax: 78, ay: 50, ax2: 16, ay2: 12, ph2: 1.1, ph4: 2.2, porpAmp: 20, phP: 0.0, z0: 1.05 },
-      { cx: 205, cy: 385, per: 19, ph: 2.0, ax: 90, ay: 40, ax2: 20, ay2: 11, ph2: 0.6, ph4: 0.9, porpAmp: 14, phP: 1.2, z0: 0.95 },
-      { cx: 275, cy: 505, per: 17.5, ph: 3.8, ax: 68, ay: 32, ax2: 14, ay2: 9, ph2: 1.8, ph4: 2.6, porpAmp: 12, phP: 2.0, z0: 1.1 }
+      { cx: 205, cy: 385, per: 19, ph: 2.0, ax: 90, ay: 40, ax2: 20, ay2: 11, ph2: 0.6, ph4: 0.9, porpAmp: 14, phP: 1.2, z0: 0.95 }
     ];
     ocean.dolphins = M.map(function (meta, i) {
       const p = paths[i];
@@ -3846,6 +3923,7 @@
       d.x = e0.x; d.y = e0.y; d.heading = e0.heading; d.facing = e0.vx >= 0 ? 1 : -1;
       return d;
     });
+    oceanCastFish();
     oceanLoad();
   }
   function oceanEmitBubble(x, y, z) {
@@ -3914,6 +3992,7 @@
       }
       if (!poseOnly && !reduce && d.porp < -14 && d.y < 190 && Math.random() < dt * 2.5) oceanEmitRipple(d.x, Math.max(90, d.y - 16));
     }
+    oceanAdvanceFish(dt, reduce, poseOnly, t, snap, easeH, easeB);
     if (reduce && !poseOnly) return;
     for (let i = ocean.bubbles.length - 1; i >= 0; i--) {
       const b = ocean.bubbles[i];
@@ -3925,19 +4004,127 @@
       if (ocean.ripples[i].t >= ocean.ripples[i].max) ocean.ripples.splice(i, 1);
     }
   }
+
+  function oceanFishSrc(name) {
+    const list = OCEAN_META.fish;
+    for (let i = 0; i < list.length; i++) if (list[i].name === name) return list[i];
+    return list[0];
+  }
+  function oceanCastFish() {
+    const list = OCEAN_META.fish || [];
+    const schools = {
+      orange: { cx: 193, cy: 656, per: 22, ax: 46, ay: 24, ax2: 10, ay2: 8, ph2: 0.8, ph4: 1.6, porpAmp: 6, phP: 0.4, z0: 0.92, dartPer: 7.5, dartAmp: 14 },
+      yellow: { cx: 92, cy: 560, per: 18, ax: 30, ay: 16, ax2: 8, ay2: 6, ph2: 1.3, ph4: 2.1, porpAmp: 5, phP: 1.0, z0: 1.02, dartPer: 8.5, dartAmp: 10 }
+    };
+    const fish = [];
+    list.forEach(function (meta, i) {
+      const kind = meta.kind || 'solo';
+      const school = kind === 'orange' || kind === 'yellow' ? kind : null;
+      const sh = school ? schools[school] : null;
+      const d = { i: i, meta: meta, kind: kind, school: school, heading: 0, facing: meta.nose || 1, bank: 0, und: 0, tail: 0, porp: 0, z: 1, primed: false, nose: meta.nose || 1, clone: false, sc: 1 };
+      if (sh) {
+        for (const k in sh) d[k] = sh[k];
+        d.ph = i * 0.37;
+        d.phP = sh.phP + i * 0.2;
+        // local offset from the painted home, so the school keeps its shape
+        d.lx = meta.px - sh.cx;
+        d.ly = meta.py - sh.cy;
+        d.z0 = sh.z0 + (i % 5) * 0.03;
+      } else {
+        const orbit = {
+          idol: { per: 20, ax: 28, ay: 18, ax2: 7, ay2: 5, porpAmp: 7, z0: 0.88 },
+          tang: { per: 21, ax: 26, ay: 14, ax2: 7, ay2: 5, porpAmp: 5, z0: 1.12 },
+          butterfly: { per: 17, ax: 22, ay: 12, ax2: 6, ay2: 5, porpAmp: 4, z0: 1.16 },
+          clown: { per: 14, ax: 16, ay: 9, ax2: 5, ay2: 4, porpAmp: 3, z0: 1.14 },
+          purp_u: { per: 19, ax: 20, ay: 11, ax2: 6, ay2: 4, porpAmp: 4, z0: 1.08 },
+          purp_l: { per: 16, ax: 18, ay: 10, ax2: 5, ay2: 4, porpAmp: 3, z0: 1.18 },
+          gold: { per: 15, ax: 18, ay: 10, ax2: 5, ay2: 4, porpAmp: 4, z0: 0.8 },
+          orange_L: { per: 18, ax: 22, ay: 11, ax2: 6, ay2: 5, porpAmp: 4, z0: 1.06 },
+          orange_M: { per: 17, ax: 20, ay: 10, ax2: 6, ay2: 4, porpAmp: 4, z0: 1.1 }
+        }[meta.name] || { per: 18, ax: 18, ay: 10, ax2: 5, ay2: 4, porpAmp: 4, z0: 1 };
+        d.cx = meta.px; d.cy = meta.py;
+        d.per = orbit.per; d.ph = i * 0.9; d.ax = orbit.ax; d.ay = orbit.ay;
+        d.ax2 = orbit.ax2; d.ay2 = orbit.ay2; d.ph2 = 0.7 + i * 0.3; d.ph4 = 1.5 + i * 0.2;
+        d.porpAmp = orbit.porpAmp; d.phP = i * 0.5; d.z0 = orbit.z0;
+        d.lx = 0; d.ly = 0; d.dartPer = 9 + (i % 4); d.dartAmp = 8;
+      }
+      const e0 = oceanEval(d, 0);
+      d.x = e0.x + (d.lx || 0); d.y = e0.y + (d.ly || 0);
+      d.heading = e0.heading; d.facing = (e0.vx >= 0 ? 1 : -1);
+      fish.push(d);
+    });
+    // Extra small school of painted anthias on the right reef (deeper, slower) so the reef feels lively without crowding the board.
+    const srcNames = ['anthias_8', 'anthias_11', 'anthias_13', 'anthias_14', 'anthias_18', 'orange_L'];
+    const homes = [[360, 600], [400, 630], [430, 610], [380, 670], [455, 655], [340, 650], [415, 690], [350, 625]];
+    homes.forEach(function (h, i) {
+      const src = oceanFishSrc(srcNames[i % srcNames.length]);
+      if (!src) return;
+      const d = { i: fish.length, meta: src, kind: 'orange', school: 'right', heading: 0, facing: src.nose || 1, bank: 0, und: 0, tail: 0, porp: 0, z: 0.72, primed: false, nose: src.nose || 1, clone: true, sc: 0.72 + (i % 4) * 0.07,
+        cx: 390, cy: 640, per: 26, ph: i * 0.55, ax: 32, ay: 16, ax2: 8, ay2: 6, ph2: 1.1, ph4: 2.0, porpAmp: 5, phP: i * 0.3, z0: 0.7 + (i % 3) * 0.04,
+        lx: h[0] - 390, ly: h[1] - 640, dartPer: 9.5, dartAmp: 11 };
+      const e0 = oceanEval(d, 0);
+      d.x = e0.x + d.lx; d.y = e0.y + d.ly; d.heading = e0.heading; d.facing = e0.vx >= 0 ? 1 : -1;
+      fish.push(d);
+    });
+    ocean.fish = fish;
+  }
+  function oceanFishDart(d, t) {
+    const per = d.dartPer || 8;
+    const pulse = Math.pow(0.5 + 0.5 * Math.sin((Math.PI * 2 / per) * t + (d.ph || 0)), 8);
+    return (d.dartAmp || 0) * pulse;
+  }
+  function oceanAdvanceFish(dt, reduce, poseOnly, t, snap, easeH, easeB) {
+    if (!ocean.fish || !ocean.fish.length) return;
+    const faceRate = 3.2;
+    for (let i = 0; i < ocean.fish.length; i++) {
+      const d = ocean.fish[i];
+      if (reduce && !poseOnly) {
+        if (d.clone) { d.x = -999; d.y = -999; }
+        else { d.x = d.meta.px; d.y = d.meta.py; d.heading = (d.meta.ang || 0) * Math.PI / 180; d.facing = d.nose || 1; }
+        d.und = 0; d.tail = 0; d.porp = 0; d.bank = 0; d.z = d.z0;
+        continue;
+      }
+      const e = oceanEval(d, t);
+      const dart = poseOnly ? 0 : oceanFishDart(d, t);
+      const hd = e.heading;
+      d.x = e.x + (d.lx || 0) + Math.cos(hd) * dart;
+      d.y = e.y + (d.ly || 0) + Math.sin(hd) * dart;
+      d.porp = e.porp;
+      d.heading = snap ? hd : oceanLerpAngle(d.heading, hd, easeH);
+      const e2 = oceanEval(d, t + 1 / 120);
+      const v2 = e.vx * e.vx + e.vy * e.vy;
+      const axv = (e2.vx - e.vx) * 120, ayv = (e2.vy - e.vy) * 120;
+      const turn = (e.vx * ayv - e.vy * axv) / (v2 + 40);
+      const bankT = Math.max(-0.32, Math.min(0.32, -0.18 * turn));
+      d.bank = d.bank + (bankT - d.bank) * easeB;
+      const want = e.vx >= 0 ? 1 : -1;
+      if (snap) d.facing = want;
+      else {
+        const step = Math.min(Math.abs(want - d.facing), faceRate * dt);
+        d.facing += (want > d.facing ? 1 : want < d.facing ? -1 : 0) * step;
+      }
+      d.z = d.z0 + 0.06 * Math.sin((Math.PI * 2 / d.per) * 0.5 * t + i);
+      d.und = Math.sin(t * 7.2 + i * 0.9);
+      d.tail = Math.sin(t * 11.5 + i * 0.9);
+    }
+  }
+
   function drawOceanSprite(c, d, box) {
     const atlas = ocean.img.atlas;
     if (!atlas || !atlas.complete) return;
     const M = d.meta;
-    const sc = box.scale * (0.88 + 0.22 * d.z);
+    const sc = box.scale * (0.88 + 0.22 * d.z) * (d.sc == null ? 1 : d.sc);
     const x = box.left + d.x * box.scale;
     const y = box.top + d.y * box.scale;
     const facing = d.facing == null ? 1 : d.facing;
-    const painted = M.ang * Math.PI / 180;
+    const nose = d.nose == null ? 1 : d.nose;
+    const flip = facing * nose;
+    const painted = (M.ang || 0) * Math.PI / 180;
     // When facing eases through 0 the sprite goes edge-on, hiding the turn; belly stays down.
-    const face = facing < 0 ? (Math.PI - painted) : painted;
+    const face = flip < 0 ? (Math.PI - painted) : painted;
     const rot = d.heading - face;
-    const edge = 0.82 + 0.18 * Math.abs(facing);
+    const edge = 0.82 + 0.18 * Math.abs(flip);
+    const sizeMul = d.sc == null ? 1 : d.sc;
     c.save();
     c.translate(x, y + 18 * box.scale);
     c.scale(1, 0.32);
@@ -3949,9 +4136,9 @@
     c.save();
     c.translate(x, y);
     c.rotate(rot + (d.bank || 0) * 0.65);
-    c.scale((facing === 0 ? 0.001 : facing) * sc, edge * sc);
+    c.scale((flip === 0 ? 0.001 : flip) * sc, edge * sc);
     c.rotate((d.und || 0) * 0.05);
-    const slices = 20;
+    const slices = (d.kind && d.kind !== 'dolphin') ? (M.aw < 28 ? 4 : 8) : 20;
     const srcW = M.aw, srcH = M.ah;
     for (let s = 0; s < slices; s++) {
       const u0 = s / slices, u1 = (s + 1) / slices;
@@ -3985,7 +4172,7 @@
       c.lineWidth = 1.6 * sc;
       c.stroke();
     }
-    const list = ocean.dolphins.slice().sort(function (a, b) { return a.z - b.z; });
+    const list = ocean.dolphins.concat(ocean.fish || []).filter(function (o) { return o.x > -200; }).sort(function (a, b) { return a.z - b.z; });
     for (let i = 0; i < list.length; i++) drawOceanSprite(c, list[i], box);
     // Bubbles
     for (let i = 0; i < ocean.bubbles.length; i++) {
@@ -4378,6 +4565,9 @@
       ctx.clearRect(0, 0, board.width, board.height);
       ctx.fillStyle = boardBg;
       ctx.fillRect(0, 0, board.width, board.height);
+      // Subtle extra dark backing so the well reads as a window over the theme photo.
+      ctx.fillStyle = 'rgba(0,0,0,0.16)';
+      ctx.fillRect(0, 0, board.width, board.height);
       ctx.strokeStyle = 'rgba(255,255,255,0.05)';
       ctx.lineWidth = 1;
       for (let c = 1; c < COLS; c++) { ctx.beginPath(); ctx.moveTo(c * CELL + 0.5, 0); ctx.lineTo(c * CELL + 0.5, ROWS * CELL); ctx.stroke(); }
@@ -4407,6 +4597,7 @@
       try { drawBlockSparks(ctx, now, CELL); } catch (e) { }
       if (fx) drawClearFx(ctx, fx);
       if (g.levelUp) drawLevelUp(ctx, g.levelUp);
+      try { drawWellFrame(ctx, board.width, board.height); } catch (e) { }
       ctx.textAlign = 'right';
       ctx.font = '600 16px ' + FONT;
       ctx.fillStyle = 'rgba(255,255,255,0.85)';

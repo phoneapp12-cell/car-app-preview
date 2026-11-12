@@ -1288,7 +1288,33 @@ var MF = ls.get('mediaFilter', 'all'); if (!MF_OPTS.some(o => o[0] === MF)) MF =
 var SHOW_LIFE = ls.get('showLife', 1) !== 0; // default ON
 var APPEAR = ls.get('appear', null); if (!['light', 'dark', 'auto', 'ocean', 'spring', 'candy'].includes(APPEAR)) { APPEAR = 'dark'; ls.set('appear', 'dark'); } // default dark, including existing users
 
+// 1.9.183 Force a dark UI / status bar while Tetris is open, without changing or saving APPEAR.
+// Auto (match-phone) and the weather/colour themes are left intact and restored on close.
+var TETRIS_DARK = false;
+function setTetrisChrome(on) {
+  const r = document.documentElement;
+  TETRIS_DARK = !!on;
+  if (on) {
+    r.classList.add('ib-tetris-dark');
+    r.classList.remove('force-light', 'th-ocean', 'th-spring', 'th-candy');
+    r.classList.add('force-dark');
+    r.style.colorScheme = 'dark';
+    const color = '#0f1115';
+    let m = document.querySelector('meta[name="theme-color"]:not([media])');
+    if (!m) { m = document.createElement('meta'); m.name = 'theme-color'; document.head.append(m); }
+    m.content = color;
+    document.querySelectorAll('meta[name="theme-color"][media]').forEach(el => { el.content = color; });
+    let sbar = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+    if (!sbar) { sbar = document.createElement('meta'); sbar.name = 'apple-mobile-web-app-status-bar-style'; document.head.append(sbar); }
+    sbar.content = 'black-translucent';
+  } else {
+    r.classList.remove('ib-tetris-dark');
+    r.style.colorScheme = '';
+    applyAppear();
+  }
+}
 function applyAppear() {
+  if (TETRIS_DARK) { setTetrisChrome(true); return; }
   const r = document.documentElement;
   r.classList.remove('force-dark', 'force-light', 'th-ocean', 'th-spring', 'th-candy');
   const TH = { ocean: ['dark', '#06263a'], spring: ['light', '#f0fbe9'], candy: ['light', '#ffe1f3'] }[APPEAR]; // 1.9.101 colour themes

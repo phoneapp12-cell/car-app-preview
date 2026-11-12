@@ -299,6 +299,8 @@
     artWin.querySelector('[data-artfs]').hidden = !spec.local;
     artWin.hidden = false;
     lockFeed(true);
+    if (kind === 'tetris' && typeof root.setTetrisChrome === 'function') root.setTetrisChrome(true);
+    else if (kind === 'tetris' && typeof setTetrisChrome === 'function') setTetrisChrome(true);
     const close = artWin.querySelector('[data-artclose]');
     if (close) close.focus();
     if (!artHist) { try { root.history.pushState({ ibArt: kind }, ''); artHist = true; } catch (e) { artHist = false; } }
@@ -309,6 +311,8 @@
     unloadArt();
     artWin.hidden = true;
     lockFeed(false);
+    if (typeof root.setTetrisChrome === 'function') root.setTetrisChrome(false);
+    else if (typeof setTetrisChrome === 'function') setTetrisChrome(false);
     const back = artHist && !fromPop;
     artHist = false;
     if (back) { try { root.history.back(); } catch (e) { } }
