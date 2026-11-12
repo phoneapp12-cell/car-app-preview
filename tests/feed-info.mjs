@@ -975,7 +975,7 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
 
 // 1.9.166 Shane-only Tetris level picker (practice mode, not posted to the family scoreboard)
 {
-  const names = ['Farmyard', 'Jeremiah was a bullfrog', 'Beach', 'Rainforest', 'Ocean', 'Bush walk', 'New Zealand', 'Snowy mountains', 'City', 'Night sky', 'Triangles', 'Space travel'];
+  const names = ['Farmyard', 'Jeremiah was a bullfrog', 'Beach', 'Fireworks', 'Ocean', 'Bush walk', 'New Zealand', 'Snowy mountains', 'City', 'Night sky', 'Triangles', 'Space travel'];
   assert.deepStrictEqual(Array.from(tetGame.ORDER), [6, 11, 0, 1, 2, 3, 9, 10, 4, 5, 8, 7]);
   assert.deepStrictEqual(Array.from(tetGame.stages().map(s => s.name)), names);
   assert.deepStrictEqual(Array.from(tetGame.stages().map(s => s.level)), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
@@ -1557,6 +1557,7 @@ if (live) {
   assert.strictEqual(tetGame.isEffect(6), 'farm');
   assert.strictEqual(tetGame.isEffect(11), 'frog');
   assert.strictEqual(tetGame.isEffect(0), 'beach');
+  assert.strictEqual(tetGame.isEffect(1), 'fireworks');
   assert.strictEqual(tetGame.isEffect(7), null);
   assert.strictEqual(tetGame.themeFor(1), 6);
   assert.strictEqual(tetGame.themeFor(2), 11);
@@ -1714,7 +1715,7 @@ if (live) {
   assert.ok(meta.trees && meta.trees.big && meta.trees.mid && meta.flowers && meta.sea && meta.foamBox);
   assert.ok(meta.trees.big.px != null && meta.trees.big.py != null && meta.trees.big.crownY);
   assert.ok(src.includes('function drawBeachScene') && src.includes('function beachAdvance') && src.includes('function beachLoad'));
-  assert.ok(src.includes("EFFECT_TI = { 0: 'beach', 6: 'farm', 11: 'frog' }"));
+  assert.ok(src.includes("EFFECT_TI = { 0: 'beach', 1: 'fireworks', 6: 'farm', 11: 'frog' }"));
   // 1.9.178 lightning, sparkle, singing frog, and 1.9.177 farm stay intact
   assert.ok(src.includes('function drawLightningBolts') && src.includes('function drawBlockGloss') && src.includes('function drawFrogScene'));
   assert.ok(tetGame.farmArt && tetGame.farmArt().plate.indexOf('farm-plate-') >= 0);
@@ -1722,3 +1723,41 @@ if (live) {
   assert.strictEqual(tetGame.TRACKS[6].bpm, 171);
   assert.strictEqual(tetGame.BGM_HASH[11], '8afd517f');
 }
+
+// 1.9.180 Fireworks: Shane's 7:03 soundscape looped as theme 1, black-sky 3D bursts on the 131 BPM pulse
+{
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.strictEqual(tetGame.THEMES[1].name, 'Fireworks');
+  assert.strictEqual(tetGame.themeFor(4), 1);
+  assert.strictEqual(tetGame.isEffect(1), 'fireworks');
+  assert.strictEqual(tetGame.TRACKS[1].bpm, 131);
+  assert.strictEqual(tetGame.TRACKS[1].offset, 0.083);
+  assert.strictEqual(tetGame.TRACKS[1].key, 'F#');
+  assert.strictEqual(tetGame.TRACKS[1].mode, 'minor');
+  assert.strictEqual(tetGame.BGM_HASH[1], '9813c57a');
+  assert.ok(fs.existsSync('feed/tetris-bg/m1-9813c57a.mp3'), 'new fireworks track is shipped');
+  assert.ok(!fs.existsSync('feed/tetris-bg/m1-9711dc01.mp3'), 'old rainforest track is gone');
+  const beat = tetGame.musicBeat(1, 0.083);
+  assert.ok(beat.on && beat.pulse > 0.8, 'offset sits on a Fireworks beat');
+  const mid = tetGame.musicBeat(1, 0.083 + (60 / 131) * 0.5);
+  assert.ok(!mid.on && mid.pulse < 0.2, 'halfway between beats is quiet');
+  const art = tetGame.fwArt();
+  assert.ok(/^tetris-bg\/fw-sil-[0-9a-f]{8}\.webp$/.test(art.sil), 'hashed silhouette');
+  assert.ok(fs.existsSync('feed/' + art.sil));
+  const meta = tetGame.fwMeta();
+  assert.ok(meta.y != null && meta.h && meta.w === 540);
+  assert.ok(src.includes('function drawFireworksScene') && src.includes('function fwAdvance') && src.includes('function fwLoad') && src.includes('function playFwSfx') && src.includes('function fwOnClear') && src.includes('function fwOnLevelUp'));
+  assert.ok(src.includes('peony') && src.includes('chrys') && src.includes('willow') && src.includes('ring') && src.includes('crackle'));
+  assert.ok(src.includes('fwBedHot') && src.includes("kind === 'clear' && hot"));
+  // 1.9.179 beach, 1.9.178 lightning/sparkle/frog, 1.9.177 farm stay intact
+  assert.ok(src.includes('function drawBeachScene') && src.includes('function drawLightningBolts') && src.includes('function drawBlockGloss') && src.includes('function drawFrogScene'));
+  assert.ok(tetGame.beachArt && tetGame.beachArt().plate.indexOf('beach-plate-') >= 0);
+  assert.ok(tetGame.farmArt && tetGame.farmArt().plate.indexOf('farm-plate-') >= 0);
+  assert.strictEqual(tetGame.TRACKS[0].bpm, 115.5);
+  assert.strictEqual(tetGame.TRACKS[11].bpm, 127.45);
+  assert.strictEqual(tetGame.TRACKS[6].bpm, 171);
+  assert.strictEqual(tetGame.BGM_HASH[0], 'da11a54a');
+  assert.strictEqual(tetGame.BGM_HASH[11], '8afd517f');
+  assert.strictEqual(tetGame.THEMES[1].ambient, 'none');
+}
+
