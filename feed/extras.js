@@ -827,6 +827,44 @@ const PRON_OPTS = [['', 'Pronouns – not set (they)'], ['she', 'she/her'], ['he
 const PRON_LABEL = { she: 'she/her', he: 'he/him', they: 'they/them' };
 function pronOf(k) { const t = k === 'she' ? { sub: 'she', obj: 'her', pos: 'her' } : k === 'he' ? { sub: 'he', obj: 'him', pos: 'his' } : { sub: 'they', obj: 'them', pos: 'their' }; t.Sub = t.sub[0].toUpperCase() + t.sub.slice(1); t.Pos = t.pos[0].toUpperCase() + t.pos.slice(1); return t; }
 
+
+/* ---- 1.9.176 ✏️ write a words-only family post ---- */
+const TX_MAX = 1000;
+function textSheet() {
+  if (!FAM_ON) { toast('Join the family in Info Book first'); return; }
+  const people = (FAM_PEOPLE || []).filter(p => p.id !== MEMBER.id);
+  $('#sheet').classList.add('on');
+  $('#sheetin').innerHTML = `<h2>✏️ Write a post</h2><p class="sst">A few words for the family. No photo needed.</p>
+    <textarea id="txbody" rows="6" maxlength="${TX_MAX}" placeholder="What’s on your mind?" aria-label="Your post"></textarea>
+    <p class="sst" id="txlen"><span id="txcc">0</span> / ${TX_MAX}</p>
+    <h3>Who sees it?</h3><div class="lkto"><label><input type="radio" name="lkto" value="all" checked> 👨‍👩‍👧 The whole family</label><label><input type="radio" name="lkto" value="some"> 🔒 Just some people</label></div>
+    <div id="lkppl" class="sgx" hidden>${people.map(p => `<button class="chip" data-lkp="${esc(p.id)}">${esc(p.name)}</button>`).join('') || '<p class="sst">Nobody else has joined yet.</p>'}</div>
+    <div class="xbtns"><button class="btn pri" id="txpost" disabled>Post</button><button class="btn" data-close>Cancel</button></div>`;
+  const ta = $('#txbody'); if (ta) setTimeout(() => ta.focus(), 50);
+  txReady();
+}
+function txReady() {
+  const ta = $('#txbody'), b = $('#txpost'), n = $('#txcc'); if (!ta || !b) return;
+  const t = (ta.value || '').trim();
+  if (n) n.textContent = (ta.value || '').length;
+  b.disabled = !t;
+}
+async function textPost() {
+  const ta = $('#txbody'); if (!ta) return;
+  const text = (ta.value || '').trim();
+  if (!text) { toast('Write a few words first'); return; }
+  if (text.length > TX_MAX) { toast('Keep it under ' + TX_MAX + ' characters'); return; }
+  if (typeof unsafe === 'function' && unsafe({ t: text })) { toast('Please keep it family-friendly'); return; }
+  const some = (document.querySelector('input[name="lkto"]:checked') || {}).value === 'some', to = some ? [...document.querySelectorAll('[data-lkp].on')].map(b => b.dataset.lkp) : [];
+  if (some && !to.length) { toast('Pick who should see it'); return; }
+  const btn = $('#txpost'); btn.disabled = true; btn.textContent = 'Posting…';
+  try {
+    await fam('/shares/text', { method: 'POST', body: JSON.stringify({ text, to }) });
+    $('#sheet').classList.remove('on'); toast(some ? '🔒 Posted for ' + to.length + (to.length === 1 ? ' person' : ' people') : '✏️ Posted to the family');
+    await loadShares(); if (typeof tab !== 'undefined' && tab !== 'family') { const b = document.querySelector('[data-tab="family"]'); if (b) b.click(); }
+  } catch (e) { btn.disabled = false; btn.textContent = 'Post'; toast(e.message); }
+}
+
 /* ---- 1.9.30 🔗 share a link (Android: Info Book in the phone's Share menu; iPhone/desktop: paste a link) ---- */
 let LS = null;
 const LINK_WHY = { sport: 'Info Book keeps sport out of the feeds, so this one can’t be shared.', money: 'Money and bills stay out of Info Book, so this one can’t be shared.', unsafe: 'That one isn’t family-safe, so it can’t be shared here.' };
@@ -897,11 +935,13 @@ async function linkPost() {
     await loadShares(); if (typeof tab !== 'undefined' && tab !== 'family') { const b = document.querySelector('[data-tab="family"]'); if (b) b.click(); }
   } catch (e) { btn.disabled = false; btn.textContent = 'Share'; toast(e.message); lkReady(); }
 }
-document.addEventListener('input', e => { if (e.target && e.target.id === 'lkurl') { clearTimeout(lkT); lkT = setTimeout(linkPreview, 500); } if (e.target && e.target.id === 'lkdesc') lkReady(); });
+document.addEventListener('input', e => { if (e.target && e.target.id === 'lkurl') { clearTimeout(lkT); lkT = setTimeout(linkPreview, 500); } if (e.target && e.target.id === 'lkdesc') lkReady(); if (e.target && e.target.id === 'txbody') txReady(); });
 document.addEventListener('change', e => { if (e.target && e.target.name === 'lkto') { const p = $('#lkppl'); if (p) p.hidden = e.target.value !== 'some'; } });
 document.addEventListener('click', async e => {
   const t = e.target; if (!t || !t.closest) return;
   if (t.closest('[data-sharelink]')) { linkSheet(''); return; }
+  if (t.closest('[data-sharetext]')) { textSheet(); return; }
+  if (t.id === 'txpost') { textPost(); return; }
   if (t.id === 'lkpaste') { try { const v = await navigator.clipboard.readText(); if (v) { $('#lkurl').value = v; linkPreview(); } } catch (er) { toast('Long-press the box and tap Paste'); } return; }
   const lp = t.closest('[data-lkp]'); if (lp) { lp.classList.toggle('on'); return; }
   if (t.id === 'lkpost') { linkPost(); return; }

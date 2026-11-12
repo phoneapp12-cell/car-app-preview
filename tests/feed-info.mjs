@@ -359,12 +359,12 @@ for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 3, at.join(',
 const appSrc = fs.readFileSync('feed/app.js', 'utf8');
 for (const id of sights.TOPICS) assert.ok(appSrc.includes("'" + id + "'"), id);
 assert.ok(!/Math\.pow\(baseOf\(t\), 3\)/.test(appSrc));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.175'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.175'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.175'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.176'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.176'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.176'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.cdot.tv'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.bd ul.sum'));
-assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.175'"));
+assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.176'"));
 function swVersion(src) { const m = String(src).match(/const VERSION = '([^']+)'/); assert.ok(m, 'parent sw.js VERSION'); return m[1]; }
 const parentHere = swVersion(fs.readFileSync('sw.js', 'utf8'));
 let parentMain = parentHere;
@@ -403,10 +403,10 @@ assert.equal(artB.length, 1);
 assert.notEqual(artB[0].id, artA.id);
 seenArt.wasSeen = () => true;
 assert.equal(seenArt.ibArt.cards(0).length, 0);
-assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.175'"));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.176'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'art3d.js?v=' + VERSION"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'portal.js?v=' + VERSION"));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.175'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.176'));
 const portalSrc = fs.readFileSync('feed/portal.js', 'utf8');
 assert.ok(portalSrc.includes('prefers-reduced-motion'));
 assert.ok(portalSrc.includes("sessionStorage.getItem(KEY)"));
@@ -434,7 +434,7 @@ assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("cache: 'reload'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("u.pathname + '?v=' + VERSION"), 'game scripts are fetched at this VERSION, not from a stale unversioned cache');
 assert.ok(appSrc.includes('ibPortalRise'));
 assert.ok(!/portal-style\.jpg|attachments\/image/.test(portalSrc + fs.readFileSync('feed/index.html', 'utf8')));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.175'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.176'));
 assert.ok(appSrc.includes("['art3d', '3D art'"));
 assert.ok(appSrc.includes("['3D art', 'art3d'"));
 assert.ok(appSrc.includes("'art3d'"));
@@ -1602,4 +1602,33 @@ if (live) {
   const html = fs.readFileSync('feed/tetris.html', 'utf8');
   assert.ok(html.includes('canvas.fx-life'));
   assert.ok(!html.includes('html.effect canvas#board'));
+}
+
+
+// 1.9.176 family words-only posts (✏️ Write a post)
+{
+  const fam = fs.readFileSync('feed/family.js', 'utf8');
+  const ex = fs.readFileSync('feed/extras.js', 'utf8');
+  const app = fs.readFileSync('feed/app.js', 'utf8');
+  const html = fs.readFileSync('feed/index.html', 'utf8');
+  const wrk = fs.readFileSync('worker/src/family.js', 'utf8');
+  assert.ok(fam.includes('data-sharetext') && fam.includes('✏️ Write a post'), 'Family tab has a Write a post button beside photo and link');
+  assert.ok(fam.includes("s.text || x.kind === 'text'") && fam.includes("kind: 'text'"), 'shareItem maps a words post to kind text');
+  assert.ok(fam.includes('Written by') && fam.includes('data-text="1"'), 'words cards say Written by and can be deleted by the author or Shane');
+  assert.ok(fam.includes("i.kind === 'text'") && fam.includes('i._share.text'), '🔁 is hidden on words posts');
+  assert.ok(ex.includes('function textSheet') && ex.includes('function textPost') && ex.includes("fam('/shares/text'"), 'composer posts to /shares/text');
+  assert.ok(ex.includes('maxlength="${TX_MAX}"') || ex.includes('maxlength="1000"'), 'composer caps length at 1000');
+  assert.ok(ex.includes('TX_MAX = 1000') && ex.includes("unsafe({ t: text })"), 'client uses 1000-char max and the unsafe() filter');
+  assert.ok(ex.includes('Just some people') && ex.includes('name="lkto"'), 'composer reuses the Just for recipient picker');
+  assert.ok(app.includes("i.kind === 'text'") && app.includes('card shared words') && app.includes('wdbody'), 'All/Family card renderer has a words card');
+  assert.ok(html.includes('.card.words') && html.includes('.wdbody'), 'words cards have their own soft-card style');
+  assert.ok(wrk.includes("p === '/shares/text'") && wrk.includes('priv,at,vis) VALUES (?,?,?,?,4,?,?)'), 'Worker accepts kind text via POST /shares/text (priv 4)');
+  assert.ok(wrk.includes('text: r.priv === 4') && wrk.includes('isUnsafe({ t: text })') && wrk.includes('MAX_TEXT'), 'Worker GET flags text posts and runs the unsafe filter');
+  assert.ok(wrk.includes('blockedWhy(text)'), 'Worker also blocks sport and money wording on words posts');
+  // Pictures only may drop text cards; the normal All feed and Family tab must still show them
+  const mediaFn = app.slice(app.indexOf('function mediaFilter'), app.indexOf('function mfChip'));
+  assert.ok(mediaFn.includes("MF === 'all'") && mediaFn.includes('return order'), 'normal All view does not filter out family words posts');
+  assert.ok(app.includes("tab === 'family'") && app.includes('drawFamily()') && app.includes('moodLabel(); return;'), 'Family tab draws shares before mediaFilter runs');
+  const sharesFor = fam.slice(fam.indexOf('function sharesFor'), fam.indexOf('function weaveShares'));
+  assert.ok(sharesFor.includes('unsafe(i)') && !sharesFor.includes("kind === 'text'") && !sharesFor.includes("kind !== 'text'"), 'sharesFor keeps words posts in Family and All (only unsafe / down-voted are dropped)');
 }
