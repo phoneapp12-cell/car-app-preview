@@ -292,6 +292,7 @@
 
   // Offline analysis of tetris-bg/m0..m11.mp3: tempo, first-beat phase (loop-safe), key.
   // 1.9.173 m6 (Farmyard) re-analysed after Shane's new level-1 track.
+  // 1.9.178 m11 (Bullfrog) re-analysed after Shane's new level-2 track (127.45 BPM, D major, loop-safe 440 beats).
   const TRACKS = [
     { bpm: 143.5, offset: 0.069, key: 'E', mode: 'major' },
     { bpm: 117.5, offset: 0.047, key: 'F#', mode: 'minor' },
@@ -304,7 +305,7 @@
     { bpm: 117.5, offset: 0.209, key: 'A', mode: 'major' },
     { bpm: 112.5, offset: 0.468, key: 'D#', mode: 'major' },
     { bpm: 123, offset: 0.218, key: 'G', mode: 'major' },
-    { bpm: 130, offset: 0.049, key: 'D', mode: 'major' }
+    { bpm: 127.45, offset: 0.266, key: 'D', mode: 'major' }
   ];
   const MAJOR_IV = [0, 2, 4, 5, 7, 9, 11], MINOR_IV = [0, 2, 3, 5, 7, 8, 10];
   const PC = { C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, F: 5, 'F#': 6, Gb: 6, G: 7, 'G#': 8, Ab: 8, A: 9, 'A#': 10, Bb: 10, B: 11 };
@@ -485,6 +486,38 @@
     const chord = notes.slice(0, Math.min(4, notes.length));
     chord.forEach((f, i) => luBell(f, 1.15, 0.30 * (1 - i * 0.04), dest, land + i * 0.018));
     notes.forEach((f, i) => luBell(f, 0.62, 0.27, dest, land + 0.1 + i * 0.11));
+    // Soft rolling thunder + a gentle electric crackle. Content stays about 300–3000 Hz
+    // so a phone speaker can play it, with no harsh snaps. Quieter than the music peak.
+    if (noiseBuf) {
+      const rum = ac.createBufferSource();
+      rum.buffer = noiseBuf;
+      const hp = ac.createBiquadFilter();
+      hp.type = 'highpass'; hp.frequency.value = 300; hp.Q.value = 0.7;
+      const lp = ac.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 720; lp.Q.value = 0.5;
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.linearRampToValueAtTime(0.16, t0 + 0.12);
+      g.gain.setValueAtTime(0.14, t0 + 0.45);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.45);
+      rum.connect(hp); hp.connect(lp); lp.connect(g); g.connect(dest);
+      rum.start(t0); rum.stop(t0 + 1.5);
+      for (let k = 0; k < 5; k++) {
+        const at = t0 + 0.04 + k * 0.11;
+        const src = ac.createBufferSource();
+        src.buffer = noiseBuf;
+        const bp = ac.createBiquadFilter();
+        bp.type = 'bandpass'; bp.frequency.value = 520 + k * 180; bp.Q.value = 0.9;
+        const clp = ac.createBiquadFilter();
+        clp.type = 'lowpass'; clp.frequency.value = 2600; clp.Q.value = 0.5;
+        const cg = ac.createGain();
+        cg.gain.setValueAtTime(0.0001, at);
+        cg.gain.linearRampToValueAtTime(0.09 - k * 0.01, at + 0.018);
+        cg.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
+        src.connect(bp); bp.connect(clp); clp.connect(cg); cg.connect(dest);
+        src.start(at); src.stop(at + 0.2);
+      }
+    }
   }
   function sfx(name, lines) {
     if (!soundOn || !ac) return;
@@ -747,6 +780,15 @@
     chick: ['hop', 'hop', 'shuffle']
   };
   const farm = { img: null, ready: false, spr: {}, lit: {}, st: {}, stars: [], tilt: { x: 0, y: 0, at: -9, gx: 0, gy: 0 }, listen: false, crowed: false };
+  // 1.9.178 Painted bullfrog cut-out (the frog in theme 11's photo) sings to the new track.
+  const FROG_ART = { plate: 'tetris-bg/frog-plate-18aed091.webp', atlas: 'tetris-bg/frog-atlas-26f38e61.webp' };
+  const FROG_META = {
+    x: 46, y: 355, w: 372, h: 344, fw: 372, fh: 344,
+    eyes: [{ x: 168, y: 52, r: 22 }, { x: 252, y: 48, r: 22 }],
+    throat: { x: 210, y: 168 }, belly: { x: 210, y: 210 }, foot: { x: 186, y: 330 }
+  };
+  const frog = { img: null, ready: false, spr: [], notes: [] };
+  const SPARK_DUR = 600, SPARK_MAX = 5, SPARK_MAX_REDUCE = 1;
   const EFFECT_TI = { 6: 'farm', 11: 'frog' };
   function isEffect(ti) { return EFFECT_TI[ti] || null; }
   function reduceMotion() {
@@ -1050,6 +1092,92 @@
     }
     return parts;
   }
+  function luRand(seed) {
+    seed = (seed * 16807) % 2147483647;
+    return { seed: seed, v: (seed - 1) / 2147483646 };
+  }
+  // Branching bolts around the board / banner. Mid-point displacement, cheap to stroke.
+  function makeLightning(w, h) {
+    w = w || 280; h = h || 560;
+    const bolts = [];
+    let seed = 9301 + ((w * 13 + h) | 0);
+    function rnd() { const r = luRand(seed); seed = r.seed; return r.v; }
+    function bolt(x0, y0, x1, y1, depth, jag) {
+      const pts = [{ x: x0, y: y0 }, { x: x1, y: y1 }];
+      function split(list, d, j) {
+        if (d <= 0) return list;
+        const out = [list[0]];
+        for (let i = 1; i < list.length; i++) {
+          const a = list[i - 1], b = list[i];
+          const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+          const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
+          const ox = (-dy / len) * (rnd() - 0.5) * 2 * j, oy = (dx / len) * (rnd() - 0.5) * 2 * j;
+          out.push({ x: mx + ox, y: my + oy }); out.push(b);
+        }
+        return split(out, d - 1, j * 0.55);
+      }
+      const path = split(pts, depth, jag);
+      const branches = [];
+      if (depth >= 3) {
+        for (let i = 2; i < path.length - 1; i++) if (rnd() < 0.28) {
+          const p = path[i], ang = Math.atan2(path[i].y - path[i - 1].y, path[i].x - path[i - 1].x) + (rnd() < 0.5 ? 0.7 : -0.7);
+          const len = 18 + rnd() * 28;
+          branches.push(split([p, { x: p.x + Math.cos(ang) * len, y: p.y + Math.sin(ang) * len }], 2, jag * 0.5));
+        }
+      }
+      return { path: path, branches: branches, phase: rnd() * 6.28 };
+    }
+    // Around the board: bolts along each edge, branching outward.
+    const pad = 10;
+    const edges = [
+      [pad, pad, w - pad, pad],
+      [w - pad, pad, w - pad, h - pad],
+      [w - pad, h - pad, pad, h - pad],
+      [pad, h - pad, pad, pad]
+    ];
+    edges.forEach((e, i) => {
+      const t0 = 0.1 + (i % 2) * 0.15, t1 = 0.7 + rnd() * 0.2;
+      const x0 = e[0] + (e[2] - e[0]) * t0, y0 = e[1] + (e[3] - e[1]) * t0;
+      const x1 = e[0] + (e[2] - e[0]) * t1, y1 = e[1] + (e[3] - e[1]) * t1;
+      // push slightly outward
+      const nx = (i === 1) ? 1 : (i === 3) ? -1 : (rnd() - 0.5) * 0.4;
+      const ny = (i === 2) ? 1 : (i === 0) ? -1 : (rnd() - 0.5) * 0.4;
+      bolts.push(bolt(x0 + nx * 6, y0 + ny * 6, x1 + nx * 18, y1 + ny * 22, 5, 16));
+    });
+    // A few bolts toward the banner (centre of the board)
+    const cx = w / 2, cy = h / 2 - 18;
+    for (let k = 0; k < 4; k++) {
+      const ang = -0.9 + k * 0.6 + (rnd() - 0.5) * 0.25;
+      const r0 = 28 + rnd() * 10, r1 = 90 + rnd() * 40;
+      bolts.push(bolt(cx + Math.cos(ang) * r0, cy + Math.sin(ang) * r0, cx + Math.cos(ang) * r1, cy + Math.sin(ang) * r1, 4, 14));
+    }
+    return bolts;
+  }
+  function strokeBolt(ctx, pts, width, color) {
+    if (!pts || pts.length < 2) return;
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke();
+  }
+  function drawLightningBolts(ctx, bolts, p, fade, flicker) {
+    if (!bolts || !bolts.length || !(fade > 0.02)) return;
+    const appear = Math.min(1, p / 0.12);
+    const hold = p < 0.72 ? 1 : Math.max(0, (1 - p) / 0.28);
+    const a = fade * appear * hold;
+    bolts.forEach((b, i) => {
+      const fl = 0.55 + 0.45 * Math.abs(Math.sin(flicker * 18 + b.phase + i));
+      const aa = a * fl;
+      if (aa < 0.03) return;
+      strokeBolt(ctx, b.path, 5.2, 'rgba(160,210,255,' + (0.22 * aa) + ')');
+      strokeBolt(ctx, b.path, 2.2, 'rgba(200,230,255,' + (0.55 * aa) + ')');
+      strokeBolt(ctx, b.path, 1.05, 'rgba(255,255,255,' + (0.9 * aa) + ')');
+      (b.branches || []).forEach(br => {
+        strokeBolt(ctx, br, 2.4, 'rgba(170,215,255,' + (0.28 * aa) + ')');
+        strokeBolt(ctx, br, 0.9, 'rgba(255,255,255,' + (0.7 * aa) + ')');
+      });
+    });
+  }
   function startLevelUp(g, fromLevel, toLevel) {
     const copy = levelUpCopy(fromLevel, toLevel);
     const ti = copy.theme;
@@ -1063,7 +1191,8 @@
       t: 0, dur: LEVEL_UP_MS, hold: false, at: 0,
       title: copy.title, sub: copy.sub, beat: copy.beat,
       level: toLevel, theme: ti, kind: clearKind(ti), parts, n: 4, reduce,
-      lines: g.lines
+      lines: g.lines,
+      bolts: reduce ? [] : makeLightning(COLS * CELL, ROWS * CELL)
     };
     playLevelUpSfx(ti);
     if (isEffect(ti)) { effectOnLevelUp(ti); lifeReact(); }
@@ -1173,9 +1302,9 @@
   // effects cannot pause or mute a separate HTML audio element on iOS/Android WebView.
   // Filenames include a content hash because some phone media caches ignore ?v= query strings
   // (1.9.163 busted the URL but Shane still heard the old bullfrog track).
-  const BGM_HASH = ['a719f241', '9711dc01', '9ca3b84e', '7776197f', '6a9bd0f6', '63c9eafe', '7bc4ebcd', 'b76dd1d3', 'fdec4369', '2b10c8ba', 'cdbe7d34', 'b61bc42a'];
+  const BGM_HASH = ['a719f241', '9711dc01', '9ca3b84e', '7776197f', '6a9bd0f6', '63c9eafe', '7bc4ebcd', 'b76dd1d3', 'fdec4369', '2b10c8ba', 'cdbe7d34', '8afd517f'];
   function bgmSrc(ti) { return 'tetris-bg/m' + ti + '-' + BGM_HASH[ti] + '.mp3'; }
-  let bgmGain = null, bgmNode = null, bgmIdx = -1, bgmBufs = {}, bgmLoading = {}, bgmAt = 0, bgmRate = 1, bgmWant = false, bgmWantTi = -1;
+  let bgmGain = null, bgmNode = null, bgmIdx = -1, bgmBufs = {}, bgmLoading = {}, bgmAt = 0, bgmRate = 1, bgmWant = false, bgmWantTi = -1, bgmAnalyser = null, bgmBins = null;
   function silentUnlock() {
     if (!ac) return;
     try { const z = ac.createBuffer(1, 1, ac.sampleRate || 44100); const s = ac.createBufferSource(); s.buffer = z; s.connect(ac.destination); s.start(0); } catch (e) { }
@@ -1186,6 +1315,12 @@
       bgmGain = ac.createGain();
       bgmGain.gain.value = BGM_VOL;
       bgmGain.connect(ac.destination);
+      if (!bgmAnalyser && ac.createAnalyser) {
+        bgmAnalyser = ac.createAnalyser();
+        bgmAnalyser.fftSize = 256;
+        bgmAnalyser.smoothingTimeConstant = 0.65;
+        bgmGain.connect(bgmAnalyser);
+      }
     }
   }
   function loadBgm(ti) {
@@ -1261,7 +1396,7 @@
     ac = null; sfxGain = null; musicGain = null; bgmGain = null; melodyBus = null; noiseBuf = null;
     bgmBufs = {}; bgmLoading = {};
   }
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, farmDayTarget, farmSunPos, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day };
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, farmDayTarget, farmSunPos, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogReady: () => frog.ready, frogLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts };
 
   if (!root.document) return;
   const doc = root.document;
@@ -1305,7 +1440,7 @@
   function press(a) {
     if (!started) started = true;
     const next = act(g, a);
-    if (a === 'restart') { g = next; invReset(); life.hold = null; lifeReset(); if (isEffect(themeFor(g.level))) { lifeCast(isEffect(themeFor(g.level))); } if (root.IBScores) root.IBScores.close(); }
+    if (a === 'restart') { g = next; invReset(); life.hold = null; life.singHold = null; sparkHold = null; blockSparks = []; lifeReset(); if (isEffect(themeFor(g.level))) { lifeCast(isEffect(themeFor(g.level))); } if (root.IBScores) root.IBScores.close(); }
     syncHud();
   }
   root.Tetris.press = press;
@@ -1364,6 +1499,15 @@
       g.levelUp.hold = true;
       g.levelUp.at = opts.levelUp.at != null ? opts.levelUp.at : 0.32;
     }
+    if (opts.frogSing) {
+      life.singHold = opts.frogSing;
+      if (life.frog) {
+        life.frog.mouth = opts.frogSing.mouth != null ? opts.frogSing.mouth : 0;
+        life.frog.puff = opts.frogSing.puff != null ? opts.frogSing.puff : 0;
+        life.frog.blink = opts.frogSing.blink != null ? opts.frogSing.blink : 0;
+      }
+    } else life.singHold = null;
+    if (opts.sparkle) holdBlockSpark(opts.sparkle); else { sparkHold = null; }
     syncHud();
     const mb = doc.getElementById('musicbtn'); if (mb) mb.textContent = 'Music off';
     const sb = doc.getElementById('soundbtn'); if (sb) sb.textContent = 'Sound off';
@@ -1492,6 +1636,122 @@
     ctx.closePath();
     return up;
   }
+  // 1.9.178 Tasteful block sparkle: a glossy highlight on every cell, and every so
+  // often a few random cells get a 4-point twinkle (~0.6s) and a diagonal sheen.
+  // Cheap on a phone. prefers-reduced-motion keeps the gloss and calms the motion. No sound.
+  let blockSparks = [], sparkNext = 0, sparkHold = null;
+  function sparkEase(p) {
+    if (p <= 0 || p >= 1) return 0;
+    const x = p < 0.4 ? (p / 0.4) : (1 - (p - 0.4) / 0.6);
+    return x * x * (3 - 2 * x);
+  }
+  function drawStarGlint(ctx, x, y, r, a, rot) {
+    if (!ctx || !(a > 0.02) || !(r > 0)) return;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot || 0);
+    ctx.globalAlpha = Math.max(0, Math.min(1, a));
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    function cross(len, thick) {
+      ctx.beginPath();
+      ctx.moveTo(0, -len);
+      ctx.lineTo(thick, -thick);
+      ctx.lineTo(len, 0);
+      ctx.lineTo(thick, thick);
+      ctx.lineTo(0, len);
+      ctx.lineTo(-thick, thick);
+      ctx.lineTo(-len, 0);
+      ctx.lineTo(-thick, -thick);
+      ctx.closePath();
+      ctx.fill();
+    }
+    cross(r, r * 0.16);
+    ctx.rotate(Math.PI / 4);
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    cross(r * 0.52, r * 0.1);
+    ctx.restore();
+  }
+  function drawBlockGloss(ctx, x, y, size, alpha) {
+    if (!(size > 4) || !(alpha > 0)) return;
+    const a = alpha;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x + 1, y + 1, size - 2, size - 2);
+    ctx.clip();
+    ctx.fillStyle = 'rgba(255,255,255,' + (0.22 * a) + ')';
+    ctx.beginPath();
+    ctx.ellipse(x + size * 0.32, y + size * 0.28, size * 0.34, size * 0.16, -0.5, 0, 6.283);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,' + (0.4 * a) + ')';
+    ctx.beginPath();
+    ctx.ellipse(x + size * 0.24, y + size * 0.2, size * 0.08, size * 0.05, -0.4, 0, 6.283);
+    ctx.fill();
+    ctx.restore();
+  }
+  function cellSparkKey(c, r, falling) { return (falling ? 'p:' : '') + c + ':' + r; }
+  function tickBlockSpark(now, board, piece, reduce) {
+    if (sparkHold) return;
+    blockSparks = blockSparks.filter(s => (now - s.t0) < s.dur);
+    const cap = reduce ? SPARK_MAX_REDUCE : SPARK_MAX;
+    if (blockSparks.length >= cap || now < sparkNext) return;
+    const cells = [];
+    if (board) for (let r = 0; r < board.length; r++) for (let c = 0; c < board[r].length; c++) if (board[r][c]) cells.push({ c: c, r: r, falling: 0 });
+    if (piece && piece.m) piece.m.forEach((row, rr) => row.forEach((v, cc) => {
+      if (v && piece.y + rr >= 0) cells.push({ c: piece.x + cc, r: piece.y + rr, falling: 1 });
+    }));
+    if (!cells.length) return;
+    const used = new Set(blockSparks.map(s => cellSparkKey(s.c, s.r, s.falling)));
+    const free = cells.filter(c => !used.has(cellSparkKey(c.c, c.r, c.falling)));
+    if (!free.length) return;
+    const pick = free[(Math.random() * free.length) | 0];
+    blockSparks.push({
+      c: pick.c, r: pick.r, falling: pick.falling, t0: now,
+      dur: SPARK_DUR * (0.92 + Math.random() * 0.16),
+      rot: Math.random() * 0.6 - 0.3,
+      ox: 0.3 + Math.random() * 0.4,
+      oy: 0.3 + Math.random() * 0.4
+    });
+    sparkNext = now + (reduce ? 1600 : (220 + Math.random() * 320));
+  }
+  function drawBlockSparks(ctx, now, size) {
+    if (!ctx || !blockSparks.length) return;
+    const t = sparkHold != null ? sparkHold : now;
+    blockSparks.forEach(s => {
+      const p = (t - s.t0) / s.dur;
+      const life = sparkEase(p);
+      if (life <= 0.02) return;
+      const x = s.c * size, y = s.r * size;
+      const fade = s.falling ? 0.65 : 1;
+      // diagonal sheen band sweeping across the cell
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x + 1, y + 1, size - 2, size - 2);
+      ctx.clip();
+      const u = Math.max(0, Math.min(1, p));
+      const mid = (u * 2 - 0.5) * size;
+      const sg = ctx.createLinearGradient(x + mid, y + mid - size, x + mid + size, y + mid);
+      sg.addColorStop(0, 'rgba(255,255,255,0)');
+      sg.addColorStop(0.45, 'rgba(255,255,255,' + (0.08 * life * fade) + ')');
+      sg.addColorStop(0.5, 'rgba(255,255,255,' + (0.32 * life * fade) + ')');
+      sg.addColorStop(0.55, 'rgba(255,255,255,' + (0.08 * life * fade) + ')');
+      sg.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = sg;
+      ctx.fillRect(x, y, size, size);
+      ctx.restore();
+      drawStarGlint(ctx, x + s.ox * size, y + s.oy * size, size * (0.22 + 0.14 * life), 0.85 * life * fade, s.rot);
+    });
+  }
+  function holdBlockSpark(opts) {
+    opts = opts || {};
+    const now = performance.now();
+    const cells = opts.cells || [[1, 16], [3, 17], [6, 15], [8, 18], [4, 14]];
+    sparkHold = now;
+    blockSparks = cells.slice(0, SPARK_MAX).map((pr, i) => ({
+      c: pr[0], r: pr[1], falling: pr[2] ? 1 : 0,
+      t0: now - SPARK_DUR * (opts.at != null ? opts.at : 0.4),
+      dur: SPARK_DUR, rot: -0.15 + i * 0.12, ox: 0.45, oy: 0.35
+    }));
+  }
   function drawCell(ctx, x, y, color, size, alpha, col, row) {
     if (themeFor(g.level) === TRI_THEME) {
       ctx.globalAlpha = alpha;
@@ -1512,6 +1772,7 @@
       ctx.strokeStyle = 'rgba(0,0,0,0.18)';
       triPath(ctx, x, y, size, col, row);
       ctx.stroke();
+      drawBlockGloss(ctx, x, y, size, alpha);
       ctx.globalAlpha = 1;
       return;
     }
@@ -1522,6 +1783,7 @@
     ctx.fillRect(x + 1, y + 1, size - 2, 4);
     ctx.fillStyle = 'rgba(0,0,0,0.22)';
     ctx.fillRect(x + 1, y + size - 5, size - 2, 4);
+    drawBlockGloss(ctx, x, y, size, alpha);
     ctx.globalAlpha = 1;
   }
   function drawGhost(ctx, x, y, color, size, col, row) {
@@ -1571,7 +1833,7 @@
     // 1.9.175: always the original theme photo (center / cover), including Farmyard and Bullfrog.
     doc.documentElement.style.background = 'linear-gradient(rgba(0,0,0,.28),rgba(0,0,0,.28)), url("' + PICS[i] + '") center / cover no-repeat, ' + L.bg;
     try { const nx = new root.Image(); nx.src = PICS[(i + 1) % PICS.length]; } catch (e) { }
-    if (kind) { efxClearAll(); lifeReset(); if (kind === 'farm') farmLoad(); }
+    if (kind) { efxClearAll(); lifeReset(); if (kind === 'farm') farmLoad(); if (kind === 'frog') frogLoad(); }
     doc.documentElement.style.backgroundAttachment = 'fixed';
     doc.body.style.background = 'transparent';
     drawMini(doc.getElementById('next'), g.next, false);
@@ -2069,7 +2331,9 @@
     if (kind === 'farm') {
       farmCast();
     } else {
-      life.frog = { pad: 0, nx: FROG_PADS[0].x, ny: FROG_PADS[0].y, from: 0, to: 2, hop: -1, hopDur: 0.55, dir: 1, squat: 0 };
+      life.frog = { mouth: 0, puff: 0, blink: 0, blinkIn: 0, nextBlink: 2.4, sway: 0, vocal: 0, avg: 0.12, lev: 0 };
+      frog.notes = [];
+      frogLoad();
       life.flies = [
         { nx: 0.28, ny: 0.16, ph: 0, sp: 0.08 },
         { nx: 0.62, ny: 0.20, ph: 2.1, sp: 0.07 }
@@ -2096,32 +2360,42 @@
       farmAdvance(dt, prog, reduce);
     } else if (life.frog) {
       const f = life.frog;
-      if (!reduce && beat && beat.on && !life.beatLatch) {
-        life.beatN++;
-        life.beatLatch = true;
-        if (f.hop < 0 && (life.beatN % 8 === 0 || life.react > 0 && life.beatN % 2 === 0)) {
-          f.from = f.pad;
-          let next = (f.pad + 1 + ((life.beatN / 8) | 0) % 3) % FROG_PADS.length;
-          if (next === f.pad) next = (next + 2) % FROG_PADS.length;
-          f.to = next; f.hop = 0; f.hopDur = life.react > 0 ? 0.7 : 0.55;
-        }
-      }
+      if (beat && beat.on && !life.beatLatch) { life.beatN++; life.beatLatch = true; }
       if (beat && !beat.on) life.beatLatch = false;
-      if (f.hop >= 0) {
-        f.hop += dt;
-        const p = Math.min(1, f.hop / f.hopDur);
-        const a = FROG_PADS[f.from], b = FROG_PADS[f.to];
-        f.nx = a.x + (b.x - a.x) * p;
-        const arc = life.react > 0 ? 0.16 : 0.11;
-        f.ny = a.y + (b.y - a.y) * p - 4 * arc * p * (1 - p);
-        f.dir = (b.x - a.x) >= 0 ? 1 : -1;
-        if (p >= 1) {
-          f.hop = -1; f.pad = f.to; f.nx = b.x; f.ny = b.y; f.squat = 0.18;
-          life.ripples.push({ nx: b.x, ny: b.y, t: 0, max: 1.1, big: life.react > 0 });
+      if (life.singHold) {
+        f.mouth = life.singHold.mouth != null ? life.singHold.mouth : f.mouth;
+        f.puff = life.singHold.puff != null ? life.singHold.puff : f.puff;
+        f.blink = life.singHold.blink != null ? life.singHold.blink : f.blink;
+      } else if (reduce) {
+        f.mouth *= Math.max(0, 1 - dt * 3);
+        f.puff *= Math.max(0, 1 - dt * 3);
+        f.blink = 0;
+        f.sway = 0;
+      } else {
+        const v = frogVocal();
+        f.vocal = v;
+        f.mouth += (v - f.mouth) * Math.min(1, dt * 10);
+        const pulse = (beat && beat.pulse) || 0;
+        const wantPuff = Math.max(v * 0.85, pulse > 0.7 ? pulse : 0);
+        f.puff += (wantPuff - f.puff) * Math.min(1, dt * 8);
+        f.sway = Math.sin(life.t * (TRACKS[11] && TRACKS[11].bpm ? TRACKS[11].bpm / 60 : 2.12) * Math.PI * 2 * 0.5) * 0.035;
+        f.nextBlink -= dt;
+        if (f.blinkIn > 0) {
+          f.blinkIn -= dt;
+          const u = 1 - Math.max(0, f.blinkIn) / 0.12;
+          f.blink = u < 0.5 ? u * 2 : (1 - u) * 2;
+        } else if (f.nextBlink <= 0) {
+          f.blinkIn = 0.12;
+          f.nextBlink = 2.8 + Math.random() * 2.4;
+          f.blink = 0;
+        } else f.blink = 0;
+        if (v > 0.55 && frog.notes.length < 6 && Math.random() < dt * 2.4) {
+          frog.notes.push({ x: 0.42 + Math.random() * 0.08, y: 0.48, t: 0, s: 0.7 + Math.random() * 0.5, rot: (Math.random() - 0.5) * 0.4 });
         }
       }
-      if (f.squat > 0) f.squat = Math.max(0, f.squat - dt);
-      if (life.react > 0) life.croak = Math.max(life.croak, life.react);
+      if (life.react > 0) { f.puff = Math.max(f.puff, 0.7); life.croak = Math.max(life.croak, life.react); }
+      frog.notes.forEach(n => { n.t += dt; n.y -= dt * 0.06; n.x += Math.sin(n.t * 3) * dt * 0.015; });
+      frog.notes = frog.notes.filter(n => n.t < 1.6);
       life.flies.forEach((d, i) => {
         d.ph += dt * d.sp;
         d.nx = 0.25 + i * 0.32 + Math.sin(d.ph) * 0.16;
@@ -2492,6 +2766,193 @@
   }
   function lifeReact() { life.react = 0.45; }
 
+  function frogLoad() {
+    if (frog.img || !root.Image) return;
+    frog.img = {};
+    let left = 2;
+    Object.keys(FROG_ART).forEach(k => {
+      const im = new root.Image();
+      im.onload = () => { if (--left === 0) { frog.ready = true; frogSprites(); } };
+      im.src = FROG_ART[k];
+      frog.img[k] = im;
+    });
+  }
+  function frogSprites() {
+    if (!frog.img || !frog.img.atlas || !doc.createElement) return;
+    const M = FROG_META, w = M.fw, h = M.fh;
+    frog.spr = [0, 1, 2].map(i => {
+      const cv = doc.createElement('canvas');
+      cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(frog.img.atlas, i * w, 0, w, h, 0, 0, w, h);
+      return cv;
+    });
+  }
+  function frogVocal() {
+    if (!bgmAnalyser || !ac || !musicOn || !bgmNode) {
+      const b = musicBeat(11);
+      return b ? Math.max(0, b.pulse) * 0.75 : 0;
+    }
+    const n = bgmAnalyser.frequencyBinCount;
+    if (!bgmBins || bgmBins.length !== n) bgmBins = new Uint8Array(n);
+    bgmAnalyser.getByteFrequencyData(bgmBins);
+    const binHz = (ac.sampleRate / 2) / n;
+    let sum = 0, c = 0;
+    for (let i = 0; i < n; i++) {
+      const hz = i * binHz;
+      if (hz >= 250 && hz <= 1800) { sum += bgmBins[i]; c++; }
+    }
+    const v = c ? sum / (c * 255) : 0;
+    const f = life.frog;
+    if (!f) return 0;
+    f.avg = (f.avg || 0.12) * 0.985 + v * 0.015;
+    f.lev = (f.lev || 0) * 0.65 + v * 0.35;
+    return Math.max(0, Math.min(1, (f.lev - f.avg * 0.8) / 0.28));
+  }
+  function drawMusicNote(c, x, y, s, a, rot) {
+    c.save();
+    c.translate(x, y); c.rotate(rot || 0); c.globalAlpha = a;
+    c.fillStyle = 'rgba(255, 236, 170, 0.95)';
+    c.beginPath(); c.ellipse(0, 4 * s, 3.2 * s, 2.2 * s, -0.4, 0, 6.283); c.fill();
+    c.strokeStyle = 'rgba(255, 236, 170, 0.95)'; c.lineWidth = 1.4 * s; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(2.8 * s, 4 * s); c.lineTo(2.8 * s, -8 * s); c.stroke();
+    c.beginPath(); c.moveTo(2.8 * s, -8 * s); c.quadraticCurveTo(7 * s, -10 * s, 6 * s, -5 * s); c.stroke();
+    c.restore();
+  }
+  // Painted frog + inpainted plate, drawn behind the board so the singer shows through empty cells.
+  function drawFrogScene(c, w, h, reduce) {
+    frogLoad();
+    if (!frog.ready || !frog.img || !frog.img.plate) return;
+    if (!frog.spr.length) frogSprites();
+    const box = photoBox();
+    const M = FROG_META;
+    // Plate covers the original photo (frog removed) in the same center/cover box.
+    c.drawImage(frog.img.plate, box.left, box.top, box.dw, box.dh);
+    // Match the 28% CSS veil so the frog and the pond share the same look.
+    c.fillStyle = 'rgba(0,0,0,0.28)';
+    c.fillRect(box.left, box.top, box.dw, box.dh);
+    const f = life.frog;
+    const mouth = f ? Math.max(0, Math.min(1, f.mouth)) : 0;
+    const puff = f ? Math.max(0, Math.min(1, f.puff)) : 0;
+    const blink = f ? Math.max(0, Math.min(1, f.blink)) : 0;
+    const sway = (f && !reduce) ? (f.sway || 0) : 0;
+    // Soft contact shadow on the lily pad (3D sit).
+    const footX = box.left + (M.x + M.foot.x) * box.scale;
+    const footY = box.top + (M.y + M.foot.y) * box.scale;
+    c.save();
+    c.translate(footX + sway * 10 * box.scale, footY);
+    c.scale(1, 0.28);
+    const sh = c.createRadialGradient(0, 0, 4, 0, 0, 90 * box.scale);
+    sh.addColorStop(0, 'rgba(10,20,8,0.35)');
+    sh.addColorStop(1, 'rgba(10,20,8,0)');
+    c.fillStyle = sh; c.beginPath(); c.arc(0, 0, 90 * box.scale, 0, 6.283); c.fill();
+    c.restore();
+    // Sprite: blend adjacent mouth frames (closed / half / open).
+    const x = mouth * 2, i0 = Math.max(0, Math.min(1, x | 0)), t = x - i0, i1 = Math.min(2, i0 + 1);
+    const dx = box.left + M.x * box.scale, dy = box.top + M.y * box.scale;
+    const dw = M.w * box.scale, dh = M.h * box.scale;
+    const ox = M.foot.x * box.scale, oy = M.foot.y * box.scale;
+    c.save();
+    c.translate(dx + ox, dy + oy);
+    c.rotate(sway);
+    const puffS = 1 + puff * 0.045;
+    c.scale(puffS * 1.015, (2 - puffS) * 0.985 + puff * 0.02); // slight body swell, gentle parallax scale
+    c.translate(-ox, -oy);
+    const a0 = frog.spr[i0], a1 = frog.spr[i1];
+    if (a0) c.drawImage(a0, 0, 0, dw, dh);
+    if (a1 && t > 0.02 && a1 !== a0) { c.globalAlpha = t; c.drawImage(a1, 0, 0, dw, dh); c.globalAlpha = 1; }
+    // Sun-side rim light (sun is upper-right in the painting).
+    if (a0) {
+      c.save();
+      c.globalCompositeOperation = 'source-atop';
+      const rg = c.createRadialGradient(dw * 0.72, dh * 0.18, 4, dw * 0.5, dh * 0.45, dw * 0.85);
+      rg.addColorStop(0, 'rgba(255, 214, 150, 0.22)');
+      rg.addColorStop(0.55, 'rgba(255, 214, 150, 0)');
+      rg.addColorStop(1, 'rgba(20, 10, 0, 0.12)');
+      c.fillStyle = rg; c.fillRect(0, 0, dw, dh);
+      c.restore();
+    }
+    // Throat glow on strong beats / singing.
+    if (puff > 0.08) {
+      const tx = M.throat.x * box.scale, ty = M.throat.y * box.scale;
+      const gg = c.createRadialGradient(tx, ty, 2, tx, ty, 36 * box.scale * (0.8 + puff));
+      gg.addColorStop(0, 'rgba(255, 230, 140,' + (0.32 * puff) + ')');
+      gg.addColorStop(1, 'rgba(255, 230, 140, 0)');
+      c.fillStyle = gg; c.beginPath(); c.arc(tx, ty, 36 * box.scale * (0.8 + puff), 0, 6.283); c.fill();
+    }
+    // Eyelids
+    if (blink > 0.04) {
+      M.eyes.forEach(e => {
+        const ex = e.x * box.scale, ey = e.y * box.scale, r = e.r * box.scale;
+        c.fillStyle = 'rgba(70, 120, 40, 0.92)';
+        c.beginPath();
+        c.ellipse(ex, ey - r * (1 - blink) * 0.15, r * 1.05, r * blink * 1.05, 0, 0, 6.283);
+        c.fill();
+      });
+    }
+    c.restore();
+    if (!reduce && frog.notes) frog.notes.forEach(n => {
+      const a = Math.max(0, 1 - n.t / 1.6);
+      const p = photoToScreen(n.x, n.y);
+      drawMusicNote(c, p.x, p.y, n.s * Math.max(0.9, p.s), a, n.rot);
+    });
+  }
+  let stormCv = null, stormCtx = null;
+  function stormInit() {
+    if (stormCv || !doc.body || !doc.createElement) return;
+    const cv = doc.createElement('canvas');
+    cv.className = 'fx-storm';
+    cv.setAttribute('aria-hidden', 'true');
+    cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:2';
+    doc.body.appendChild(cv);
+    stormCv = cv; stormCtx = cv.getContext('2d');
+  }
+  function drawStorm() {
+    const lu = g && g.levelUp;
+    if (!lu) {
+      if (stormCtx && stormCv) stormCtx.clearRect(0, 0, stormCv.width, stormCv.height);
+      return;
+    }
+    stormInit();
+    if (!stormCtx) return;
+    const d = Math.min(2, root.devicePixelRatio || 1);
+    const w = root.innerWidth, h = root.innerHeight;
+    if (stormCv.width !== Math.round(w * d) || stormCv.height !== Math.round(h * d)) {
+      stormCv.width = Math.round(w * d); stormCv.height = Math.round(h * d);
+    }
+    stormCtx.setTransform(d, 0, 0, d, 0, 0);
+    stormCtx.clearRect(0, 0, w, h);
+    const p = lu.hold ? (lu.at || 0) : Math.min(1, lu.t / lu.dur);
+    const fade = p < 0.08 ? p / 0.08 : (p > 0.82 ? Math.max(0, (1 - p) / 0.18) : 1);
+    if (lu.reduce) {
+      // Calm: a soft blue glow only, no flash or crackling bolts.
+      const el = doc.getElementById('board');
+      if (el && el.getBoundingClientRect) {
+        const r = el.getBoundingClientRect();
+        const a = 0.12 * fade;
+        const rg = stormCtx.createRadialGradient(r.left + r.width / 2, r.top + r.height / 2, 8, r.left + r.width / 2, r.top + r.height / 2, r.width);
+        rg.addColorStop(0, 'rgba(180,220,255,' + a + ')');
+        rg.addColorStop(1, 'rgba(180,220,255,0)');
+        stormCtx.fillStyle = rg;
+        stormCtx.fillRect(r.left - 20, r.top - 20, r.width + 40, r.height + 40);
+      }
+      return;
+    }
+    const flash = 0.25 * Math.max(0, 1 - p / 0.22);
+    if (flash > 0.01) {
+      stormCtx.fillStyle = 'rgba(200,230,255,' + (flash * fade) + ')';
+      stormCtx.fillRect(0, 0, w, h);
+    }
+    const el = doc.getElementById('board');
+    if (!el || !el.getBoundingClientRect) return;
+    const r = el.getBoundingClientRect();
+    stormCtx.save();
+    stormCtx.translate(r.left, r.top);
+    const sx = r.width / (board && board.width ? board.width : r.width);
+    const sy = r.height / (board && board.height ? board.height : r.height);
+    stormCtx.scale(sx, sy);
+    drawLightningBolts(stormCtx, lu.bolts, p, fade, (lu.hold ? (lu.at || 0) * lu.dur : lu.t) / 1000);
+    stormCtx.restore();
+  }
   function drawHopFrog(c) {
     const f = life.frog; if (!f) return;
     const stretch = f.hop >= 0;
@@ -2577,6 +3038,7 @@
     c0.clearRect(0, 0, fx.w, fx.h);
     if (kind === 'farm') drawFarmScene(c0, fx.w, fx.h, reduce);
     else {
+      drawFrogScene(c0, fx.w, fx.h, reduce);
       // pond ripples + shimmer live on the photo, behind the board, so they show in the margins
       drawRipples(c0);
     }
@@ -2589,7 +3051,7 @@
     if (kind !== 'farm') {
       drawFlies(c, reduce);
       drawFishJump(c);
-      drawHopFrog(c);
+      // The painted frog is drawn behind the board (drawFrogScene) so it shows through empty cells.
       // also draw ripples in the visible margins in front, so the bottom pond clearly moves
       drawRipples(c);
     }
@@ -2741,6 +3203,23 @@
     ctx.fillStyle = '#140814';
     ctx.fillRect(0, 0, board.width, board.height);
     ctx.restore();
+    // Blue-white lightning glow + a short screen flash (about 0.25 opacity, not blinding).
+    if (!lu.reduce) {
+      const flash = 0.25 * Math.max(0, 1 - p / 0.22);
+      if (flash > 0.01) {
+        ctx.fillStyle = 'rgba(200,230,255,' + (flash * fade) + ')';
+        ctx.fillRect(0, 0, board.width, board.height);
+      }
+      const glowA = 0.28 * fade * (p < 0.2 ? p / 0.2 : (p > 0.75 ? Math.max(0, (1 - p) / 0.25) : 1));
+      const cx0 = board.width / 2, cy0 = board.height / 2 - 18;
+      const rg = ctx.createRadialGradient(cx0, cy0, 8, cx0, cy0, board.width * 0.7);
+      rg.addColorStop(0, 'rgba(180,220,255,' + glowA + ')');
+      rg.addColorStop(0.45, 'rgba(140,190,255,' + (glowA * 0.35) + ')');
+      rg.addColorStop(1, 'rgba(140,190,255,0)');
+      ctx.fillStyle = rg;
+      ctx.fillRect(0, 0, board.width, board.height);
+      drawLightningBolts(ctx, lu.bolts, p, fade, (lu.hold ? (lu.at || 0) * lu.dur : lu.t) / 1000);
+    }
     // Soft shimmer sweep across the board
     const sw = board.width * 0.42;
     const sx = -sw + Math.min(1, p / 0.55) * (board.width + sw * 2);
@@ -2917,6 +3396,7 @@
         const v = drawBoard[r][c];
         if (v) drawCell(ctx, c * CELL, r * CELL, blockColor(v, colLines, colLevel), CELL, 1, c, r);
       }
+      try { if (!sparkHold) tickBlockSpark(now, drawBoard, (!g.over && !fx) ? g.piece : null, reduceMotion()); } catch (e) { }
       try { invDraw(ctx); } catch (e) { }
       try { drawEffectTrails(ctx); drawEffectRipples(ctx); } catch (e) { }
       if (!g.over && !fx) {
@@ -2930,6 +3410,7 @@
           if (v && p.y + r >= 0) drawCell(ctx, (p.x + c) * CELL, (p.y + r) * CELL, blockColor(p.t, g.lines, g.level), CELL, 1, p.x + c, p.y + r);
         }));
       }
+      try { drawBlockSparks(ctx, now, CELL); } catch (e) { }
       if (fx) drawClearFx(ctx, fx);
       if (g.levelUp) drawLevelUp(ctx, g.levelUp);
       ctx.textAlign = 'right';
@@ -2958,6 +3439,7 @@
       }
       ctx.restore();
     }
+    try { drawStorm(); } catch (e) { }
     drawMini(nextCv, g.next, false);
     drawMini(holdCv, g.hold, !g.canHold);
     raf = requestAnimationFrame(loop);
