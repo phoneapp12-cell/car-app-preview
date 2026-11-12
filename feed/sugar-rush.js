@@ -563,7 +563,7 @@
   // sine with a gentle bell harmonic, fundamentals 400–800 Hz, 2.5 kHz lowpass,
   // quieter than the words. Mix: voices clearly above the music, a brief duck
   // that always restores, a compressor on the bus.
-  const BGM_VOL = 0.12, END_VOL = 0.20, MENU_VOL = 0.12, BGM_DUCK = 0.078, XF = 0.55;
+  const BGM_VOL = 0.12, END_VOL = 0.20, MENU_VOL = 0.12, BGM_DUCK = 0.078, XF = 0.3;
   const SFX_MASTER = 0.96, SFX_NOTE = 0.10, SFX_LP = 2500, SFX_MAX_HZ = 800;
   const VOICE_VOL = 0.36, CHIME_VOL = 0.10, CHIME_DUR = 0.20, VOICE_GAP = 1.2;
   const SCALE = [440.0, 523.3, 587.3, 659.3, 784.0];
@@ -737,7 +737,7 @@
 
   root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, cloneState, bestMove, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
     allowed: () => !!(root.IBScores && root.IBScores.isShane && root.IBScores.isShane()),
-    SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL,
+    SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL, XF,
     VOICE_FILES, VOICE_RANK, MEDIA_HASH, mediaUrl, gameTrack, attachSfxBus, playTone, playChime, playClip, voiceForStep,
     SPARKLE_MIN_MS, SPARKLE_MAX_MS, SPARKLE_MAX, SPARKLE_MAX_REDUCE, SHIMMER_MS, sparkleCap, sparkleEase, shimmerAt, drawStarGlint, drawCandyShine };
 
@@ -779,8 +779,10 @@
   // synth effects with spoken words and a short 3-match chime, and unlocks the
   // context on the game page itself (pointerup/touchend plus a silent buffer).
   let ac = null, out = null, clipOut = null, musicGain = null, musicSoft = null;
-  let bufs = {}, loading = {}, musicSrc = null, musicKind = '', endSrc = null, ducked = false;
-  let voiceSrc = null, voiceUntil = 0, voiceRank = 0, chimeN = 0;
+  let bufs = {}, loading = {}, musicSrc = null, musicSrcGain = null, musicKind = '', endSrc = null;
+  let musicTok = 0, endTok = 0, endPlaying = false, endKind = '';
+  let liveMusic = new Set();
+  let voiceSrc = null, voiceUntil = 0, voiceRank = 0, voiceWait = null, chimeN = 0;
 
   function audio() {
     if (ac) { if (ac.state === 'suspended' || ac.state === 'interrupted') ac.resume().catch(() => { }); return ac; }
@@ -789,7 +791,7 @@
     const bus = attachSfxBus(ac);
     out = bus.master; clipOut = bus.clip;
     Object.keys(VOICE_FILES).forEach(k => loadBuf(k));
-    musicGain = ac.createGain(); musicGain.gain.value = 0.0001;
+    musicGain = ac.createGain(); musicGain.gain.value = 1;
     musicSoft = ac.createBiquadFilter(); musicSoft.type = 'lowpass'; musicSoft.frequency.value = 2800; musicSoft.Q.value = 0.5;
     musicGain.connect(musicSoft); musicSoft.connect(ac.destination);
     return ac;
@@ -807,105 +809,141 @@
     const n = level == null ? lvNum : level;
     return n === 1 ? 'game1' : n === 2 ? 'game2' : 'game';
   }
-  function stopSrc(src, fade) {
+  // 1.9.171 One music controller: exactly one intended track at a time.
+  // Each loop has its own gain so a ~300ms crossfade actually fades the old
+  // song out instead of leaving it on the shared bus. A token cancels stale
+  // async decodes. End songs stop the gameplay loop and do not let it restart
+  // underneath (taps, visibility, or the watchdog).
+  function trackSrc(src) {
+    if (!src) return src;
+    liveMusic.add(src);
+    const orig = src.stop.bind(src);
+    src.stop = function () {
+      liveMusic.delete(src);
+      try { orig.apply(src, arguments); } catch (e) { }
+    };
+    return src;
+  }
+  function fadeStop(src, gain, fade) {
     if (!src || !ac) return;
     try {
-      if (fade && musicGain) {
-        const t = ac.currentTime;
-        musicGain.gain.cancelScheduledValues(t);
-        musicGain.gain.setValueAtTime(Math.max(0.0001, musicGain.gain.value), t);
-        musicGain.gain.linearRampToValueAtTime(0.0001, t + fade);
-        setTimeout(() => { try { src.stop(); } catch (e) { } }, fade * 1000 + 30);
+      if (fade && gain) {
+        const t0 = ac.currentTime;
+        gain.gain.cancelScheduledValues(t0);
+        gain.gain.setValueAtTime(Math.max(0.0001, gain.gain.value), t0);
+        gain.gain.linearRampToValueAtTime(0.0001, t0 + fade);
+        const s = src;
+        setTimeout(() => { try { s.stop(); } catch (e) { } }, fade * 1000 + 40);
       } else { src.stop(); }
     } catch (e) { }
   }
-  function startLoop(kind, fade) {
-    if (!ac || !bufs[kind] || !musicOn) return;
+  function stopLoop(fade) {
+    if (musicSrc) fadeStop(musicSrc, musicSrcGain, fade);
+    musicSrc = null; musicSrcGain = null; musicKind = '';
+  }
+  function introOpen() { const el = $('intro'); return !!(el && !el.hidden); }
+  function wantKind() {
+    if (endPlaying) return null;
+    if (introOpen()) return 'menu';
+    return screen === 'game' ? gameKind(lvNum) : 'menu';
+  }
+  function startLoop(kind, fade, tok) {
+    if (tok != null && tok !== musicTok) return;
+    if (!ac || !bufs[kind] || !musicOn || endPlaying) return;
+    if (kind !== wantKind()) return;
     fade = fade == null ? XF : fade;
-    const t = ac.currentTime;
-    if (musicSrc && musicKind === kind && !ducked) return;
-    if (musicSrc && musicKind !== kind) { try { const old = musicSrc; musicGain.gain.cancelScheduledValues(t); musicGain.gain.setValueAtTime(Math.max(0.0001, musicGain.gain.value), t); musicGain.gain.linearRampToValueAtTime(0.0001, t + fade); setTimeout(() => { try { old.stop(); } catch (e) { } }, fade * 1000 + 30); } catch (e) { } }
-    const src = ac.createBufferSource();
-    src.buffer = bufs[kind]; src.loop = true; src.connect(musicGain);
+    if (musicSrc && musicKind === kind) return;
+    if (musicSrc) fadeStop(musicSrc, musicSrcGain, fade);
+    const g = ac.createGain();
+    const src = trackSrc(ac.createBufferSource());
+    src.buffer = bufs[kind]; src.loop = true;
+    src.connect(g); g.connect(musicGain);
+    const t0 = ac.currentTime, v = volFor(kind);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(v, t0 + Math.max(0.01, fade || 0));
     try { src.start(0); } catch (e) { return; }
-    musicSrc = src; musicKind = kind; ducked = false;
-    const v = volFor(kind);
-    musicGain.gain.cancelScheduledValues(t);
-    if (fade && musicSrc) {
-      musicGain.gain.setValueAtTime(0.0001, t);
-      musicGain.gain.linearRampToValueAtTime(v, t + fade);
-    } else musicGain.gain.setValueAtTime(v, t);
+    musicSrc = src; musicSrcGain = g; musicKind = kind;
   }
   function playKind(kind) {
-    if (!musicOn || !audio()) return;
-    const go = () => loadBuf(kind).then(() => { if (musicOn) startLoop(kind); });
+    if (!musicOn || !audio() || endPlaying) return;
+    if (!kind) kind = wantKind();
+    if (!kind) return;
+    const tok = ++musicTok;
+    const go = () => {
+      if (tok !== musicTok || !musicOn || endPlaying || kind !== wantKind()) return;
+      loadBuf(kind).then(() => {
+        if (tok !== musicTok || !musicOn || endPlaying || kind !== wantKind()) return;
+        startLoop(kind, XF, tok);
+      });
+    };
     if (ac.state === 'suspended' || ac.state === 'interrupted') ac.resume().then(go).catch(() => { });
     else go();
   }
-  function musicForScreen() { return (screen === 'game' && !$('end').hidden === false) || screen === 'game' ? ( $('end').hidden === false ? musicKind || 'game' : 'game') : 'menu'; }
-  function wantKind() { return screen === 'game' ? gameKind(lvNum) : 'menu'; }
-  function duckMusic() {
-    if (!ac || !musicGain) return;
-    const t = ac.currentTime;
-    ducked = true;
-    musicGain.gain.cancelScheduledValues(t);
-    musicGain.gain.setValueAtTime(Math.max(0.0001, musicGain.gain.value), t);
-    musicGain.gain.linearRampToValueAtTime(0.0001, t + 0.4);
-  }
   function duckMusicBrief(dur) {
-    if (!ac || !musicGain || ducked) return;
+    if (!ac || !musicGain || endPlaying) return;
     dur = dur == null ? 0.35 : dur;
-    const t = ac.currentTime, v = musicOn ? volFor(wantKind()) : 0.0001;
-    musicGain.gain.cancelScheduledValues(t);
-    musicGain.gain.setValueAtTime(Math.max(0.0001, musicGain.gain.value), t);
-    musicGain.gain.linearRampToValueAtTime(BGM_DUCK, t + 0.03);
-    musicGain.gain.setValueAtTime(BGM_DUCK, t + dur);
-    musicGain.gain.linearRampToValueAtTime(v, t + dur + 0.22);
-  }
-  function resumeMusic() {
-    if (!ac || !musicGain || !musicOn) return;
-    const t = ac.currentTime, v = volFor(wantKind());
-    ducked = false;
-    if (!musicSrc || musicKind !== wantKind()) { playKind(wantKind()); return; }
-    musicGain.gain.cancelScheduledValues(t);
-    musicGain.gain.setValueAtTime(Math.max(0.0001, musicGain.gain.value), t);
-    musicGain.gain.linearRampToValueAtTime(v, t + 0.5);
+    const t0 = ac.currentTime;
+    const duck = BGM_DUCK / BGM_VOL;
+    musicGain.gain.cancelScheduledValues(t0);
+    musicGain.gain.setValueAtTime(Math.max(0.0001, musicGain.gain.value), t0);
+    musicGain.gain.linearRampToValueAtTime(duck, t0 + 0.03);
+    musicGain.gain.setValueAtTime(duck, t0 + dur);
+    musicGain.gain.linearRampToValueAtTime(1, t0 + dur + 0.22);
   }
   function musicWatch() {
     if (!musicOn || (doc && doc.hidden) || !ac) return;
-    if (endSrc) return; // end-of-level song is playing, music is meant to stay ducked
+    if (endPlaying) return;
     if (ac.state === 'suspended' || ac.state === 'interrupted') ac.resume().catch(() => { });
     if (!musicSrc) { playKind(wantKind()); return; }
-    if (!ducked && musicGain && musicGain.gain.value < volFor(wantKind()) * 0.4) resumeMusic();
   }
   function stopEnd() {
+    endTok++;
+    endPlaying = false;
+    endKind = '';
     if (endSrc) { try { endSrc.stop(); } catch (e) { } endSrc = null; }
   }
   function playEndSong(kind) {
     if (!musicOn || !audio()) return;
-    duckMusic();
+    const tok = ++endTok;
+    endPlaying = true;
+    endKind = kind;
+    musicTok++;
+    stopLoop(XF);
     const go = () => loadBuf(kind).then(b => {
-      if (!b || !musicOn) return;
-      stopEnd();
-      const src = ac.createBufferSource();
+      if (tok !== endTok || !b || !musicOn || !endPlaying) return;
+      if (endSrc) { try { endSrc.stop(); } catch (e) { } endSrc = null; }
+      const src = trackSrc(ac.createBufferSource());
       const g = ac.createGain();
       g.gain.value = END_VOL;
       src.buffer = b; src.connect(g); g.connect(musicSoft || ac.destination);
       try { src.start(0); } catch (e) { return; }
       endSrc = src;
-      src.onended = () => { if (endSrc === src) endSrc = null; };
+      src.onended = () => {
+        if (endSrc === src) { endSrc = null; endPlaying = false; endKind = ''; }
+        // Do not auto-restart the level loop; wait for retry, next, or map.
+      };
     });
-    if (ac.state === 'suspended') ac.resume().then(go).catch(() => { }); else go();
+    if (ac.state === 'suspended' || ac.state === 'interrupted') ac.resume().then(go).catch(() => { });
+    else go();
   }
   function stopAllMusic() {
+    musicTok++;
     stopEnd();
-    if (musicSrc) { try { musicSrc.stop(); } catch (e) { } musicSrc = null; musicKind = ''; }
-    if (musicGain && ac) musicGain.gain.setValueAtTime(0.0001, ac.currentTime);
-    ducked = false;
+    stopLoop(0);
+    if (musicGain && ac) {
+      musicGain.gain.cancelScheduledValues(ac.currentTime);
+      musicGain.gain.setValueAtTime(1, ac.currentTime);
+    }
   }
   function setMusic(on) {
     musicOn = on; ls.set('ib-sugar-music', on); paintButtons();
     if (on) playKind(wantKind()); else stopAllMusic();
+  }
+  function musicState() {
+    return {
+      kind: musicKind, want: wantKind(), looping: !!musicSrc, endPlaying: !!endPlaying,
+      endKind: endKind, endAlive: !!endSrc, live: liveMusic.size, voice: !!voiceSrc, tok: musicTok
+    };
   }
   function silentUnlock(ctx) {
     if (!ctx) return;
@@ -930,7 +968,6 @@
     silentUnlock(ac);
     if (ac.state === 'suspended' || ac.state === 'interrupted') {
       ac.resume().then(go).catch(() => { });
-      go();
     } else go();
   }
   function chime() {
@@ -948,10 +985,12 @@
       if (t < voiceUntil && rank <= voiceRank) return;
       const buf = bufs[word];
       if (!buf || !clipOut) {
-        // Clip may still be loading; try again shortly, but do not block a later bigger word.
-        loadBuf(word).then(b => { if (b && soundOn) say(word); });
+        // Clip may still be loading; only play it if this word is still the one we want.
+        voiceWait = word;
+        loadBuf(word).then(b => { if (b && soundOn && voiceWait === word) { voiceWait = null; say(word); } });
         return;
       }
+      voiceWait = null;
       stopVoice();
       const dur = buf.duration || 0.6;
       voiceSrc = playClip(ac, clipOut, buf, t + 0.01, 1, VOICE_VOL);
@@ -1214,7 +1253,7 @@
     $('game').hidden = true; $('intro').hidden = true; $('end').hidden = true; $('map').hidden = false;
     doc.body.classList.remove('sarah');
     renderMap(); paintButtons();
-    if (musicOn) playKind('menu');
+    if (musicOn) playKind(wantKind());
   }
   function openLevel(n) {
     const lv = LEVELS[n - 1]; if (!lv || n > prog.open) return;
@@ -1359,18 +1398,16 @@
   function leaveEnd() { stopEnd(); $('end').hidden = true; }
   function restart() {
     leaveEnd();
-    resumeMusic();
     startLevel(lvNum);
   }
   function goNext() {
     leaveEnd();
     if (lvNum < 10) openLevel(lvNum + 1);
     else showMap();
-    if (screen === 'game' && musicOn) playKind(wantKind());
+    if (musicOn) playKind(wantKind());
   }
   function backToMap() {
     leaveEnd();
-    resumeMusic();
     showMap();
   }
 
@@ -1438,6 +1475,7 @@
     setScore(n) { if (!st) return; st.score = n; st.moves = 0; st.over = true; st.won = goalsMet(st) || n >= (st.target || 0); st.stars = starsOf(st); hud(); },
     previewWin(opts) { opts = opts || {}; const n = opts.level || (st && st.lv && st.lv.n) || 2; if (!st || st.lv.n !== n) startLevel(n); st.score = opts.score || Math.max(st.lv.stars[2] || 0, 2400); st.moves = Math.max(st.moves, 1); st.won = true; st.over = true; st.stars = opts.stars || 3; if (opts.resetBadge) prog.badges[n - 1] = 0; winInfo = recordWin(st); hud(); showEnd(); },
     view: () => ({ score: st && st.score, moves: st && st.moves, busy, soundOn, musicOn, screen, level: st && st.lv && st.lv.n, acState: ac && ac.state, sparkles: sparkles.length, hold: sparkleHoldT != null }),
+    musicState, playKind, wantKind, playEndSong, stopAllMusic, stopEnd, gameKind, setMusic,
     // Freeze a sparkling board for screenshots (settled pieces, mid-sweep, a few glints at peak).
     previewSparkle(opts) {
       opts = opts || {};

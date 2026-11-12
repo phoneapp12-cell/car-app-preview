@@ -359,12 +359,12 @@ for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 3, at.join(',
 const appSrc = fs.readFileSync('feed/app.js', 'utf8');
 for (const id of sights.TOPICS) assert.ok(appSrc.includes("'" + id + "'"), id);
 assert.ok(!/Math\.pow\(baseOf\(t\), 3\)/.test(appSrc));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.170'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.170'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.170'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.171'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.171'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.171'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.cdot.tv'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.bd ul.sum'));
-assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.170'"));
+assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.171'"));
 function swVersion(src) { const m = String(src).match(/const VERSION = '([^']+)'/); assert.ok(m, 'parent sw.js VERSION'); return m[1]; }
 const parentHere = swVersion(fs.readFileSync('sw.js', 'utf8'));
 let parentMain = parentHere;
@@ -403,10 +403,10 @@ assert.equal(artB.length, 1);
 assert.notEqual(artB[0].id, artA.id);
 seenArt.wasSeen = () => true;
 assert.equal(seenArt.ibArt.cards(0).length, 0);
-assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.170'"));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.171'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'art3d.js?v=' + VERSION"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'portal.js?v=' + VERSION"));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.170'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.171'));
 const portalSrc = fs.readFileSync('feed/portal.js', 'utf8');
 assert.ok(portalSrc.includes('prefers-reduced-motion'));
 assert.ok(portalSrc.includes("sessionStorage.getItem(KEY)"));
@@ -434,7 +434,7 @@ assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("cache: 'reload'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("u.pathname + '?v=' + VERSION"), 'game scripts are fetched at this VERSION, not from a stale unversioned cache');
 assert.ok(appSrc.includes('ibPortalRise'));
 assert.ok(!/portal-style\.jpg|attachments\/image/.test(portalSrc + fs.readFileSync('feed/index.html', 'utf8')));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.170'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.171'));
 assert.ok(appSrc.includes("['art3d', '3D art'"));
 assert.ok(appSrc.includes("['3D art', 'art3d'"));
 assert.ok(appSrc.includes("'art3d'"));
@@ -502,19 +502,20 @@ assert.ok(fs.readFileSync('feed/nz.js', 'utf8').includes('next: fut[0].t.slice(0
 const calCtx = { ls: { mem: {}, get(k, d) { return this.mem[k] || d; }, set(k, v) { this.mem[k] = v; } } };
 vm.runInNewContext(fs.readFileSync('feed/cal.js', 'utf8'), calCtx);
 const cal = calCtx.ibCal;
-const saved = cal.upsert({ title: 'Yoga', date: '2026-11-12', time: '18:00', note: 'Class', remind: 'h1' });
+const calDay = new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10);
+const saved = cal.upsert({ title: 'Yoga', date: calDay, time: '18:00', note: 'Class', remind: 'h1' });
 assert.equal(saved.title, 'Yoga');
-assert.equal(cal.upsert({ title: '  ', date: '2026-11-12' }), null);
-const when = cal.aucklandMs('2026-11-12', '18:00');
-assert.equal(cal.nzParts(when).date, '2026-11-12');
+assert.equal(cal.upsert({ title: '  ', date: calDay }), null);
+const when = cal.aucklandMs(calDay, '18:00');
+assert.equal(cal.nzParts(when).date, calDay);
 assert.equal(cal.nzParts(when).time, '18:00');
 assert.equal(cal.fireMs(saved), when - 3600000);
 const tv = cal.prefill({ kind: 'tv', src: 'nz-tvg2', ev: when, t: 'The Chase', where: 'TVNZ 1', url: 'https://www.tvnz.co.nz/show' });
-assert.equal(tv.date, '2026-11-12');
+assert.equal(tv.date, calDay);
 assert.equal(tv.time, '18:00');
 assert.equal(cal.prefill({ kind: 'tv', src: 'tvm-us', ev: when, t: 'US show', url: 'https://www.adultswim.com/x' }), null);
 assert.equal(cal.prefill({ kind: 'event', t: 'Market', url: 'https://www.eventfinda.co.nz/x' }), null);
-const film = cal.prefill({ x: 'cine', film: { title: 'Pressure', next: '2026-11-12T19:30', rating: 'M', sessions: 'https://www.eventcinemas.co.nz/cinema/whangarei/sessions' } });
+const film = cal.prefill({ x: 'cine', film: { title: 'Pressure', next: calDay + 'T19:30', rating: 'M', sessions: 'https://www.eventcinemas.co.nz/cinema/whangarei/sessions' } });
 assert.equal(film.time, '19:30');
 assert.equal(tv.tv, 1);
 assert.equal(tv.kind, 'tv');
@@ -529,7 +530,7 @@ const futDay = new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10); // a
 const timed = cal.prefill({ x: 'watch', w: { t: 'QI', day: futDay, ev: cal.aucklandMs(futDay, '19:30'), plat: 'ThreeNow', url: 'https://www.threenow.co.nz/show' } });
 assert.equal(timed.time, '19:30');
 assert.ok(fs.readFileSync('feed/cal.js', 'utf8').includes('Add reminder'));
-assert.ok(cal.ics(saved).includes('DTSTART:20261112T050000Z'));
+assert.ok(cal.ics(saved).includes('DTSTART:' + calDay.replace(/-/g, '') + 'T050000Z'));
 const summer = cal.aucklandMs('2026-11-12', '19:30');
 const winter = cal.aucklandMs('2026-07-15', '19:30');
 assert.equal(summer, Date.parse('2026-11-12T06:30:00Z'));
@@ -945,7 +946,7 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   assert.strictEqual(SR.voiceForStep({ popped: Array(12).fill({}), made: [], fired: [], cascade: 1 }, 1), 'succulent');
   assert.strictEqual(SR.voiceForStep({ popped: [{}, {}, {}], made: [], fired: [], cascade: 5 }, 5), 'succulent');
   assert.ok(srJs.includes("if (won) say('yay')") && srJs.includes('function chime') && srJs.includes('function say'));
-  assert.ok(srJs.includes('duckMusicBrief') && srJs.includes('linearRampToValueAtTime(v, t + dur'));
+  assert.ok(srJs.includes('duckMusicBrief') && srJs.includes('linearRampToValueAtTime(1, t0 + dur + 0.22)'));
   assert.ok(SR.LEVELS.length === 10 && SR.LEVELS[1].name === "Sarah's Sweet Spot");
   assert.ok(SR.LEVELS[1].theme === 'sarah' && SR.LEVELS[1].badge && SR.LEVELS[1].badge.special);
   assert.ok(SR.LEVELS[1].intro && /Sarah, Shane's partner/.test(SR.LEVELS[1].intro.body));
@@ -1486,4 +1487,25 @@ if (live) {
   assert.ok(src.includes("n === 2 ? 'game2'"));
   assert.ok(src.includes('playKind(wantKind())'));
   assert.ok(src.includes('IBScores.isShane'), 'the game stays Shane-only');
+}
+
+// 1.9.171 One music controller: no overlapping Sugar Rush tracks, stale loads cancelled
+{
+  const SR = load('feed/sugar-rush.js').SugarRush;
+  assert.strictEqual(SR.XF, 0.3);
+  const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
+  assert.ok(src.includes('let musicTok = 0, endTok = 0, endPlaying = false'));
+  assert.ok(src.includes('if (tok !== musicTok || !musicOn || endPlaying || kind !== wantKind()) return'));
+  assert.ok(src.includes('src.connect(g); g.connect(musicGain)'), 'each loop has its own gain for a real crossfade');
+  assert.ok(src.includes('stopLoop(XF)') && src.includes('endPlaying = true'));
+  assert.ok(src.includes('Do not auto-restart the level loop') || src.includes('wait for retry, next, or map'));
+  assert.ok(!src.includes('resumeMusic()'), 'going back to the map must not first restart the level song');
+  assert.ok(!/new root\.Audio\(|new Audio\(/.test(src), 'no HTMLAudioElement loop');
+  assert.ok(src.includes('voiceWait === word'), 'stale voice clips do not play after a later word is requested');
+  assert.ok(src.includes("if (introOpen()) return 'menu'"));
+  // Watchdog and taps must not restart music under an end song
+  assert.ok(src.includes('if (endPlaying) return') && src.includes('function musicWatch'));
+  const tet = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.ok(tet.includes('bgmWantTi === ti') && tet.includes('bgmWantTi = ti'), 'Tetris must not start a previous theme after a level-up');
+  assert.ok(tet.includes('playLevelUpSfx(ti)') && !/sfx\(\'level\'\)/.test(tet) || tet.includes('playLevelUpSfx(ti)'));
 }
