@@ -359,12 +359,12 @@ for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 3, at.join(',
 const appSrc = fs.readFileSync('feed/app.js', 'utf8');
 for (const id of sights.TOPICS) assert.ok(appSrc.includes("'" + id + "'"), id);
 assert.ok(!/Math\.pow\(baseOf\(t\), 3\)/.test(appSrc));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.172'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.172'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.172'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.173'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.173'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.173'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.cdot.tv'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.bd ul.sum'));
-assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.172'"));
+assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.173'"));
 function swVersion(src) { const m = String(src).match(/const VERSION = '([^']+)'/); assert.ok(m, 'parent sw.js VERSION'); return m[1]; }
 const parentHere = swVersion(fs.readFileSync('sw.js', 'utf8'));
 let parentMain = parentHere;
@@ -403,10 +403,10 @@ assert.equal(artB.length, 1);
 assert.notEqual(artB[0].id, artA.id);
 seenArt.wasSeen = () => true;
 assert.equal(seenArt.ibArt.cards(0).length, 0);
-assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.172'"));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.173'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'art3d.js?v=' + VERSION"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'portal.js?v=' + VERSION"));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.172'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.173'));
 const portalSrc = fs.readFileSync('feed/portal.js', 'utf8');
 assert.ok(portalSrc.includes('prefers-reduced-motion'));
 assert.ok(portalSrc.includes("sessionStorage.getItem(KEY)"));
@@ -434,7 +434,7 @@ assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("cache: 'reload'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("u.pathname + '?v=' + VERSION"), 'game scripts are fetched at this VERSION, not from a stale unversioned cache');
 assert.ok(appSrc.includes('ibPortalRise'));
 assert.ok(!/portal-style\.jpg|attachments\/image/.test(portalSrc + fs.readFileSync('feed/index.html', 'utf8')));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.172'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.173'));
 assert.ok(appSrc.includes("['art3d', '3D art'"));
 assert.ok(appSrc.includes("['3D art', 'art3d'"));
 assert.ok(appSrc.includes("'art3d'"));
@@ -1530,4 +1530,24 @@ if (live) {
   assert.ok(play.includes('allow="autoplay; fullscreen"') && play.includes("setAttribute('allow', 'autoplay; fullscreen')"));
   const idx = fs.readFileSync('feed/index.html', 'utf8');
   assert.ok(idx.includes('.artwin.artfull{inset:0;width:100dvw;height:100dvh'));
+}
+
+// 1.9.173 Tetris level 1 (Farmyard, theme 6) plays Shane's farm song
+{
+  assert.strictEqual(tetGame.themeFor(1), 6);
+  assert.strictEqual(tetGame.THEMES[6].name, 'Farmyard');
+  assert.strictEqual(tetGame.bgmSrc(6), 'tetris-bg/m6-7bc4ebcd.mp3');
+  assert.strictEqual(tetGame.BGM_HASH[6], '7bc4ebcd');
+  assert.ok(fs.existsSync('feed/tetris-bg/m6-7bc4ebcd.mp3'));
+  assert.ok(!fs.existsSync('feed/tetris-bg/m6-ef3f9675.mp3'), 'old farm track removed');
+  const tr = tetGame.TRACKS[6];
+  assert.strictEqual(tr.bpm, 171);
+  assert.strictEqual(tr.offset, 0.006);
+  assert.strictEqual(tr.key, 'D');
+  assert.strictEqual(tr.mode, 'major');
+  // Still a decoded AudioContext loop with a watchdog; fullscreen + audio-conflict work stays.
+  const tet = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.ok(tet.includes('createBufferSource()') && tet.includes('src.loop = true'));
+  assert.ok(tet.includes('Watchdog:') || /bgmGain\.gain\.value < BGM_VOL/.test(tet));
+  assert.ok(tet.includes("function setFull") && tet.includes("d.type !== 'ib-artfull'"));
 }
