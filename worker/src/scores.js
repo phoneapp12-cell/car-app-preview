@@ -34,9 +34,37 @@ export function scoresInit(sql) {
   sql.exec(`CREATE TABLE IF NOT EXISTS scores (id INTEGER PRIMARY KEY AUTOINCREMENT, game TEXT NOT NULL, mid TEXT NOT NULL, score INTEGER NOT NULL, lines INTEGER, level INTEGER, won INTEGER, opp TEXT, at INTEGER NOT NULL);
     CREATE INDEX IF NOT EXISTS s_game ON scores(game, score DESC);
     CREATE INDEX IF NOT EXISTS s_mid ON scores(mid, game, at);`);
+  clearShaneTetrisOnce(sql);
 }
 
+/* One-off, 12 Nov 2026: Shane asked to be cleared from the Tetris high-score table only.
+   Guarded by a meta flag so it runs exactly once. Other games and other members are left alone.
+   After it has run, new Tetris scores Shane posts later are kept. */
+export const CLEAR_SHANE_TETRIS_KEY = 'clear_shane_tetris_20261112';
 const rows = (sql, q, ...a) => sql.exec(q, ...a).toArray();
+export function clearShaneTetrisOnce(sql) {
+  try {
+    sql.exec(`CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT)`);
+    const prev = rows(sql, `SELECT v FROM meta WHERE k=?`, CLEAR_SHANE_TETRIS_KEY)[0];
+    if (prev) {
+      try { return { already: true, ...JSON.parse(prev.v) }; } catch (e) { return { already: true }; }
+    }
+    const shane = rows(sql, `SELECT id, name FROM members WHERE role='admin' AND removed=0`)
+      .filter(m => /^Shane\b/i.test(String(m.name || '').trim()));
+    const deleted = [];
+    for (const m of shane) {
+      const existing = rows(sql, `SELECT score, lines, level, at FROM scores WHERE game='tetris' AND mid=? ORDER BY score DESC, at ASC`, m.id);
+      sql.exec(`DELETE FROM scores WHERE game='tetris' AND mid=?`, m.id);
+      deleted.push({ name: m.name, n: existing.length, top: existing.length ? existing[0].score : 0, scores: existing });
+    }
+    const rec = { at: Date.now(), matched: shane.length, deleted };
+    sql.exec(`INSERT OR REPLACE INTO meta (k,v) VALUES (?,?)`, CLEAR_SHANE_TETRIS_KEY, JSON.stringify(rec));
+    try { console.log('clear_shane_tetris_20261112', JSON.stringify({ matched: rec.matched, deleted: rec.deleted.map(d => ({ name: d.name, n: d.n, top: d.top })) })); } catch (e) { }
+    return rec;
+  } catch (e) {
+    return { err: 'pending' }; // e.g. members table not ready yet; flag is not set, so a later call can retry
+  }
+}
 
 export function addScore(sql, me, body, now = Date.now()) {
   const c = checkScore(body); if (c.err) return { status: 400, body: { err: c.err } };
