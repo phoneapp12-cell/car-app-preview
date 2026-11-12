@@ -1923,8 +1923,23 @@ if (live) {
   for (let i = 0; i < 24; i++) bigger.add(tetGame.pickCallout({ n: 4, b2b: true, combo: 2, high: false, near: false }));
   assert.ok(bigger.has('fantastic') || bigger.has('awesome'), 'back-to-back bigger callout');
   const enc = new Set();
-  for (let i = 0; i < 24; i++) enc.add(tetGame.pickCallout({ n: 0, b2b: false, combo: 0, high: true, near: true }));
-  assert.ok(enc.has('yougotthis') || enc.has('keepgoing'), 'encouragement when the stack is high');
+  for (let i = 0; i < 24; i++) enc.add(tetGame.pickCallout({ n: 0, b2b: false, combo: 0, high: true, near: true, level: 1 }));
+  assert.ok(enc.has('yougotthis') || enc.has('keepgoing'), 'encouragement when the stack is high on level 1');
+  // 1.9.188: You got this / Keep going only on level 1; praise stays on every level
+  const laterEnc = new Set();
+  for (let i = 0; i < 40; i++) {
+    laterEnc.add(tetGame.pickCallout({ n: 0, b2b: false, combo: 0, high: true, near: true, level: 2 }));
+    laterEnc.add(tetGame.pickCallout({ n: 0, b2b: false, combo: 0, high: true, near: true, level: 5 }));
+    laterEnc.add(tetGame.pickCallout({ n: 0, b2b: false, combo: 0, high: true, near: true }));
+  }
+  assert.ok(!laterEnc.has('yougotthis') && !laterEnc.has('keepgoing'), 'no encouragement from level 2 onward');
+  assert.ok([...laterEnc].every(x => x == null));
+  const praiseLater = new Set();
+  for (let i = 0; i < 24; i++) praiseLater.add(tetGame.pickCallout({ n: 4, b2b: false, combo: 1, high: false, near: false, level: 5 }));
+  assert.ok(praiseLater.has('amazing') || praiseLater.has('brilliant'), 'Amazing/Brilliant still fire after level 1');
+  const biggerLater = new Set();
+  for (let i = 0; i < 24; i++) biggerLater.add(tetGame.pickCallout({ n: 4, b2b: true, combo: 2, high: false, near: false, level: 8 }));
+  assert.ok(biggerLater.has('fantastic') || biggerLater.has('awesome'), 'Fantastic/Awesome still fire after level 1');
   const g = tetGame.newGame();
   assert.strictEqual(g.callout, null);
   assert.strictEqual(g.clearCombo, 0);
