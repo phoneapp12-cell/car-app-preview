@@ -1775,7 +1775,7 @@ if (live) {
   assert.ok(/^tetris-bg\/ocean-atlas-[0-9a-f]{8}\.webp$/.test(art.atlas), 'hashed ocean atlas');
   assert.ok(fs.existsSync('feed/' + art.plate) && fs.existsSync('feed/' + art.atlas));
   const dols = tetGame.oceanMeta().dolphins;
-  assert.strictEqual(dols.length, 3, 'three big painted dolphins');
+  assert.strictEqual(dols.length, 2, 'two big painted dolphins (1.9.183)');
   assert.ok(dols.every(d => d.px != null && d.py != null && d.ang != null && d.aw && d.ah));
   assert.ok(src.includes('function drawOceanScene') && src.includes('function oceanAdvance') && src.includes('function oceanCast') && src.includes('function playMoveSfx'));
   assert.ok(src.includes("name === 'move' || name === 'rotate' || name === 'soft' || name === 'drop' || name === 'lock'"));
@@ -1799,14 +1799,49 @@ if (live) {
   assert.ok(src.includes('function oceanEval') && src.includes('function oceanLerpAngle') && src.includes('function oceanWrapAngle'));
   assert.ok(src.includes('Analytic velocity') && src.includes('path closes exactly each period'));
   assert.ok(!src.includes('Math.floor(loop)') && !src.includes('Math.max(40, Math.min(PHOTO_W'));
-  assert.ok(src.includes('d.facing') && src.includes('d.bank') && src.includes('d.tail') && src.includes('slices = 20'));
+  assert.ok(src.includes('d.facing') && src.includes('d.bank') && src.includes('d.tail') && src.includes('oceanEval'));
   assert.strictEqual(tetGame.isEffect(2), 'ocean');
-  assert.strictEqual(tetGame.oceanMeta().dolphins.length, 3);
-  assert.ok(tetGame.oceanArt().plate.indexOf('ocean-plate-24aea8de') >= 0);
   assert.strictEqual(tetGame.BGM_HASH[2], '9ca3b84e');
   // Prior 1.9.181 art and other levels stay intact
   assert.ok(src.includes('function drawOceanScene') && src.includes('function drawFireworksScene') && src.includes('function drawBeachScene'));
   assert.strictEqual(tetGame.fwSize(0), 0.3);
   assert.strictEqual(tetGame.TRACKS[1].bpm, 131);
+}
+
+// 1.9.183 One less dolphin, more reef fish; Tetris-only dark chrome; clearer well and ghost
+{
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  const art = tetGame.oceanArt();
+  const meta = tetGame.oceanMeta();
+  assert.strictEqual(meta.dolphins.length, 2);
+  assert.ok(meta.dolphins.every(d => d.name === 'top' || d.name === 'mid'));
+  assert.ok(!meta.dolphins.some(d => d.name === 'low'));
+  assert.ok(meta.fish && meta.fish.length >= 20, 'painted reef fish in the atlas');
+  assert.ok(meta.fish.some(f => f.kind === 'orange') && meta.fish.some(f => f.kind === 'yellow') && meta.fish.some(f => f.name === 'clown'));
+  assert.ok(art.plate.indexOf('ocean-plate-51d83ca2') >= 0);
+  assert.ok(art.atlas.indexOf('ocean-atlas-fb01ff38') >= 0);
+  assert.ok(fs.existsSync('feed/tetris-bg/ocean-plate-51d83ca2.webp'));
+  assert.ok(fs.existsSync('feed/tetris-bg/ocean-atlas-fb01ff38.webp'));
+  assert.ok(!fs.existsSync('feed/tetris-bg/ocean-plate-24aea8de.webp'));
+  assert.ok(!fs.existsSync('feed/tetris-bg/ocean-atlas-19544900.webp'));
+  assert.ok(src.includes('function oceanCastFish') && src.includes('oceanAdvanceFish') && src.includes('function drawWellFrame'));
+  assert.ok(src.includes('See-through fill') || src.includes('see-through fill') || src.includes('Stronger landing preview'));
+  assert.ok(src.includes('ctx.fillStyle = \'rgba(0,0,0,0.16)\''));
+  assert.strictEqual(tetGame.BGM_HASH[2], '9ca3b84e');
+  assert.ok(fs.existsSync('feed/tetris-bg/m2-9ca3b84e.mp3'));
+  assert.ok(src.includes('function playMoveSfx'));
+  assert.strictEqual(tetGame.fwSize(0), 0.3);
+  const app = fs.readFileSync('feed/app.js', 'utf8');
+  const play = fs.readFileSync('feed/play.js', 'utf8');
+  const tetHtml = fs.readFileSync('feed/tetris.html', 'utf8');
+  const idx = fs.readFileSync('feed/index.html', 'utf8');
+  assert.ok(app.includes('function setTetrisChrome') && app.includes('TETRIS_DARK'));
+  assert.ok(app.includes("ls.set('appear'") === false || (app.includes('function setTetrisChrome') && !app.slice(app.indexOf('function setTetrisChrome'), app.indexOf('function setTetrisChrome') + 800).includes("ls.set('appear'")));
+  assert.ok(play.includes("kind === 'tetris'") && play.includes('setTetrisChrome(true)') && play.includes('setTetrisChrome(false)'));
+  assert.ok(idx.includes('ib-tetris-dark'));
+  assert.ok(tetHtml.includes('theme-color') && tetHtml.includes('#0f1115') && tetHtml.includes('color-scheme: dark'));
+  assert.ok(tetHtml.includes('box-shadow') && tetHtml.includes('canvas#board'));
+  // Music and prior painted levels stay
+  assert.ok(src.includes('function drawFireworksScene') && src.includes('function drawBeachScene'));
 }
 

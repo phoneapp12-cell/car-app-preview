@@ -583,6 +583,15 @@ html.th-candy .card{border-color:#ffc2e5;box-shadow:0 2px 0 #ffb3dc,0 8px 20px r
 .artwin.artfull .artbar{display:none}
 .artwin.artfull .artfsx{display:block}
 .artframe{flex:1 1 auto;width:100%;min-height:0;border:0;background:#000}
+
+/* 1.9.183 Dark chrome around Tetris, regardless of the chosen Info Book / My App theme. */
+html.ib-tetris-dark, html.ib-tetris-dark body { background: #0a0b0e; color-scheme: dark; }
+html.ib-tetris-dark .artwin { background: #000; color: #fff; }
+html.ib-tetris-dark .artbar { background: #0e1014; color: #fff; }
+html.ib-tetris-dark .artx { background: #1c2028; color: #f4f4f5; border: 1px solid rgba(255,255,255,.18); }
+html.ib-tetris-dark .artfsx { background: rgba(20,22,28,.92); color: #f4f4f5; }
+html.ib-tetris-dark .artframe { background: #000; }
+
 @media (prefers-reduced-motion:reduce){#feed > .card.puzzle *,#feed > .card.zoomq *,#feed > .card.fallq *,#feed > .card.tetq *,#feed > .card.cine *{animation:none!important;transition:none!important}}
 /* 1.9.114 main-feed videos fill the card width. Landscape stays 16:9, portrait (Shorts) stays 9:16.
    The picture and the player are contained, not cropped or stretched. Swipe rows do not hold videos. */
