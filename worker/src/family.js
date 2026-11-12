@@ -8,7 +8,7 @@ import { Retain, nudgeFor, TAGS } from './retain.js';
 import { InfoBot, BOT_ID, BOT_NAME, AI_MODEL } from './ai.js';
 import { paywallUrl, paywallHtml } from './paywall.js';
 import { preview, blockedWhy, findUrl, safeUrl, stockPics } from './preview.js';
-import { scoresInit, scoresRoute } from './scores.js'; // 1.9.149 family scoreboard
+import { scoresInit, scoresRoute, clearShaneTetrisOnce } from './scores.js'; // 1.9.149 family scoreboard; 12 Nov 2026 one-off Tetris clear
 
 const ORIGINS = /^https:\/\/([a-z0-9]+\.)?shane-my-app\.pages\.dev$|^http:\/\/localhost:\d+$/;
 const PRIVATE_ID = /:|^tip\d/;                        // Shane's own cards (life:, app:, ph:, you:) and the app's tips: never commentable
@@ -132,6 +132,7 @@ export class Family extends DurableObject {
     const u = new URL(req.url), p = u.pathname.replace(/^\/api/, ''), m = req.method;
     const J = (o, s = 200) => Response.json(o, { status: s });
     const body = async () => { try { return await req.json(); } catch (e) { return {}; } };
+    try { clearShaneTetrisOnce(this.sql); } catch (e) { } // 12 Nov 2026 one-off: Shane's Tetris rows, once
 
     if (p === '/bootstrap') { // first admin only (needs the service's secret key); does nothing once an admin exists
       if (!this.env.SEED_KEY || u.searchParams.get('key') !== this.env.SEED_KEY) return J({ err: 'no' }, 403);
