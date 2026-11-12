@@ -1767,7 +1767,8 @@ if (live) {
   assert.strictEqual(tetGame.themeFor(5), 2);
   assert.strictEqual(tetGame.THEMES[2].name, 'Ocean');
   assert.strictEqual(tetGame.isEffect(2), 'ocean');
-  assert.ok(tetGame.fwSize(0) === 0.3 && Math.abs(tetGame.fwSize(1) - 1.15) < 1e-9, 'fireworks start at 30% and grow past full');
+  // 1.9.185: growth widened a lot (about 20% → 275%); still strictly increasing through the level.
+  assert.ok(Math.abs(tetGame.fwSize(0) - 0.2) < 1e-9 && Math.abs(tetGame.fwSize(1) - 2.75) < 1e-9, 'fireworks start small and grow huge');
   assert.ok(tetGame.fwSize(0) < tetGame.fwSize(0.5) && tetGame.fwSize(0.5) < tetGame.fwSize(1));
   const art = tetGame.oceanArt();
   assert.ok(/^tetris-bg\/ocean-plate-[0-9a-f]{8}\.webp$/.test(art.plate), 'hashed ocean plate');
@@ -1804,7 +1805,7 @@ if (live) {
   assert.strictEqual(tetGame.BGM_HASH[2], '9ca3b84e');
   // Prior 1.9.181 art and other levels stay intact
   assert.ok(src.includes('function drawOceanScene') && src.includes('function drawFireworksScene') && src.includes('function drawBeachScene'));
-  assert.strictEqual(tetGame.fwSize(0), 0.3);
+  assert.ok(Math.abs(tetGame.fwSize(0) - 0.2) < 1e-9);
   assert.strictEqual(tetGame.TRACKS[1].bpm, 131);
 }
 
@@ -1830,7 +1831,7 @@ if (live) {
   assert.strictEqual(tetGame.BGM_HASH[2], '9ca3b84e');
   assert.ok(fs.existsSync('feed/tetris-bg/m2-9ca3b84e.mp3'));
   assert.ok(src.includes('function playMoveSfx'));
-  assert.strictEqual(tetGame.fwSize(0), 0.3);
+  assert.ok(Math.abs(tetGame.fwSize(0) - 0.2) < 1e-9);
   const app = fs.readFileSync('feed/app.js', 'utf8');
   const play = fs.readFileSync('feed/play.js', 'utf8');
   const tetHtml = fs.readFileSync('feed/tetris.html', 'utf8');
@@ -1874,7 +1875,7 @@ if (live) {
   // Prior music and painted levels stay
   assert.strictEqual(tetGame.BGM_HASH[2], '9ca3b84e');
   assert.ok(fs.existsSync('feed/tetris-bg/m2-9ca3b84e.mp3'));
-  assert.strictEqual(tetGame.fwSize(0), 0.3);
+  assert.ok(Math.abs(tetGame.fwSize(0) - 0.2) < 1e-9);
   assert.ok(src.includes('function drawOceanScene') && src.includes('function drawFireworksScene'));
 }
 
@@ -1948,4 +1949,47 @@ if (live) {
   assert.strictEqual(tetGame.BGM_HASH[2], '9ca3b84e');
   assert.ok(src.includes('function playLevelUpSfx') && src.includes('function makeLightning'));
   assert.ok(src.includes('function drawOceanScene') && src.includes('function drawFireworksScene'));
+  // NEW HIGH SCORE
+  assert.strictEqual(tetGame.HIGHSCORE_HASH, 'f7bf7066');
+  assert.strictEqual(tetGame.highScoreSrc(), 'tetris-bg/highscore-f7bf7066.mp3');
+  assert.ok(fs.existsSync('feed/tetris-bg/highscore-f7bf7066.mp3'), 'hashed high-score mp3 is shipped');
+  assert.ok(src.includes('function playHighScoreSfx') && src.includes('function startHighScore') && src.includes('NEW HIGH SCORE'));
+  assert.ok(src.includes("title: 'NEW HIGH SCORE'") && src.includes('function maybeHighScore'));
+  const empty = tetGame.newGame();
+  assert.strictEqual(empty.highNoted, false);
+  empty.familyHigh = 100;
+  empty.score = 200;
+  empty.demo = false;
+  assert.equal(tetGame.maybeHighScore(empty), false, 'no banner on an empty board');
+  empty.board[19][0] = 1;
+  assert.ok(tetGame.maybeHighScore(empty), 'fires once the board has blocks and the score passes the bar');
+  assert.ok(empty.highScore && empty.highScore.title === 'NEW HIGH SCORE');
+  assert.equal(tetGame.maybeHighScore(empty), false, 'at most once per game');
+  assert.strictEqual(tetGame.familyHighFrom({ top: [{ score: 8000 }, { score: 1200 }] }), 8000);
+  assert.strictEqual(tetGame.familyHighFrom({ top: [] }), 0);
+  assert.ok(src.includes('duckBus(ccGain') && src.includes('duckBus(voGain') && src.includes('hsGain'));
+  assert.ok(src.includes("ib-tetris-best-cleared-20261113") && src.includes('function clearShaneLocalBestOnce'));
+  // Fireworks growth and quicker farm sunrise
+  assert.ok(Math.abs(tetGame.fwSize(0) - 0.2) < 1e-9 && Math.abs(tetGame.fwSize(1) - 2.75) < 1e-9);
+  assert.ok(tetGame.fwSize(0.75) > tetGame.fwSize(0.5) && tetGame.fwSize(1) > tetGame.fwSize(0.75));
+  assert.strictEqual(tetGame.farmDayTarget(0, 0), 0);
+  assert.strictEqual(tetGame.farmDayTarget(0.4, 0), 1);
+  assert.ok(tetGame.farmDayTarget(0.2, 0) > 0.4 && tetGame.farmDayTarget(0.2, 0) < 0.6);
+  // Little painted frogs hop on the Bullfrog level; the big singer stays
+  const fArt = tetGame.frogArt();
+  assert.ok(fArt.plate.indexOf('frog-plate-e01ea4ca') >= 0);
+  assert.ok(fArt.little.indexOf('frog-little-4dcdd4dc') >= 0);
+  assert.ok(fs.existsSync('feed/' + fArt.plate) && fs.existsSync('feed/' + fArt.little) && fs.existsSync('feed/' + fArt.atlas));
+  const little = tetGame.frogLittle();
+  assert.ok(Array.isArray(little) && little.length === 2 && little[0].name === 'left' && little[1].name === 'right');
+  assert.ok(tetGame.frogLittlePads().length >= 5);
+  assert.ok(src.includes('function littleFrogAdvance') && src.includes('function drawLittleFrogs') && src.includes('function littleFrogCast'));
+  assert.ok(src.includes('The painted frog is drawn behind the board') && !src.includes('drawHopFrog(c);'), 'cartoon hopper is still not drawn');
+  // Ocean fish roam the whole screen; dolphins unchanged
+  assert.ok(src.includes('oceanWrapX') && src.includes('oceanFishPos') && src.includes('driftX'));
+  assert.ok(src.includes('cx: 270, cy: 500, per: 36, ax: 300, ay: 340') || (src.includes('ax: 300') && src.includes('ay: 340')));
+  assert.ok(src.includes('{ cx: 195, cy: 225, per: 16') && src.includes('{ cx: 205, cy: 385, per: 19'), 'dolphin paths stay');
+  assert.ok(!src.includes('cx: 193, cy: 656'));
+  assert.strictEqual(tetGame.oceanMeta().dolphins.length, 2);
 }
+

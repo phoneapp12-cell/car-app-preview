@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
-import { checkScore, tetrisMax, scoresInit, scoresRoute, addScore, board, RATE, clearShaneTetrisOnce, CLEAR_SHANE_TETRIS_KEY } from '../src/scores.js';
+import { checkScore, tetrisMax, scoresInit, scoresRoute, addScore, board, RATE, clearShaneTetrisOnce, CLEAR_SHANE_TETRIS_KEY, clearShaneTetrisOnce20261113, CLEAR_SHANE_TETRIS_KEY2 } from '../src/scores.js';
 
 function stubSql() {
   const db = new DatabaseSync(':memory:');
@@ -123,4 +123,37 @@ assert.equal(rec2.deleted[0].n, 2);
 assert.deepEqual(board(sql3, shane, 'tetris').body.top.map(x => [x.name, x.score]), [['Sarah', 8000], ['Shane', 3000], ['Shane Jenkins', 500]]);
 assert.ok(fam.includes('clearShaneTetrisOnce(this.sql)'));
 
+
+// 13 Nov 2026 one-off: a second clear, after the first flag is already set (as in production)
+const sql4 = stubSql();
+sql4.db.exec(`CREATE TABLE members (id TEXT PRIMARY KEY, name TEXT, role TEXT, removed INTEGER DEFAULT 0)`);
+for (const [id, name, role] of [['m1', 'Shane Jenkins', 'admin'], ['m2', 'Sarah', 'member'], ['m4', 'Shane', 'member'], ['m5', 'Alex', 'admin']])
+  sql4.db.prepare(`INSERT INTO members VALUES (?,?,?,0)`).run(id, name, role);
+scoresInit(sql4);
+// first flag stays set (as in production); second flag is not yet set
+sql4.db.prepare('DELETE FROM meta WHERE k=?').run(CLEAR_SHANE_TETRIS_KEY2);
+// Shane has posted new Tetris games since the 12 Nov clear
+const ins4 = sql4.db.prepare(`INSERT INTO scores (game,mid,score,lines,level,won,opp,at) VALUES (?,?,?,?,?,?,?,?)`);
+ins4.run('tetris', 'm1', 9900, 50, 6, null, null, 200);
+ins4.run('tetris', 'm1', 2100, 16, 2, null, null, 190);
+ins4.run('tetris', 'm2', 8000, 50, 6, null, null, 180);
+ins4.run('tetris', 'm4', 3000, 20, 3, null, null, 170);
+ins4.run('scrabble', 'm1', 412, null, null, 1, 'computer', 160);
+const rec13 = clearShaneTetrisOnce20261113(sql4);
+assert.equal(rec13.already, undefined);
+assert.equal(rec13.matched, 1);
+assert.equal(rec13.deleted.length, 1);
+assert.equal(rec13.deleted[0].n, 2);
+assert.equal(rec13.deleted[0].top, 9900);
+assert.deepEqual(rec13.newLeader, { name: 'Sarah', score: 8000 });
+assert.deepEqual(board(sql4, shane, 'tetris').body.top.map(x => [x.name, x.score]), [['Sarah', 8000], ['Shane', 3000]], 'only the admin Shane is removed from Tetris');
+assert.deepEqual(board(sql4, shane, 'scrabble').body.top.map(x => [x.name, x.score]), [['Shane Jenkins', 412]], 'Scrabble is untouched');
+assert.equal(addScore(sql4, shane, { game: 'tetris', score: 500, lines: 4, level: 1 }, 2e12).status, 200);
+const rec13b = clearShaneTetrisOnce20261113(sql4);
+assert.equal(rec13b.already, true);
+assert.equal(rec13b.deleted[0].n, 2);
+assert.deepEqual(board(sql4, shane, 'tetris').body.top.map(x => [x.name, x.score]), [['Sarah', 8000], ['Shane', 3000], ['Shane Jenkins', 500]]);
+assert.ok(fam.includes('clearShaneTetrisOnce20261113(this.sql)'));
+
 console.log('scores tests ok');
+
