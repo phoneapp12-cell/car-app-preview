@@ -359,12 +359,12 @@ for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 3, at.join(',
 const appSrc = fs.readFileSync('feed/app.js', 'utf8');
 for (const id of sights.TOPICS) assert.ok(appSrc.includes("'" + id + "'"), id);
 assert.ok(!/Math\.pow\(baseOf\(t\), 3\)/.test(appSrc));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.174'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.174'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.174'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.175'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.175'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.175'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.cdot.tv'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.bd ul.sum'));
-assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.174'"));
+assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.175'"));
 function swVersion(src) { const m = String(src).match(/const VERSION = '([^']+)'/); assert.ok(m, 'parent sw.js VERSION'); return m[1]; }
 const parentHere = swVersion(fs.readFileSync('sw.js', 'utf8'));
 let parentMain = parentHere;
@@ -403,10 +403,10 @@ assert.equal(artB.length, 1);
 assert.notEqual(artB[0].id, artA.id);
 seenArt.wasSeen = () => true;
 assert.equal(seenArt.ibArt.cards(0).length, 0);
-assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.174'"));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.175'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'art3d.js?v=' + VERSION"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'portal.js?v=' + VERSION"));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.174'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.175'));
 const portalSrc = fs.readFileSync('feed/portal.js', 'utf8');
 assert.ok(portalSrc.includes('prefers-reduced-motion'));
 assert.ok(portalSrc.includes("sessionStorage.getItem(KEY)"));
@@ -434,7 +434,7 @@ assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("cache: 'reload'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("u.pathname + '?v=' + VERSION"), 'game scripts are fetched at this VERSION, not from a stale unversioned cache');
 assert.ok(appSrc.includes('ibPortalRise'));
 assert.ok(!/portal-style\.jpg|attachments\/image/.test(portalSrc + fs.readFileSync('feed/index.html', 'utf8')));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.174'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.175'));
 assert.ok(appSrc.includes("['art3d', '3D art'"));
 assert.ok(appSrc.includes("['3D art', 'art3d'"));
 assert.ok(appSrc.includes("'art3d'"));
@@ -1580,13 +1580,26 @@ if (live) {
   assert.strictEqual(g1.clearFx.parts.length, tetGame.clearPartCount(1));
   assert.ok(g1.clearFx.dur <= 400);
   const src = fs.readFileSync('feed/tetris.js', 'utf8');
-  assert.ok(src.includes('function effectStageDraw') && src.includes('drawFarmScene') && src.includes('drawFrogScene'));
-  assert.ok(src.includes('drawEffectCell') && src.includes('prefers-reduced-motion'));
+  assert.ok(src.includes('function effectStageDraw') && src.includes('function lifeCast') && src.includes('drawHopFrog'));
+  assert.ok(src.includes('drawSun') && src.includes('paintRooster') && src.includes('paintFrog') && src.includes('prefers-reduced-motion'));
   assert.ok(src.includes('effectDropTrail') && src.includes('effectLand') && src.includes('effectOnClear'));
+  assert.ok(src.includes("url(\"' + PICS[i] + '\") center / cover") || src.includes("PICS[i] + '\") center / cover"), 'theme photos still used for every level including 1 and 2');
+  assert.ok(!src.includes('linear-gradient(180deg,#0b0618'), 'dark abstract farm backdrop is gone');
   assert.ok(src.includes("function setFull") && src.includes("d.type !== 'ib-artfull'"));
   assert.ok(src.includes('Watchdog:') || /bgmGain\.gain\.value < BGM_VOL/.test(src));
   assert.ok(src.includes("bgmWantTi === ti"));
   const html = fs.readFileSync('feed/tetris.html', 'utf8');
-  assert.ok(html.includes('html.effect canvas#board') && html.includes('html.fs canvas#board'));
+  assert.ok(html.includes('canvas.fx-life') && html.includes('html.fs canvas#board'));
   // No Sugar Rush changes in this release beyond the version bump later.
+}
+
+// 1.9.175 Original photos stay; animals and a hopping frog are clearly staged around the board
+{
+  assert.strictEqual(typeof tetGame.lifeReset, 'function');
+  assert.strictEqual(typeof tetGame.lifeFastForward, 'function');
+  const src175 = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.ok(src175.includes('const FROG_PADS') && src175.includes('{ x: 0.70, y: 0.90 }'));
+  const html = fs.readFileSync('feed/tetris.html', 'utf8');
+  assert.ok(html.includes('canvas.fx-life'));
+  assert.ok(!html.includes('html.effect canvas#board'));
 }
