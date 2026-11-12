@@ -3780,6 +3780,7 @@
 
   // 1.9.181 Ocean: the three big painted dolphins swim on arcs, porpoise, and undulate.
   // The whale, turtle, fish and coral stay on the plate. No cartoon dolphins.
+  // 1.9.182: smooth, eased, continuous motion (layered sines, analytic velocity, no wrap pop).
   const ocean = { img: { plate: null, atlas: null }, ready: false, loading: false, dolphins: [], bubbles: [], ripples: [], hold: null, posed: false, t: 0 };
 
   function oceanLoad() {
@@ -3799,20 +3800,61 @@
     ocean.dolphins = []; ocean.bubbles = []; ocean.ripples = [];
     ocean.t = 0; ocean.posed = false;
   }
+
+  // Evaluate a C-infinity layered-sine path (plus a smooth porpoise) and its velocity at time t.
+  // Positions stay in the open water by construction, so they are never clamped.
+  function oceanEval(d, t) {
+    const w = Math.PI * 2 / d.per;
+    const a = w * t + d.ph;
+    const s1 = Math.sin(a), c1 = Math.cos(a);
+    const s2 = Math.sin(2 * a + d.ph2), c2 = Math.cos(2 * a + d.ph2);
+    const s4 = Math.sin(2 * a + d.ph4), c4 = Math.cos(2 * a + d.ph4);
+    const x = d.cx + d.ax * s1 + d.ax2 * s2;
+    const up = 0.5 + 0.5 * Math.sin(a + d.phP);
+    const porp = -d.porpAmp * up * up;
+    const y = d.cy + d.ay * c1 + d.ay2 * s4 + porp;
+    // Analytic velocity (no finite-difference stepping, path closes exactly each period).
+    const vx = w * (d.ax * c1 + 2 * d.ax2 * c2);
+    const dup = 0.5 * w * Math.cos(a + d.phP);
+    const vPorp = -d.porpAmp * (2 * up * dup);
+    const vy = w * (-d.ay * s1 + 2 * d.ay2 * c4) + vPorp;
+    return { x: x, y: y, vx: vx, vy: vy, porp: porp, heading: Math.atan2(vy, vx) };
+  }
+  function oceanWrapAngle(a) {
+    while (a > Math.PI) a -= Math.PI * 2;
+    while (a < -Math.PI) a += Math.PI * 2;
+    return a;
+  }
+  function oceanLerpAngle(from, to, k) {
+    return from + oceanWrapAngle(to - from) * k;
+  }
   function oceanCast() {
     oceanReset();
     const M = OCEAN_META.dolphins;
-    // Swim loops stay in the open water, left and centre, above the coral, around the whale's left side.
+    // Layered sines: a slow primary orbit plus a smaller second harmonic, so the
+    // path is a continuous eased curve with no corners and no wrap-around pop.
     const paths = [
-      { cx: 200, cy: 230, rx: 95, ry: 58, per: 13.5, ph: 0.2, z0: 1.05 },
-      { cx: 210, cy: 390, rx: 115, ry: 52, per: 16.5, ph: 2.1, z0: 0.95 },
-      { cx: 280, cy: 520, rx: 88, ry: 60, per: 14.5, ph: 4.0, z0: 1.12 }
+      { cx: 195, cy: 225, per: 16, ph: 0.3, ax: 78, ay: 50, ax2: 16, ay2: 12, ph2: 1.1, ph4: 2.2, porpAmp: 20, phP: 0.0, z0: 1.05 },
+      { cx: 205, cy: 385, per: 19, ph: 2.0, ax: 90, ay: 40, ax2: 20, ay2: 11, ph2: 0.6, ph4: 0.9, porpAmp: 14, phP: 1.2, z0: 0.95 },
+      { cx: 275, cy: 505, per: 17.5, ph: 3.8, ax: 68, ay: 32, ax2: 14, ay2: 9, ph2: 1.8, ph4: 2.6, porpAmp: 12, phP: 2.0, z0: 1.1 }
     ];
-    ocean.dolphins = M.map(function (d, i) {
+    ocean.dolphins = M.map(function (meta, i) {
       const p = paths[i];
-      return { i: i, meta: d, cx: p.cx, cy: p.cy, rx: p.rx, ry: p.ry, per: p.per, ph: p.ph, z0: p.z0, x: d.px, y: d.py, heading: d.ang * Math.PI / 180, z: p.z0, und: 0, porp: 0, prevX: d.px, prevY: d.py };
+      const d = { i: i, meta: meta, heading: meta.ang * Math.PI / 180, facing: 1, bank: 0, und: 0, tail: 0, porp: 0, z: p.z0, primed: false };
+      for (const k in p) d[k] = p[k];
+      const e0 = oceanEval(d, 0);
+      d.x = e0.x; d.y = e0.y; d.heading = e0.heading; d.facing = e0.vx >= 0 ? 1 : -1;
+      return d;
     });
     oceanLoad();
+  }
+  function oceanEmitBubble(x, y, z) {
+    if (ocean.bubbles.length > 28) ocean.bubbles.shift();
+    ocean.bubbles.push({ x: x, y: y, z: z || 1, r: 1.4 + Math.random() * 2.2, vx: (Math.random() - 0.5) * 8, vy: -(16 + Math.random() * 22), t: 0, max: 1.4 + Math.random() * 0.8 });
+  }
+  function oceanEmitRipple(x, y) {
+    if (ocean.ripples.length > 8) ocean.ripples.shift();
+    ocean.ripples.push({ x: x, y: y, t: 0, max: 1.15 });
   }
   function oceanPoseAt(t) {
     ocean.t = t;
@@ -3826,14 +3868,6 @@
     }
     ocean.posed = true;
   }
-  function oceanEmitBubble(x, y, z) {
-    if (ocean.bubbles.length > 28) ocean.bubbles.shift();
-    ocean.bubbles.push({ x: x, y: y, z: z || 1, r: 1.4 + Math.random() * 2.2, vx: (Math.random() - 0.5) * 8, vy: -(16 + Math.random() * 22), t: 0, max: 1.4 + Math.random() * 0.8 });
-  }
-  function oceanEmitRipple(x, y) {
-    if (ocean.ripples.length > 8) ocean.ripples.shift();
-    ocean.ripples.push({ x: x, y: y, t: 0, max: 1.15 });
-  }
   function oceanAdvance(dt, reduce, poseOnly) {
     if (ocean.hold && !poseOnly) {
       if (!ocean.posed) oceanPoseAt(ocean.hold.t != null ? ocean.hold.t : 0);
@@ -3842,39 +3876,43 @@
     if (!ocean.dolphins.length) oceanCast();
     if (!poseOnly) ocean.t += dt;
     const t = ocean.t;
+    const snap = poseOnly || dt === 0;
+    const easeH = snap ? 1 : (1 - Math.exp(-5.5 * dt));
+    const easeB = snap ? 1 : (1 - Math.exp(-6 * dt));
+    const faceRate = 2.8;
     for (let i = 0; i < ocean.dolphins.length; i++) {
       const d = ocean.dolphins[i];
       if (reduce && !poseOnly) {
-        d.x = d.meta.px; d.y = d.meta.py; d.heading = d.meta.ang * Math.PI / 180; d.z = d.z0; d.und = 0; d.porp = 0;
+        d.x = d.meta.px; d.y = d.meta.py; d.heading = d.meta.ang * Math.PI / 180; d.z = d.z0; d.und = 0; d.tail = 0; d.porp = 0; d.bank = 0; d.facing = 1;
         continue;
       }
-      const u = (t / d.per) * Math.PI * 2 + d.ph;
-      const px = d.cx + d.rx * Math.cos(u);
-      // Porpoise: a rise toward the surface on the top of each other loop.
-      const loop = (t / d.per) + d.ph / (Math.PI * 2);
-      const porpGate = (Math.floor(loop) % 2 === 0);
-      const crest = Math.sin(u); // -1 bottom, +1 would be... wait cy+ry*sin, sin=-1 is up if we use minus
-      // Use -sin so u=0 is mid-right, u=pi/2 is up.
-      const baseY = d.cy - d.ry * Math.sin(u);
-      let porp = 0;
-      if (porpGate && Math.sin(u) > 0.45) {
-        porp = -28 * Math.pow((Math.sin(u) - 0.45) / 0.55, 1.2);
+      const e = oceanEval(d, t);
+      d.x = e.x;
+      d.y = e.y;
+      d.porp = e.porp;
+      d.heading = snap ? e.heading : oceanLerpAngle(d.heading, e.heading, easeH);
+      const v2 = e.vx * e.vx + e.vy * e.vy;
+      // Analytic yaw rate → a slow bank into the turn (no sudden roll).
+      const e2 = oceanEval(d, t + 1 / 120);
+      const axv = (e2.vx - e.vx) * 120, ayv = (e2.vy - e.vy) * 120;
+      const turn = (e.vx * ayv - e.vy * axv) / (v2 + 40);
+      const bankT = Math.max(-0.38, Math.min(0.38, -0.22 * turn));
+      d.bank = d.bank + (bankT - d.bank) * easeB;
+      const want = e.vx >= 0 ? 1 : -1;
+      if (snap) d.facing = want;
+      else {
+        const step = Math.min(Math.abs(want - d.facing), faceRate * dt);
+        d.facing += (want > d.facing ? 1 : want < d.facing ? -1 : 0) * step;
       }
-      const x = Math.max(40, Math.min(PHOTO_W - 40, px));
-      const y = Math.max(80, Math.min(620, baseY + porp));
-      const dx = x - d.prevX, dy = y - d.prevY;
-      d.prevX = d.x; d.prevY = d.y;
-      d.x = x; d.y = y; d.porp = porp;
-      if (Math.abs(dx) + Math.abs(dy) > 0.05) d.heading = Math.atan2(dy, dx);
-      d.z = d.z0 + 0.12 * Math.sin(u * 0.5 + i);
-      d.und = Math.sin(t * 7.2 + i * 1.3);
-      // Bubbles from the tail
-      if (!poseOnly && !reduce && Math.random() < dt * 3.2) {
-        const tail = d.heading + Math.PI;
-        oceanEmitBubble(d.x + Math.cos(tail) * 36, d.y + Math.sin(tail) * 22, d.z);
+      d.z = d.z0 + 0.1 * Math.sin((Math.PI * 2 / d.per) * 0.5 * t + i);
+      // Continuous body flex and a slightly quicker tail beat.
+      d.und = Math.sin(t * 5.6 + i * 1.1);
+      d.tail = Math.sin(t * 8.2 + i * 1.1);
+      if (!poseOnly && !reduce && Math.random() < dt * 2.4) {
+        const back = d.heading + Math.PI;
+        oceanEmitBubble(d.x + Math.cos(back) * 36, d.y + Math.sin(back) * 22, d.z);
       }
-      // Ripple when a porpoise peaks near the surface
-      if (!poseOnly && !reduce && porp < -20 && y < 180 && Math.random() < dt * 4) oceanEmitRipple(d.x, Math.max(90, y - 16));
+      if (!poseOnly && !reduce && d.porp < -14 && d.y < 190 && Math.random() < dt * 2.5) oceanEmitRipple(d.x, Math.max(90, d.y - 16));
     }
     if (reduce && !poseOnly) return;
     for (let i = ocean.bubbles.length - 1; i >= 0; i--) {
@@ -3894,12 +3932,12 @@
     const sc = box.scale * (0.88 + 0.22 * d.z);
     const x = box.left + d.x * box.scale;
     const y = box.top + d.y * box.scale;
-    const flip = Math.cos(d.heading) < 0;
-    // Painted nose angle in sprite space; after an optional horizontal flip, rotate to the heading.
+    const facing = d.facing == null ? 1 : d.facing;
     const painted = M.ang * Math.PI / 180;
-    const face = flip ? (Math.PI - painted) : painted;
+    // When facing eases through 0 the sprite goes edge-on, hiding the turn; belly stays down.
+    const face = facing < 0 ? (Math.PI - painted) : painted;
     const rot = d.heading - face;
-    // Soft contact shadow
+    const edge = 0.82 + 0.18 * Math.abs(facing);
     c.save();
     c.translate(x, y + 18 * box.scale);
     c.scale(1, 0.32);
@@ -3908,21 +3946,19 @@
     c.fillStyle = 'rgba(8,20,40,' + (0.18 * Math.min(1.1, d.z)) + ')';
     c.fill();
     c.restore();
-    // Body with a gentle undulation along the length (more at the tail).
     c.save();
     c.translate(x, y);
-    c.rotate(rot);
-    if (flip) c.scale(-1, 1);
-    c.scale(sc, sc);
-    const slices = 8;
+    c.rotate(rot + (d.bank || 0) * 0.65);
+    c.scale((facing === 0 ? 0.001 : facing) * sc, edge * sc);
+    c.rotate((d.und || 0) * 0.05);
+    const slices = 20;
     const srcW = M.aw, srcH = M.ah;
     for (let s = 0; s < slices; s++) {
       const u0 = s / slices, u1 = (s + 1) / slices;
       const sx = M.ax + srcW * u0, sw = Math.max(1, srcW * (u1 - u0));
       const dx = -M.ox + srcW * u0, dw = srcW * (u1 - u0);
-      // Tail is the left of the painted sprites (rear). More wobble toward u=0.
-      const tail = 1 - (u0 + u1) * 0.5;
-      const wob = d.und * 7.5 * (0.25 + 0.75 * tail);
+      const tailW = 1 - (u0 + u1) * 0.5;
+      const wob = (d.und || 0) * 3.2 * (0.18 + 0.45 * tailW) + (d.tail || 0) * 5.6 * Math.pow(tailW, 1.4);
       c.save();
       c.translate(0, wob);
       c.drawImage(atlas, sx, M.ay, sw, srcH, dx, -M.oy, dw, srcH);
@@ -3930,6 +3966,7 @@
     }
     c.restore();
   }
+
   function drawOceanScene(c, w, h, reduce) {
     const box = photoBox();
     if (!box || !box.dw) return;
