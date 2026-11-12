@@ -1581,7 +1581,7 @@ if (live) {
   assert.ok(g1.clearFx.dur <= 400);
   const src = fs.readFileSync('feed/tetris.js', 'utf8');
   assert.ok(src.includes('function effectStageDraw') && src.includes('function lifeCast') && src.includes('drawHopFrog'));
-  assert.ok(src.includes('drawSun') && src.includes('paintRooster') && src.includes('paintFrog') && src.includes('prefers-reduced-motion'));
+  assert.ok(src.includes('drawSun') && src.includes('FARM_RIG') && src.includes('paintFrog') && src.includes('prefers-reduced-motion'));
   assert.ok(src.includes('effectDropTrail') && src.includes('effectLand') && src.includes('effectOnClear'));
   assert.ok(src.includes("url(\"' + PICS[i] + '\") center / cover") || src.includes("PICS[i] + '\") center / cover"), 'theme photos still used for every level including 1 and 2');
   assert.ok(!src.includes('linear-gradient(180deg,#0b0618'), 'dark abstract farm backdrop is gone');
@@ -1631,4 +1631,27 @@ if (live) {
   assert.ok(app.includes("tab === 'family'") && app.includes('drawFamily()') && app.includes('moodLabel(); return;'), 'Family tab draws shares before mediaFilter runs');
   const sharesFor = fam.slice(fam.indexOf('function sharesFor'), fam.indexOf('function weaveShares'));
   assert.ok(sharesFor.includes('unsafe(i)') && !sharesFor.includes("kind === 'text'") && !sharesFor.includes("kind !== 'text'"), 'sharesFor keeps words posts in Family and All (only unsafe / down-voted are dropped)');
+}
+
+// 1.9.177 Farmyard: the painted animals themselves move (cut-outs), 3D light, and a sunrise from darkness
+{
+  const src177 = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.ok(!src177.includes('paintRooster') && !src177.includes('paintCow') && !src177.includes('FARM_YARD'), 'added small farm characters are gone');
+  const art = tetGame.farmArt();
+  let bytes = 0;
+  for (const k of ['plate', 'land', 'atlas', 'sun']) {
+    assert.ok(/^tetris-bg\/farm-[a-z]+-[0-9a-f]{8}\.webp$/.test(art[k]), 'content-hashed ' + k);
+    assert.ok(fs.existsSync('feed/' + art[k]), art[k] + ' shipped');
+    bytes += fs.statSync('feed/' + art[k]).size;
+  }
+  assert.ok(bytes < 600 * 1024, 'farm art stays small: ' + bytes);
+  const rig = tetGame.farmRig();
+  assert.deepStrictEqual(Object.keys(rig).sort(), ['calf', 'chick', 'cow', 'henb1', 'henb2', 'henw1', 'henw2', 'pig', 'rooster', 'sheep']);
+  // dark at the start, full daylight by the end of level 1
+  assert.strictEqual(tetGame.farmDayTarget(0, 0), 0);
+  assert.strictEqual(tetGame.farmDayTarget(1, 60), 1);
+  const lo = tetGame.farmSunPos(0), hi = tetGame.farmSunPos(1);
+  assert.ok(lo.y > 300 && Math.abs(hi.y - 84.5) < 0.01 && Math.abs(hi.x - 136.9) < 0.01, 'sun rises from behind the barn to the painted sun');
+  assert.ok(src177.includes("'deviceorientation'") && src177.includes('createRadialGradient') && src177.includes('destination-out'));
+  assert.strictEqual(tetGame.isEffect(11), 'frog');
 }

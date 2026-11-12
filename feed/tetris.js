@@ -721,6 +721,32 @@
   function takeNext(g) { if (g.bag.length === 0) g.bag = refillBag(); return g.bag.shift(); }
   // 1.9.174 Tetris Effect stage for Farmyard (6) and Bullfrog (11) only.
   // Dark, beat-synced scenes; luminous tiles; action bursts. Other themes are unchanged.
+  const FARM_ART = { plate: 'tetris-bg/farm-plate-87d14966.webp', land: 'tetris-bg/farm-land-dcf78c32.webp', atlas: 'tetris-bg/farm-animals-a062cf37.webp', sun: 'tetris-bg/farm-sun-378e81e0.webp' };
+  // Sky line (photo px) every 6 px across the 540 px painting, from the sky mask.
+  const FARM_HZ = [247,245,241,239,240,246,251,265,265,263,259,258,257,263,272,272,270,269,260,237,230,227,220,224,231,236,259,258,255,255,258,263,269,274,279,284,291,294,306,317,328,339,323,319,319,324,319,317,318,327,323,324,329,326,328,331,332,333,334,335,337,338,338,340,341,341,340,338,337,331,330,329,329,329,332,332,323,323,324,325,326,327,327,328,327,328,329,330,330,331,333];
+  const FARM_SUN = { x: 66, y: 14, w: 142, h: 142, cx: 136.9, cy: 84.5, x0: 210, y0: 335 };
+  // [atlas x, atlas y, w, h, photo x, photo y, foot row]; head/tail: tip and neck columns, rows yA..yB blend.
+  const FARM_RIG = {
+    cow: { a: [0, 0, 121, 83, 135, 510, 81], kind: 'graze', head: { tip: 0, neck: 50, yA: 0.78, yB: 0.96 } },
+    calf: { a: [123, 0, 69, 112, 247, 556, 110], kind: 'graze', head: { tip: 0, neck: 36, yA: 0.34, yB: 0.52 } },
+    pig: { a: [194, 0, 155, 115, 319, 617, 112], kind: 'snuffle', head: { tip: 0, neck: 64, yA: 0.82, yB: 0.98 }, tail: { tip: 155, neck: 136, yA: 0.24, yB: 0.4 } },
+    sheep: { a: [351, 0, 155, 143, 117, 673, 141], kind: 'graze', head: { tip: 155, neck: 100, yA: 0.4, yB: 0.58 } },
+    rooster: { a: [0, 145, 115, 130, 419, 692, 128], kind: 'rooster', head: { tip: 0, neck: 40, yA: 0.34, yB: 0.52 }, tail: { tip: 115, neck: 68, yA: 0.42, yB: 0.64 } },
+    henw1: { a: [117, 145, 72, 77, 268, 762, 75], kind: 'hen', head: { tip: 72, neck: 46, yA: 0.62, yB: 0.86 } },
+    henw2: { a: [191, 145, 81, 88, 197, 814, 85], kind: 'hen', head: { tip: 81, neck: 54, yA: 0.58, yB: 0.82 } },
+    henb1: { a: [274, 145, 62, 96, 344, 737, 94], kind: 'pecker', head: { tip: 0, neck: 28, yA: 0.97, yB: 1 } },
+    henb2: { a: [338, 145, 86, 100, 365, 797, 98], kind: 'pecker', head: { tip: 0, neck: 32, yA: 0.97, yB: 1 } },
+    chick: { a: [426, 145, 34, 46, 311, 852, 44], kind: 'chick' }
+  };
+  const FARM_BEH = {
+    graze: ['graze', 'graze', 'look', 'nod', 'shuffle'],
+    snuffle: ['snuffle', 'snuffle', 'look', 'shuffle'],
+    rooster: ['look', 'peck', 'nod', 'shuffle'],
+    hen: ['peck', 'peck', 'look', 'shuffle'],
+    pecker: ['peck', 'peck', 'peck', 'shuffle'],
+    chick: ['hop', 'hop', 'shuffle']
+  };
+  const farm = { img: null, ready: false, spr: {}, lit: {}, st: {}, stars: [], tilt: { x: 0, y: 0, at: -9, gx: 0, gy: 0 }, listen: false, crowed: false };
   const EFFECT_TI = { 6: 'farm', 11: 'frog' };
   function isEffect(ti) { return EFFECT_TI[ti] || null; }
   function reduceMotion() {
@@ -1235,7 +1261,7 @@
     ac = null; sfxGain = null; musicGain = null; bgmGain = null; melodyBus = null; noiseBuf = null;
     bgmBufs = {}; bgmLoading = {};
   }
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen };
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, farmDayTarget, farmSunPos, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day };
 
   if (!root.document) return;
   const doc = root.document;
@@ -1545,7 +1571,7 @@
     // 1.9.175: always the original theme photo (center / cover), including Farmyard and Bullfrog.
     doc.documentElement.style.background = 'linear-gradient(rgba(0,0,0,.28),rgba(0,0,0,.28)), url("' + PICS[i] + '") center / cover no-repeat, ' + L.bg;
     try { const nx = new root.Image(); nx.src = PICS[(i + 1) % PICS.length]; } catch (e) { }
-    if (kind) { efxClearAll(); lifeReset(); }
+    if (kind) { efxClearAll(); lifeReset(); if (kind === 'farm') farmLoad(); }
     doc.documentElement.style.backgroundAttachment = 'fixed';
     doc.body.style.background = 'transparent';
     drawMini(doc.getElementById('next'), g.next, false);
@@ -1955,159 +1981,6 @@
   }
 
   // ---- cute illustrated sprites (feet at the bottom of the canvas) ----
-  function paintRooster(c, w, h, flap) {
-    const cx = w * 0.45, fy = h * 0.88;
-    c.lineJoin = 'round'; c.lineCap = 'round';
-    // legs
-    c.strokeStyle = '#eab308'; c.lineWidth = 2.2;
-    c.beginPath(); c.moveTo(cx - 4, fy - 10); c.lineTo(cx - 6, fy); c.lineTo(cx - 10, fy); c.stroke();
-    c.beginPath(); c.moveTo(cx + 3, fy - 10); c.lineTo(cx + 5, fy); c.lineTo(cx + 9, fy); c.stroke();
-    // tail
-    c.save(); c.translate(cx - 10, fy - 28);
-    const tails = ['#14532d', '#16a34a', '#facc15', '#ea580c'];
-    tails.forEach((col, i) => {
-      c.fillStyle = col;
-      c.beginPath();
-      c.moveTo(0, 0);
-      c.quadraticCurveTo(-18 - i * 3, -8 - i * 4, -8 - i, 14 + i * 2);
-      c.quadraticCurveTo(-4, 6, 0, 2);
-      c.fill(); c.strokeStyle = 'rgba(20,20,10,0.45)'; c.lineWidth = 1; c.stroke();
-    });
-    c.restore();
-    // body — warm red-gold, clearly a rooster
-    c.beginPath(); c.ellipse(cx, fy - 22, 14, 12, -0.15, 0, 6.283);
-    strokeFill(c, '#ea580c', '#7c2d12', 1.3);
-    // wing
-    c.save(); c.translate(cx + 2, fy - 22); c.rotate(flap ? -0.8 : 0.15);
-    c.beginPath(); c.ellipse(0, 0, 10, 7, 0.2, 0, 6.283);
-    strokeFill(c, '#fbbf24', '#92400e', 1.2);
-    c.restore();
-    // neck + head
-    c.beginPath(); c.ellipse(cx + 10, fy - 34, 6, 8, 0.3, 0, 6.283);
-    strokeFill(c, '#f97316', '#7c2d12', 1.2);
-    c.beginPath(); c.arc(cx + 16, fy - 42, 7, 0, 6.283);
-    strokeFill(c, '#f97316', '#7c2d12', 1.2);
-    // comb
-    c.fillStyle = '#dc2626';
-    c.beginPath(); c.moveTo(cx + 12, fy - 46); c.quadraticCurveTo(cx + 12, fy - 56, cx + 16, fy - 48);
-    c.quadraticCurveTo(cx + 19, fy - 57, cx + 22, fy - 47); c.quadraticCurveTo(cx + 16, fy - 46, cx + 12, fy - 46); c.fill();
-    // wattle + beak
-    c.beginPath(); c.ellipse(cx + 18, fy - 36, 3, 4, 0.2, 0, 6.283); c.fill();
-    c.fillStyle = '#facc15';
-    c.beginPath(); c.moveTo(cx + 22, fy - 42); c.lineTo(cx + 32, fy - 40); c.lineTo(cx + 22, fy - 38); c.closePath(); c.fill();
-    c.strokeStyle = '#a16207'; c.lineWidth = 1; c.stroke();
-    // eye
-    c.fillStyle = '#111'; c.beginPath(); c.arc(cx + 18, fy - 43, 1.3, 0, 6.283); c.fill();
-  }
-  function paintChicken(c, w, h, brown, step) {
-    const cx = w * 0.5, fy = h * 0.9;
-    const body = brown ? '#b45309' : '#f8fafc';
-    const stroke = brown ? '#431407' : '#3f3f46';
-    c.lineJoin = 'round'; c.lineCap = 'round';
-    c.strokeStyle = '#eab308'; c.lineWidth = 2;
-    const a = step ? 4 : -3, b = step ? -3 : 4;
-    c.beginPath(); c.moveTo(cx - 3, fy - 6); c.lineTo(cx - 3 + a, fy); c.stroke();
-    c.beginPath(); c.moveTo(cx + 3, fy - 6); c.lineTo(cx + 3 + b, fy); c.stroke();
-    c.beginPath(); c.ellipse(cx, fy - 14, 12, 10, 0, 0, 6.283);
-    strokeFill(c, body, stroke, 1.3);
-    c.beginPath(); c.arc(cx + 10, fy - 22, 6.5, 0, 6.283);
-    strokeFill(c, body, stroke, 1.2);
-    c.fillStyle = '#dc2626';
-    c.beginPath(); c.moveTo(cx + 8, fy - 26); c.lineTo(cx + 10, fy - 32); c.lineTo(cx + 13, fy - 26); c.fill();
-    c.fillStyle = '#facc15';
-    c.beginPath(); c.moveTo(cx + 15, fy - 22); c.lineTo(cx + 23, fy - 21); c.lineTo(cx + 15, fy - 20); c.closePath(); c.fill();
-    c.fillStyle = '#111'; c.beginPath(); c.arc(cx + 12, fy - 23, 1.15, 0, 6.283); c.fill();
-  }
-  function paintChick(c, w, h, step) {
-    const cx = w * 0.5, fy = h * 0.9;
-    c.strokeStyle = '#ca8a04'; c.lineWidth = 1.6;
-    c.beginPath(); c.moveTo(cx - 2, fy - 4); c.lineTo(cx - 2 + (step ? 3 : -2), fy); c.stroke();
-    c.beginPath(); c.moveTo(cx + 2, fy - 4); c.lineTo(cx + 2 + (step ? -2 : 3), fy); c.stroke();
-    c.beginPath(); c.arc(cx, fy - 10, 8, 0, 6.283);
-    strokeFill(c, '#fde047', '#a16207', 1.2);
-    c.fillStyle = '#facc15';
-    c.beginPath(); c.moveTo(cx + 6, fy - 10); c.lineTo(cx + 13, fy - 9); c.lineTo(cx + 6, fy - 8); c.fill();
-    c.fillStyle = '#111'; c.beginPath(); c.arc(cx + 3, fy - 12, 1.1, 0, 6.283); c.fill();
-  }
-  function paintSheep(c, w, h, step) {
-    const cx = w * 0.5, fy = h * 0.9;
-    c.lineJoin = 'round';
-    c.fillStyle = '#1c1917';
-    const a = step ? 3 : -2;
-    c.fillRect(cx - 12, fy - 8, 3.2, 8 + (step ? -2 : 1));
-    c.fillRect(cx - 5, fy - 8, 3.2, 8 + (step ? 1 : -2));
-    c.fillRect(cx + 4, fy - 8, 3.2, 8 + (step ? -2 : 1));
-    c.fillRect(cx + 11, fy - 8, 3.2, 8 + (step ? 1 : -2));
-    // wool
-    const tufts = [[-16, -22, 12], [-4, -28, 13], [10, -24, 12], [-10, -14, 11], [6, -14, 11], [16, -16, 10]];
-    tufts.forEach(t => { c.beginPath(); c.arc(cx + t[0], fy + t[1], t[2], 0, 6.283); strokeFill(c, '#f8fafc', '#a1a1aa', 1.2); });
-    // head
-    c.beginPath(); c.ellipse(cx + 20, fy - 18, 7, 8, 0.2, 0, 6.283);
-    strokeFill(c, '#1c1917', '#0a0a0a', 1);
-    c.fillStyle = '#f5d0c5';
-    c.beginPath(); c.ellipse(cx + 23, fy - 14, 4, 3.5, 0.2, 0, 6.283); c.fill();
-    c.fillStyle = '#f8fafc';
-    c.beginPath(); c.ellipse(cx + 16, fy - 24, 3.5, 5, -0.4, 0, 6.283); c.fill();
-    c.fillStyle = '#fde68a'; c.beginPath(); c.arc(cx + 23, fy - 20, 1.2, 0, 6.283); c.fill();
-    c.fillStyle = '#111'; c.beginPath(); c.arc(cx + 23, fy - 20, 0.7, 0, 6.283); c.fill();
-  }
-  function paintCow(c, w, h, step) {
-    const cx = w * 0.45, fy = h * 0.9;
-    c.lineJoin = 'round';
-    c.fillStyle = '#1c1917';
-    c.fillRect(cx - 16, fy - 10, 4, 10 + (step ? -2 : 2));
-    c.fillRect(cx - 6, fy - 10, 4, 10 + (step ? 2 : -2));
-    c.fillRect(cx + 10, fy - 10, 4, 10 + (step ? -2 : 2));
-    c.fillRect(cx + 20, fy - 10, 4, 10 + (step ? 2 : -2));
-    c.beginPath(); c.ellipse(cx + 4, fy - 26, 26, 16, 0, 0, 6.283);
-    strokeFill(c, '#f8fafc', '#3f3f46', 1.4);
-    // spots
-    c.fillStyle = '#1c1917';
-    c.beginPath(); c.ellipse(cx - 6, fy - 28, 8, 7, 0.2, 0, 6.283); c.fill();
-    c.beginPath(); c.ellipse(cx + 12, fy - 22, 7, 6, -0.3, 0, 6.283); c.fill();
-    // head
-    c.beginPath(); c.ellipse(cx + 28, fy - 36, 10, 9, 0.15, 0, 6.283);
-    strokeFill(c, '#f8fafc', '#3f3f46', 1.3);
-    c.fillStyle = '#1c1917';
-    c.beginPath(); c.ellipse(cx + 24, fy - 40, 5, 4, 0, 0, 6.283); c.fill();
-    // horns
-    c.strokeStyle = '#a8a29e'; c.lineWidth = 2;
-    c.beginPath(); c.moveTo(cx + 22, fy - 42); c.quadraticCurveTo(cx + 18, fy - 50, cx + 22, fy - 52); c.stroke();
-    c.beginPath(); c.moveTo(cx + 32, fy - 42); c.quadraticCurveTo(cx + 36, fy - 50, cx + 34, fy - 52); c.stroke();
-    // snout
-    c.beginPath(); c.ellipse(cx + 34, fy - 32, 6, 4.5, 0.2, 0, 6.283);
-    strokeFill(c, '#fda4af', '#9f1239', 1);
-    c.fillStyle = '#111';
-    c.beginPath(); c.arc(cx + 33, fy - 32, 0.8, 0, 6.283); c.fill();
-    c.beginPath(); c.arc(cx + 36, fy - 32, 0.8, 0, 6.283); c.fill();
-    c.beginPath(); c.arc(cx + 30, fy - 38, 1.2, 0, 6.283); c.fill();
-  }
-  function paintPig(c, w, h, step) {
-    const cx = w * 0.5, fy = h * 0.9;
-    c.lineJoin = 'round';
-    c.fillStyle = '#be185d';
-    c.fillRect(cx - 10, fy - 8, 3.2, 8 + (step ? -2 : 1));
-    c.fillRect(cx - 3, fy - 8, 3.2, 8 + (step ? 1 : -2));
-    c.fillRect(cx + 6, fy - 8, 3.2, 8 + (step ? -2 : 1));
-    c.fillRect(cx + 13, fy - 8, 3.2, 8 + (step ? 1 : -2));
-    c.beginPath(); c.ellipse(cx + 2, fy - 20, 20, 13, 0, 0, 6.283);
-    strokeFill(c, '#fda4af', '#9f1239', 1.3);
-    // ear
-    c.beginPath(); c.moveTo(cx + 10, fy - 30); c.lineTo(cx + 6, fy - 40); c.lineTo(cx + 16, fy - 32); c.closePath();
-    strokeFill(c, '#fb7185', '#9f1239', 1);
-    // head / snout
-    c.beginPath(); c.ellipse(cx + 18, fy - 22, 10, 9, 0.1, 0, 6.283);
-    strokeFill(c, '#fda4af', '#9f1239', 1.2);
-    c.beginPath(); c.ellipse(cx + 26, fy - 20, 6, 5, 0.1, 0, 6.283);
-    strokeFill(c, '#fb7185', '#9f1239', 1);
-    c.fillStyle = '#831843';
-    c.beginPath(); c.arc(cx + 24.5, fy - 20, 0.9, 0, 6.283); c.fill();
-    c.beginPath(); c.arc(cx + 27.5, fy - 20, 0.9, 0, 6.283); c.fill();
-    c.fillStyle = '#111'; c.beginPath(); c.arc(cx + 20, fy - 25, 1.2, 0, 6.283); c.fill();
-    // curly tail
-    c.strokeStyle = '#fb7185'; c.lineWidth = 2;
-    c.beginPath(); c.arc(cx - 18, fy - 20, 4, 0.2, 5.5); c.stroke();
-  }
   function paintFrog(c, w, h, stretch) {
     const cx = w * 0.5, fy = stretch ? h * 0.62 : h * 0.78;
     const k = stretch ? 1.25 : 1;
@@ -2179,23 +2052,6 @@
     c.restore();
   }
 
-  function actorSprite(a) {
-    const step = (a.walkPhase | 0) % 2;
-    if (a.typ === 'rooster') return lifeSprite('rooster-' + (a.flap ? 'up' : 'dn'), 64, 70, (c, w, h) => paintRooster(c, w, h, a.flap));
-    if (a.typ === 'chicken') return lifeSprite((a.brown ? 'hen' : 'chickw') + step, 44, 40, (c, w, h) => paintChicken(c, w, h, a.brown, step));
-    if (a.typ === 'chick') return lifeSprite('chick' + step, 30, 28, (c, w, h) => paintChick(c, w, h, step));
-    if (a.typ === 'sheep') return lifeSprite('sheep' + step, 64, 52, (c, w, h) => paintSheep(c, w, h, step));
-    if (a.typ === 'cow') return lifeSprite('cow' + step, 88, 64, (c, w, h) => paintCow(c, w, h, step));
-    if (a.typ === 'pig') return lifeSprite('pig' + step, 64, 48, (c, w, h) => paintPig(c, w, h, step));
-    return null;
-  }
-
-  const FARM_DOOR = { x: 0.30, y: 0.50 };
-  const FARM_YARD = [
-    { x: 0.38, y: 0.90 }, { x: 0.70, y: 0.78 }, { x: 0.50, y: 0.93 },
-    { x: 0.22, y: 0.89 }, { x: 0.58, y: 0.90 }, { x: 0.80, y: 0.80 },
-    { x: 0.84, y: 0.90 }, { x: 0.30, y: 0.86 }
-  ];
   const FROG_PADS = [
     { x: 0.80, y: 0.50 }, { x: 0.80, y: 0.64 }, { x: 0.70, y: 0.90 },
     { x: 0.42, y: 0.91 }, { x: 0.18, y: 0.87 }
@@ -2211,21 +2067,7 @@
     life.react = 0; life.croak = 0; life.beatN = 0; life.beatLatch = false;
     life.seeded = true;
     if (kind === 'farm') {
-      // Rooster is already in the yard and crows at the start.
-      life.actors.push({ typ: 'rooster', nx: 0.82, ny: 0.86, dir: -1, sp: 0.035, state: 'crow', appear: -0.01, tx: 0.74, ty: 0.88, walkPhase: 0, flap: 1, bounce: 0, wait: 0 });
-      const roster = [
-        { typ: 'chicken', brown: false, appear: 0, delay: 0.4 },
-        { typ: 'chicken', brown: true, appear: 0.12, delay: 1.6 },
-        { typ: 'chick', appear: 0.18, delay: 2.2 },
-        { typ: 'sheep', appear: 0.28, delay: 0 },
-        { typ: 'pig', appear: 0.48, delay: 0 },
-        { typ: 'cow', appear: 0.68, delay: 0 },
-        { typ: 'chicken', brown: true, appear: 0.82, delay: 0 }
-      ];
-      roster.forEach((r, i) => {
-        const yard = FARM_YARD[i % FARM_YARD.length];
-        life.actors.push({ typ: r.typ, brown: r.brown, nx: FARM_DOOR.x, ny: FARM_DOOR.y, dir: 1, sp: 0.10 + Math.random() * 0.03, state: 'barn', appear: r.appear, delay: r.delay, tx: yard.x, ty: yard.y, walkPhase: 0, flap: 0, bounce: 0, wait: 0 });
-      });
+      farmCast();
     } else {
       life.frog = { pad: 0, nx: FROG_PADS[0].x, ny: FROG_PADS[0].y, from: 0, to: 2, hop: -1, hopDur: 0.55, dir: 1, squat: 0 };
       life.flies = [
@@ -2237,14 +2079,13 @@
   }
   function lifeReset() {
     life.t = 0;
+    life.day = 0;
+    life.dayLock = null;
     life.seeded = false;
     life.actors = [];
     life.frog = null;
     life.ripples = [];
     life.kind = '';
-  }
-  function farmWanderTarget() {
-    return FARM_YARD[(Math.random() * FARM_YARD.length) | 0];
   }
   function lifeAdvance(dt, prog, beat, reduce) {
     if (!life.seeded) return;
@@ -2252,41 +2093,7 @@
     if (life.react > 0) life.react = Math.max(0, life.react - dt);
     if (life.croak > 0) life.croak = Math.max(0, life.croak - dt);
     if (life.kind === 'farm') {
-      life.actors.forEach(a => {
-        if (prog < a.appear && a.state === 'barn') return;
-        if (a.state === 'barn') {
-          if (a.delay > 0) { a.delay -= dt; return; }
-          a.state = 'exit';
-        }
-        if (a.state === 'crow') {
-          a.flap = reduce ? 0 : (life.t < 2.6 || life.react > 0) ? 1 : 0;
-          if (life.t > 2.6 && life.react <= 0 && !reduce) {
-            a.state = 'wander';
-            const t = farmWanderTarget(); a.tx = t.x; a.ty = t.y;
-          }
-        }
-        if (a.state === 'exit' || a.state === 'wander') {
-          const dx = a.tx - a.nx, dy = a.ty - a.ny;
-          const dist = Math.hypot(dx, dy) || 1;
-          const spd = (a.state === 'exit' ? 0.22 : a.sp) * (reduce ? 0 : 1);
-          if (!reduce && dist > 0.012) {
-            a.nx += (dx / dist) * spd * dt;
-            a.ny += (dy / dist) * spd * dt;
-            a.dir = dx >= 0 ? 1 : -1;
-            a.walkPhase = (a.walkPhase + dt * 8) % 2;
-          } else if (!reduce) {
-            a.state = 'wander';
-            a.wait = (a.wait || 0) - dt;
-            if (a.wait <= 0) {
-              const t = farmWanderTarget(); a.tx = t.x; a.ty = t.y; a.wait = 0.6 + Math.random() * 2;
-            }
-          }
-        }
-        if (life.react > 0 && (a.typ === 'chicken' || a.typ === 'chick' || a.typ === 'sheep' || a.typ === 'rooster')) {
-          a.bounce = Math.sin((0.45 - Math.min(0.45, life.react)) / 0.45 * Math.PI) * (a.typ === 'sheep' ? 0.035 : 0.05);
-        } else a.bounce = 0;
-        if (a.typ === 'rooster' && a.state === 'wander') a.flap = life.react > 0 ? 1 : 0;
-      });
+      farmAdvance(dt, prog, reduce);
     } else if (life.frog) {
       const f = life.frog;
       if (!reduce && beat && beat.on && !life.beatLatch) {
@@ -2345,11 +2152,332 @@
       }
     }
   }
+  // 1.9.177 Farmyard: the animals already painted in tetris-bg/6.webp are cut out (u2net masks),
+  // the painting behind them is filled in (farm-plate), and each animal is drawn back on its own
+  // spot with gentle motion (breathing, head bobs, pecking, tail swish), sun-side rim light,
+  // soft ground shadows and a little depth parallax. The day starts in darkness; the painted sun
+  // rises from behind the barn and the light reaches each animal, which then wakes up.
+  function farmLoad() {
+    if (farm.img || !root.Image) return;
+    farm.img = {};
+    let left = 4;
+    Object.keys(FARM_ART).forEach(k => {
+      const im = new root.Image();
+      im.onload = () => { if (--left === 0) { farm.ready = true; farmSprites(); } };
+      im.src = FARM_ART[k];
+      farm.img[k] = im;
+    });
+    if (!farm.listen && root.addEventListener) {
+      farm.listen = true;
+      // Tilt only if the phone already sends orientation (no permission prompt is asked for).
+      root.addEventListener('deviceorientation', e => {
+        if (e.gamma == null) return;
+        farm.tilt.gx = Math.max(-1, Math.min(1, e.gamma / 25));
+        farm.tilt.gy = Math.max(-1, Math.min(1, ((e.beta || 50) - 50) / 25));
+        farm.tilt.at = life.t;
+      });
+    }
+  }
+  function farmSprites() {
+    Object.keys(FARM_RIG).forEach(k => {
+      const a = FARM_RIG[k].a;
+      const cv = doc.createElement('canvas');
+      cv.width = a[2]; cv.height = a[3];
+      cv.getContext('2d').drawImage(farm.img.atlas, a[0], a[1], a[2], a[3], 0, 0, a[2], a[3]);
+      farm.spr[k] = cv;
+    });
+  }
+  function farmCast() {
+    farm.st = {};
+    farm.crowed = false;
+    let seed = 7;
+    const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+    Object.keys(FARM_RIG).forEach((k, i) => {
+      farm.st[k] = { awake: 0, br: rnd() * 6.28, beh: '', bt: 0, bdur: 0, next: 0.6 + rnd() * 2.5, hy: 0, ty: 0, dx: 0, dxT: 0, dz: 0, dzT: 0, hop: 0, rot: 0, crow: 0, ph: rnd() * 6.28 };
+    });
+    farm.stars = [];
+    for (let i = 0; i < 46; i++) {
+      const x = 6 + rnd() * 528;
+      const hz = FARM_HZ[Math.min(FARM_HZ.length - 1, Math.round(x / 6))];
+      farm.stars.push({ x: x, y: 6 + rnd() * Math.max(10, hz - 26), r: 0.5 + rnd() * 1.1, ph: rnd() * 6.28, sp: 0.6 + rnd() * 1.6 });
+    }
+  }
+  function farmDayTarget(prog, t) { return Math.max(0, Math.min(1, prog * 0.9 + t / 420)); }
+  function smooth01(v) { v = Math.max(0, Math.min(1, v)); return v * v * (3 - 2 * v); }
+  function farmSunPos(day) {
+    const t = Math.max(0, Math.min(1, (day - 0.16) / 0.84));
+    const e = t * (0.75 + 0.25 * t);
+    return { x: FARM_SUN.x0 + (FARM_SUN.cx - FARM_SUN.x0) * e, y: FARM_SUN.y0 + (FARM_SUN.cy - FARM_SUN.y0) * e, alt: e };
+  }
+  function farmFront(day) { return 0.22 + smooth01((day - 0.28) / 0.55) * 0.86; }
+  function farmAdvance(dt, prog, reduce) {
+    if (life.dayLock != null) life.day = life.dayLock;
+    else {
+      const tgt = farmDayTarget(prog, life.t);
+      life.day = (life.day || 0) + (tgt - (life.day || 0)) * Math.min(1, dt * 0.6);
+    }
+    const day = life.day, front = farmFront(day);
+    // smooth tilt: phone orientation if it is arriving, otherwise a slow drift
+    const T = farm.tilt, live = life.t - T.at < 1.5;
+    const wx = reduce ? 0 : live ? T.gx : Math.sin(life.t * 0.23) * 0.6;
+    const wy = reduce ? 0 : live ? T.gy : Math.sin(life.t * 0.17 + 1) * 0.4;
+    T.x += (wx - T.x) * Math.min(1, dt * 2.5); T.y += (wy - T.y) * Math.min(1, dt * 2.5);
+    if (!farm.crowed && farmSunPos(day).y < 215) { farm.crowed = true; if (farm.st.rooster) farm.st.rooster.crow = 1.8; }
+    Object.keys(FARM_RIG).forEach(k => {
+      const R = FARM_RIG[k], S = farm.st[k];
+      if (!S) return;
+      const footN = (R.a[5] + R.a[6]) / PHOTO_H;
+      if (day > 0.3 && front >= footN) S.awake = Math.min(1, S.awake + dt / 1.6);
+      if (reduce) { S.hy = 0; S.ty = 0; S.hop = 0; S.rot = 0; return; }
+      S.br += dt * (1.3 + S.awake * 1.1);
+      S.ph += dt;
+      let hy = (1 - S.awake) * (R.kind === 'pecker' ? 0 : 4); // sleepy head drop
+      const side = R.head && R.head.tip < R.head.neck ? -1 : 1;
+      let hop = 0, rot = 0;
+      if (S.awake >= 1) {
+        S.next -= dt;
+        if (!S.beh && S.next <= 0) {
+          const list = FARM_BEH[R.kind];
+          S.beh = list[(Math.random() * list.length) | 0];
+          S.bt = 0;
+          S.bdur = { graze: 2.6, snuffle: 1.8, look: 1.5, nod: 1.1, peck: 0.9, hop: 0.5, shuffle: 0.9 }[S.beh] || 1;
+          if (S.beh === 'shuffle') { S.dxT = (Math.random() * 2 - 1) * 2.6; S.dzT = (Math.random() * 2 - 1) * 0.018; }
+        }
+        if (S.beh) {
+          S.bt += dt;
+          const u = Math.min(1, S.bt / S.bdur), bell = Math.sin(Math.PI * u);
+          if (S.beh === 'graze') hy += 5.5 * smooth01(Math.min(1, u * 4)) * smooth01(Math.min(1, (1 - u) * 4)) + Math.sin(S.bt * 11) * 0.9 * bell;
+          else if (S.beh === 'snuffle') hy += Math.sin(S.bt * 16) * 1.8 * bell + 2.4 * bell;
+          else if (S.beh === 'look') { hy -= 5 * bell; rot -= side * 0.025 * bell; }
+          else if (S.beh === 'nod') hy += Math.sin(u * Math.PI * 4) * 3.2 * bell;
+          else if (S.beh === 'peck') { const q = Math.abs(Math.sin(u * Math.PI * 2)); hy += (R.kind === 'pecker' ? -6 : 6) * q; rot += side * (R.kind === 'pecker' ? -0.05 : 0.12) * q; }
+          else if (S.beh === 'hop') { hop -= 5 * bell; rot += Math.sin(u * Math.PI * 2) * 0.08; }
+          else if (S.beh === 'shuffle') { hop -= Math.abs(Math.sin(u * Math.PI * 3)) * 1.6; rot += Math.sin(u * Math.PI * 3) * 0.02; }
+          if (u >= 1) { S.beh = ''; S.next = 1.2 + Math.random() * 3.2; }
+        }
+      }
+      if (S.crow > 0) {
+        S.crow = Math.max(0, S.crow - dt);
+        const c = Math.sin(Math.PI * Math.min(1, (1.8 - S.crow) / 1.8));
+        hy -= 7 * c; rot -= side * 0.06 * c; S.dz = 0.04 * c;
+      }
+      if (life.react > 0 && S.awake > 0.5) {
+        const r = Math.sin((0.45 - Math.min(0.45, life.react)) / 0.45 * Math.PI);
+        if (R.kind === 'hen' || R.kind === 'pecker' || R.kind === 'chick' || k === 'sheep') hop -= (k === 'sheep' ? 5 : 6) * r;
+        else hy -= 5 * r;
+        if (R.kind === 'rooster') hy -= 2 * r;
+      }
+      S.dx += (S.dxT - S.dx) * Math.min(1, dt * 3);
+      if (S.crow <= 0) S.dz += (S.dzT - S.dz) * Math.min(1, dt * 3);
+      S.hy = hy; S.hop = hop; S.rot = rot;
+      S.ty = R.tail ? Math.sin(S.ph * (R.kind === 'rooster' ? 1.6 : 7)) * (R.kind === 'rooster' ? 2.2 : 2.4) * S.awake : 0;
+    });
+  }
+  // Pre-lit copy of a sprite: round shading toward the sun, darker belly, warm rim on the sun side.
+  function farmLit(k, ang, L) {
+    const ab = Math.round(ang / (Math.PI / 8)) & 15, lb = Math.round(L * 5);
+    const key = k + ':' + ab + ':' + lb;
+    const had = farm.lit[k];
+    if (had && had.key === key) return had.cv;
+    const src = farm.spr[k], w = src.width, h = src.height;
+    const cv = doc.createElement('canvas'); cv.width = w; cv.height = h;
+    const c = cv.getContext('2d');
+    c.drawImage(src, 0, 0);
+    const a = ab * Math.PI / 8, ux = Math.cos(a), uy = Math.sin(a), Lq = lb / 5;
+    if (Lq > 0) {
+      c.globalCompositeOperation = 'source-atop';
+      const R = Math.max(w, h) * 0.75;
+      const gx = w / 2 + ux * w * 0.28, gy = h * 0.42 + uy * h * 0.28;
+      const rg = c.createRadialGradient(gx, gy, 2, gx, gy, R);
+      rg.addColorStop(0, 'rgba(255,238,205,' + (0.32 * Lq) + ')');
+      rg.addColorStop(0.45, 'rgba(255,236,200,0)');
+      rg.addColorStop(1, 'rgba(24,14,40,' + (0.46 * Lq) + ')');
+      c.fillStyle = rg; c.fillRect(0, 0, w, h);
+      const lg = c.createLinearGradient(0, h * 0.5, 0, h);
+      lg.addColorStop(0, 'rgba(0,0,0,0)'); lg.addColorStop(1, 'rgba(20,10,0,' + (0.22 * Lq) + ')');
+      c.fillStyle = lg; c.fillRect(0, 0, w, h);
+      // rim: the sprite's edge facing the sun
+      const rc = doc.createElement('canvas'); rc.width = w; rc.height = h;
+      const r = rc.getContext('2d');
+      r.drawImage(src, 0, 0);
+      r.globalCompositeOperation = 'source-in';
+      r.fillStyle = 'rgb(255,214,150)'; r.fillRect(0, 0, w, h);
+      r.globalCompositeOperation = 'destination-out';
+      r.drawImage(src, -ux * 2.6, -uy * 2.6);
+      c.globalCompositeOperation = 'source-atop';
+      c.globalAlpha = 0.9 * Lq;
+      c.drawImage(rc, 0, 0);
+      c.globalAlpha = 1;
+      c.globalCompositeOperation = 'source-over';
+    }
+    farm.lit[k] = { key: key, cv: cv }; // one cached lighting per animal
+    return cv;
+  }
+  function headW(part, x) {
+    const v = (x - part.neck) / (part.tip - part.neck);
+    return smooth01(v);
+  }
+  // Draw one animal with its head/tail columns bent by a smooth vertical warp (no gaps).
+  function farmDrawRig(c, k, img, S) {
+    const R = FARM_RIG[k], w = R.a[2], h = R.a[3], foot = R.a[6];
+    const parts = [];
+    if (R.head) parts.push({ p: R.head, dy: S.hy });
+    if (R.tail) parts.push({ p: R.tail, dy: S.ty });
+    const ranges = parts.map(o => [Math.min(o.p.tip, o.p.neck), Math.max(o.p.tip, o.p.neck)]);
+    // body columns
+    let x = 0;
+    const segs = ranges.slice().sort((a, b) => a[0] - b[0]);
+    segs.forEach(r => { if (r[0] > x) c.drawImage(img, x, 0, r[0] - x, h, x, 0, r[0] - x + 0.6, h); x = Math.max(x, r[1]); });
+    if (x < w) c.drawImage(img, x, 0, w - x, h, x - 0.3, 0, w - x + 0.3, h);
+    parts.forEach((o, i) => {
+      const r = ranges[i], yA = Math.round(o.p.yA * h), yB = Math.round(o.p.yB * h);
+      if (yB < h) c.drawImage(img, r[0], yB, r[1] - r[0], h - yB, r[0], yB - 0.3, r[1] - r[0], h - yB + 0.3);
+      for (let cx = r[0]; cx < r[1]; cx += 2) {
+        const cw = Math.min(2, r[1] - cx);
+        const dy = o.dy * headW(o.p, cx + cw / 2);
+        if (yA > 0) c.drawImage(img, cx, 0, cw, yA, cx, dy, cw + 0.6, yA + 0.4);
+        if (yB > yA) c.drawImage(img, cx, yA, cw, yB - yA, cx, yA + dy, cw + 0.6, yB - yA - dy + 0.4);
+      }
+    });
+  }
+  function farmSkyClip(c, ox, oy, box) {
+    c.beginPath();
+    c.moveTo(box.left + ox, box.top + oy - 4);
+    for (let i = 0; i < FARM_HZ.length; i++) c.lineTo(box.left + ox + i * 6 * box.scale, box.top + oy + (FARM_HZ[i] - 2) * box.scale);
+    c.lineTo(box.left + ox + PHOTO_W * box.scale, box.top + oy - 4);
+    c.closePath();
+    c.clip();
+  }
+  function lerpKeys(keys, v) {
+    for (let i = 1; i < keys.length; i++) if (v <= keys[i][0]) {
+      const a = keys[i - 1], b = keys[i], u = (v - a[0]) / (b[0] - a[0] || 1);
+      return a[1].map((x, j) => x + (b[1][j] - x) * u);
+    }
+    return keys[keys.length - 1][1];
+  }
+  const FARM_SKY = [
+    [0, [30, 40, 92, 0.8]], [0.2, [44, 50, 112, 0.72]], [0.38, [122, 82, 152, 0.46]],
+    [0.58, [255, 166, 112, 0.18]], [0.8, [255, 222, 186, 0.05]], [1, [255, 255, 255, 0]]
+  ];
+  function drawSun(c, box, ox, oy, day) {
+    const sp = farmSunPos(day);
+    const sx = box.left + ox + sp.x * box.scale, sy = box.top + oy + sp.y * box.scale;
+    const glow = Math.max(0, Math.sin(Math.PI * Math.max(0, Math.min(1, (day - 0.12) / 0.75))));
+    c.save();
+    farmSkyClip(c, ox, oy, box);
+    c.globalCompositeOperation = 'lighter';
+    if (glow > 0.01) {
+      const rg = c.createRadialGradient(sx, sy, 4, sx, sy, 230 * box.scale);
+      rg.addColorStop(0, 'rgba(255,190,110,' + (0.55 * glow) + ')');
+      rg.addColorStop(0.4, 'rgba(255,120,70,' + (0.22 * glow) + ')');
+      rg.addColorStop(1, 'rgba(120,40,80,0)');
+      c.fillStyle = rg; c.fillRect(sx - 240 * box.scale, sy - 240 * box.scale, 480 * box.scale, 480 * box.scale);
+    }
+    c.globalCompositeOperation = 'source-over';
+    const sw = FARM_SUN.w * box.scale, sh = FARM_SUN.h * box.scale;
+    c.globalAlpha = Math.min(1, 0.35 + day);
+    c.drawImage(farm.img.sun, sx - (FARM_SUN.cx - FARM_SUN.x) * box.scale, sy - (FARM_SUN.cy - FARM_SUN.y) * box.scale, sw, sh);
+    c.globalAlpha = 1;
+    if (sp.alt < 0.85) { // low sun is redder
+      c.globalCompositeOperation = 'multiply';
+      c.fillStyle = 'rgba(255,' + Math.round(130 + 125 * sp.alt) + ',' + Math.round(70 + 185 * sp.alt) + ',' + (0.9 * (1 - sp.alt / 0.85)) + ')';
+      c.beginPath(); c.arc(sx, sy, 72 * box.scale, 0, 6.283); c.fill();
+      c.globalCompositeOperation = 'source-over';
+    }
+    c.restore();
+    return { x: sp.x, y: sp.y, alt: sp.alt, glow: glow };
+  }
+  function drawFarmScene(c, w, h, reduce) {
+    farmLoad();
+    if (!farm.ready) { // keep the start dark while the cut-outs load
+      c.fillStyle = 'rgba(4,6,18,' + (0.9 * (1 - (life.day || 0))) + ')'; c.fillRect(0, 0, w, h);
+      return;
+    }
+    if (!farm.st.cow) farmCast();
+    const box = photoBox();
+    const day = life.day || 0, T = farm.tilt;
+    // 3D: whole painting drifts a touch, the land a little more, animals more again by depth.
+    const zoom = reduce ? 1 : 1.03;
+    const bw = box.dw * zoom, bh = box.dh * zoom;
+    const B = { left: box.left - (bw - box.dw) / 2, top: box.top - (bh - box.dh) / 2, dw: bw, dh: bh, scale: box.scale * zoom };
+    const bx = T.x * 5, by = T.y * 4, lx = bx + T.x * 1.6, ly = by + T.y * 1.2;
+    c.drawImage(farm.img.plate, B.left + bx, B.top + by, bw, bh);
+    c.drawImage(farm.img.land, B.left + lx, B.top + ly, bw, bh);
+    // where the light comes from (photo px)
+    const sp = farmSunPos(day), L = smooth01((day - 0.3) / 0.45);
+    const order = Object.keys(FARM_RIG).sort((a, b) => (FARM_RIG[a].a[5] + FARM_RIG[a].a[6]) - (FARM_RIG[b].a[5] + FARM_RIG[b].a[6]));
+    // soft ground shadows, cast away from the sun
+    if (L > 0.02) order.forEach(k => {
+      const R = FARM_RIG[k], S = farm.st[k];
+      const fx = R.a[4] + R.a[2] / 2, fy = R.a[5] + R.a[6];
+      const depth = (fy / PHOTO_H - 0.5) / 0.45;
+      const ax = lx + T.x * 1.6 * depth, ay = ly + T.y * 1.2 * depth;
+      const dxs = fx - sp.x, len = (1.15 - sp.alt) * 0.35 + 0.08;
+      const sx = B.left + ax + (fx + S.dx + Math.sign(dxs) * R.a[2] * len * 0.5) * B.scale, sy = B.top + ay + (fy - 1) * B.scale;
+      const rw = R.a[2] * (0.42 + len * 0.4) * B.scale, rh = R.a[2] * 0.08 * B.scale + 2;
+      const lift = Math.max(0, -S.hop) / 6;
+      c.save();
+      c.translate(sx, sy); c.scale(1, rh / rw);
+      const rg = c.createRadialGradient(0, 0, 1, 0, 0, rw);
+      rg.addColorStop(0, 'rgba(30,20,8,' + (0.32 * L * (1 - lift * 0.5)) + ')');
+      rg.addColorStop(1, 'rgba(30,20,8,0)');
+      c.fillStyle = rg; c.beginPath(); c.arc(0, 0, rw, 0, 6.283); c.fill();
+      c.restore();
+    });
+    order.forEach(k => {
+      const R = FARM_RIG[k], S = farm.st[k];
+      const fx = R.a[4] + R.a[2] / 2, fy = R.a[5] + R.a[6];
+      const depth = (fy / PHOTO_H - 0.5) / 0.45;
+      const ax = lx + T.x * 1.6 * depth, ay = ly + T.y * 1.2 * depth;
+      const ang = Math.atan2(sp.y - (R.a[5] + R.a[3] / 2), sp.x - fx);
+      const img = farmLit(k, (ang + 6.283) % 6.283, L);
+      const br = Math.sin(S.br) * (0.006 + 0.008 * (1 - S.awake));
+      c.save();
+      c.translate(B.left + ax + (R.a[4] + S.dx) * B.scale, B.top + ay + (R.a[5] + S.hop) * B.scale);
+      c.scale(B.scale, B.scale);
+      const ox = R.a[2] / 2, oy = R.a[6];
+      c.translate(ox, oy);
+      c.scale((1 + S.dz) * (1 - br * 0.4), (1 + S.dz) * (1 + br));
+      if (S.rot) c.rotate(S.rot);
+      c.translate(-ox, -oy);
+      farmDrawRig(c, k, img, S);
+      c.restore();
+    });
+    // night: cool tint + darkness that lifts from the horizon down as the sun rises
+    const k = lerpKeys(FARM_SKY, day);
+    if (day < 0.999) {
+      c.globalCompositeOperation = 'multiply';
+      c.fillStyle = 'rgb(' + Math.round(k[0]) + ',' + Math.round(k[1]) + ',' + Math.round(k[2]) + ')';
+      c.fillRect(0, 0, w, h);
+      c.globalCompositeOperation = 'source-over';
+    }
+    const front = farmFront(day), d = k[3];
+    const fy0 = B.top + by + (front - 0.2) * bh, fy1 = B.top + by + (front + 0.12) * bh;
+    const veil = (v) => 1 - (1 - Math.min(0.93, v)) * (1 - 0.28);
+    const lg = c.createLinearGradient(0, Math.min(fy0, h), 0, Math.max(fy1, fy0 + 1));
+    lg.addColorStop(0, 'rgba(4,6,18,' + veil(d * 0.55) + ')');
+    lg.addColorStop(1, 'rgba(4,6,18,' + veil(d * 1.18) + ')');
+    c.fillStyle = lg; c.fillRect(0, 0, w, h);
+    // stars fade as the sky lightens
+    const sa = 1 - smooth01(day / 0.36);
+    if (sa > 0.01) {
+      c.save();
+      farmSkyClip(c, bx, by, B);
+      farm.stars.forEach(s => {
+        const tw = reduce ? 0.8 : 0.55 + 0.45 * Math.sin(life.t * s.sp + s.ph);
+        c.fillStyle = 'rgba(235,240,255,' + (sa * tw * 0.85) + ')';
+        c.beginPath(); c.arc(B.left + bx + s.x * B.scale, B.top + by + s.y * B.scale, s.r * 1.1, 0, 6.283); c.fill();
+      });
+      c.restore();
+    }
+    drawSun(c, B, bx, by, day);
+  }
   function lifeFastForward(seconds, prog) {
     const kind = isEffect(lookIdx < 0 ? themeIdx : themeFor((g && g.level) || 1));
     if (!kind) return;
     lifeReset();
     lifeCast(kind);
+    if (kind === 'farm') life.dayLock = farmDayTarget(prog, seconds);
     const step = 1 / 30;
     const beat = { on: false };
     let acc = 0, n = 0;
@@ -2360,62 +2488,10 @@
       lifeAdvance(step, prog, { on: on }, false);
       n++;
     }
+    life.dayLock = null;
   }
   function lifeReact() { life.react = 0.45; }
 
-  function drawSun(c, prog, reduce, pulse) {
-    const y0 = 0.225, y1 = 0.105;
-    const ny = y0 + (y1 - y0) * prog;
-    const s = photoToScreen(0.22, ny);
-    const r = 18 * Math.max(0.85, s.s);
-    // hide the painted high sun until we've risen (veil does most of this)
-    c.save();
-    const gdt = c.createRadialGradient(s.x, s.y, 2, s.x, s.y, r * 3.2);
-    gdt.addColorStop(0, 'rgba(255,240,160,' + (0.95) + ')');
-    gdt.addColorStop(0.35, 'rgba(255,200,60,0.85)');
-    gdt.addColorStop(1, 'rgba(255,160,40,0)');
-    c.fillStyle = gdt; c.beginPath(); c.arc(s.x, s.y, r * 3.2, 0, 6.283); c.fill();
-    c.fillStyle = '#fde047';
-    c.beginPath(); c.arc(s.x, s.y, r, 0, 6.283); c.fill();
-    c.strokeStyle = '#facc15'; c.lineWidth = 2; c.stroke();
-    c.fillStyle = '#facc15';
-    const rays = 12;
-    for (let i = 0; i < rays; i++) {
-      const a = (i / rays) * 6.283 + (reduce ? 0 : pulse * 0.05);
-      const r0 = r + 4, r1 = r + 14 + (i % 2 ? 6 : 0);
-      c.beginPath();
-      c.moveTo(s.x + Math.cos(a) * r0, s.y + Math.sin(a) * r0);
-      c.lineTo(s.x + Math.cos(a - 0.08) * r1, s.y + Math.sin(a - 0.08) * r1);
-      c.lineTo(s.x + Math.cos(a + 0.08) * r1, s.y + Math.sin(a + 0.08) * r1);
-      c.closePath(); c.fill();
-    }
-    c.restore();
-  }
-  function drawDawnVeil(c, w, h, prog) {
-    const a = 0.72 * (1 - prog);
-    if (a < 0.02) return;
-    const box = photoBox();
-    const yEnd = box.top + 0.48 * box.dh;
-    const gdt = c.createLinearGradient(0, 0, 0, yEnd);
-    gdt.addColorStop(0, 'rgba(18,16,60,' + a + ')');
-    gdt.addColorStop(0.45, 'rgba(40,24,70,' + (a * 0.75) + ')');
-    gdt.addColorStop(0.8, 'rgba(80,40,40,' + (a * 0.35) + ')');
-    gdt.addColorStop(1, 'rgba(80,40,40,0)');
-    c.fillStyle = gdt;
-    c.fillRect(0, 0, w, Math.max(0, yEnd));
-  }
-  function drawActor(c, a) {
-    const spr = actorSprite(a);
-    if (!spr) return;
-    const s = photoToScreen(a.nx, a.ny - (a.bounce || 0));
-    const sc = Math.max(0.85, s.s);
-    const w = spr.w * sc, h = spr.h * sc;
-    c.save();
-    c.translate(s.x, s.y);
-    c.scale(a.dir < 0 ? -1 : 1, 1);
-    c.drawImage(spr.cv, -w * 0.5, -h, w, h);
-    c.restore();
-  }
   function drawHopFrog(c) {
     const f = life.frog; if (!f) return;
     const stretch = f.hop >= 0;
@@ -2499,7 +2575,7 @@
     // Live clock: hold is used for screenshots; otherwise advance happens in effectTick.
     const c0 = fx.ctx;
     c0.clearRect(0, 0, fx.w, fx.h);
-    if (kind === 'farm') drawDawnVeil(c0, fx.w, fx.h, prog);
+    if (kind === 'farm') drawFarmScene(c0, fx.w, fx.h, reduce);
     else {
       // pond ripples + shimmer live on the photo, behind the board, so they show in the margins
       drawRipples(c0);
@@ -2510,13 +2586,7 @@
     c.clearRect(0, 0, life.w, life.h);
     c.save();
     clipAroundBoard(c, life.w, life.h);
-    if (kind === 'farm') {
-      drawSun(c, prog, reduce, beat.pulse);
-      // sort far to near (higher ny on top)
-      const list = life.actors.filter(a => a.state !== 'barn' || prog >= a.appear);
-      list.sort((a, b) => a.ny - b.ny);
-      list.forEach(a => drawActor(c, a));
-    } else {
+    if (kind !== 'farm') {
       drawFlies(c, reduce);
       drawFishJump(c);
       drawHopFrog(c);
