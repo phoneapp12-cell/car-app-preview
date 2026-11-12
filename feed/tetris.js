@@ -99,7 +99,7 @@
     o.start(t0);
     o.stop(t0 + dur + 0.02);
   }
-  // Six calm themes (Beach, Rainforest, Ocean, Bush walk, City, Night sky); music, sounds, colours and background change every level, cycling round (1-5, 6-10, ... 26-30 and beyond).
+  // Themes cycle every level. Level 4 (theme 1) is Fireworks as of 1.9.180.
   const SEMI = { C: 0, CS: 1, D: 2, DS: 3, E: 4, F: 5, FS: 6, G: 7, GS: 8, A: 9, AS: 10, B: 11 };
   function nf(n) {
     const oct = parseInt(n.slice(-1), 10);
@@ -110,7 +110,7 @@
     { name: 'Beach', beat: 0.7, pad: 'sine', ambient: 'wave', critter: 'gull', pitch: 1, sfx: 'sine',
       chords: [['F3', 'A3', 'C4', 'E4'], ['C3', 'G3', 'B3', 'E4'], ['A2', 'E3', 'G3', 'C4'], ['G2', 'D3', 'G3', 'B3']],
       bells: ['C5', 'D5', 'E5', 'G5', 'A5', 'C6'] },
-    { name: 'Rainforest', beat: 0.7, pad: 'triangle', ambient: 'rain', critter: 'bird', pitch: 1.122, sfx: 'triangle',
+    { name: 'Fireworks', beat: 0.7, pad: 'triangle', ambient: 'none', critter: 'bird', pitch: 1.122, sfx: 'triangle',
       chords: [['D3', 'A3', 'D4', 'FS4'], ['B2', 'FS3', 'A3', 'D4'], ['G2', 'D3', 'B3', 'D4'], ['A2', 'E3', 'A3', 'CS4']],
       bells: ['D5', 'E5', 'FS5', 'A5', 'B5', 'D6'] },
     { name: 'Ocean', beat: 0.9, pad: 'sine', ambient: 'wave', critter: ['dolphin', 'whale'], pitch: 0.794, sfx: 'sine',
@@ -147,7 +147,7 @@
   // Colours and see-through backgrounds for each theme (same order as THEMES).
   const LOOKS = [
     { colors: ['#22d3ee', '#0ea5e9', '#fb923c', '#fde047', '#2dd4bf', '#f472b6', '#f87171'], bg: 'linear-gradient(180deg,#38bdf8 0%,#7dd3fc 45%,#fcd34d 85%,#f5d08a 100%)', board: 'rgba(8,47,73,0.5)' },
-    { colors: ['#84cc16', '#16a34a', '#f59e0b', '#facc15', '#22c55e', '#10b981', '#f97316'], bg: 'linear-gradient(180deg,#052e16 0%,#14532d 55%,#3f6212 100%)', board: 'rgba(3,24,10,0.55)' },
+    { colors: ['#facc15', '#f472b6', '#22d3ee', '#a855f7', '#4ade80', '#fb923c', '#f43f5e'], bg: 'linear-gradient(180deg,#020308 0%,#050814 55%,#0a1020 100%)', board: 'rgba(4,6,16,0.52)' },
     { colors: ['#22d3ee', '#3b82f6', '#06b6d4', '#a5f3fc', '#14b8a6', '#818cf8', '#38bdf8'], bg: 'linear-gradient(180deg,#0b8fb0 0%,#065a82 40%,#03263f 100%)', board: 'rgba(2,20,36,0.55)' },
     { colors: ['#a3e635', '#65a30d', '#d97706', '#fbbf24', '#4ade80', '#b45309', '#e11d48'], bg: 'linear-gradient(180deg,#365314 0%,#1a2e05 55%,#3b2a14 100%)', board: 'rgba(16,20,6,0.55)' },
     { colors: ['#f472b6', '#22d3ee', '#a855f7', '#facc15', '#34d399', '#fb923c', '#60a5fa'], bg: 'linear-gradient(180deg,#0f172a 0%,#312e81 55%,#831843 100%)', board: 'rgba(10,10,25,0.55)' },
@@ -162,7 +162,7 @@
   // Colourful picture behind each theme (same order as THEMES), softened with a dark veil so the blocks stand out.
   const PICS = THEMES.map((_, i) => 'tetris-bg/' + i + '.webp');
   let themeIdx = 0;
-  // Level order (indexes into THEMES): Farmyard, Jeremiah was a bullfrog, Beach, Rainforest, Ocean, Bush walk, New Zealand, Snowy mountains, City, Night sky, Triangles, Space travel last.
+  // Level order (indexes into THEMES): Farmyard, Jeremiah was a bullfrog, Beach, Fireworks, Ocean, Bush walk, New Zealand, Snowy mountains, City, Night sky, Triangles, Space travel last.
   const ORDER = [6, 11, 0, 1, 2, 3, 9, 10, 4, 5, 8, 7];
   function themeFor(level) { return ORDER[(Math.max(1, level) - 1) % ORDER.length]; }
   function stages() { return ORDER.map((ti, i) => ({ level: i + 1, theme: ti, name: THEMES[ti].name })); }
@@ -294,9 +294,10 @@
   // 1.9.173 m6 (Farmyard) re-analysed after Shane's new level-1 track.
   // 1.9.178 m11 (Bullfrog) re-analysed after Shane's new level-2 track (127.45 BPM, D major, loop-safe 440 beats).
   // 1.9.179 m0 (Beach) re-analysed after Shane's new level-3 track (115.5 BPM, C major, loop-safe 392 beats).
+  // 1.9.180 m1 (Fireworks) re-analysed after Shane's level-4 soundscape (131 BPM, F# minor kept for chimes, loop-safe 905 beats).
   const TRACKS = [
     { bpm: 115.5, offset: 0.229, key: 'C', mode: 'major' },
-    { bpm: 117.5, offset: 0.047, key: 'F#', mode: 'minor' },
+    { bpm: 131, offset: 0.083, key: 'F#', mode: 'minor' },
     { bpm: 136, offset: 0, key: 'C#', mode: 'major' },
     { bpm: 117.5, offset: 0.348, key: 'G', mode: 'major' },
     { bpm: 99.5, offset: 0.096, key: 'C', mode: 'major' },
@@ -813,7 +814,17 @@
   const beach = { img: null, ready: false };
 
   const SPARK_DUR = 600, SPARK_MAX = 5, SPARK_MAX_REDUCE = 1;
-  const EFFECT_TI = { 0: 'beach', 6: 'farm', 11: 'frog' };
+  const FW_ART = { sil: 'tetris-bg/fw-sil-947b87d3.webp', silY: 588 };
+  const FW_META = { y: 588, h: 372, w: 540 };
+  const FW_MAX_P = 480, FW_MAX_R = 10;
+  const FW_KINDS = ['peony', 'chrys', 'willow', 'ring', 'crackle'];
+  const FW_COLS = [
+    [255, 214, 90], [255, 86, 128], [80, 220, 255], [186, 96, 255],
+    [110, 255, 150], [255, 150, 56], [255, 244, 248], [255, 72, 196]
+  ];
+  const fw = { ready: false, sil: null, loading: false, rockets: [], parts: [], flashes: [], lit: 0, litR: 1, litG: 1, litB: 1, beatLatch: false, beatN: 0, hold: null, posed: false };
+
+  const EFFECT_TI = { 0: 'beach', 1: 'fireworks', 6: 'farm', 11: 'frog' };
   function isEffect(ti) { return EFFECT_TI[ti] || null; }
   function reduceMotion() {
     try { return !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; }
@@ -917,6 +928,7 @@
     const kind = isEffect(ti);
     if (!kind || !fx || !root.document) return;
     fx.effect = true;
+    if (kind === 'fireworks') { fwOnClear(fx.n); return; }
     if (!reduceMotion() && (fx.n >= 3 || fx.banner)) {
       efx.zoom = Math.max(efx.zoom, fx.n === 4 ? 1.05 : 1.03);
       efx.zoomV = 0;
@@ -948,6 +960,11 @@
   function effectOnLevelUp(ti) {
     const kind = isEffect(ti);
     if (!kind || !root.document) return;
+    if (kind === 'fireworks') {
+      if (!reduceMotion()) { efx.zoom = 1.07; efx.zoomV = 0; }
+      fwOnLevelUp();
+      return;
+    }
     if (!reduceMotion()) { efx.zoom = 1.07; efx.zoomV = 0; }
     const pal = (LOOKS[ti] && LOOKS[ti].colors) || ['#fff'];
     const el = root.document.getElementById('board');
@@ -1326,7 +1343,7 @@
   // effects cannot pause or mute a separate HTML audio element on iOS/Android WebView.
   // Filenames include a content hash because some phone media caches ignore ?v= query strings
   // (1.9.163 busted the URL but Shane still heard the old bullfrog track).
-  const BGM_HASH = ['da11a54a', '9711dc01', '9ca3b84e', '7776197f', '6a9bd0f6', '63c9eafe', '7bc4ebcd', 'b76dd1d3', 'fdec4369', '2b10c8ba', 'cdbe7d34', '8afd517f'];
+  const BGM_HASH = ['da11a54a', '9813c57a', '9ca3b84e', '7776197f', '6a9bd0f6', '63c9eafe', '7bc4ebcd', 'b76dd1d3', 'fdec4369', '2b10c8ba', 'cdbe7d34', '8afd517f'];
   function bgmSrc(ti) { return 'tetris-bg/m' + ti + '-' + BGM_HASH[ti] + '.mp3'; }
   let bgmGain = null, bgmNode = null, bgmIdx = -1, bgmBufs = {}, bgmLoading = {}, bgmAt = 0, bgmRate = 1, bgmWant = false, bgmWantTi = -1, bgmAnalyser = null, bgmBins = null;
   function silentUnlock() {
@@ -1420,7 +1437,7 @@
     ac = null; sfxGain = null; musicGain = null; bgmGain = null; melodyBus = null; noiseBuf = null;
     bgmBufs = {}; bgmLoading = {};
   }
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, farmDayTarget, farmSunPos, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts };
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, farmDayTarget, farmSunPos, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts };
 
   if (!root.document) return;
   const doc = root.document;
@@ -1464,7 +1481,7 @@
   function press(a) {
     if (!started) started = true;
     const next = act(g, a);
-    if (a === 'restart') { g = next; invReset(); life.hold = null; life.singHold = null; life.beachHold = null; sparkHold = null; blockSparks = []; lifeReset(); if (isEffect(themeFor(g.level))) { lifeCast(isEffect(themeFor(g.level))); } if (root.IBScores) root.IBScores.close(); }
+    if (a === 'restart') { g = next; invReset(); life.hold = null; life.singHold = null; life.beachHold = null; fw.hold = null; sparkHold = null; blockSparks = []; lifeReset(); if (isEffect(themeFor(g.level))) { lifeCast(isEffect(themeFor(g.level))); } if (root.IBScores) root.IBScores.close(); }
     syncHud();
   }
   root.Tetris.press = press;
@@ -1535,6 +1552,7 @@
         life.frog.blink = opts.frogSing.blink != null ? opts.frogSing.blink : 0;
       }
     } else life.singHold = null;
+    if (opts.fireworks) { fw.hold = opts.fireworks; fw.posed = false; } else { fw.hold = null; fw.posed = false; }
     if (opts.sparkle) holdBlockSpark(opts.sparkle); else { sparkHold = null; }
     syncHud();
     const mb = doc.getElementById('musicbtn'); if (mb) mb.textContent = 'Music off';
@@ -1858,11 +1876,14 @@
       doc.documentElement.classList.toggle('fx-farm', kind === 'farm');
       doc.documentElement.classList.toggle('fx-frog', kind === 'frog');
       doc.documentElement.classList.toggle('fx-beach', kind === 'beach');
+      doc.documentElement.classList.toggle('fx-fireworks', kind === 'fireworks');
     }
     // 1.9.175: always the original theme photo (center / cover), including Farmyard and Bullfrog.
-    doc.documentElement.style.background = 'linear-gradient(rgba(0,0,0,.28),rgba(0,0,0,.28)), url("' + PICS[i] + '") center / cover no-repeat, ' + L.bg;
+    // 1.9.180 Fireworks is the exception: a black night sky (Shane asked for a black background).
+    if (kind === 'fireworks') doc.documentElement.style.background = L.bg;
+    else doc.documentElement.style.background = 'linear-gradient(rgba(0,0,0,.28),rgba(0,0,0,.28)), url("' + PICS[i] + '") center / cover no-repeat, ' + L.bg;
     try { const nx = new root.Image(); nx.src = PICS[(i + 1) % PICS.length]; } catch (e) { }
-    if (kind) { efxClearAll(); lifeReset(); if (kind === 'farm') farmLoad(); if (kind === 'frog') frogLoad(); if (kind === 'beach') beachLoad(); }
+    if (kind) { efxClearAll(); lifeReset(); if (kind === 'farm') farmLoad(); if (kind === 'frog') frogLoad(); if (kind === 'beach') beachLoad(); if (kind === 'fireworks') fwLoad(); }
     doc.documentElement.style.backgroundAttachment = 'fixed';
     doc.body.style.background = 'transparent';
     drawMini(doc.getElementById('next'), g.next, false);
@@ -2362,6 +2383,9 @@
     } else if (kind === 'beach') {
       life.beach = { tide: 0.5, wet: 0.2, big: 0, mid: 0, fl: 0, gust: 0 };
       beachLoad();
+    } else if (kind === 'fireworks') {
+      fwReset();
+      fwLoad();
     } else {
       life.frog = { mouth: 0, puff: 0, blink: 0, blinkIn: 0, nextBlink: 2.4, sway: 0, vocal: 0, avg: 0.12, lev: 0 };
       frog.notes = [];
@@ -2382,6 +2406,7 @@
     life.frog = null;
     life.ripples = [];
     life.kind = '';
+    fwReset();
   }
   function lifeAdvance(dt, prog, beat, reduce) {
     if (!life.seeded) return;
@@ -2392,6 +2417,8 @@
       farmAdvance(dt, prog, reduce);
     } else if (life.kind === 'beach') {
       beachAdvance(dt, reduce);
+    } else if (life.kind === 'fireworks') {
+      fwAdvance(dt, beat, reduce);
     } else if (life.frog) {
       const f = life.frog;
       if (beat && beat.on && !life.beatLatch) { life.beatN++; life.beatLatch = true; }
@@ -3214,6 +3241,404 @@
     c.fillRect(box.left + pPlate * sc, box.top + pPlate * 0.15 * sc, PHOTO_W * sc, PHOTO_H * sc);
   }
 
+  // 1.9.180 Level 4 Fireworks: black sky, 3D bursts of many sizes and colours, faint rainforest
+  // silhouette along the bottom, lit briefly by each burst. Launches follow the 131 BPM pulse.
+
+  function fwLoad() {
+    if (fw.ready || fw.loading || !root.Image) return;
+    fw.loading = true;
+    const im = new root.Image();
+    im.onload = function () { fw.sil = im; fw.ready = true; fw.loading = false; };
+    im.onerror = function () { fw.ready = true; fw.loading = false; };
+    im.src = FW_ART.sil;
+  }
+  function fwReset() {
+    fw.rockets = []; fw.parts = []; fw.flashes = [];
+    fw.lit = 0; fw.beatLatch = false; fw.beatN = 0; fw.posed = false;
+  }
+  function fwPick() { return FW_COLS[(Math.random() * FW_COLS.length) | 0]; }
+  function fwAddPart(p) {
+    if (fw.parts.length >= FW_MAX_P) fw.parts.shift();
+    fw.parts.push(p);
+  }
+  function fwFlash(x, y, z, col, scale) {
+    const pow = 0.32 * (scale || 1) * (z || 1);
+    fw.flashes.push({ x: x, y: y, z: z || 1, r: col[0], g: col[1], b: col[2], t: 0, max: 0.55, pow: pow });
+    const k = Math.min(1, pow * 1.4);
+    const s = fw.lit + k;
+    if (s > 0.001) {
+      fw.litR = (fw.litR * fw.lit + (col[0] / 255) * k) / s;
+      fw.litG = (fw.litG * fw.lit + (col[1] / 255) * k) / s;
+      fw.litB = (fw.litB * fw.lit + (col[2] / 255) * k) / s;
+    }
+    fw.lit = Math.min(1, fw.lit + k);
+  }
+  function fwBurst(x, y, z, typ, col, scale) {
+    typ = typ || FW_KINDS[(Math.random() * FW_KINDS.length) | 0];
+    col = col || fwPick();
+    scale = scale || 1;
+    z = z == null ? 0.55 + Math.random() * 0.9 : z;
+    const base = typ === 'ring' ? 22 : typ === 'crackle' ? 16 : typ === 'willow' ? 30 : typ === 'chrys' ? 38 : 32;
+    const n = Math.max(8, Math.round(base * scale * (0.75 + 0.4 * z)));
+    const spd0 = (typ === 'ring' ? 150 : typ === 'willow' ? 130 : typ === 'chrys' ? 170 : typ === 'crackle' ? 120 : 160) * scale * (0.7 + 0.35 * z);
+    const life0 = typ === 'willow' ? 1.35 : typ === 'chrys' ? 1.15 : typ === 'crackle' ? 0.85 : typ === 'ring' ? 0.9 : 0.95;
+    const size0 = (typ === 'willow' ? 1.7 : typ === 'crackle' ? 1.8 : 2.2) * scale * z;
+    const tilt = (Math.random() - 0.5) * 0.55;
+    for (let i = 0; i < n; i++) {
+      let vx, vy, vz, spd;
+      if (typ === 'ring') {
+        const a = (i / n) * Math.PI * 2;
+        spd = spd0 * (0.92 + Math.random() * 0.12);
+        vx = Math.cos(a) * spd;
+        vy = Math.sin(a) * Math.cos(tilt) * spd * 0.72;
+        vz = Math.sin(a) * Math.sin(tilt) * 0.35;
+      } else {
+        const a = Math.random() * Math.PI * 2;
+        const el = typ === 'willow' ? (-0.15 + Math.random() * 0.85) : (Math.acos(2 * Math.random() - 1) - Math.PI / 2);
+        spd = spd0 * (0.55 + Math.random() * 0.55);
+        const c = Math.cos(el);
+        vx = Math.cos(a) * c * spd;
+        vy = Math.sin(el) * spd;
+        vz = Math.sin(a) * c * 0.4;
+      }
+      fwAddPart({
+        typ: typ, x: x, y: y, z: z, vx: vx, vy: vy, vz: vz,
+        life: 0, max: life0 * (0.75 + Math.random() * 0.4),
+        size: size0 * (0.7 + Math.random() * 0.6),
+        r: col[0], g: col[1], b: col[2],
+        trail: typ === 'chrys' || typ === 'willow' ? 1 : typ === 'ring' ? 0.4 : 0.55,
+        pop: typ === 'crackle' ? 0.22 + Math.random() * 0.18 : 0, popped: false
+      });
+    }
+    fwFlash(x, y, z, col, scale);
+  }
+  function fwLaunch(box, destX, destY, typ, col, scale, z, flight) {
+    if (fw.rockets.length >= FW_MAX_R) { fwBurst(destX, destY, z, typ, col, scale); return; }
+    const x0 = destX + (Math.random() - 0.5) * 30;
+    const y0 = box.top + box.dh * (0.88 + Math.random() * 0.08);
+    const T = flight || (0.55 + Math.random() * 0.28);
+    fw.rockets.push({
+      x: x0, y: y0, x0: x0, y0: y0, destX: destX, destY: destY, t: 0, max: T,
+      typ: typ, col: col, scale: scale || 1, z: z || 1
+    });
+  }
+  function fwSkyPos(box, prefer) {
+    const nx = prefer && prefer.x != null ? prefer.x : (0.12 + Math.random() * 0.76);
+    const ny = prefer && prefer.y != null ? prefer.y : (0.10 + Math.random() * 0.38);
+    return { x: box.left + nx * box.dw, y: box.top + ny * box.dh, nx: nx, ny: ny };
+  }
+  function fwOnBeat() {
+    const box = photoBox();
+    if (!box || !box.dw) return;
+    const n = fw.beatN;
+    const busy = fw.flashes.filter(function (f) { return f.t < 0.28; }).length;
+    if (busy >= 5 && n % 2) return;
+    const typ = FW_KINDS[n % FW_KINDS.length];
+    const col = fwPick();
+    const big = (n % 4 === 0);
+    const z = big ? 1.05 + Math.random() * 0.4 : 0.5 + Math.random() * 0.95;
+    const scale = big ? 1.15 + Math.random() * 0.25 : 0.7 + Math.random() * 0.45;
+    const pos = fwSkyPos(box, { x: 0.18 + ((n * 0.37) % 0.64), y: 0.12 + (n % 3) * 0.1 + Math.random() * 0.08 });
+    // Burst on the pulse, and send a rocket that will burst a couple of beats later.
+    fwBurst(pos.x, pos.y, z, typ, col, scale);
+    if (!big && fw.parts.length > FW_MAX_P * 0.85) return;
+    if (n % 2 === 0 || big) {
+      const later = fwSkyPos(box);
+      fwLaunch(box, later.x, later.y, FW_KINDS[(n + 2) % FW_KINDS.length], fwPick(), big ? 1.2 : 0.8, 0.6 + Math.random() * 0.7, 0.55 + Math.random() * 0.3);
+    }
+  }
+  function fwOnClear(n) {
+    const box = photoBox();
+    if (!box || !box.dw) return;
+    const tetris = n >= 4;
+    const count = reduceMotion() ? (tetris ? 2 : 1) : (tetris ? 5 : (n >= 3 ? 3 : 2));
+    const scale = tetris ? 1.45 : (0.9 + n * 0.12);
+    for (let i = 0; i < count; i++) {
+      const pos = fwSkyPos(box, { x: 0.16 + (i / Math.max(1, count - 1)) * 0.68, y: 0.12 + (i % 2) * 0.12 + Math.random() * 0.06 });
+      const typ = tetris ? FW_KINDS[i % FW_KINDS.length] : FW_KINDS[(Math.random() * FW_KINDS.length) | 0];
+      fwBurst(pos.x, pos.y, tetris ? 1.15 + Math.random() * 0.3 : 0.8 + Math.random() * 0.4, typ, fwPick(), scale);
+    }
+    playFwSfx(tetris ? 'big' : 'clear');
+  }
+  function fwOnLevelUp() {
+    const box = photoBox();
+    if (!box || !box.dw) return;
+    const count = reduceMotion() ? 3 : 7;
+    for (let i = 0; i < count; i++) {
+      const pos = fwSkyPos(box, { x: 0.12 + (i / Math.max(1, count - 1)) * 0.76, y: 0.08 + (i % 3) * 0.1 });
+      fwBurst(pos.x, pos.y, 1.05 + Math.random() * 0.4, FW_KINDS[i % FW_KINDS.length], FW_COLS[i % FW_COLS.length], reduceMotion() ? 1.1 : 1.55);
+    }
+    playFwSfx('big');
+  }
+  function fwTickParticles(dt) {
+    if (dt <= 0) return;
+    // Step in modest slices so a posed age still looks right.
+    let left = dt;
+    while (left > 0) {
+      const step = Math.min(0.032, left);
+      left -= step;
+      for (let i = fw.rockets.length - 1; i >= 0; i--) {
+        const r = fw.rockets[i];
+        r.t += step;
+        const u = Math.min(1, r.t / r.max);
+        const ease = u * u * (3 - 2 * u);
+        const rise = Math.sin(u * Math.PI) * 18;
+        r.x = r.x0 + (r.destX - r.x0) * ease;
+        r.y = r.y0 + (r.destY - r.y0) * ease - rise;
+        // spark trail
+        if (fw.parts.length < FW_MAX_P) {
+          fwAddPart({ typ: 'spark', x: r.x, y: r.y, z: r.z, vx: (Math.random() - 0.5) * 20, vy: 30 + Math.random() * 40, vz: 0, life: 0, max: 0.28, size: 1.4 * r.z, r: 255, g: 220, b: 160, trail: 0.8, pop: 0, popped: true });
+        }
+        if (r.t >= r.max) {
+          fwBurst(r.destX, r.destY, r.z, r.typ, r.col, r.scale);
+          fw.rockets.splice(i, 1);
+        }
+      }
+      for (let i = fw.parts.length - 1; i >= 0; i--) {
+        const p = fw.parts[i];
+        p.life += step;
+        const g = p.typ === 'willow' ? 240 : p.typ === 'spark' ? 80 : 150;
+        p.vy += g * step;
+        p.vx *= (1 - 0.55 * step);
+        p.vy *= (1 - 0.22 * step);
+        p.x += p.vx * step;
+        p.y += p.vy * step;
+        p.z = Math.max(0.25, p.z + (p.vz || 0) * step);
+        if (p.pop && !p.popped && p.life >= p.pop) {
+          p.popped = true;
+          const n = 3 + (Math.random() * 3) | 0;
+          for (let k = 0; k < n; k++) {
+            const a = Math.random() * Math.PI * 2, s = 60 + Math.random() * 90;
+            fwAddPart({ typ: 'spark', x: p.x, y: p.y, z: p.z, vx: Math.cos(a) * s, vy: Math.sin(a) * s, vz: 0, life: 0, max: 0.35, size: p.size * 0.7, r: p.r, g: p.g, b: p.b, trail: 0.2, pop: 0, popped: true });
+          }
+        }
+        if (p.life >= p.max) fw.parts.splice(i, 1);
+      }
+      for (let i = fw.flashes.length - 1; i >= 0; i--) {
+        fw.flashes[i].t += step;
+        if (fw.flashes[i].t >= fw.flashes[i].max) fw.flashes.splice(i, 1);
+      }
+      fw.lit = Math.max(0, fw.lit - step * 1.35);
+    }
+  }
+  function fwAdvance(dt, beat, reduce) {
+    if (fw.hold) {
+      if (!fw.posed) fwPose(fw.hold);
+      return;
+    }
+    if (reduce) {
+      fw.lit = Math.max(0.08, fw.lit - dt * 0.4);
+      if (fw.flashes.length === 0) {
+        const box = photoBox();
+        if (box) {
+          fw.flashes.push({ x: box.left + box.dw * 0.3, y: box.top + box.dh * 0.22, z: 0.8, r: 255, g: 210, b: 120, t: 0, max: 8, pow: 0.18 });
+          fw.flashes.push({ x: box.left + box.dw * 0.7, y: box.top + box.dh * 0.18, z: 0.6, r: 120, g: 200, b: 255, t: 0, max: 8, pow: 0.14 });
+        }
+      }
+      return;
+    }
+    if (beat && beat.on && !fw.beatLatch) {
+      fw.beatLatch = true;
+      fw.beatN++;
+      fwOnBeat();
+    }
+    if (beat && !beat.on) fw.beatLatch = false;
+    fwTickParticles(dt);
+  }
+  function fwPose(spec) {
+    fwReset();
+    fw.hold = spec;
+    fw.posed = true;
+    const box = photoBox();
+    if (!box || !box.dw) return;
+    const bursts = spec.bursts || [];
+    for (let i = 0; i < bursts.length; i++) {
+      const b = bursts[i];
+      const x = box.left + (b.x != null ? b.x : 0.5) * box.dw;
+      const y = box.top + (b.y != null ? b.y : 0.22) * box.dh;
+      const col = b.col != null ? FW_COLS[b.col % FW_COLS.length] : fwPick();
+      fwBurst(x, y, b.z != null ? b.z : 1, b.typ || 'peony', col, b.scale || 1);
+    }
+    const rocks = spec.rockets || [];
+    for (let i = 0; i < rocks.length; i++) {
+      const r = rocks[i];
+      const dest = fwSkyPos(box, r);
+      fwLaunch(box, dest.x, dest.y, r.typ || 'peony', r.col != null ? FW_COLS[r.col % FW_COLS.length] : fwPick(), r.scale || 0.9, r.z || 1, r.flight || 0.8);
+      if (r.u != null && fw.rockets.length) fw.rockets[fw.rockets.length - 1].t = (r.u) * fw.rockets[fw.rockets.length - 1].max;
+    }
+    fwTickParticles(spec.at != null ? spec.at : 0.38);
+    if (spec.lit != null) fw.lit = spec.lit;
+  }
+  function fwBedHot() {
+    if (!bgmAnalyser || !bgmBins) return false;
+    try {
+      bgmAnalyser.getByteFrequencyData(bgmBins);
+      let s = 0, n = 0;
+      const hi = Math.min(bgmBins.length, 28);
+      for (let i = 3; i < hi; i++) { s += bgmBins[i]; n++; }
+      return n && (s / n) > 110;
+    } catch (e) { return false; }
+  }
+  // Soft mid booms + low-passed crackle for line clears / Tetris / LEVEL UP only.
+  // Ordinary beat-synced launches stay quiet so they do not double the bangs already in the bed.
+  function playFwSfx(kind) {
+    if (!soundOn || !ac || !sfxGain || !noiseBuf) return;
+    const hot = fwBedHot();
+    if (kind === 'clear' && hot) return;
+    const dest = sfxGain;
+    const t0 = ac.currentTime + 0.01;
+    const boom = kind === 'big' ? (hot ? 0.07 : 0.13) : 0.09;
+    const crack = kind === 'big' ? (hot ? 0.04 : 0.07) : 0.055;
+    const rum = ac.createBufferSource();
+    rum.buffer = noiseBuf;
+    const hp = ac.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 300; hp.Q.value = 0.7;
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 680; lp.Q.value = 0.5;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(boom, t0 + 0.04);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + (kind === 'big' ? 0.7 : 0.42));
+    rum.connect(hp); hp.connect(lp); lp.connect(g); g.connect(dest);
+    rum.start(t0); rum.stop(t0 + 0.75);
+    const pops = kind === 'big' ? 4 : 2;
+    for (let k = 0; k < pops; k++) {
+      const at = t0 + 0.03 + k * 0.08;
+      const src = ac.createBufferSource();
+      src.buffer = noiseBuf;
+      const bp = ac.createBiquadFilter();
+      bp.type = 'bandpass'; bp.frequency.value = 540 + k * 160; bp.Q.value = 0.85;
+      const clp = ac.createBiquadFilter();
+      clp.type = 'lowpass'; clp.frequency.value = 2600; clp.Q.value = 0.5;
+      const cg = ac.createGain();
+      cg.gain.setValueAtTime(0.0001, at);
+      cg.gain.linearRampToValueAtTime(crack - k * 0.008, at + 0.016);
+      cg.gain.exponentialRampToValueAtTime(0.0001, at + 0.14);
+      src.connect(bp); bp.connect(clp); clp.connect(cg); cg.connect(dest);
+      src.start(at); src.stop(at + 0.18);
+    }
+  }
+  function drawFireworksScene(c, w, h, reduce) {
+    const box = photoBox();
+    if (!box || !box.dw) return;
+    if (fw.hold && !fw.posed) fwPose(fw.hold);
+    const sc = box.scale;
+    // Night sky in the photo box (black, with a hint of deep blue toward the ground).
+    const g = c.createLinearGradient(0, box.top, 0, box.top + box.dh);
+    g.addColorStop(0, '#020308');
+    g.addColorStop(0.55, '#050814');
+    g.addColorStop(1, '#0a1020');
+    c.fillStyle = g;
+    c.fillRect(box.left, box.top, box.dw, box.dh);
+
+    // Burst lighting of the sky
+    c.save();
+    c.beginPath();
+    c.rect(box.left, box.top, box.dw, box.dh);
+    c.clip();
+    c.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < fw.flashes.length; i++) {
+      const f = fw.flashes[i];
+      const fade = Math.max(0, 1 - f.t / f.max);
+      const a = fade * fade * f.pow;
+      if (a < 0.01) continue;
+      const rad = (90 + 140 * f.z) * sc * (0.85 + 0.4 * fade);
+      const rg = c.createRadialGradient(f.x, f.y, 0, f.x, f.y, rad);
+      rg.addColorStop(0, 'rgba(' + f.r + ',' + f.g + ',' + f.b + ',' + (0.55 * a) + ')');
+      rg.addColorStop(0.35, 'rgba(' + f.r + ',' + f.g + ',' + f.b + ',' + (0.18 * a) + ')');
+      rg.addColorStop(1, 'rgba(' + f.r + ',' + f.g + ',' + f.b + ',0)');
+      c.fillStyle = rg;
+      c.fillRect(f.x - rad, f.y - rad, rad * 2, rad * 2);
+    }
+    // Rockets
+    if (!reduce) {
+      for (let i = 0; i < fw.rockets.length; i++) {
+        const r = fw.rockets[i];
+        const a = 0.7 * r.z;
+        c.strokeStyle = 'rgba(255,230,180,' + a + ')';
+        c.lineWidth = 1.6 * r.z * sc;
+        c.lineCap = 'round';
+        c.beginPath();
+        c.moveTo(r.x, r.y + 14 * sc);
+        c.lineTo(r.x, r.y);
+        c.stroke();
+        c.fillStyle = 'rgba(255,244,220,' + a + ')';
+        c.beginPath();
+        c.arc(r.x, r.y, 2 * r.z * sc, 0, Math.PI * 2);
+        c.fill();
+      }
+    }
+    // Particles, far to near
+    if (!reduce && fw.parts.length) {
+      const list = fw.parts.slice().sort(function (a, b) { return a.z - b.z; });
+      for (let i = 0; i < list.length; i++) {
+        const p = list[i];
+        const u = Math.max(0, 1 - p.life / p.max);
+        const fade = u * u * (0.45 + 0.55 * Math.min(1.3, p.z));
+        if (fade < 0.03) continue;
+        const sz = p.size * sc * (0.85 + 0.25 * p.z);
+        if (p.trail && (Math.abs(p.vx) + Math.abs(p.vy) > 40)) {
+          const tx = p.x - p.vx * 0.045 * p.trail;
+          const ty = p.y - p.vy * 0.045 * p.trail;
+          c.strokeStyle = 'rgba(' + p.r + ',' + p.g + ',' + p.b + ',' + (fade * 0.65) + ')';
+          c.lineWidth = Math.max(0.6, sz * 0.7);
+          c.lineCap = 'round';
+          c.beginPath();
+          c.moveTo(tx, ty);
+          c.lineTo(p.x, p.y);
+          c.stroke();
+        }
+        c.fillStyle = 'rgba(' + p.r + ',' + p.g + ',' + p.b + ',' + fade + ')';
+        c.beginPath();
+        c.arc(p.x, p.y, Math.max(0.6, sz), 0, Math.PI * 2);
+        c.fill();
+      }
+    } else if (reduce) {
+      for (let i = 0; i < fw.flashes.length; i++) {
+        const f = fw.flashes[i];
+        const rad = 70 * sc * f.z;
+        const rg = c.createRadialGradient(f.x, f.y, 0, f.x, f.y, rad);
+        rg.addColorStop(0, 'rgba(' + f.r + ',' + f.g + ',' + f.b + ',0.28)');
+        rg.addColorStop(1, 'rgba(' + f.r + ',' + f.g + ',' + f.b + ',0)');
+        c.fillStyle = rg;
+        c.fillRect(f.x - rad, f.y - rad, rad * 2, rad * 2);
+      }
+    }
+    c.restore();
+
+    // Faint rainforest silhouette, briefly lit by bursts.
+    if (fw.sil && fw.sil.complete) {
+      const sy = box.top + (FW_ART.silY / PHOTO_H) * box.dh;
+      const sh = (FW_META.h / PHOTO_H) * box.dh;
+      const light = Math.min(1, fw.lit);
+      c.save();
+      c.globalAlpha = 0.72 + light * 0.28;
+      c.drawImage(fw.sil, box.left, sy, box.dw, sh);
+      if (light > 0.04) {
+        c.globalCompositeOperation = 'lighter';
+        c.globalAlpha = light * 0.22;
+        c.fillStyle = 'rgba(' + Math.round(fw.litR * 255) + ',' + Math.round(fw.litG * 255) + ',' + Math.round(fw.litB * 255) + ',1)';
+        // Light only the silhouette, using the image as a mask via destination-in on a temp path is heavy;
+        // a soft ground wash plus the already-drawn sil is enough.
+        const lg = c.createLinearGradient(0, sy, 0, sy + sh);
+        lg.addColorStop(0, 'rgba(' + Math.round(fw.litR * 255) + ',' + Math.round(fw.litG * 255) + ',' + Math.round(fw.litB * 255) + ',0)');
+        lg.addColorStop(0.45, 'rgba(' + Math.round(fw.litR * 255) + ',' + Math.round(fw.litG * 255) + ',' + Math.round(fw.litB * 255) + ',0.35)');
+        lg.addColorStop(1, 'rgba(' + Math.round(fw.litR * 255) + ',' + Math.round(fw.litG * 255) + ',' + Math.round(fw.litB * 255) + ',0.15)');
+        c.globalCompositeOperation = 'source-atop';
+        // source-atop would need the sil as the only content; clip to sil rect and use multiply-like wash
+        c.globalCompositeOperation = 'lighter';
+        c.fillStyle = lg;
+        c.fillRect(box.left, sy, box.dw, sh);
+      }
+      c.restore();
+    }
+
+    // Light veil so the board stays readable without muting the bursts too much.
+    c.fillStyle = 'rgba(0,0,0,0.16)';
+    c.fillRect(box.left, box.top, box.dw, box.dh);
+  }
+
+
   function effectStageDraw(now) {
     const kind = isEffect(lookIdx < 0 ? themeIdx : lookIdx);
     if (!kind) {
@@ -3236,6 +3661,7 @@
     c0.clearRect(0, 0, fx.w, fx.h);
     if (kind === 'farm') drawFarmScene(c0, fx.w, fx.h, reduce);
     else if (kind === 'beach') drawBeachScene(c0, fx.w, fx.h, reduce);
+    else if (kind === 'fireworks') drawFireworksScene(c0, fx.w, fx.h, reduce);
     else {
       drawFrogScene(c0, fx.w, fx.h, reduce);
       // pond ripples + shimmer live on the photo, behind the board, so they show in the margins
