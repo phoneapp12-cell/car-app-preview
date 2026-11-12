@@ -568,8 +568,8 @@
   const LINECLEAR_DUR = 1.67;
   function lineClearSrc() { return 'tetris-bg/lineclear-' + LINECLEAR_HASH + '.mp3'; }
   const CALLOUT_VOICES = {
-    amazing: 'c4d7ae5c', brilliant: '225b6d4c', fantastic: 'e2da3afd',
-    awesome: '20dd28a7', yougotthis: 'aee779f3', keepgoing: '6b1d8446'
+    amazing: 'c46de485', brilliant: 'f64c21f2', fantastic: '271ecea2',
+    awesome: '3273dcf3', yougotthis: '7761c550', keepgoing: '6be51176'
   };
   const CALLOUT_TEXT = {
     amazing: 'Amazing!', brilliant: 'Brilliant!', fantastic: 'Fantastic!',

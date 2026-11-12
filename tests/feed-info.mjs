@@ -1905,6 +1905,16 @@ if (live) {
     assert.ok(tetGame.CALLOUT_VOICES[id] && /^[0-9a-f]{8}$/.test(tetGame.CALLOUT_VOICES[id]));
     assert.ok(fs.existsSync('feed/' + tetGame.calloutSrc(id)), 'voice ' + id);
   });
+  // 1.9.187 bright energetic male callouts (en-US-RogerNeural); old Molly clips are gone
+  const VO187 = { amazing: 'c46de485', brilliant: 'f64c21f2', fantastic: '271ecea2', awesome: '3273dcf3', yougotthis: '7761c550', keepgoing: '6be51176' };
+  Object.keys(VO187).forEach(id => {
+    assert.strictEqual(tetGame.CALLOUT_VOICES[id], VO187[id]);
+    assert.ok(fs.existsSync('feed/tetris-bg/vo-' + id + '-' + VO187[id] + '.mp3'));
+  });
+  ['c4d7ae5c','225b6d4c','e2da3afd','20dd28a7','aee779f3','6b1d8446'].forEach(h => {
+    const stale = fs.readdirSync('feed/tetris-bg').filter(f => f.indexOf(h) >= 0);
+    assert.deepEqual(stale, [], 'old Molly clip ' + h + ' must be removed');
+  });
   assert.ok(src.includes('function maybeCallout') && src.includes('function playCallout') && src.includes('voGain'));
   const praise = new Set();
   for (let i = 0; i < 24; i++) praise.add(tetGame.pickCallout({ n: 4, b2b: false, combo: 1, high: false, near: false }));
