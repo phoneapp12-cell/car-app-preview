@@ -356,6 +356,7 @@
   // 1.9.179 m0 (Beach) re-analysed after Shane's new level-3 track (115.5 BPM, C major, loop-safe 392 beats).
   // 1.9.180 m1 (Fireworks) re-analysed after Shane's level-4 soundscape (131 BPM, F# minor kept for chimes, loop-safe 905 beats).
   // 1.9.188 m4 (City, now level 5) re-analysed after Shane's Hot In The City track (111.25 BPM, G minor, loop-safe 420 beats).
+  // 1.9.193 m9 (New Zealand, level 8) re-analysed after Shane's soundtrack (143.25 BPM, D# major, loop-safe 236 beats).
   const TRACKS = [
     { bpm: 115.5, offset: 0.229, key: 'C', mode: 'major' },
     { bpm: 131, offset: 0.083, key: 'F#', mode: 'minor' },
@@ -366,7 +367,7 @@
     { bpm: 171, offset: 0.006, key: 'D', mode: 'major' },
     { bpm: 123, offset: 0.163, key: 'D', mode: 'minor' },
     { bpm: 117.5, offset: 0.209, key: 'A', mode: 'major' },
-    { bpm: 112.5, offset: 0.468, key: 'D#', mode: 'major' },
+    { bpm: 143.25, offset: 0.035, key: 'D#', mode: 'major' },
     { bpm: 123, offset: 0.218, key: 'G', mode: 'major' },
     { bpm: 127.45, offset: 0.266, key: 'D', mode: 'major' }
   ];
@@ -831,7 +832,21 @@
   const HIGHSCORE_HASH = 'f7bf7066';
   const HIGHSCORE_VOL = 0.85;
   const HIGHSCORE_DUR = 2.09;
-  const HIGH_SCORE_MS = 2200;
+  // 1.9.193: add 1000ms of visible hold before the fade-out. Fade-in and fade-out
+  // keep the original 2200ms candy timing (fade starts after 0.72 of that span).
+  const HIGH_SCORE_FADE_MS = 2200;
+  const HIGH_SCORE_MS = HIGH_SCORE_FADE_MS + 1000;
+  function highScoreProg(hs) {
+    if (!hs) return 0;
+    if (hs.hold) return hs.at || 0;
+    const old = HIGH_SCORE_FADE_MS;
+    const extra = Math.max(0, (hs.dur || HIGH_SCORE_MS) - old);
+    const tm = hs.t || 0;
+    const fadeOutAt = 0.72 * old;
+    if (tm <= fadeOutAt) return Math.min(0.72, tm / old);
+    if (tm < fadeOutAt + extra) return 0.72;
+    return Math.min(1, 0.72 + (tm - fadeOutAt - extra) / (0.28 * old) * 0.28);
+  }
   function highScoreSrc() { return 'tetris-bg/highscore-' + HIGHSCORE_HASH + '.mp3'; }
   let hsBuf = null, hsLoading = null, hsGain = null;
   function ensureHsGain() {
@@ -885,6 +900,48 @@
     const start = (buf) => { playDecoded(buf, roosterGain, ROOSTER_VOL, ac.currentTime); };
     if (roosterBuf) start(roosterBuf);
     else if (roosterLoading) roosterLoading.then(b => { if (b && soundOn && ac) { ensureRoosterGain(); start(b); } });
+  }
+  // 1.9.193 Seagull squawk: Freesound 263786 "Seagull single call" by steaq, CC0.
+  // Pitched down 4 semitones, 300 Hz high-pass, 3.5 kHz low-pass, quiet under the music.
+  const SEAGULL_HASH = '712237c3';
+  const SEAGULL_VOL = 0.4;
+  const SEAGULL_DUR = 0.47;
+  function seagullSrc() { return 'tetris-bg/seagull-' + SEAGULL_HASH + '.mp3'; }
+  let seagullBuf = null, seagullLoading = null, seagullGain = null;
+  function ensureSeagullGain() {
+    if (!ac || seagullGain) return;
+    seagullGain = ac.createGain();
+    seagullGain.gain.value = 1;
+    seagullGain.connect(ac.destination);
+  }
+  function loadSeagull() {
+    if (seagullBuf) return Promise.resolve(seagullBuf);
+    if (seagullLoading) return seagullLoading;
+    if (!ac) return Promise.resolve(null);
+    seagullLoading = fetch(seagullSrc()).then(r => r.arrayBuffer()).then(ab => ac.decodeAudioData(ab.slice(0))).then(b => { seagullBuf = b; return b; }).catch(() => { seagullLoading = null; return null; });
+    return seagullLoading;
+  }
+  function playSeagullSfx() {
+    if (!soundOn || !ac) return;
+    ensureSeagullGain();
+    loadSeagull();
+    const rate = 0.94 + Math.random() * 0.1;
+    const start = function (buf) {
+      if (!buf || !seagullGain || !ac) return;
+      const src = ac.createBufferSource();
+      src.buffer = buf;
+      src.playbackRate.value = rate;
+      const hp = ac.createBiquadFilter();
+      hp.type = 'highpass'; hp.frequency.value = 300; hp.Q.value = 0.7;
+      const lp = ac.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 3500; lp.Q.value = 0.5;
+      const g0 = ac.createGain();
+      g0.gain.value = SEAGULL_VOL;
+      src.connect(hp); hp.connect(lp); lp.connect(g0); g0.connect(seagullGain);
+      src.start(ac.currentTime);
+    };
+    if (seagullBuf) start(seagullBuf);
+    else if (seagullLoading) seagullLoading.then(function (b) { if (b && soundOn && ac) { ensureSeagullGain(); start(b); } });
   }
     function boardOccupied(g) {
     return !!(g && g.board && g.board.some(function (row) { return row.some(function (v) { return v; }); }));
@@ -958,10 +1015,10 @@
   }
   function drawHighScore(ctx, hs) {
     if (!hs) return;
-    const p = hs.hold ? (hs.at || 0) : Math.min(1, hs.t / hs.dur);
+    const p = highScoreProg(hs);
     const fade = candyFade(p);
     const scale = candyScale(p, hs.reduce);
-    const tSec = p * (hs.dur / 1000);
+    const tSec = hs.hold ? (hs.at || 0) * (HIGH_SCORE_FADE_MS / 1000) : (hs.t || 0) / 1000;
     ctx.save();
     ctx.globalAlpha = 0.26 * fade;
     ctx.fillStyle = '#1a0e04';
@@ -1812,6 +1869,7 @@
     }
     g.clearFx = { t: 0, dur, rows: rows.slice(), snap, snapHits: snapHits ? snapHits.map(r => r.slice()) : null, n, kind, parts, lines, level, hold: false, at: 0, banner: n === 4 };
     if (isEffect(ti)) { effectOnClear(g.clearFx, ti); lifeReact(); }
+    if (ti === NZ_THEME) startNzFlash();
     return g.clearFx;
   }
   function tickClear(g, dt) {
@@ -2003,6 +2061,31 @@
     return g;
   }
   function dropInterval(level) { return Math.max(60, 800 * Math.pow(0.85, level - 1)); }
+  // 1.9.193 New Zealand (theme 9, level 8): gravity is quantised to the song's beat.
+  // Starts at 1 row every 2 beats, ramps to 1 row per beat, then 2 rows per beat
+  // near the end, never faster than the global dropInterval for that level.
+  const NZ_THEME = 9;
+  function nzProg(lines, level) {
+    const lv = Math.max(1, level || 1);
+    const base = (lv - 1) * 10;
+    return Math.max(0, Math.min(1, ((lines || 0) - base) / 10));
+  }
+  function nzBeatsPerRow(prog) {
+    const p = Math.max(0, Math.min(1, prog || 0));
+    if (p < 0.55) return 2 - p / 0.55;
+    return 1 - 0.5 * Math.min(1, (p - 0.55) / 0.45);
+  }
+  function nzDropInterval(lines, level) {
+    const tr = TRACKS[NZ_THEME] || { bpm: 143.25 };
+    const beatMs = 60000 / (tr.bpm > 0 ? tr.bpm : 143.25);
+    const ms = nzBeatsPerRow(nzProg(lines, level)) * beatMs;
+    return Math.max(dropInterval(level), ms);
+  }
+  function nzSnapTime(t, grid, offset) {
+    const off = offset || 0;
+    const k = Math.round((t - off) / grid);
+    return off + k * grid;
+  }
 
   function findFullRows(g) {
     const full = [];
@@ -2316,7 +2399,7 @@
   // effects cannot pause or mute a separate HTML audio element on iOS/Android WebView.
   // Filenames include a content hash because some phone media caches ignore ?v= query strings
   // (1.9.163 busted the URL but Shane still heard the old bullfrog track).
-  const BGM_HASH = ['da11a54a', '9813c57a', '9ca3b84e', '7776197f', '1814d32a', '63c9eafe', '7bc4ebcd', 'b76dd1d3', 'fdec4369', '2b10c8ba', 'cdbe7d34', '8afd517f'];
+  const BGM_HASH = ['da11a54a', '9813c57a', '9ca3b84e', '7776197f', '1814d32a', '63c9eafe', '7bc4ebcd', 'b76dd1d3', 'fdec4369', '6a43316b', 'cdbe7d34', '8afd517f'];
   function bgmSrc(ti) { return 'tetris-bg/m' + ti + '-' + BGM_HASH[ti] + '.mp3'; }
   let bgmGain = null, bgmNode = null, bgmIdx = -1, bgmBufs = {}, bgmLoading = {}, bgmAt = 0, bgmRate = 1, bgmWant = false, bgmWantTi = -1, bgmAnalyser = null, bgmBins = null;
   function silentUnlock() {
@@ -2520,19 +2603,171 @@
     return { g: g, started: !!snap.started, musicOn: snap.musicOn !== false, soundOn: snap.soundOn !== false };
   }
 
+
+  // 1.9.193 New Zealand line-clear: a soft lightning flash of the painting, 1–2
+  // flickers fading over about 0.4s. Not a harsh full-white strobe. Existing line-clear sound is unchanged.
+  let nzFlash = null;
+  function startNzFlash(opts) {
+    opts = opts || {};
+    nzFlash = { t: 0, dur: 400, hold: !!opts.hold, at: opts.at != null ? opts.at : 0 };
+  }
+  function nzFlashAlpha(tSec) {
+    const a1 = Math.exp(-Math.pow((tSec - 0.04) / 0.045, 2));
+    const a2 = 0.55 * Math.exp(-Math.pow((tSec - 0.16) / 0.05, 2));
+    const fade = Math.max(0, 1 - tSec / 0.4);
+    return 0.36 * (a1 + a2) * fade;
+  }
+  function tickNzFlash(dt) {
+    if (!nzFlash) return;
+    if (nzFlash.hold) return;
+    nzFlash.t += dt;
+    if (nzFlash.t >= nzFlash.dur) nzFlash = null;
+  }
+  function drawNzFlash(ctx, w, h) {
+    if (!nzFlash || !ctx) return;
+    const tSec = (nzFlash.hold ? nzFlash.at : nzFlash.t) / 1000;
+    const a = nzFlashAlpha(tSec);
+    if (a < 0.01) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    ctx.globalAlpha = a;
+    const grd = ctx.createRadialGradient(w * 0.55, h * 0.2, 16, w * 0.5, h * 0.32, Math.max(w, h) * 0.8);
+    grd.addColorStop(0, 'rgba(255,252,240,1)');
+    grd.addColorStop(0.4, 'rgba(210,230,255,0.9)');
+    grd.addColorStop(1, 'rgba(180,210,255,0)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+  }
+  function newNzGulls() {
+    const birds = [];
+    for (let i = 0; i < 4; i++) {
+      birds.push({
+        x: 70 + i * 90, y: 60 + (i % 3) * 36, z: 0.55 + i * 0.16,
+        ang: (i % 2 ? -0.12 : 0.1), dir: i % 2 ? -1 : 1,
+        bank: 0, flap: i * 1.1, turn: 0, ph: i * 1.7
+      });
+    }
+    return { birds: birds, t: 0, squawkIn: 6 + Math.random() * 9, ready: false, w: 0, h: 0 };
+  }
+  let nzGulls = newNzGulls();
+  function nzGullsReset() { nzGulls = newNzGulls(); }
+  function stepNzGulls(st, dt, w, h, flags) {
+    st = st || nzGulls;
+    w = w || st.w || 390; h = h || st.h || 844;
+    st.w = w; st.h = h;
+    const sec = Math.max(0, dt || 0) / 1000;
+    st.t += sec;
+    if (!st.ready) {
+      for (let i = 0; i < st.birds.length; i++) {
+        const b = st.birds[i];
+        b.x = (0.08 + (i * 0.22) % 0.84) * w;
+        b.y = (0.06 + (i * 0.065) % 0.26) * h;
+      }
+      st.ready = true;
+    }
+    if (flags && flags.reduce) return st;
+    for (let i = 0; i < st.birds.length; i++) {
+      const b = st.birds[i];
+      b.flap += sec * (2.0 + b.z * 0.6);
+      const speed = (26 + 24 * b.z) * (0.88 + 0.12 * Math.sin(st.t * 0.6 + b.ph));
+      if (b.turn > 0) {
+        b.turn -= sec;
+        b.bank += (b.dir * 0.85 - b.bank) * Math.min(1, sec * 3);
+        b.ang += b.dir * sec * 1.35;
+        b.x += Math.cos(b.ang) * b.dir * speed * 0.45 * sec;
+        b.y += Math.sin(st.t * 0.8 + b.ph) * 8 * sec;
+        if (b.turn <= 0) { b.dir *= -1; b.turn = 0; }
+      } else {
+        b.bank += (0 - b.bank) * Math.min(1, sec * 1.8);
+        b.x += Math.cos(b.ang) * (b.dir) * speed * sec;
+        b.y += Math.sin(b.ang) * speed * 0.2 * sec + Math.sin(st.t * 0.85 + b.ph) * 7 * sec;
+        if (b.x < w * 0.04 || b.x > w * 0.96) { b.turn = 1.15; b.x = Math.max(w * 0.04, Math.min(w * 0.96, b.x)); }
+        if (b.y < h * 0.035) b.y = h * 0.035;
+        if (b.y > h * 0.36) b.y = h * 0.36;
+      }
+    }
+    return st;
+  }
+  function drawNzGull(ctx, b) {
+    const sc = 0.7 + 0.55 * (b.z || 1);
+    const flap = Math.sin(b.flap) * 0.22;
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.rotate(b.ang * 0.35);
+    ctx.scale((b.dir < 0 ? -sc : sc), sc);
+    ctx.rotate(b.bank * 0.45);
+    ctx.globalAlpha = 0.16;
+    ctx.fillStyle = 'rgba(40,60,80,0.4)';
+    ctx.beginPath(); ctx.ellipse(2, 11, 13, 3.6, 0, 0, 6.283); ctx.fill();
+    ctx.globalAlpha = 0.92;
+    ctx.fillStyle = 'rgba(186, 200, 210, 0.92)';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(-8, -10 - flap * 16, -26, -7 - flap * 9);
+    ctx.quadraticCurveTo(-10, -2, 2, 2);
+    ctx.fill();
+    const body = ctx.createLinearGradient(-10, -4, 12, 8);
+    body.addColorStop(0, '#f7f4ee');
+    body.addColorStop(0.55, '#e6e2da');
+    body.addColorStop(1, '#b4c0c8');
+    ctx.fillStyle = body;
+    ctx.beginPath(); ctx.ellipse(2, 1, 13, 5.4, -0.16, 0, 6.283); ctx.fill();
+    const wing = ctx.createLinearGradient(0, 0, 18, -16);
+    wing.addColorStop(0, '#fffdf8');
+    wing.addColorStop(0.55, '#d3dbe2');
+    wing.addColorStop(1, '#97a6b1');
+    ctx.fillStyle = wing;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(8, -16 - flap * 18, 30, -11 - flap * 8);
+    ctx.quadraticCurveTo(12, -4, 2, 3);
+    ctx.fill();
+    ctx.globalAlpha = 0.4;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.moveTo(2, -1);
+    ctx.quadraticCurveTo(10, -10, 17, -7);
+    ctx.quadraticCurveTo(8, -3, 2, 0);
+    ctx.fill();
+    ctx.globalAlpha = 0.95;
+    ctx.fillStyle = '#f3f0ea';
+    ctx.beginPath(); ctx.ellipse(13, -1.2, 4.1, 3.3, 0.2, 0, 6.283); ctx.fill();
+    ctx.fillStyle = '#e2a24a';
+    ctx.beginPath(); ctx.moveTo(16.7, -1); ctx.lineTo(21.8, 0.2); ctx.lineTo(16.5, 1.05); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#2a2a28';
+    ctx.beginPath(); ctx.arc(14.5, -1.55, 0.65, 0, 6.283); ctx.fill();
+    ctx.fillStyle = '#c5ced4';
+    ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(-17.5, -2.6); ctx.lineTo(-16.5, 2); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  function drawNzGulls(ctx, st) {
+    st = st || nzGulls;
+    if (!st || !st.birds) return;
+    const list = st.birds.slice().sort(function (a, b) { return a.z - b.z; });
+    for (let i = 0; i < list.length; i++) drawNzGull(ctx, list[i]);
+  }
+  function tickNzSquawk(dt) {
+    if (!nzGulls) return;
+    if (!g || themeFor(g.clearFx ? g.clearFx.level : g.level) !== NZ_THEME) return;
+    nzGulls.squawkIn -= dt / 1000;
+    if (nzGulls.squawkIn <= 0) {
+      playSeagullSfx();
+      nzGulls.squawkIn = 6 + Math.random() * 9;
+    }
+  }
+
   // 1.9.191 Beach (theme 0, level 3): 2–3 small painterly surfers ride the
   // top of the settled Tetris stack inside the well. They follow the skyline
   // column by column, carve up and over block tops, drop at height changes
   // and at the walls with a soft spray, turn around at the edges, and
   // re-route when lines clear. Empty well: they ride the floor. No gameplay effect.
   // The 1.9.190 sea-wash riders were removed so the well does not get cluttered.
-  const STACK_SURF_N = 2;
-  const STACK_SURF_SPEED = 52;
-  const STACK_SURF_INSET = 6;
-  // 1.9.192: much bigger, mostly opaque figures — about 1.5 cells tall, board 1.75 cells.
-  const STACK_SURF_H = 42;
-  const STACK_SURF_BOARD = 49;
-  const STACK_SURF_ALPHA = 0.9;
+  // 1.9.193: those surfers were removed. A painterly sea-blue wave band
+  // with a soft white foam crest now rides the same skyline instead.
+  const STACK_WAVE_SPEED = 48;
+  const STACK_WAVE_INSET = 6;
+  const STACK_WAVE_H = 15;
   function stackColY(board, c) {
     if (!board || c < 0 || c >= COLS) return ROWS * CELL;
     for (let r = 0; r < ROWS; r++) if (board[r][c]) return r * CELL;
@@ -2542,8 +2777,8 @@
     const pts = [];
     for (let c = 0; c < COLS; c++) {
       const y = stackColY(board, c);
-      const x0 = c * CELL + (c === 0 ? STACK_SURF_INSET : 0);
-      const x1 = (c + 1) * CELL - (c === COLS - 1 ? STACK_SURF_INSET : 0);
+      const x0 = c * CELL + (c === 0 ? STACK_WAVE_INSET : 0);
+      const x1 = (c + 1) * CELL - (c === COLS - 1 ? STACK_WAVE_INSET : 0);
       if (!pts.length) pts.push({ x: x0, y: y });
       else if (Math.abs(pts[pts.length - 1].y - y) > 0.5) {
         pts.push({ x: pts[pts.length - 1].x, y: y, drop: y > pts[pts.length - 1].y });
@@ -2558,7 +2793,7 @@
     return n;
   }
   function stackPathAt(pts, dist) {
-    if (!pts || pts.length < 2) return { x: STACK_SURF_INSET, y: ROWS * CELL, ang: 0, drop: false, rise: false, s: 0, len: 0 };
+    if (!pts || pts.length < 2) return { x: STACK_WAVE_INSET, y: ROWS * CELL, ang: 0, drop: false, rise: false, s: 0, len: 0 };
     const total = stackPathLen(pts);
     if (total <= 0) return { x: pts[0].x, y: pts[0].y, ang: 0, drop: false, rise: false, s: 0, len: 0 };
     const s = Math.max(0, Math.min(total, dist));
@@ -2567,10 +2802,10 @@
       const dx = pts[i].x - pts[i - 1].x, dy = pts[i].y - pts[i - 1].y;
       const len = Math.hypot(dx, dy) || 1e-6;
       if (acc + len >= s - 1e-6) {
-        const t = (s - acc) / len;
+        const u = (s - acc) / len;
         return {
-          x: pts[i - 1].x + dx * t,
-          y: pts[i - 1].y + dy * t,
+          x: pts[i - 1].x + dx * u,
+          y: pts[i - 1].y + dy * u,
           ang: Math.atan2(dy, dx),
           drop: !!(pts[i].drop || dy > 4),
           rise: dy < -4,
@@ -2591,11 +2826,11 @@
       const dx = bx - ax, dy = by - ay;
       const len2 = dx * dx + dy * dy || 1e-6;
       const len = Math.sqrt(len2);
-      let t = ((x - ax) * dx + (y - ay) * dy) / len2;
-      t = Math.max(0, Math.min(1, t));
-      const px = ax + t * dx, py = ay + t * dy;
+      let u = ((x - ax) * dx + (y - ay) * dy) / len2;
+      u = Math.max(0, Math.min(1, u));
+      const px = ax + u * dx, py = ay + u * dy;
       const d2 = (px - x) * (px - x) + (py - y) * (py - y);
-      if (d2 < best.d2) best = { s: acc + t * len, d2: d2, x: px, y: py };
+      if (d2 < best.d2) best = { s: acc + u * len, d2: d2, x: px, y: py };
       acc += len;
     }
     return best;
@@ -2605,197 +2840,153 @@
     for (let c = 0; c < COLS; c++) k += stackColY(board, c) + ',';
     return k;
   }
-  function newStackSurf() {
-    return {
-      ready: false,
-      riders: [0, 1].map(function (i) {
-        return { s: 40 + i * 150, dir: i === 1 ? -1 : 1, hue: i, x: 0, y: ROWS * CELL, ang: 0, bob: i * 1.7, dropT: 0 };
-      }),
-      spray: [],
-      pts: null,
-      key: '',
-      len: 0
-    };
+  // 1.9.193: the stack surfers are gone. A translucent painterly sea-blue wave
+  // band with a soft white foam crest rides the settled skyline, curling and
+  // rolling left to right and back. Visual only, under the piece and ghost.
+  function newStackWave() {
+    return { ready: false, s: 36, dir: 1, t: 0, spray: [], pts: null, key: '', len: 0, x: 0, y: ROWS * CELL, ang: 0 };
   }
-  function stackAddSpray(surf, x, y, dir, heavy) {
-    const n = heavy ? 7 : 4;
+  function stackAddSpray(wave, x, y, dir, heavy) {
+    const n = heavy ? 8 : 5;
     for (let i = 0; i < n; i++) {
-      const a = -1.35 + Math.random() * 2.7;
-      const sp = 14 + Math.random() * (heavy ? 34 : 20);
-      surf.spray.push({
+      const a = -1.4 + Math.random() * 2.8;
+      const sp = 16 + Math.random() * (heavy ? 32 : 18);
+      wave.spray.push({
         x: x + (Math.random() - 0.5) * 8,
         y: y - 2,
         vx: Math.cos(a) * sp + (dir || 0) * 8,
-        vy: Math.sin(a) * sp * 0.25 - 16 - Math.random() * 14,
+        vy: Math.sin(a) * sp * 0.2 - 18 - Math.random() * 12,
         t: 0,
         life: 0.28 + Math.random() * 0.22,
-        sz: 1.1 + Math.random() * 1.5
+        sz: 1.2 + Math.random() * 1.6
       });
     }
   }
-  function stepStackSurf(surf, board, dt, flags) {
+  function stepStackWave(wave, board, dt, flags) {
     flags = flags || {};
-    if (!surf || !board) return surf;
-    const sec = dt / 1000;
+    if (!wave || !board) return wave;
+    const sec = Math.max(0, dt || 0) / 1000;
+    wave.t += sec;
     const pts = stackSkyline(board);
     const key = stackSkyKey(board);
     const len = stackPathLen(pts);
-    if (key !== surf.key) {
-      if (surf.key) {
-        for (let i = 0; i < surf.riders.length; i++) {
-          const r = surf.riders[i];
-          const n = stackNearestS(pts, r.x, r.y);
-          if (n.y - r.y > 10) stackAddSpray(surf, n.x, n.y, r.dir, true);
-          r.s = n.s;
-        }
+    if (key !== wave.key) {
+      if (wave.key) {
+        const n = stackNearestS(pts, wave.x, wave.y);
+        if (n.y - wave.y > 10) stackAddSpray(wave, n.x, n.y, wave.dir, true);
+        wave.s = n.s;
       }
-      surf.key = key;
-      surf.pts = pts;
-      surf.len = len;
-      surf.ready = true;
+      wave.key = key;
+      wave.pts = pts;
+      wave.len = len;
+      wave.ready = true;
     } else {
-      surf.pts = pts;
-      surf.len = len;
+      wave.pts = pts;
+      wave.len = len;
     }
-    if (surf.spray.length) {
-      for (let i = 0; i < surf.spray.length; i++) {
-        const d = surf.spray[i];
+    if (wave.spray.length) {
+      for (let i = 0; i < wave.spray.length; i++) {
+        const d = wave.spray[i];
         d.t += sec;
         d.x += d.vx * sec;
         d.y += d.vy * sec;
         d.vy += 90 * sec;
       }
-      surf.spray = surf.spray.filter(function (d) { return d.t < d.life; });
+      wave.spray = wave.spray.filter(function (d) { return d.t < d.life; });
     }
     const reduce = !!flags.reduce;
-    for (let i = 0; i < surf.riders.length; i++) {
-      const r = surf.riders[i];
-      r.bob += sec * 6;
-      if (reduce) {
-        const p = stackPathAt(surf.pts, r.s);
-        r.x = p.x; r.y = p.y; r.ang = p.ang;
-        continue;
-      }
-      const before = stackPathAt(surf.pts, r.s);
-      let speed = STACK_SURF_SPEED;
-      if (before.drop) speed *= 1.35;
-      if (before.rise) speed *= 0.85;
-      r.s += r.dir * speed * sec;
+    const before = stackPathAt(wave.pts, wave.s);
+    if (!reduce) {
+      let speed = STACK_WAVE_SPEED;
+      if (before.drop) speed *= 1.28;
+      if (before.rise) speed *= 0.86;
+      wave.s += wave.dir * speed * sec;
       let turned = false;
-      if (r.s <= 0) { r.s = 0; r.dir = 1; turned = true; }
-      if (r.s >= surf.len) { r.s = surf.len; r.dir = -1; turned = true; }
-      const p = stackPathAt(surf.pts, r.s);
-      if (turned) stackAddSpray(surf, p.x, p.y, r.dir, false);
-      if (p.drop && !before.drop) stackAddSpray(surf, p.x, p.y, r.dir, true);
-      r.x = p.x; r.y = p.y; r.ang = p.ang;
-      r.dropT = p.drop ? Math.min(1, (r.dropT || 0) + sec * 8) : Math.max(0, (r.dropT || 0) - sec * 6);
+      if (wave.s <= 0) { wave.s = 0; wave.dir = 1; turned = true; }
+      if (wave.s >= wave.len) { wave.s = wave.len; wave.dir = -1; turned = true; }
+      const p = stackPathAt(wave.pts, wave.s);
+      if (turned) stackAddSpray(wave, p.x, p.y, wave.dir, false);
+      if (p.drop && !before.drop) stackAddSpray(wave, p.x, p.y, wave.dir, true);
+      wave.x = p.x; wave.y = p.y; wave.ang = p.ang;
+    } else {
+      wave.x = before.x; wave.y = before.y; wave.ang = before.ang;
     }
-    return surf;
+    return wave;
   }
-  let stackSurf = newStackSurf();
-  function stackSurfReset() { stackSurf = newStackSurf(); }
-  const STACK_SURF_PAL = [
-    { board: '#ff7a3a', wet: '#c44a22', suit: '#1c2438', skin: '#e8b089', hair: '#2a1c14' },
-    { board: '#2ad4c8', wet: '#178a82', suit: '#1a3a48', skin: '#d9a06e', hair: '#3d2416' }
-  ];
-  function drawStackSurfer(ctx, r) {
-    const col = STACK_SURF_PAL[r.hue % STACK_SURF_PAL.length];
-    const H = STACK_SURF_H, BL = STACK_SURF_BOARD;
-    const bob = Math.sin(r.bob || 0) * 1.1;
-    const face = r.dir < 0 ? -1 : 1;
-    const deck = -5;
-    ctx.save();
-    ctx.translate(r.x, r.y + bob);
-    ctx.scale(face, 1);
-    ctx.rotate((r.ang || 0) * face + (r.dropT || 0) * 0.28);
-    ctx.globalAlpha = STACK_SURF_ALPHA;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    // Soft shadow on the blocks under the board.
-    ctx.fillStyle = 'rgba(20, 16, 28, 0.34)';
-    ctx.beginPath(); ctx.ellipse(2, 3, BL * 0.46, 5.8, 0, 0, Math.PI * 2); ctx.fill();
-    // Board: underside, colourful deck, rail stripe, sun highlight. ~1.75 cells long.
-    ctx.fillStyle = 'rgba(30, 20, 18, 0.5)';
-    ctx.beginPath(); ctx.ellipse(1.6, deck + 2.4, BL * 0.50, 5.4, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = col.board;
-    ctx.beginPath(); ctx.ellipse(0, deck, BL * 0.50, 5.1, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = col.wet;
-    ctx.beginPath(); ctx.ellipse(-BL * 0.03, deck - 0.5, BL * 0.34, 2.3, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(255, 240, 210, 0.5)';
-    ctx.beginPath(); ctx.ellipse(-BL * 0.08, deck - 2.3, BL * 0.28, 1.3, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
-    ctx.lineWidth = 1.3;
-    ctx.beginPath(); ctx.ellipse(0, deck, BL * 0.50, 5.1, 0, 0, Math.PI * 2); ctx.stroke();
-    // Feet on the deck.
-    ctx.fillStyle = col.suit;
-    ctx.beginPath(); ctx.ellipse(-6, deck - 3.2, 4.4, 2.1, 0.12, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(7, deck - 3.4, 4.4, 2.1, -0.16, 0, Math.PI * 2); ctx.fill();
-    // Bent knees, crouched stance.
-    ctx.strokeStyle = col.suit;
-    ctx.lineWidth = 6;
-    ctx.beginPath();
-    ctx.moveTo(-5, deck - 5);
-    ctx.quadraticCurveTo(-12, deck - 14, -2, deck - 21);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(7, deck - 5);
-    ctx.quadraticCurveTo(13, deck - 13, 2, deck - 21);
-    ctx.stroke();
-    ctx.fillStyle = col.suit;
-    ctx.beginPath(); ctx.arc(-11, deck - 13.5, 3.3, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(12, deck - 12.8, 3.3, 0, Math.PI * 2); ctx.fill();
-    // Torso, slightly leaned forward, with a 3D rim.
-    ctx.save();
-    ctx.translate(0, deck - 27);
-    ctx.rotate(-0.2);
-    ctx.fillStyle = col.suit;
-    ctx.beginPath(); ctx.ellipse(0, 0, 7.4, 11.6, 0.06, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
-    ctx.beginPath(); ctx.ellipse(2.8, -1.2, 3.1, 8.2, 0.1, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
-    // Arms out for balance.
-    ctx.strokeStyle = col.skin;
-    ctx.lineWidth = 3.8;
-    ctx.beginPath();
-    ctx.moveTo(4, deck - 31);
-    ctx.quadraticCurveTo(16, deck - 37, 23, deck - 24);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(-3, deck - 30);
-    ctx.quadraticCurveTo(-16, deck - 35, -23, deck - 22);
-    ctx.stroke();
-    ctx.fillStyle = col.skin;
-    ctx.beginPath(); ctx.arc(23, deck - 24, 2.7, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(-23, deck - 22, 2.7, 0, Math.PI * 2); ctx.fill();
-    // Head and hair. Hair tip sits about 1.5 cells above the deck.
-    const hx = 1.6, hy = deck - 35;
-    ctx.fillStyle = col.skin;
-    ctx.beginPath(); ctx.arc(hx, hy, 6.3, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(255, 230, 200, 0.4)';
-    ctx.beginPath(); ctx.arc(hx + 1.8, hy - 1.5, 3.0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = col.hair;
-    ctx.beginPath(); ctx.ellipse(hx - 0.6, hy - 3.3, 6.3, 4.5, -0.28, Math.PI * 0.15, Math.PI * 1.95); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(hx - 3.4, hy - 0.4, 3.5, 5.0, 0.28, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(hx + 2.5, hy - 5.3, 2.5, 2.1, -0.45, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
-  }
-  function drawStackSurfers(ctx) {
+  let stackWave = newStackWave();
+  function stackWaveReset() { stackWave = newStackWave(); }
+  function drawStackWave(ctx) {
     if (!g || isEffect((g.clearFx ? themeFor(g.clearFx.level) : themeFor(g.level))) !== 'beach') return;
-    if (!stackSurf.ready && g.board) stepStackSurf(stackSurf, g.board, 0);
-    if (!stackSurf.ready) return;
+    if (!stackWave.ready && g.board) stepStackWave(stackWave, g.board, 0);
+    if (!stackWave.ready || !stackWave.pts || stackWave.pts.length < 2) return;
+    const pts = stackWave.pts;
+    const bob = Math.sin(stackWave.t * 2.15) * 1.7;
     ctx.save();
     ctx.beginPath();
     ctx.rect(0, 0, COLS * CELL, ROWS * CELL);
     ctx.clip();
-    for (let i = 0; i < stackSurf.spray.length; i++) {
-      const d = stackSurf.spray[i];
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y + bob);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y + bob);
+    for (let i = pts.length - 1; i >= 0; i--) ctx.lineTo(pts[i].x, pts[i].y + bob + STACK_WAVE_H);
+    ctx.closePath();
+    const band = ctx.createLinearGradient(0, 0, 0, ROWS * CELL);
+    band.addColorStop(0, 'rgba(70, 175, 210, 0.55)');
+    band.addColorStop(1, 'rgba(20, 90, 140, 0.42)');
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = 'rgba(46, 150, 196, 0.48)';
+    ctx.fill();
+    ctx.globalAlpha = 0.28;
+    ctx.fillStyle = 'rgba(30, 110, 160, 0.7)';
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y + bob + STACK_WAVE_H * 0.55);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y + bob + STACK_WAVE_H * 0.55);
+    for (let i = pts.length - 1; i >= 0; i--) ctx.lineTo(pts[i].x, pts[i].y + bob + STACK_WAVE_H);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 0.55;
+    ctx.strokeStyle = 'rgba(180, 225, 240, 0.8)';
+    ctx.lineWidth = 3.4;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y + bob + 3.2);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y + bob + 3.2);
+    ctx.stroke();
+    ctx.globalAlpha = 0.95;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.92)';
+    ctx.lineWidth = 2.3;
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y + bob);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y + bob);
+    ctx.stroke();
+    const cx = stackWave.x, cy = stackWave.y + bob - 1, dir = stackWave.dir || 1;
+    ctx.globalAlpha = 0.7;
+    ctx.fillStyle = 'rgba(40, 145, 190, 0.5)';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + 3, 18, 8, stackWave.ang || 0, 0, 6.283);
+    ctx.fill();
+    ctx.globalAlpha = 0.95;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+    ctx.beginPath();
+    ctx.moveTo(cx - dir * 16, cy + 3);
+    ctx.quadraticCurveTo(cx - dir * 2, cy - 11, cx + dir * 14, cy - 2);
+    ctx.quadraticCurveTo(cx + dir * 8, cy + 7, cx - dir * 5, cy + 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - dir * 14, cy + 2);
+    ctx.quadraticCurveTo(cx - dir * 1, cy - 10, cx + dir * 13, cy - 1);
+    ctx.stroke();
+    for (let i = 0; i < stackWave.spray.length; i++) {
+      const d = stackWave.spray[i];
       const k = Math.max(0, 1 - d.t / d.life);
-      ctx.globalAlpha = 0.42 * k;
-      ctx.fillStyle = 'rgba(255,248,235,1)';
+      ctx.globalAlpha = 0.55 * k;
+      ctx.fillStyle = 'rgba(255,255,255,1)';
       ctx.beginPath(); ctx.arc(d.x, d.y, d.sz * (0.7 + 0.3 * k), 0, 6.283); ctx.fill();
     }
-    const list = stackSurf.riders.slice().sort(function (a, b) { return a.y - b.y; });
-    for (let i = 0; i < list.length; i++) drawStackSurfer(ctx, list[i]);
     ctx.restore();
   }
 
@@ -2979,7 +3170,7 @@
     }
   }
 
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_SAFE_TOP, CITY_CREW_N, cityBuildWait, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, maybeHighScore, startHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, FARM_SUN, FARM_HZ, farmDayTarget, farmSunPos, ROOSTER_HASH, roosterSrc, stackColY, stackSkyline, stackPathAt, stackPathLen, newStackSurf, stepStackSurf, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts, SNOW_THEME, snowProg, snowFallParams, newBoardSnow, stepBoardSnow, snowOnLineClear, snowReset, boardSnow: () => boardSnow };
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_SAFE_TOP, CITY_CREW_N, cityBuildWait, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, HIGH_SCORE_MS, HIGH_SCORE_FADE_MS, highScoreProg, maybeHighScore, startHighScore, tickHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, FARM_SUN, FARM_HZ, farmDayTarget, farmSunPos, ROOSTER_HASH, roosterSrc, stackColY, stackSkyline, stackPathAt, stackPathLen, newStackWave, stepStackWave, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts, SNOW_THEME, snowProg, snowFallParams, newBoardSnow, stepBoardSnow, snowOnLineClear, snowReset, boardSnow: () => boardSnow, NZ_THEME, nzProg, nzBeatsPerRow, nzDropInterval, SEAGULL_HASH, seagullSrc, startNzFlash, nzFlashAlpha, newNzGulls, stepNzGulls, nzGulls: () => nzGulls, nzFlashState: () => nzFlash };
 
   if (!root.document) return;
   const doc = root.document;
@@ -3035,7 +3226,7 @@
   function press(a) {
     if (!started) started = true;
     const next = act(g, a);
-    if (a === 'restart') { g = next; invReset(); cityReset(); stackSurfReset(); snowReset(); life.hold = null; life.singHold = null; life.beachHold = null; fw.hold = null; ocean.hold = null; sparkHold = null; blockSparks = []; lifeReset(); if (isEffect(themeFor(g.level))) { lifeCast(isEffect(themeFor(g.level))); } if (root.IBScores) root.IBScores.close(); }
+    if (a === 'restart') { g = next; invReset(); cityReset(); stackWaveReset(); snowReset(); life.hold = null; life.singHold = null; life.beachHold = null; fw.hold = null; ocean.hold = null; sparkHold = null; blockSparks = []; lifeReset(); if (isEffect(themeFor(g.level))) { lifeCast(isEffect(themeFor(g.level))); } if (root.IBScores) root.IBScores.close(); }
     syncHud();
     try { persistLive(); } catch (e) { }
   }
@@ -3149,6 +3340,16 @@
     invSeed(opts);
     citySeed(opts);
     snowReset();
+    stackWaveReset();
+    if (isEffect(themeFor(g.level)) === 'beach' && g.board) {
+      stepStackWave(stackWave, g.board, opts.waveTime != null ? opts.waveTime : 0, { reduce: reduceMotion() });
+    }
+    if (opts.nzFlash) startNzFlash({ hold: true, at: opts.nzFlash.at != null ? opts.nzFlash.at : 80 });
+    else if (themeFor(g.level) !== NZ_THEME) nzFlash = null;
+    if (themeFor(g.level) === NZ_THEME) {
+      nzGullsReset();
+      stepNzGulls(nzGulls, opts.nzGullTime != null ? opts.nzGullTime : 1800, (root.innerWidth || 390), (root.innerHeight || 844), { reduce: false });
+    } else nzGullsReset();
     if (themeFor(g.level) === SNOW_THEME && g.board) {
       stepBoardSnow(boardSnow, g.board, opts.snowTime != null ? opts.snowTime : 0, snowProg(g.lines, g.level), { reduce: reduceMotion() });
     }
@@ -3188,7 +3389,7 @@
     applyLook(themeIdx);
     invReset();
     cityReset();
-    stackSurfReset();
+    stackWaveReset();
     snowReset();
     syncHud();
   }
@@ -3705,6 +3906,14 @@
       }
     }
     c.globalAlpha = 1;
+    const nzOn = (lookIdx < 0 ? themeIdx : lookIdx) === NZ_THEME || (g && themeFor(g.clearFx ? g.clearFx.level : g.level) === NZ_THEME);
+    if (nzOn) {
+      try {
+        stepNzGulls(nzGulls, dt * 1000, fx.w, fx.h, { reduce: fx.off || reduceMotion() });
+        drawNzGulls(c, nzGulls);
+      } catch (e) { }
+    } else if (nzGulls && nzGulls.ready) nzGullsReset();
+    try { drawNzFlash(c, fx.w, fx.h); } catch (e) { }
   }
   // Pixel invaders on the Space travel board. They drift; bombs fall slowly down a column.
   const INV_SPRITES = [
@@ -6486,22 +6695,50 @@
     const highing = tickHighScore(g, dt);
     const running = started && !g.over && !g.paused && !g.demo && !clearing && !leveling && !highing;
     if (running) {
-      g.acc += dt;
-      if (g.acc >= dropInterval(g.level)) {
-        g.acc = 0;
-        if (!collides(g.board, g.piece.m, g.piece.x, g.piece.y + 1)) g.piece.y++;
-        else { lockPiece(g); syncHud(); }
+      if (themeFor(g.level) === NZ_THEME) {
+        const beat = musicBeat(NZ_THEME);
+        const interval = nzDropInterval(g.lines, g.level) / 1000;
+        const grid = beat.period / 2;
+        const off = (TRACKS[NZ_THEME] && TRACKS[NZ_THEME].offset) || 0;
+        const tNow = beat.t;
+        if (g.nzDropAt == null) {
+          const k = Math.ceil((tNow - off + 1e-4) / grid);
+          g.nzDropAt = off + k * grid;
+        }
+        if (tNow + 0.75 < g.nzDropAt && g.nzDropAt - tNow > 2) g.nzDropAt = off + Math.ceil((tNow - off + 1e-4) / grid) * grid;
+        let dropped = 0;
+        while (tNow + 1e-4 >= g.nzDropAt && dropped < 2) {
+          if (!collides(g.board, g.piece.m, g.piece.x, g.piece.y + 1)) g.piece.y++;
+          else { lockPiece(g); syncHud(); g.nzDropAt = null; break; }
+          g.nzDropAt = nzSnapTime(g.nzDropAt + interval, grid, off);
+          if (g.nzDropAt <= tNow) g.nzDropAt += grid;
+          dropped++;
+        }
+      } else {
+        g.nzDropAt = null;
+        g.acc += dt;
+        if (g.acc >= dropInterval(g.level)) {
+          g.acc = 0;
+          if (!collides(g.board, g.piece.m, g.piece.x, g.piece.y + 1)) g.piece.y++;
+          else { lockPiece(g); syncHud(); }
+        }
       }
     }
     try { if (!clearing) invStep(dt); } catch (e) { }
     try { if (!clearing) cityStep(dt); } catch (e) { }
     try {
-      if (g && isEffect(cellThemeIdx()) === 'beach') stepStackSurf(stackSurf, g.board, dt, { reduce: reduceMotion() });
-      else if (stackSurf.ready) stackSurfReset();
+      if (g && isEffect(cellThemeIdx()) === 'beach') stepStackWave(stackWave, g.board, dt, { reduce: reduceMotion() });
+      else if (stackWave.ready) stackWaveReset();
     } catch (e) { }
     try {
       if (g && themeFor(g.clearFx ? g.clearFx.level : g.level) === SNOW_THEME) stepBoardSnow(boardSnow, g.board, dt, snowProg(g.lines, g.level), { reduce: reduceMotion() });
       else if (boardSnow.ready) snowReset();
+    } catch (e) { }
+    try { tickNzFlash(dt); } catch (e) { }
+    try {
+      if (g && themeFor(g.clearFx ? g.clearFx.level : g.level) === NZ_THEME) {
+        if (started && !g.paused && !g.over && !g.demo) tickNzSquawk(dt);
+      }
     } catch (e) { }
     musicTick(g.level, musicWanted(g.level, started, g));
     if (g.flashT > 0) g.flashT -= dt;
@@ -6541,7 +6778,7 @@
       try { if (!sparkHold) tickBlockSpark(now, drawBoard, (!g.over && !fx) ? g.piece : null, reduceMotion()); } catch (e) { }
       try { invDraw(ctx); } catch (e) { }
       try { drawCityCrew(ctx); } catch (e) { }
-      try { drawStackSurfers(ctx); } catch (e) { }
+      try { drawStackWave(ctx); } catch (e) { }
       try { drawSnowCaps(ctx); drawBoardSnow(ctx); } catch (e) { }
       try { drawEffectTrails(ctx); drawEffectRipples(ctx); } catch (e) { }
       if (!g.over && !fx) {

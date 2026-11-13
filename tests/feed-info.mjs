@@ -2442,13 +2442,14 @@ if (live) {
 }
 
 // 1.9.191 Beach surfers ride the settled Tetris stack, not the painted wash
+// 1.9.193: those surfers were replaced by a skyline wave band; skyline helpers remain.
 {
   const src = fs.readFileSync('feed/tetris.js', 'utf8');
   assert.strictEqual(tetGame.themeFor(3), 0);
   assert.strictEqual(tetGame.isEffect(0), 'beach');
-  assert.ok(src.includes('const STACK_SURF_N = 2') && src.includes('STACK_SURF_SPEED = 52'));
-  assert.ok(src.includes('function drawStackSurfers') && src.includes('function stepStackSurf') && src.includes('function stackSkyline'));
-  assert.ok(src.includes('drawStackSurfers(ctx)') && src.includes('stackSurfReset()'));
+  assert.ok(src.includes('function drawStackWave') && src.includes('function stepStackWave') && src.includes('function stackSkyline'));
+  assert.ok(src.includes('drawStackWave(ctx)') && src.includes('stackWaveReset()'));
+  assert.ok(!src.includes('function drawStackSurfers') && !src.includes('function newStackSurf'));
   assert.ok(!src.includes('function drawBeachSurfers') && !src.includes('drawBeachSurfers(c, box)'));
 
   const empty = tetGame.emptyBoard();
@@ -2458,23 +2459,18 @@ if (live) {
   const pts0 = tetGame.stackSkyline(empty);
   assert.ok(pts0.length >= 2);
   assert.ok(pts0.every(p => Math.abs(p.y - 20 * 28) < 0.01), 'empty skyline is the floor');
-  const surf = tetGame.newStackSurf();
-  assert.strictEqual(surf.riders.length, 2);
-  tetGame.stepStackSurf(surf, empty, 0);
-  surf.riders.forEach(r => {
-    assert.ok(Math.abs(r.y - 20 * 28) < 2, 'on the floor at t=0');
-    assert.ok(r.x >= 0 && r.x <= 10 * 28);
-  });
+  const wave = tetGame.newStackWave();
+  tetGame.stepStackWave(wave, empty, 0);
+  assert.ok(Math.abs(wave.y - 20 * 28) < 2, 'on the floor at t=0');
+  assert.ok(wave.x >= 0 && wave.x <= 10 * 28);
   const before = empty.map(row => row.slice());
-  // Ride long enough to hit a wall and turn.
-  const left = surf.riders.find(r => r.dir < 0) || surf.riders[0];
-  left.s = 0;
-  left.dir = -1;
-  tetGame.stepStackSurf(surf, empty, 200);
-  assert.strictEqual(left.dir, 1, 'turns around at the left wall');
-  assert.ok(left.x >= 0, 'stays inside the well');
-  // Snapshot the board is untouched (no gameplay effect).
-  assert.deepStrictEqual(empty, before, 'stepping surfers does not change the board');
+  // Roll long enough to hit a wall and turn.
+  wave.s = 0;
+  wave.dir = -1;
+  tetGame.stepStackWave(wave, empty, 200);
+  assert.strictEqual(wave.dir, 1, 'turns around at the left wall');
+  assert.ok(wave.x >= 0, 'stays inside the well');
+  assert.deepStrictEqual(empty, before, 'stepping the wave does not change the board');
 
   // Jagged stack: follow the skyline, including vertical drops.
   const g = tetGame.newGame({ level: 3, practice: true });
@@ -2483,8 +2479,8 @@ if (live) {
     const top = 18 - (c % 4); // 18,17,16,15,18...
     for (let r = top; r < 20; r++) g.board[r][c] = 2;
   }
-  const jagged = tetGame.newStackSurf();
-  tetGame.stepStackSurf(jagged, g.board, 0);
+  const jagged = tetGame.newStackWave();
+  tetGame.stepStackWave(jagged, g.board, 0);
   function onSkyline(board, x, y, tol) {
     const C = 10, CELL = 28;
     const col = Math.max(0, Math.min(C - 1, Math.floor(x / CELL)));
@@ -2503,53 +2499,40 @@ if (live) {
     }
     return Math.abs(y - yHere) <= tol;
   }
-  jagged.riders.forEach(r => {
-    assert.ok(onSkyline(g.board, r.x, r.y, 2), 'starts on the jagged skyline');
-  });
-  for (let i = 0; i < 40; i++) tetGame.stepStackSurf(jagged, g.board, 80);
-  jagged.riders.forEach(r => {
-    assert.ok(onSkyline(g.board, r.x, r.y, 2.5), 'stays on the skyline while carving');
-    assert.ok(r.x >= 0 && r.x <= 10 * 28);
-  });
+  assert.ok(onSkyline(g.board, jagged.x, jagged.y, 2), 'starts on the jagged skyline');
+  for (let i = 0; i < 40; i++) tetGame.stepStackWave(jagged, g.board, 80);
+  assert.ok(onSkyline(g.board, jagged.x, jagged.y, 2.5), 'stays on the skyline while rolling');
+  assert.ok(jagged.x >= 0 && jagged.x <= 10 * 28);
 
   // Re-route when a line clears: a full bottom row plus a step above, then clear the row.
   const g2 = tetGame.newGame({ level: 3, practice: true });
   g2.board = tetGame.emptyBoard();
   for (let c = 0; c < 10; c++) g2.board[19][c] = 3;
   for (let c = 0; c < 4; c++) g2.board[18][c] = 4;
-  const rider = tetGame.newStackSurf();
-  tetGame.stepStackSurf(rider, g2.board, 0);
+  const rider = tetGame.newStackWave();
+  tetGame.stepStackWave(rider, g2.board, 0);
   const full = tetGame.findFullRows(g2);
   assert.ok(full.length === 1 && full[0] === 19, 'bottom row is full');
   const boardBefore = g2.board.map(r => r.slice());
   tetGame.applyClear(g2, full);
   assert.ok(g2.board[19].some(v => v === 4) || g2.board[19].every(v => !v) || g2.board[19][0] === 4, 'row dropped or cleared');
   // After the clear, the previous bottom row is gone; remaining blocks sit lower.
-  tetGame.stepStackSurf(rider, g2.board, 16);
-  rider.riders.forEach(r => {
-    assert.ok(onSkyline(g2.board, r.x, r.y, 3), 're-routes onto the post-clear skyline');
-  });
-  // applyClear changed the board; stepping again must not change it further.
+  tetGame.stepStackWave(rider, g2.board, 16);
+  assert.ok(onSkyline(g2.board, rider.x, rider.y, 3), 're-forms onto the post-clear skyline');
   const afterStep = g2.board.map(r => r.slice());
-  tetGame.stepStackSurf(rider, g2.board, 80);
+  tetGame.stepStackWave(rider, g2.board, 80);
   assert.deepStrictEqual(g2.board, afterStep, 're-route does not place or remove blocks');
 }
 
 
 // 1.9.192 Beach surfers are much bigger, mostly opaque, and there are two of them
+// 1.9.193: surfers were removed; the replacement wave is still drawn under the piece and ghost.
 {
   const src = fs.readFileSync('feed/tetris.js', 'utf8');
-  assert.ok(src.includes('const STACK_SURF_N = 2'));
-  assert.ok(src.includes('const STACK_SURF_H = 42') && src.includes('const STACK_SURF_BOARD = 49'));
-  assert.ok(src.includes('const STACK_SURF_ALPHA = 0.9') || src.includes('const STACK_SURF_ALPHA = 0.90'));
-  assert.ok(src.includes('ctx.globalAlpha = STACK_SURF_ALPHA'));
-  assert.ok(src.includes('Soft shadow on the blocks') && src.includes('Arms out for balance') && src.includes('Head and hair'));
-  const surf = tetGame.newStackSurf();
-  assert.strictEqual(surf.riders.length, 2, 'two surfers, not three');
-  // Still drawn under the active piece and ghost.
-  const draw = src.indexOf('try { drawStackSurfers(ctx); }');
+  assert.ok(!src.includes('const STACK_SURF_N = 2') && !src.includes('function drawStackSurfers'));
+  const draw = src.indexOf('try { drawStackWave(ctx); }');
   const ghost = src.indexOf('drawGhost(ctx, (p.x + c)');
-  assert.ok(draw > 0 && ghost > draw, 'surfers are drawn before the ghost and falling piece');
+  assert.ok(draw > 0 && ghost > draw, 'stack wave is drawn before the ghost and falling piece');
 }
 
 
@@ -2604,4 +2587,88 @@ if (live) {
   assert.ok(launchFn.includes('playFwWhoosh()'), 'soft whoosh on launch');
   assert.ok(!/function fwOnLevelUp[\s\S]{0,600}playFwSfx\('big'\)/.test(src));
   assert.ok(!/function fwOnClear[\s\S]{0,900}playFwSfx\(/.test(src), 'line-clear does not batch a second bang on top of per-burst booms');
+}
+
+
+// 1.9.193 New Zealand soundtrack, beat-quantised gravity, seagulls, line-clear flash
+{
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  const fsHash = crypto.createHash('sha256').update(fs.readFileSync('feed/tetris-bg/m9-6a43316b.mp3')).digest('hex').slice(0, 8);
+  assert.strictEqual(tetGame.themeFor(8), 9);
+  assert.strictEqual(tetGame.NZ_THEME, 9);
+  assert.strictEqual(tetGame.THEMES[9].name, 'New Zealand');
+  assert.strictEqual(tetGame.TRACKS[9].bpm, 143.25);
+  assert.strictEqual(tetGame.TRACKS[9].key, 'D#');
+  assert.strictEqual(tetGame.TRACKS[9].mode, 'major');
+  assert.ok(Math.abs(tetGame.TRACKS[9].offset - 0.035) < 1e-6);
+  assert.strictEqual(tetGame.BGM_HASH[9], '6a43316b');
+  assert.strictEqual(fsHash, '6a43316b');
+  assert.ok(fs.existsSync('feed/tetris-bg/m9-6a43316b.mp3'));
+  assert.ok(!fs.existsSync('feed/tetris-bg/m9-2b10c8ba.mp3'), 'old NZ track is gone');
+  assert.strictEqual(tetGame.nzProg(70, 8), 0);
+  assert.strictEqual(tetGame.nzProg(80, 8), 1);
+  assert.ok(Math.abs(tetGame.nzBeatsPerRow(0) - 2) < 1e-9);
+  assert.ok(Math.abs(tetGame.nzBeatsPerRow(0.55) - 1) < 1e-9);
+  assert.ok(Math.abs(tetGame.nzBeatsPerRow(1) - 0.5) < 1e-9);
+  const beatMs = 60000 / 143.25;
+  const cap = tetGame.dropInterval(8);
+  assert.ok(Math.abs(tetGame.nzDropInterval(70, 8) - 2 * beatMs) < 0.05, 'starts at 1 row every 2 beats');
+  assert.ok(tetGame.nzDropInterval(70, 8) > tetGame.nzDropInterval(75, 8));
+  assert.strictEqual(tetGame.nzDropInterval(79, 8), cap, 'end of the level is not harder than the global curve');
+  assert.ok(tetGame.nzDropInterval(79, 8) >= 0.5 * beatMs);
+  assert.ok(src.includes('themeFor(g.level) === NZ_THEME') && src.includes('nzDropInterval(g.lines, g.level)'));
+  assert.ok(src.includes('const grid = beat.period / 2'));
+  assert.strictEqual(tetGame.SEAGULL_HASH, '712237c3');
+  assert.strictEqual(tetGame.seagullSrc(), 'tetris-bg/seagull-712237c3.mp3');
+  assert.ok(fs.existsSync('feed/tetris-bg/seagull-712237c3.mp3'));
+  assert.ok(src.includes('Freesound 263786') && src.includes('steaq') && src.includes('CC0'));
+  assert.ok(src.includes('hp.frequency.value = 300') && src.includes('lp.frequency.value = 3500'));
+  assert.ok(src.includes('6 + Math.random() * 9'));
+  assert.ok(src.includes('function drawNzGull') && src.includes('function stepNzGulls') && src.includes('function playSeagullSfx'));
+  assert.ok(src.includes('function startNzFlash') && src.includes('function drawNzFlash') && src.includes('startNzFlash()'));
+  assert.ok(src.includes('ti === NZ_THEME) startNzFlash()'));
+  const a0 = tetGame.nzFlashAlpha(0.04), aMid = tetGame.nzFlashAlpha(0.16), aEnd = tetGame.nzFlashAlpha(0.4);
+  assert.ok(a0 > 0.15 && aMid > 0.05 && aEnd < 0.05, 'two soft flickers, gone by 0.4s');
+  assert.ok(a0 < 0.5, 'not a full-white strobe');
+  const gClear = tetGame.newGame({ level: 8, practice: true });
+  gClear.board = tetGame.emptyBoard();
+  for (let c = 0; c < 10; c++) gClear.board[19][c] = 2;
+  gClear.piece = { t: 1, m: [[1]], x: 0, y: 0 };
+  tetGame.startClear(gClear, [19], gClear.board.map(r => r.slice()), gClear.lines, gClear.level, null);
+  assert.ok(tetGame.nzFlashState(), 'a line clear on NZ starts the lightning flash');
+}
+
+// 1.9.193 Beach stack waves replace the surfers
+{
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.ok(src.includes('function drawStackWave') && src.includes('soft white foam crest'));
+  assert.ok(src.includes('const STACK_WAVE_H = 15') && src.includes('STACK_WAVE_SPEED = 48'));
+  assert.ok(!src.includes('function drawStackSurfer') && !src.includes('Arms out for balance'));
+  const draw = src.indexOf('try { drawStackWave(ctx); }');
+  const ghost = src.indexOf('drawGhost(ctx, (p.x + c)');
+  assert.ok(draw > 0 && ghost > draw, 'wave is drawn under the ghost and falling piece');
+}
+
+// 1.9.193 NEW HIGH SCORE banner holds 1000ms longer before fade-out
+{
+  assert.strictEqual(tetGame.HIGH_SCORE_FADE_MS, 2200);
+  assert.strictEqual(tetGame.HIGH_SCORE_MS, 3200);
+  const hs = { t: 0, dur: tetGame.HIGH_SCORE_MS, hold: false };
+  assert.ok(Math.abs(tetGame.highScoreProg(hs) - 0) < 1e-9);
+  hs.t = 0.72 * 2200;
+  assert.ok(Math.abs(tetGame.highScoreProg(hs) - 0.72) < 1e-9);
+  hs.t = 0.72 * 2200 + 500;
+  assert.ok(Math.abs(tetGame.highScoreProg(hs) - 0.72) < 1e-9, 'extra second is still fully visible hold');
+  hs.t = 0.72 * 2200 + 1000;
+  assert.ok(Math.abs(tetGame.highScoreProg(hs) - 0.72) < 1e-9, 'fade-out starts after the extra 1000ms');
+  hs.t = 3200;
+  assert.ok(Math.abs(tetGame.highScoreProg(hs) - 1) < 1e-9);
+  const g = tetGame.newGame();
+  g.familyHigh = 10; g.score = 50; g.demo = false; g.board[19][0] = 1;
+  tetGame.maybeHighScore(g);
+  assert.strictEqual(g.highScore.dur, 3200);
+  tetGame.tickHighScore(g, 2500);
+  assert.ok(g.highScore, 'still on screen 2.5s in, during the added hold');
+  tetGame.tickHighScore(g, 800);
+  assert.strictEqual(g.highScore, null, 'gone after the original fade-out plus the extra second');
 }
