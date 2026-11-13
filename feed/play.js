@@ -375,6 +375,13 @@
     if (back) { try { root.history.back(); } catch (e) { } }
     if (artBtn && artBtn.focus) artBtn.focus();
   }
+  root.addEventListener('message', e => {
+    const d = e && e.data;
+    if (!d || d.type !== 'ib-tetris-close') return;
+    if (!isTetrisOpen()) return;
+    if (artFrame && e.source && e.source !== artFrame.contentWindow) return;
+    closeArt(false);
+  });
   root.addEventListener('keydown', e => { if (e.key === 'Escape' && artWin && !artWin.hidden) { e.preventDefault(); closeArt(false); } });
   root.addEventListener('popstate', () => { if (artWin && !artWin.hidden) closeArt(true); });
   // 1.9.188: leaving Tetris open when Info Book is minimised. Other live windows still close so their sound stops.

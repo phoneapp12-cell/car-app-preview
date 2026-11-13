@@ -2055,7 +2055,7 @@ if (live) {
   assert.ok(tetGame.fwSize(0.75) > tetGame.fwSize(0.5) && tetGame.fwSize(1) > tetGame.fwSize(0.75));
   assert.strictEqual(tetGame.farmDayTarget(0, 0), 0);
   assert.strictEqual(tetGame.farmDayTarget(0.4, 0), 1);
-  assert.ok(tetGame.farmDayTarget(0.2, 0) > 0.4 && tetGame.farmDayTarget(0.2, 0) < 0.6);
+  assert.strictEqual(tetGame.farmDayTarget(0.2, 0), 1, '1.9.205 halved sunrise: full day at 20% of the level');
   // Little painted frogs hop on the Bullfrog level; the big singer stays
   const fArt = tetGame.frogArt();
   assert.ok(fArt.plate.indexOf('frog-plate-e01ea4ca') >= 0);
@@ -3328,3 +3328,82 @@ if (live) {
   assert.ok(src.includes("PICS[BUSH_THEME]") || src.includes('PICS[3]') || src.includes('tetris-bg/3.webp'));
   assert.ok(fs.existsSync('feed/tetris-bg/3.webp'), 'existing bush painting is reused');
 }
+
+// 1.9.205 Start overlay, How to play, and close after 5 minutes paused
+{
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  const html = fs.readFileSync('feed/tetris.html', 'utf8');
+  const play = fs.readFileSync('feed/play.js', 'utf8');
+  assert.strictEqual(tetGame.PAUSE_CLOSE_MS, 5 * 60 * 1000);
+  assert.strictEqual(tetGame.CLOSE_MSG, 'ib-tetris-close');
+  const names = tetGame.howToPlayLevels();
+  assert.strictEqual(names.join('|'), ['Farmyard', 'Beach', 'Space travel', 'Jeremiah was a bullfrog', 'Fireworks', 'City', 'Ocean', 'Bush walk', 'New Zealand', 'Snowy mountains', 'Night sky', 'Food', 'Triangles'].join('|'));
+  const guide = tetGame.howToPlayHtml();
+  for (const n of names) assert.ok(guide.includes(n), 'how to play lists ' + n);
+  assert.ok(guide.includes('13 levels') && guide.includes('gets faster'));
+  assert.ok(guide.includes('Tap the board to rotate') && guide.includes('Drag left or right') && guide.includes('Flick down') && guide.includes('Swipe up'));
+  assert.ok(guide.includes('Arrow keys') && guide.includes('Space drops') && guide.includes('C or Shift') && guide.includes('P pauses') && guide.includes('Escape') && guide.includes('M turns music') && guide.includes('R restarts'));
+  assert.ok(guide.includes('ghost') && guide.includes('Next') && guide.includes('Hold'));
+  assert.ok(guide.includes('Single is 100') && guide.includes('Double 300') && guide.includes('Triple 500') && guide.includes('800'));
+  assert.ok(guide.includes('Cherry bombs') && guide.includes('Banana bursts') && guide.includes('J or L'));
+  assert.ok(guide.includes('cheer') && guide.includes('high score'));
+  assert.ok(guide.includes('Extreme') && guide.includes('X in the top right') && guide.includes('Exit extreme') && guide.includes('full screen') && guide.includes('Close at the top'));
+
+  // Fake clock: 5 continuous minutes paused closes; resume resets; start screen does not.
+  const t0 = 1_700_000_000_000;
+  tetGame.setNowMs(t0);
+  assert.strictEqual(tetGame.nowMs(), t0);
+  const playing = { started: true, paused: false, over: false, demo: false };
+  const paused = { started: true, paused: true, over: false, demo: false };
+  assert.strictEqual(tetGame.nextPausedAt(null, playing, t0), null);
+  const stamp = tetGame.nextPausedAt(null, paused, t0);
+  assert.strictEqual(stamp, t0);
+  tetGame.setNowMs(t0 + 4 * 60 * 1000);
+  assert.strictEqual(tetGame.nextPausedAt(stamp, paused, tetGame.nowMs()), stamp, 'continuous pause keeps the original time');
+  assert.ok(!tetGame.shouldCloseAfterPause({ ...paused, pausedAt: stamp, now: tetGame.nowMs() }), 'not yet 5 minutes');
+  tetGame.setNowMs(t0 + 5 * 60 * 1000 - 1);
+  assert.ok(!tetGame.shouldCloseAfterPause({ ...paused, pausedAt: stamp, now: tetGame.nowMs() }));
+  tetGame.setNowMs(t0 + 5 * 60 * 1000);
+  assert.ok(tetGame.shouldCloseAfterPause({ ...paused, pausedAt: stamp, now: tetGame.nowMs() }), 'closes at 5 minutes on a fake clock');
+  tetGame.setNowMs(t0 + 5 * 60 * 1000);
+  assert.strictEqual(tetGame.nextPausedAt(stamp, playing, tetGame.nowMs()), null, 'resume clears the timer');
+  const after = tetGame.nextPausedAt(null, paused, t0 + 6 * 60 * 1000);
+  assert.strictEqual(after, t0 + 6 * 60 * 1000, 'a later pause starts a fresh 5 minutes');
+  assert.ok(!tetGame.shouldCloseAfterPause({ ...paused, pausedAt: after, now: after + 5 * 60 * 1000 - 1 }));
+  assert.ok(tetGame.shouldCloseAfterPause({ ...paused, pausedAt: after, now: after + 5 * 60 * 1000 }));
+  assert.ok(!tetGame.shouldCloseAfterPause({ started: false, paused: false, over: false, demo: false, pausedAt: t0, now: t0 + 10 * 60 * 1000 }), 'the start screen does not auto-close');
+  assert.ok(!tetGame.shouldCloseAfterPause({ started: true, paused: true, over: true, demo: false, pausedAt: t0, now: t0 + 10 * 60 * 1000 }), 'game over does not auto-close');
+  assert.ok(!tetGame.shouldCloseAfterPause({ started: true, paused: true, over: false, demo: true, pausedAt: t0, now: t0 + 10 * 60 * 1000 }), 'demo / still board does not auto-close');
+  tetGame.setNowMs(null);
+
+  assert.ok(src.includes('if (!started) return g;'), 'controls do not auto-start the game');
+  assert.ok(src.includes('if (!started) return;') && src.includes('function startGame'), 'first board tap no longer starts the game');
+  assert.ok(src.includes('function startGame') && src.includes('ensureAudio()') && src.includes('started = true'));
+  assert.ok(src.includes("parent.postMessage({ type: CLOSE_MSG }") || src.includes('parent.postMessage({ type: CLOSE_MSG },'));
+  const closeFn = src.slice(src.indexOf('function requestCloseTetris'), src.indexOf('function checkPauseClose'));
+  assert.ok(closeFn.includes('stopAudio') && closeFn.includes('CLOSE_MSG') && !closeFn.includes('removeItem') && closeFn.includes('Do not touch tetris-best'), 'auto-close stops audio and does not clear the saved high score');
+  assert.ok(src.includes('function checkPauseClose') && src.includes('function syncPauseClose') && src.includes('function openHowto') && src.includes('howtoResume'));
+  assert.ok(src.includes('g.paused = true') && src.includes('howtoResume'));
+  assert.ok(html.includes('id="startov"') && html.includes('id="startbtn"') && html.includes('Start') && html.includes('id="starthowto"'));
+  assert.ok(html.includes('id="howto"') && html.includes('id="howtobtn"') && html.includes('How to play') && html.includes('id="howtoclose"') && html.includes('id="pauseov"'));
+  assert.ok(html.includes('html.fs-x .startov') && html.includes('html.fs-x .pauseov') && html.includes('html.fs-x #howto'), 'overlays stay visible in Extreme');
+  assert.ok(play.includes("d.type !== 'ib-tetris-close'") && play.includes('closeArt(false)'));
+  assert.ok(!play.includes("storeDel") || (play.includes('clearArtPersist') && !play.slice(play.indexOf('function clearArtPersist'), play.indexOf('function clearArtPersist') + 500).includes('tetris-best')), 'parent close does not clear tetris-best');
+  assert.ok(src.includes('1.9.205 Start overlay') || src.includes('1.9.205 Start button'));
+
+  // 1.9.205 Farmyard sunrise is twice as quick; rooster still crows at full sunrise
+  assert.strictEqual(tetGame.FARM_SUNRISE_PROG, 0.2);
+  assert.strictEqual(tetGame.FARM_SUNRISE_SEC, 400);
+  assert.strictEqual(tetGame.farmDayTarget(0, 0), 0, 'still starts in darkness');
+  assert.strictEqual(tetGame.farmDayTarget(0.2, 0), 1, 'full daylight at 20% of level 1 (was 40%)');
+  assert.strictEqual(tetGame.farmDayTarget(0, 400), 1, 'full daylight after 400s with no lines (was 800s)');
+  assert.ok(tetGame.farmDayTarget(0, 200) > 0.49 && tetGame.farmDayTarget(0, 200) < 0.51, 'halfway at 200s');
+  assert.ok(tetGame.farmDayTarget(0, 399) < 1);
+  assert.ok(tetGame.farmDayTarget(0.1, 0) > 0.49 && tetGame.farmDayTarget(0.1, 0) < 0.51);
+  assert.ok(src.includes('farmSunPos(day).alt >= 0.98'), 'rooster still crows at full sunrise');
+  assert.ok(tetGame.farmSunPos(1).alt >= 0.98);
+  assert.ok(tetGame.farmSunPos(0.98).alt < 0.98, 'alt reaches 0.98 only near the top of the climb');
+  assert.ok(src.includes('1.9.205: sunrise duration halved') || src.includes('FARM_SUNRISE_PROG / FARM_SUNRISE_SEC are halved'));
+}
+
+

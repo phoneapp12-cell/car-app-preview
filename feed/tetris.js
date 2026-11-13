@@ -2014,6 +2014,10 @@
   // Sky line (photo px) every 6 px across the 540 px painting, from the sky mask.
   const FARM_HZ = [247,245,241,239,240,246,251,265,265,263,259,258,257,263,272,272,270,269,260,237,230,227,220,224,231,236,259,258,255,255,258,263,269,274,279,284,291,294,306,317,328,339,323,319,319,324,319,317,318,327,323,324,329,326,328,331,332,333,334,335,337,338,338,340,341,341,340,338,337,331,330,329,329,329,332,332,323,323,324,325,326,327,327,328,327,328,329,330,330,331,333];
   const FARM_SUN = { x: 66, y: 14, w: 142, h: 142, cx: 136.9, cy: 84.5, x0: 420, y0: 378.5, rTop: 64.5 };
+  // 1.9.205: sunrise duration halved (was prog 0.4 / 800s in 1.9.185).
+  const FARM_SUNRISE_PROG = 0.2;
+  const FARM_SUNRISE_SEC = 400;
+
   // [atlas x, atlas y, w, h, photo x, photo y, foot row]; head/tail: tip and neck columns, rows yA..yB blend.
   const FARM_RIG = {
     cow: { a: [0, 0, 121, 83, 135, 510, 81], kind: 'graze', head: { tip: 0, neck: 50, yA: 0.78, yB: 0.96 } },
@@ -3978,7 +3982,50 @@
     c.fillRect(0, 0, w, h);
     c.restore();
   }
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_BUILD_EVERY_LOW, CITY_SAFE_TOP, CITY_CREW_N, CITY_ANIM_CLIMB, CITY_ANIM_PLACE, CITY_ANIM_DOWN, CITY_ANIM_FAST, cityHighestSettled, cityStackLow, cityBuildEvery, cityBuildWait, cityAnimDur, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, HIGH_SCORE_MS, HIGH_SCORE_FADE_MS, highScoreProg, maybeHighScore, startHighScore, tickHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, FARM_SUN, FARM_HZ, farmDayTarget, farmSunPos, ROOSTER_HASH, roosterSrc, farmThemeActive, playRoosterSfx, stopRoosterSfx, stackColY, stackSkyline, stackPathAt, stackPathLen, newStackWash, stepStackWash, STACK_WASH_PERIOD, washCover, washSpill, washPool, stackWashInland, washCycle, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, fwSkyFlashAlpha, startFwSkyFlash, maybeFwSkyFlash, FW_SKY_FLASH_PEAK, FW_SKY_FLASH_FADE, FW_MAJOR_SCALE, FW_BIGGER_GROW, fwSkyFlashState: () => fw.skyFlash, fwProg: (p) => { if (p != null) fw.prog = p; return fw.prog; }, fwReset, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts, SNOW_THEME, snowProg, snowFallParams, newBoardSnow, stepBoardSnow, snowOnLineClear, snowReset, boardSnow: () => boardSnow, NZ_THEME, nzProg, nzBeatsPerRow, nzDropInterval, NZ_PAL, NZ_PAL_STEPS, NZ_PAL_FADE_MS, nzPalIndex, nzPaletteNow, mixHex, nzMixProgress, resetNzPal, setNzPal, tickNzPal, nzPalState, EXTREME_KEY, EXTREME_PEEK_MS, EXTREME_EXIT_MIN, EXTREME_TOP_RESERVE, SEAGULL_HASH, seagullSrc, startNzFlash, nzFlashAlpha, newNzGulls, stepNzGulls, nzGulls: () => nzGulls, nzFlashState: () => nzFlash, FOOD_THEME, BUSH_THEME, BUSH_LOOP, BUSH_FADE, BUSH_ZOOM, BUSH_FOCUS_X, BUSH_FOCUS_Y0, BUSH_FOCUS_Y1, BUSH_BPM, BUSH_BOB, BUSH_SWAY, bushWalkPose, bushCoverRect, FOOD_KIND, FOOD_HASH, FOOD_VOL, foodKind, foodSoundFor, foodSrc, emptyFood, ensureFood, cloneFood, dropFood, stampFood, foodMetaAt, rotShape, shapeCells, shapePath, playFoodSfx, playFoodLand, playFoodChomp, playFoodBoom, CHERRY_T, CHERRY_ODDS, CHERRY_BONUS, CHERRY_PER_CELL, isCherry, takeNext, cherryBlastCells, dropColumns, applyCherryBomb, isBanana, BANANA_BONUS, BANANA_PER_CELL, bananaTouchesLocked, connectedBananaCells, applyBananaBurst, spawnBananaBurst, FOOD_SPRITES, loadFoodSprites };
+
+  // 1.9.205 Start overlay, how to play, and close after 5 minutes paused.
+  const PAUSE_CLOSE_MS = 5 * 60 * 1000;
+  const CLOSE_MSG = 'ib-tetris-close';
+  let clockNow = null;
+  function nowMs() { return clockNow != null ? clockNow : Date.now(); }
+  function setNowMs(t) { clockNow = t == null ? null : t; }
+  function nextPausedAt(prev, info, now) {
+    if (!info || !info.started || !info.paused || info.over || info.demo) return null;
+    return prev != null ? prev : now;
+  }
+  function shouldCloseAfterPause(info) {
+    if (!info || !info.started || !info.paused || info.over || info.demo) return false;
+    if (info.pausedAt == null) return false;
+    const limit = info.limit != null ? info.limit : PAUSE_CLOSE_MS;
+    return (info.now - info.pausedAt) >= limit;
+  }
+  function howToPlayLevels() { return stages().map(s => s.name); }
+  function howToPlayHtml() {
+    const levels = howToPlayLevels().join(', ');
+    return (
+      '<h2>How to play</h2>' +
+      '<div class="howto-body">' +
+      '<h3>The game</h3>' +
+      '<p>Pieces of four blocks fall from the top. Move, rotate and drop them to fill whole rows. Full rows clear, and the blocks above settle down. Clearing more rows at once scores more: a Single is 100, a Double 300, a Triple 500, and four rows (a Tetris) 800, times the level.</p>' +
+      '<h3>On the phone</h3>' +
+      '<p>Tap the board to rotate. Drag left or right to move. Drag down to drop softly. Flick down to drop all the way. Swipe up to hold a piece for later. The buttons also move, rotate, drop, hold, pause and restart.</p>' +
+      '<h3>On a keyboard</h3>' +
+      '<p>Arrow keys move. Up or X rotates; Z rotates the other way. Space drops all the way. C or Shift holds. P pauses. Escape pauses, or leaves Extreme if you are in it. M turns music on or off. R restarts.</p>' +
+      '<h3>What you see</h3>' +
+      '<p>A faint ghost shows where the piece will land. Next shows the coming piece. Hold keeps one piece aside — you can swap once per drop.</p>' +
+      '<h3>Levels</h3>' +
+      '<p>There are 13 levels, in this order: ' + levels + '. The game gets faster as you go.</p>' +
+      '<h3>Food stage</h3>' +
+      '<p>Cherry bombs are a one-block cherry that shows up now and then. When one locks it explodes itself and the blocks under it. Banana bursts happen when two banana pieces (J or L) lock touching each other — the touching bananas explode.</p>' +
+      '<h3>Cheers and scores</h3>' +
+      '<p>A voice may cheer you on, and a high score is saved on this phone. The family scoreboard keeps everyone’s best too.</p>' +
+      '<h3>Extreme</h3>' +
+      '<p>Extreme fills the whole screen with just the board. Leave it with the X in the top right, the Exit extreme button, the Escape key, or by leaving full screen. You can also hold on an empty part of the screen. Use Close at the top to go back to Info Book.</p>' +
+      '</div>'
+    );
+  }
+
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_BUILD_EVERY_LOW, CITY_SAFE_TOP, CITY_CREW_N, CITY_ANIM_CLIMB, CITY_ANIM_PLACE, CITY_ANIM_DOWN, CITY_ANIM_FAST, cityHighestSettled, cityStackLow, cityBuildEvery, cityBuildWait, cityAnimDur, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, HIGH_SCORE_MS, HIGH_SCORE_FADE_MS, highScoreProg, maybeHighScore, startHighScore, tickHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, FARM_SUN, FARM_HZ, FARM_SUNRISE_PROG, FARM_SUNRISE_SEC, farmDayTarget, farmSunPos, ROOSTER_HASH, roosterSrc, farmThemeActive, playRoosterSfx, stopRoosterSfx, stackColY, stackSkyline, stackPathAt, stackPathLen, newStackWash, stepStackWash, STACK_WASH_PERIOD, washCover, washSpill, washPool, stackWashInland, washCycle, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, fwSkyFlashAlpha, startFwSkyFlash, maybeFwSkyFlash, FW_SKY_FLASH_PEAK, FW_SKY_FLASH_FADE, FW_MAJOR_SCALE, FW_BIGGER_GROW, fwSkyFlashState: () => fw.skyFlash, fwProg: (p) => { if (p != null) fw.prog = p; return fw.prog; }, fwReset, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts, SNOW_THEME, snowProg, snowFallParams, newBoardSnow, stepBoardSnow, snowOnLineClear, snowReset, boardSnow: () => boardSnow, NZ_THEME, nzProg, nzBeatsPerRow, nzDropInterval, NZ_PAL, NZ_PAL_STEPS, NZ_PAL_FADE_MS, nzPalIndex, nzPaletteNow, mixHex, nzMixProgress, resetNzPal, setNzPal, tickNzPal, nzPalState, EXTREME_KEY, EXTREME_PEEK_MS, EXTREME_EXIT_MIN, EXTREME_TOP_RESERVE, SEAGULL_HASH, seagullSrc, startNzFlash, nzFlashAlpha, newNzGulls, stepNzGulls, nzGulls: () => nzGulls, nzFlashState: () => nzFlash, FOOD_THEME, BUSH_THEME, BUSH_LOOP, BUSH_FADE, BUSH_ZOOM, BUSH_FOCUS_X, BUSH_FOCUS_Y0, BUSH_FOCUS_Y1, BUSH_BPM, BUSH_BOB, BUSH_SWAY, bushWalkPose, bushCoverRect, FOOD_KIND, FOOD_HASH, FOOD_VOL, foodKind, foodSoundFor, foodSrc, emptyFood, ensureFood, cloneFood, dropFood, stampFood, foodMetaAt, rotShape, shapeCells, shapePath, playFoodSfx, playFoodLand, playFoodChomp, playFoodBoom, CHERRY_T, CHERRY_ODDS, CHERRY_BONUS, CHERRY_PER_CELL, isCherry, takeNext, cherryBlastCells, dropColumns, applyCherryBomb, isBanana, BANANA_BONUS, BANANA_PER_CELL, bananaTouchesLocked, connectedBananaCells, applyBananaBurst, spawnBananaBurst, FOOD_SPRITES, loadFoodSprites, PAUSE_CLOSE_MS, CLOSE_MSG, nowMs, setNowMs, nextPausedAt, shouldCloseAfterPause, howToPlayLevels, howToPlayHtml };
 
   if (!root.document) return;
   const doc = root.document;
@@ -4034,13 +4081,153 @@
     S.open('tetris', SB);
   }
   function press(a) {
-    if (!started) started = true;
+    if (!started) return g;
     const next = act(g, a);
     if (a === 'restart') { g = next; invReset(); cityReset(); stackWashReset(); snowReset(); life.hold = null; life.singHold = null; life.beachHold = null; fw.hold = null; ocean.hold = null; sparkHold = null; blockSparks = []; lifeReset(); if (isEffect(themeFor(g.level))) { lifeCast(isEffect(themeFor(g.level))); } if (root.IBScores) root.IBScores.close(); }
     syncHud();
     try { persistLive(); } catch (e) { }
+    try { syncPauseClose(); } catch (e) { }
   }
   root.Tetris.press = press;
+
+  // 1.9.205 Start button, How to play, and auto-close after 5 minutes paused.
+  let pausedAt = null, pauseCloseTimer = 0, howtoResume = false;
+  function elHidden(id, on) {
+    const el = doc.getElementById(id);
+    if (el) el.hidden = !!on;
+  }
+  function showStart() {
+    const el = doc.getElementById('startov');
+    if (el) el.hidden = false;
+    elHidden('pauseov', true);
+  }
+  function hideStart() {
+    elHidden('startov', true);
+  }
+  function fillHowto() {
+    const body = doc.getElementById('howtobody');
+    if (body && !body.dataset.filled) {
+      body.innerHTML = howToPlayHtml();
+      body.dataset.filled = '1';
+    }
+  }
+  function openHowto() {
+    fillHowto();
+    const el = doc.getElementById('howto');
+    if (!el) return;
+    howtoResume = !!(started && g && !g.over && !g.demo && !g.paused);
+    if (started && g && !g.over && !g.demo && !g.paused) {
+      g.paused = true;
+      try { persistLive(); } catch (e) { }
+    }
+    el.hidden = false;
+    const card = el.querySelector('.howto-card') || el;
+    try { card.scrollTop = 0; } catch (e) { }
+    syncHud();
+    syncPauseClose();
+  }
+  function closeHowto(keepPause) {
+    elHidden('howto', true);
+    if (howtoResume && !keepPause && started && g && g.paused && !g.over && !g.demo) {
+      g.paused = false;
+      try { persistLive(); } catch (e) { }
+    }
+    howtoResume = false;
+    syncHud();
+    syncPauseClose();
+  }
+  function startGame() {
+    ensureAudio();
+    hideStart();
+    closeHowto(true);
+    if (!g || g.demo || g.over) {
+      g = newGame();
+    }
+    g.paused = false;
+    started = true;
+    syncHud();
+    try { persistLive(); } catch (e) { }
+    syncPauseClose();
+  }
+  function pauseInfo() {
+    return { started: started, paused: !!(g && g.paused), over: !!(g && g.over), demo: !!(g && g.demo) };
+  }
+  function clearPauseCloseTimer() {
+    if (pauseCloseTimer) {
+      try { root.clearTimeout(pauseCloseTimer); } catch (e) { }
+      pauseCloseTimer = 0;
+    }
+  }
+  function syncPauseOv() {
+    const show = !!(started && g && g.paused && !g.over && !g.demo);
+    const howto = doc.getElementById('howto');
+    const open = howto && !howto.hidden;
+    elHidden('pauseov', !(show && !open));
+  }
+  function requestCloseTetris() {
+    clearPauseCloseTimer();
+    pausedAt = null;
+    try { stopAudio(); } catch (e) { }
+    // Same path as the parent's Close button. Do not touch tetris-best.
+    try {
+      if (root.parent && root.parent !== root) {
+        root.parent.postMessage({ type: CLOSE_MSG }, '*');
+      }
+    } catch (e) { }
+  }
+  function checkPauseClose() {
+    const info = Object.assign(pauseInfo(), { pausedAt: pausedAt, now: nowMs(), limit: PAUSE_CLOSE_MS });
+    if (shouldCloseAfterPause(info)) {
+      requestCloseTetris();
+      return true;
+    }
+    return false;
+  }
+  function armPauseCloseTimer() {
+    clearPauseCloseTimer();
+    if (pausedAt == null) return;
+    const left = PAUSE_CLOSE_MS - (nowMs() - pausedAt);
+    const wait = left <= 0 ? 0 : left;
+    try {
+      pauseCloseTimer = root.setTimeout(function () {
+        pauseCloseTimer = 0;
+        if (checkPauseClose()) return;
+        if (nextPausedAt(pausedAt, pauseInfo(), nowMs()) != null) armPauseCloseTimer();
+      }, wait);
+    } catch (e) { }
+  }
+  function syncPauseClose() {
+    const next = nextPausedAt(pausedAt, pauseInfo(), nowMs());
+    if (next == null) {
+      pausedAt = null;
+      clearPauseCloseTimer();
+    } else {
+      if (pausedAt == null) pausedAt = next;
+      if (checkPauseClose()) { syncPauseOv(); return; }
+      armPauseCloseTimer();
+    }
+    syncPauseOv();
+  }
+  { const sb = doc.getElementById('startbtn'); if (sb) sb.addEventListener('click', ev => { ev.preventDefault(); startGame(); }); }
+  { const sh = doc.getElementById('starthowto'); if (sh) sh.addEventListener('click', ev => { ev.preventDefault(); openHowto(); }); }
+  { const hb = doc.getElementById('howtobtn'); if (hb) hb.addEventListener('click', ev => { ev.preventDefault(); openHowto(); }); }
+  { const hc = doc.getElementById('howtoclose'); if (hc) hc.addEventListener('click', ev => { ev.preventDefault(); closeHowto(); }); }
+  { const how = doc.getElementById('howto');
+    if (how) how.addEventListener('click', ev => { if (ev.target === how) closeHowto(); }); }
+  { const pr = doc.getElementById('pauseresume'); if (pr) pr.addEventListener('click', ev => { ev.preventDefault(); press('pause'); }); }
+  { const ph = doc.getElementById('pausehowto'); if (ph) ph.addEventListener('click', ev => { ev.preventDefault(); openHowto(); }); }
+  fillHowto();
+  showStart();
+  root.Tetris.startGame = startGame;
+  root.Tetris.openHowto = openHowto;
+  root.Tetris.closeHowto = closeHowto;
+  root.Tetris.showStart = showStart;
+  root.Tetris.hideStart = hideStart;
+  root.Tetris.checkPauseClose = checkPauseClose;
+  root.Tetris.requestCloseTetris = requestCloseTetris;
+  root.Tetris.syncPauseClose = syncPauseClose;
+  root.Tetris.pausedAt = () => pausedAt;
+
   root.Tetris.live = () => g;
   root.Tetris.bushTime = function (t) { if (t != null) bush.t = t; return bush.t; };
   root.Tetris.bushReady = function () { return !!(bush.ready && bush.cv); };
@@ -4049,6 +4236,7 @@
   root.Tetris.show = function (opts) {
     opts = opts || {};
     started = true; musicOn = false; soundOn = false;
+    try { hideStart(); closeHowto(true); } catch (e) { }
     g = newGame();
     g.lines = opts.lines || 0;
     g.level = Math.floor(g.lines / 10) + 1;
@@ -4210,6 +4398,9 @@
     started = true;
     noteIdx = 0;
     g = newGame({ level: Math.max(1, level || 1), practice: true });
+    if (g) g.paused = false;
+    try { hideStart(); } catch (e) { }
+    try { syncPauseClose(); } catch (e) { }
     themeIdx = themeFor(g.level);
     lookIdx = -1;
     applyLook(themeIdx);
@@ -4242,9 +4433,12 @@
   const map = { ArrowLeft: 'left', ArrowRight: 'right', ArrowDown: 'down', ArrowUp: 'rotate', x: 'rotate', X: 'rotate', z: 'rotateBack', Z: 'rotateBack', ' ': 'drop', c: 'hold', C: 'hold', Shift: 'hold', p: 'pause', P: 'pause', Escape: 'pause', r: 'restart', R: 'restart' };
   root.addEventListener('keydown', e => {
     if (e.key === 'm' || e.key === 'M') { musicOn = !musicOn; ensureAudio(); const b = doc.getElementById('musicbtn'); if (b) b.textContent = musicOn ? 'Music on' : 'Music off'; return; }
+    const how = doc.getElementById('howto');
+    if (how && !how.hidden) { if (e.key === 'Escape') { e.preventDefault(); closeHowto(); } return; }
     const pick = doc.getElementById('levelpick');
     if (pick && !pick.hidden) { if (e.key === 'Escape') closePicker(); return; }
     if (root.IBScores && root.IBScores.isOpen()) { if (e.key === 'Escape') root.IBScores.close(); return; }
+    if (!started) return;
     if (e.key === 'Escape' && typeof isExtreme === 'function' && isExtreme()) {
       e.preventDefault();
       setExtreme(false, 'escape');
@@ -4291,7 +4485,7 @@
     const dy = e.clientY - s.sy;
     const el = performance.now() - s.t;
     if (!s.moved) {
-      if (!started) { press('down'); return; }
+      if (!started) return;
       if (g.over) { press('restart'); return; }
       if (g.paused) { press('pause'); return; }
       press('rotate');
@@ -6052,7 +6246,9 @@
   }
   // 1.9.185: sunrise is much quicker — full daylight about 40% of the way through
   // level 1, while still starting in darkness. A slow time term is only a gentle assist.
-  function farmDayTarget(prog, t) { return Math.max(0, Math.min(1, (prog || 0) / 0.4 + (t || 0) / 800)); }
+  // 1.9.205: FARM_SUNRISE_PROG / FARM_SUNRISE_SEC are halved (0.2 / 400s).
+  // The rooster still crows at full sunrise (sun alt >= 0.98).
+  function farmDayTarget(prog, t) { return Math.max(0, Math.min(1, (prog || 0) / FARM_SUNRISE_PROG + (t || 0) / FARM_SUNRISE_SEC)); }
   function smooth01(v) { v = Math.max(0, Math.min(1, v)); return v * v * (3 - 2 * v); }
   // 1.9.190: t tracks day directly so the peek is visible at t=0 (no 0.16 delay).
   function farmSunPos(day) {
@@ -8244,6 +8440,8 @@
     }
     const mb = doc.getElementById('musicbtn'); if (mb) mb.textContent = musicOn ? 'Music on' : 'Music off';
     const sb = doc.getElementById('soundbtn'); if (sb) sb.textContent = soundOn ? 'Sound on' : 'Sound off';
+    try { if (started) hideStart(); else showStart(); } catch (e) { }
+    try { syncPauseClose(); } catch (e) { }
   }
   bootLive();
   syncHud();
@@ -8254,11 +8452,13 @@
     if (g && !g.over && !g.demo) g.paused = true;
     stopAudio();
     try { syncHud(); } catch (e) { }
+    try { syncPauseClose(); } catch (e) { }
   }
   function unhalt() {
     if (g && !g.demo && started && !g.over) g.paused = true;
     if (!raf) raf = requestAnimationFrame(loop);
     try { syncHud(); } catch (e) { }
+    try { syncPauseClose(); } catch (e) { }
   }
   doc.addEventListener('visibilitychange', () => { if (doc.hidden) halt(); else unhalt(); });
 
@@ -8404,7 +8604,7 @@
   function extremeEmptyTarget(el) {
     if (!el || !el.closest) return false;
     if (el.closest('#board') || el.closest('#xtoggle') || el.closest('#extremebtn') || el.closest('#xexitbtn')) return false;
-    if (el.closest('[data-act]') || el.closest('#levelpick') || el.closest('button')) return false;
+    if (el.closest('[data-act]') || el.closest('#levelpick') || el.closest('#startov') || el.closest('#howto') || el.closest('#pauseov') || el.closest('button')) return false;
     return true;
   }
   { let holdT = 0;
