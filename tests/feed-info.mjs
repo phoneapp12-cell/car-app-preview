@@ -1946,8 +1946,8 @@ if (live) {
   assert.strictEqual(tetGame.CALLOUT_TEXT.fantastic, 'Fantastic!');
   assert.strictEqual(tetGame.CALLOUT_TEXT.awesome, 'Awesome!');
   assert.strictEqual(tetGame.CALLOUT_TEXT.yougotthis, 'You got this!');
-  assert.strictEqual(tetGame.CALLOUT_TEXT.keepgoing, 'Keep going!');
-  ['amazing','brilliant','fantastic','awesome','yougotthis','keepgoing'].forEach(id => {
+  assert.ok(!tetGame.CALLOUT_TEXT.keepgoing && !tetGame.CALLOUT_VOICES.keepgoing, 'Keep going is removed');
+  ['amazing','brilliant','fantastic','awesome','yougotthis'].forEach(id => {
     assert.ok(tetGame.CALLOUT_VOICES[id] && /^[0-9a-f]{8}$/.test(tetGame.CALLOUT_VOICES[id]));
     assert.ok(fs.existsSync('feed/' + tetGame.calloutSrc(id)), 'voice ' + id);
   });
@@ -1955,7 +1955,7 @@ if (live) {
   // 1.9.190: Shane's Fantastic! recording replaces vo-fantastic-271ecea2.
   // 1.9.192: Amazing/Brilliant/Awesome/Keep going re-toned to the game-over voice;
   // Fantastic (Shane) and You got this (7761c550) are unchanged.
-  const VO187 = { amazing: 'f68cdbb0', brilliant: '791b3eb0', fantastic: '95c74d33', awesome: 'c083a2f5', yougotthis: '7761c550', keepgoing: '66d1b6c8' };
+  const VO187 = { amazing: 'f68cdbb0', brilliant: '791b3eb0', fantastic: '95c74d33', awesome: 'c083a2f5', yougotthis: '7761c550' };
   Object.keys(VO187).forEach(id => {
     assert.strictEqual(tetGame.CALLOUT_VOICES[id], VO187[id]);
     assert.ok(fs.existsSync('feed/tetris-bg/vo-' + id + '-' + VO187[id] + '.mp3'));
@@ -1979,7 +1979,8 @@ if (live) {
   assert.ok(bigger.has('fantastic') || bigger.has('awesome'), 'back-to-back bigger callout');
   const enc = new Set();
   for (let i = 0; i < 24; i++) enc.add(tetGame.pickCallout({ n: 0, b2b: false, combo: 0, high: true, near: true, level: 1 }));
-  assert.ok(enc.has('yougotthis') || enc.has('keepgoing'), 'encouragement when the stack is high on level 1');
+  assert.ok(enc.has('yougotthis') && !enc.has('keepgoing'), 'You got this when the stack is high on level 1');
+  assert.ok([...enc].every(x => x === 'yougotthis'), 'Keep going is never picked');
   // 1.9.188: You got this / Keep going only on level 1; praise stays on every level
   const laterEnc = new Set();
   for (let i = 0; i < 40; i++) {
@@ -2964,7 +2965,7 @@ if (live) {
     firstEnc.add(tetGame.pickCallout({ n: 0, b2b: false, combo: 0, high: true, near: true, level: 1 }));
     laterEnc.add(tetGame.pickCallout({ n: 0, b2b: false, combo: 0, high: true, near: true, level: 5 }));
   }
-  assert.ok(firstEnc.has('yougotthis') || firstEnc.has('keepgoing'), 'encouragement stays on level 1');
+  assert.ok(firstEnc.has('yougotthis') && !firstEnc.has('keepgoing'), 'You got this stays on level 1');
   assert.ok(!laterEnc.has('yougotthis') && !laterEnc.has('keepgoing'), 'no encouragement from level 2 onward');
 }
 
@@ -2977,7 +2978,7 @@ if (live) {
   assert.strictEqual(tetGame.LOOKS.length, 13);
   assert.strictEqual(tetGame.PICS[12], 'tetris-bg/12.webp');
   assert.ok(fs.existsSync('feed/tetris-bg/12.webp'), 'painted Food background is shipped');
-  assert.deepStrictEqual(Array.from(tetGame.foodKind ? [tetGame.foodKind(1), tetGame.foodKind(2), tetGame.foodKind(3), tetGame.foodKind(4), tetGame.foodKind(5), tetGame.foodKind(6), tetGame.foodKind(7)] : []), ['ice', 'banana', 'banana', 'melon', 'carrot', 'broccoli', 'chilli']);
+  assert.deepStrictEqual(Array.from(tetGame.foodKind ? [tetGame.foodKind(1), tetGame.foodKind(2), tetGame.foodKind(3), tetGame.foodKind(4), tetGame.foodKind(5), tetGame.foodKind(6), tetGame.foodKind(7)] : []), ['ice', 'banana', 'banana', 'melon', 'carrot', 'grape', 'chilli']);
   assert.strictEqual(tetGame.foodSoundFor(1), 'squish');
   assert.strictEqual(tetGame.foodSoundFor(2), 'squish');
   assert.strictEqual(tetGame.foodSoundFor(3), 'squish');
@@ -3026,7 +3027,7 @@ if (live) {
 // 1.9.200 Food sprites, cherry bombs, and Shane's Food song
 {
   assert.strictEqual(tetGame.FOOD_THEME, 12);
-  assert.ok(tetGame.FOOD_SPRITES && tetGame.FOOD_SPRITES.hash === 'd7044f80');
+  assert.ok(tetGame.FOOD_SPRITES && tetGame.FOOD_SPRITES.hash === 'e3977dde');
   assert.ok(fs.existsSync('feed/' + tetGame.FOOD_SPRITES.src), 'food sprite atlas');
   assert.strictEqual(tetGame.FOOD_SPRITES.cell, 96);
   ['1:0', '1:1', '2:0', '3:0', '4:0', '5:0', '6:0', '7:0', '8:0', '8:3'].forEach(k => {
@@ -3113,5 +3114,29 @@ if (live) {
     assert.ok([9, 11, 0, 2, 4, 5, 7].includes(pc), 'rotate riff pitch class ' + pc + ' in A minor, f=' + f);
   });
 }
+
+// 1.9.201 T piece is grapes, not broccoli; Keep going! is removed
+{
+  assert.strictEqual(tetGame.foodKind(6), 'grape');
+  assert.strictEqual(tetGame.foodSoundFor(6), 'munch');
+  assert.strictEqual(tetGame.blockColor(6, 110, 12), '#9333ea');
+  assert.strictEqual(tetGame.FOOD_SPRITES.hash, 'e3977dde');
+  assert.ok(fs.existsSync('feed/' + tetGame.FOOD_SPRITES.src), 'rebuilt grape atlas');
+  assert.ok(!fs.existsSync('feed/tetris-bg/food-sprites-d7044f80.webp'), 'old broccoli atlas removed');
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.ok(!src.includes("kind === 'broccoli'") && !src.includes("'broccoli'"));
+  assert.ok(!tetGame.CALLOUT_TEXT.keepgoing && !tetGame.CALLOUT_VOICES.keepgoing);
+  assert.ok(!fs.existsSync('feed/tetris-bg/vo-keepgoing-66d1b6c8.mp3'), 'Keep going voice is gone');
+  assert.ok(!src.includes('keepgoing') && !src.includes('Keep going!'));
+  const enc = new Set();
+  for (let i = 0; i < 30; i++) enc.add(tetGame.pickCallout({ n: 0, b2b: false, combo: 0, high: true, near: true, level: 1 }));
+  assert.deepStrictEqual(Array.from(enc), ['yougotthis']);
+  assert.strictEqual(tetGame.CALLOUT_TEXT.yougotthis, 'You got this!');
+  assert.ok(fs.existsSync('feed/' + tetGame.calloutSrc('yougotthis')));
+  const praise = new Set();
+  for (let i = 0; i < 24; i++) praise.add(tetGame.pickCallout({ n: 4, b2b: false, combo: 1, high: false, near: false, level: 5 }));
+  assert.ok(praise.has('amazing') || praise.has('brilliant'));
+}
+
 
 
