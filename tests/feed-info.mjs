@@ -3406,4 +3406,50 @@ if (live) {
   assert.ok(src.includes('1.9.205: sunrise duration halved') || src.includes('FARM_SUNRISE_PROG / FARM_SUNRISE_SEC are halved'));
 }
 
+// 1.9.205 Family scoreboard lists every player's personal best, not only the top 10 games
+{
+  const mem = new Map();
+  const lsStub = { getItem: k => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: k => mem.delete(k) };
+  const ctx = { console, Math, Object, Number, String, Array, JSON, Date, Promise, setTimeout, clearTimeout, encodeURIComponent, localStorage: lsStub, fetch: async () => ({ ok: true, json: async () => null }) };
+  ctx.window = ctx; ctx.globalThis = ctx; vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync('feed/scores.js', 'utf8'), ctx, { filename: 'feed/scores.js' });
+  const S = ctx.IBScores;
+  const top = [
+    { name: 'Shane', score: 9000, at: 100, mine: true },
+    { name: 'Shane', score: 8000, at: 90, mine: true },
+    { name: 'Shane', score: 7000, at: 80, mine: true },
+    { name: 'Sarah', score: 6000, at: 70, mine: false },
+    { name: 'Shane', score: 5000, at: 60, mine: true }
+  ];
+  // Without data.best, fall back to one row per player from the top games
+  const fromTop = [...S.personalBests({ top })];
+  assert.strictEqual(fromTop.map(x => x.name + ':' + x.score).join('|'), 'Shane:9000|Sarah:6000');
+  // With data.best, every member is listed even if they are not in the top 10 games
+  const best = [
+    { name: 'Sarah', score: 12000, at: 200, games: 4, mine: false },
+    { name: 'Shane', score: 9000, at: 100, games: 20, mine: true },
+    { name: 'Aranea', score: 3100, at: 50, games: 2, mine: false },
+    { name: 'Alex', score: 800, at: 40, games: 1, mine: false }
+  ];
+  const crowdedTop = best.slice(0, 1).concat(Array.from({ length: 9 }, (_, i) => ({ name: 'Shane', score: 9000 - i, at: 100 - i, mine: true })));
+  assert.strictEqual(crowdedTop.length, 10);
+  assert.ok(!crowdedTop.some(x => x.name === 'Aranea') && !crowdedTop.some(x => x.name === 'Alex'), 'Aranea and Alex would be hidden on the old top-10 games table');
+  const leaders = [...S.personalBests({ top: crowdedTop, best })];
+  assert.strictEqual(leaders.map(x => x.name).join('|'), 'Sarah|Shane|Aranea|Alex', 'every family member with a score is listed');
+  assert.strictEqual(leaders[0].score, 12000);
+  const markup = S.html('tetris', { top: crowdedTop, best }, {});
+  assert.ok(markup.includes("Each player's best"));
+  assert.ok(markup.includes('Sarah') && markup.includes('12,000') && markup.includes('Shane') && markup.includes('Aranea') && markup.includes('3,100') && markup.includes('Alex') && markup.includes('800'));
+  assert.ok(markup.includes('4 games') && markup.includes('20 games') && markup.includes('2 games') && markup.includes('1 game'));
+  assert.ok(!markup.includes('Everyone’s best') && !markup.includes("Everyone's best"), 'the old second list is not duplicated');
+  const scr = S.html('scrabble', { top: [], best: [{ name: 'Shane', score: 402, winsComputer: 1, winsFamily: 2, games: 3, mine: true }] }, {});
+  assert.ok(scr.includes('wins: 1 v') && scr.includes('v family'));
+  // The family high-score bar uses personal bests, not only the truncated top games
+  assert.strictEqual(tetGame.familyHighFrom({ top: crowdedTop, best }), 12000);
+  assert.strictEqual(tetGame.familyHighFrom({ best: [{ score: 5000 }] }), 5000);
+  assert.strictEqual(tetGame.familyHighFrom({ top: [{ score: 200 }] }), 200);
+  assert.strictEqual(tetGame.familyHighFrom(null), null);
+  const src = fs.readFileSync('feed/scores.js', 'utf8');
+  assert.ok(src.includes('function personalBests') && src.includes('1.9.205: the headline list is every member'));
+}
 
