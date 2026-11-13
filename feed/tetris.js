@@ -1302,9 +1302,16 @@
     return !!(g && g.board && g.board.some(function (row) { return row.some(function (v) { return v; }); }));
   }
   function familyHighFrom(data) {
-    if (!data || !Array.isArray(data.top)) return null;
+    if (!data) return null;
+    if (!Array.isArray(data.best) && !Array.isArray(data.top)) return null;
     let n = 0;
-    for (let i = 0; i < data.top.length; i++) n = Math.max(n, data.top[i].score || 0);
+    const add = function (arr) {
+      if (!arr) return;
+      for (let i = 0; i < arr.length; i++) n = Math.max(n, arr[i].score || 0);
+    };
+    // 1.9.205: read everyone's personal best as well as the latest 10 games.
+    add(data.best);
+    add(data.top);
     return n;
   }
   function localHighFallback() {
@@ -1329,7 +1336,8 @@
     const p = (S.who && S.who()) ? S.load('tetris') : null;
     Promise.resolve(p).then(function (data) {
       if (!g || g.highNoted) return;
-      if (data && Array.isArray(data.top)) g.familyHigh = familyHighFrom(data);
+      const high = familyHighFrom(data);
+      if (high != null) g.familyHigh = high;
       maybeHighScore(g);
     }).catch(function () { });
     return g;
