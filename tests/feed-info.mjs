@@ -2443,13 +2443,15 @@ if (live) {
 
 // 1.9.191 Beach surfers ride the settled Tetris stack, not the painted wash
 // 1.9.193: those surfers were replaced by a skyline wave band; skyline helpers remain.
+// 1.9.194: the wave band became a beach-wash sheet that pours off the blocks.
 {
   const src = fs.readFileSync('feed/tetris.js', 'utf8');
   assert.strictEqual(tetGame.themeFor(3), 0);
   assert.strictEqual(tetGame.isEffect(0), 'beach');
-  assert.ok(src.includes('function drawStackWave') && src.includes('function stepStackWave') && src.includes('function stackSkyline'));
-  assert.ok(src.includes('drawStackWave(ctx)') && src.includes('stackWaveReset()'));
+  assert.ok(src.includes('function drawStackWash') && src.includes('function stepStackWash') && src.includes('function stackSkyline'));
+  assert.ok(src.includes('drawStackWash(ctx)') && src.includes('stackWashReset()'));
   assert.ok(!src.includes('function drawStackSurfers') && !src.includes('function newStackSurf'));
+  assert.ok(!src.includes('function drawStackWave') && !src.includes('function newStackWave'));
   assert.ok(!src.includes('function drawBeachSurfers') && !src.includes('drawBeachSurfers(c, box)'));
 
   const empty = tetGame.emptyBoard();
@@ -2459,18 +2461,14 @@ if (live) {
   const pts0 = tetGame.stackSkyline(empty);
   assert.ok(pts0.length >= 2);
   assert.ok(pts0.every(p => Math.abs(p.y - 20 * 28) < 0.01), 'empty skyline is the floor');
-  const wave = tetGame.newStackWave();
-  tetGame.stepStackWave(wave, empty, 0);
-  assert.ok(Math.abs(wave.y - 20 * 28) < 2, 'on the floor at t=0');
-  assert.ok(wave.x >= 0 && wave.x <= 10 * 28);
+  const wash = tetGame.newStackWash();
+  tetGame.stepStackWash(wash, empty, 1600);
+  assert.ok(wash.ready);
+  assert.ok(wash.tops.every(y => Math.abs(y - 20 * 28) < 0.01), 'washes the floor when the well is empty');
+  assert.ok(wash.wet.some(v => v > 0.2), 'the sheet spreads across the floor mid-wash');
   const before = empty.map(row => row.slice());
-  // Roll long enough to hit a wall and turn.
-  wave.s = 0;
-  wave.dir = -1;
-  tetGame.stepStackWave(wave, empty, 200);
-  assert.strictEqual(wave.dir, 1, 'turns around at the left wall');
-  assert.ok(wave.x >= 0, 'stays inside the well');
-  assert.deepStrictEqual(empty, before, 'stepping the wave does not change the board');
+  tetGame.stepStackWash(wash, empty, 200);
+  assert.deepStrictEqual(empty, before, 'stepping the wash does not change the board');
 
   // Jagged stack: follow the skyline, including vertical drops.
   const g = tetGame.newGame({ level: 3, practice: true });
@@ -2479,8 +2477,8 @@ if (live) {
     const top = 18 - (c % 4); // 18,17,16,15,18...
     for (let r = top; r < 20; r++) g.board[r][c] = 2;
   }
-  const jagged = tetGame.newStackWave();
-  tetGame.stepStackWave(jagged, g.board, 0);
+  const jagged = tetGame.newStackWash();
+  tetGame.stepStackWash(jagged, g.board, 1600);
   function onSkyline(board, x, y, tol) {
     const C = 10, CELL = 28;
     const col = Math.max(0, Math.min(C - 1, Math.floor(x / CELL)));
@@ -2499,40 +2497,41 @@ if (live) {
     }
     return Math.abs(y - yHere) <= tol;
   }
-  assert.ok(onSkyline(g.board, jagged.x, jagged.y, 2), 'starts on the jagged skyline');
-  for (let i = 0; i < 40; i++) tetGame.stepStackWave(jagged, g.board, 80);
-  assert.ok(onSkyline(g.board, jagged.x, jagged.y, 2.5), 'stays on the skyline while rolling');
-  assert.ok(jagged.x >= 0 && jagged.x <= 10 * 28);
+  assert.ok(jagged.tops.every((y, c) => Math.abs(y - tetGame.stackColY(g.board, c)) < 0.01), 'tracks the jagged skyline');
+  assert.ok(jagged.wet.some(v => v > 0.2), 'sheet covers some of the jagged tops mid-wash');
+  for (let i = 0; i < 40; i++) tetGame.stepStackWash(jagged, g.board, 80);
+  assert.ok(jagged.tops.every((y, c) => Math.abs(y - tetGame.stackColY(g.board, c)) < 0.01), 'stays on the skyline as the wash cycles');
 
   // Re-route when a line clears: a full bottom row plus a step above, then clear the row.
   const g2 = tetGame.newGame({ level: 3, practice: true });
   g2.board = tetGame.emptyBoard();
   for (let c = 0; c < 10; c++) g2.board[19][c] = 3;
   for (let c = 0; c < 4; c++) g2.board[18][c] = 4;
-  const rider = tetGame.newStackWave();
-  tetGame.stepStackWave(rider, g2.board, 0);
+  const rider = tetGame.newStackWash();
+  tetGame.stepStackWash(rider, g2.board, 1600);
   const full = tetGame.findFullRows(g2);
   assert.ok(full.length === 1 && full[0] === 19, 'bottom row is full');
   const boardBefore = g2.board.map(r => r.slice());
   tetGame.applyClear(g2, full);
   assert.ok(g2.board[19].some(v => v === 4) || g2.board[19].every(v => !v) || g2.board[19][0] === 4, 'row dropped or cleared');
   // After the clear, the previous bottom row is gone; remaining blocks sit lower.
-  tetGame.stepStackWave(rider, g2.board, 16);
-  assert.ok(onSkyline(g2.board, rider.x, rider.y, 3), 're-forms onto the post-clear skyline');
+  tetGame.stepStackWash(rider, g2.board, 16);
+  assert.ok(rider.tops.every((y, c) => Math.abs(y - tetGame.stackColY(g2.board, c)) < 0.01), 're-forms onto the post-clear skyline');
   const afterStep = g2.board.map(r => r.slice());
-  tetGame.stepStackWave(rider, g2.board, 80);
+  tetGame.stepStackWash(rider, g2.board, 80);
   assert.deepStrictEqual(g2.board, afterStep, 're-route does not place or remove blocks');
 }
 
 
 // 1.9.192 Beach surfers are much bigger, mostly opaque, and there are two of them
 // 1.9.193: surfers were removed; the replacement wave is still drawn under the piece and ghost.
+// 1.9.194: the wash that replaced that wave is still drawn under the piece and ghost.
 {
   const src = fs.readFileSync('feed/tetris.js', 'utf8');
   assert.ok(!src.includes('const STACK_SURF_N = 2') && !src.includes('function drawStackSurfers'));
-  const draw = src.indexOf('try { drawStackWave(ctx); }');
+  const draw = src.indexOf('try { drawStackWash(ctx); }');
   const ghost = src.indexOf('drawGhost(ctx, (p.x + c)');
-  assert.ok(draw > 0 && ghost > draw, 'stack wave is drawn before the ghost and falling piece');
+  assert.ok(draw > 0 && ghost > draw, 'stack wash is drawn before the ghost and falling piece');
 }
 
 
@@ -2639,14 +2638,15 @@ if (live) {
 }
 
 // 1.9.193 Beach stack waves replace the surfers
+// 1.9.194: the travelling wave band was reworked into a beach-wash sheet.
 {
   const src = fs.readFileSync('feed/tetris.js', 'utf8');
-  assert.ok(src.includes('function drawStackWave') && src.includes('soft white foam crest'));
-  assert.ok(src.includes('const STACK_WAVE_H = 15') && src.includes('STACK_WAVE_SPEED = 48'));
-  assert.ok(!src.includes('function drawStackSurfer') && !src.includes('Arms out for balance'));
-  const draw = src.indexOf('try { drawStackWave(ctx); }');
+  assert.ok(src.includes('function drawStackWash') && src.includes('like a wave running up sand'));
+  assert.ok(!src.includes('const STACK_WAVE_H = 15') && !src.includes('STACK_WAVE_SPEED = 48'));
+  assert.ok(!src.includes('function drawStackWave') && !src.includes('function drawStackSurfer'));
+  const draw = src.indexOf('try { drawStackWash(ctx); }');
   const ghost = src.indexOf('drawGhost(ctx, (p.x + c)');
-  assert.ok(draw > 0 && ghost > draw, 'wave is drawn under the ghost and falling piece');
+  assert.ok(draw > 0 && ghost > draw, 'wash is drawn under the ghost and falling piece');
 }
 
 // 1.9.193 NEW HIGH SCORE banner holds 1000ms longer before fade-out
@@ -2672,3 +2672,65 @@ if (live) {
   tetGame.tickHighScore(g, 800);
   assert.strictEqual(g.highScore, null, 'gone after the original fade-out plus the extra second');
 }
+
+// 1.9.194 Beach stack wash: a sheet of sea water that spreads, spills, pools, and recedes
+{
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.strictEqual(tetGame.STACK_WASH_PERIOD, 8);
+  assert.ok(tetGame.washCover(0) === 0 && tetGame.washCover(0.42) === 1 && tetGame.washCover(1) === 0);
+  const midWash = tetGame.washCover(0.20);
+  assert.ok(midWash > 0.4 && midWash < 0.85, 'mid-wash is a partial run-up, got ' + midWash);
+  assert.ok(tetGame.washSpill(0.20) < 0.05, 'mid-wash has not started spilling yet');
+  assert.ok(tetGame.washSpill(0.46) > 0.85 && tetGame.washPool(0.46) > 0.7, 'mid-spill is at peak pour and pooling');
+  const empty = tetGame.emptyBoard();
+  const floor = tetGame.newStackWash();
+  tetGame.stepStackWash(floor, empty, 1600);
+  assert.ok(floor.tops.every(y => y === 20 * 28), 'empty well is washed along the floor');
+  assert.ok(floor.wet.some(v => v > 0.25), 'the sheet has spread across the floor');
+  const g = tetGame.newGame({ level: 3, practice: true });
+  g.board = tetGame.emptyBoard();
+  const tops = [17, 16, 15, 14, 16, 13, 14, 17, 15, 18];
+  for (let c = 0; c < 10; c++) for (let r = tops[c]; r < 20; r++) g.board[r][c] = 2;
+  const spill = tetGame.newStackWash();
+  tetGame.stepStackWash(spill, g.board, 3680);
+  assert.ok(spill.streams.length > 0, 'mid-spill has cascading streams down drop faces');
+  assert.ok(spill.pool.some(v => v > 0.08), 'water pools on lower ledges');
+  const before = g.board.map(r => r.slice());
+  tetGame.stepStackWash(spill, g.board, 80);
+  assert.deepStrictEqual(g.board, before, 'wash is visual only');
+  assert.ok(src.includes('try { drawStackWash(ctx); }'));
+  const draw = src.indexOf('try { drawStackWash(ctx); }');
+  const ghost = src.indexOf('drawGhost(ctx, (p.x + c)');
+  assert.ok(draw > 0 && ghost > draw, 'wash is under the ghost and falling piece');
+}
+
+// 1.9.194 Fireworks: plain black sky, occasional full-screen flash on major bursts
+{
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.strictEqual(tetGame.themeFor(4), 1);
+  assert.strictEqual(tetGame.isEffect(1), 'fireworks');
+  assert.ok(src.includes("if (kind === 'fireworks') doc.documentElement.style.background = '#000'"));
+  assert.ok(src.includes("c.fillStyle = '#000'") && src.includes('plain black sky'));
+  assert.ok(!src.includes('c.drawImage(fw.sil') && src.includes('rainforest silhouette removed'));
+  assert.strictEqual(tetGame.FW_BIGGER_GROW, 1.5);
+  assert.strictEqual(tetGame.FW_MAJOR_SCALE, 2);
+  assert.strictEqual(tetGame.FW_SKY_FLASH_PEAK, 0.07);
+  assert.strictEqual(tetGame.FW_SKY_FLASH_FADE, 0.15);
+  assert.strictEqual(tetGame.fwSkyFlashAlpha(0), 1);
+  assert.strictEqual(tetGame.fwSkyFlashAlpha(0.07), 1);
+  assert.ok(Math.abs(tetGame.fwSkyFlashAlpha(0.07 + 0.075) - 0.5) < 1e-9);
+  assert.ok(tetGame.fwSkyFlashAlpha(0.07 + 0.15) < 0.01);
+  tetGame.fwReset();
+  tetGame.fwProg(0.2);
+  assert.ok(tetGame.fwSize(0.2) < 1.5);
+  assert.equal(tetGame.maybeFwSkyFlash(2.4), false, 'no flash until bigger fireworks start');
+  tetGame.fwProg(1);
+  assert.ok(tetGame.fwSize(1) >= 1.5);
+  assert.equal(tetGame.maybeFwSkyFlash(1.2), false, 'small and medium bursts get no flash');
+  assert.equal(tetGame.maybeFwSkyFlash(1.99), false, 'just under 200% is not a major burst');
+  assert.equal(tetGame.maybeFwSkyFlash(2.0), true, 'a major burst flashes once the show is big');
+  assert.ok(tetGame.fwSkyFlashState(), 'flash is running');
+  assert.equal(tetGame.maybeFwSkyFlash(2.6), false, 'at most one flash every 8–12s');
+  assert.ok(src.includes('playFwSfx(scale, z)') && src.includes('maybeFwSkyFlash(scale)'), 'existing booms stay; flash is extra');
+}
+
