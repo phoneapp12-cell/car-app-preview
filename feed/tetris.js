@@ -615,7 +615,7 @@
   const LINECLEAR_DUR = 1.67;
   function lineClearSrc() { return 'tetris-bg/lineclear-' + LINECLEAR_HASH + '.mp3'; }
   const CALLOUT_VOICES = {
-    amazing: 'c46de485', brilliant: 'f64c21f2', fantastic: '271ecea2',
+    amazing: 'c46de485', brilliant: 'f64c21f2', fantastic: '95c74d33',
     awesome: '3273dcf3', yougotthis: '7761c550', keepgoing: '6be51176'
   };
   const CALLOUT_TEXT = {
@@ -853,7 +853,35 @@
     if (hsBuf) start(hsBuf);
     else if (hsLoading) hsLoading.then(b => { if (b && soundOn && ac) { ensureHsGain(); start(b); } });
   }
-  function boardOccupied(g) {
+  // 1.9.190: CC0 rooster crow (Freesound 456804, Breviceps) once the farm sun is fully up.
+  const ROOSTER_HASH = 'd5a4ffc5';
+  const ROOSTER_VOL = 0.62;
+  const ROOSTER_DUR = 2.73;
+  function roosterSrc() { return 'tetris-bg/rooster-' + ROOSTER_HASH + '.mp3'; }
+  let roosterBuf = null, roosterLoading = null, roosterGain = null;
+  function ensureRoosterGain() {
+    if (!ac || roosterGain) return;
+    roosterGain = ac.createGain();
+    roosterGain.gain.value = 1;
+    roosterGain.connect(ac.destination);
+  }
+  function loadRooster() {
+    if (roosterBuf) return Promise.resolve(roosterBuf);
+    if (roosterLoading) return roosterLoading;
+    if (!ac) return Promise.resolve(null);
+    roosterLoading = fetch(roosterSrc()).then(r => r.arrayBuffer()).then(ab => ac.decodeAudioData(ab.slice(0))).then(b => { roosterBuf = b; return b; }).catch(() => { roosterLoading = null; return null; });
+    return roosterLoading;
+  }
+  function playRoosterSfx() {
+    if (!soundOn || !ac) return;
+    ensureRoosterGain();
+    loadRooster();
+    duckMusic(0, Math.max(0.7, ROOSTER_DUR - 0.2));
+    const start = (buf) => { playDecoded(buf, roosterGain, ROOSTER_VOL, ac.currentTime); };
+    if (roosterBuf) start(roosterBuf);
+    else if (roosterLoading) roosterLoading.then(b => { if (b && soundOn && ac) { ensureRoosterGain(); start(b); } });
+  }
+    function boardOccupied(g) {
     return !!(g && g.board && g.board.some(function (row) { return row.some(function (v) { return v; }); }));
   }
   function familyHighFrom(data) {
@@ -1429,7 +1457,7 @@
   const FARM_ART = { plate: 'tetris-bg/farm-plate-87d14966.webp', land: 'tetris-bg/farm-land-dcf78c32.webp', atlas: 'tetris-bg/farm-animals-a062cf37.webp', sun: 'tetris-bg/farm-sun-378e81e0.webp' };
   // Sky line (photo px) every 6 px across the 540 px painting, from the sky mask.
   const FARM_HZ = [247,245,241,239,240,246,251,265,265,263,259,258,257,263,272,272,270,269,260,237,230,227,220,224,231,236,259,258,255,255,258,263,269,274,279,284,291,294,306,317,328,339,323,319,319,324,319,317,318,327,323,324,329,326,328,331,332,333,334,335,337,338,338,340,341,341,340,338,337,331,330,329,329,329,332,332,323,323,324,325,326,327,327,328,327,328,329,330,330,331,333];
-  const FARM_SUN = { x: 66, y: 14, w: 142, h: 142, cx: 136.9, cy: 84.5, x0: 210, y0: 335 };
+  const FARM_SUN = { x: 66, y: 14, w: 142, h: 142, cx: 136.9, cy: 84.5, x0: 420, y0: 378.5, rTop: 64.5 };
   // [atlas x, atlas y, w, h, photo x, photo y, foot row]; head/tail: tip and neck columns, rows yA..yB blend.
   const FARM_RIG = {
     cow: { a: [0, 0, 121, 83, 135, 510, 81], kind: 'graze', head: { tip: 0, neck: 50, yA: 0.78, yB: 0.96 } },
@@ -2486,7 +2514,7 @@
     return { g: g, started: !!snap.started, musicOn: snap.musicOn !== false, soundOn: snap.soundOn !== false };
   }
 
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_SAFE_TOP, CITY_CREW_N, cityBuildWait, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, maybeHighScore, startHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, farmDayTarget, farmSunPos, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts };
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_SAFE_TOP, CITY_CREW_N, cityBuildWait, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, maybeHighScore, startHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, FARM_SUN, FARM_HZ, farmDayTarget, farmSunPos, ROOSTER_HASH, roosterSrc, newBeachSurf, beachSurfPos, stepBeachSurf, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts };
 
   if (!root.document) return;
   const doc = root.document;
@@ -3792,7 +3820,7 @@
     if (kind === 'farm') {
       farmCast();
     } else if (kind === 'beach') {
-      life.beach = { tide: 0.5, wet: 0.2, big: 0, mid: 0, fl: 0, gust: 0 };
+      life.beach = { tide: 0.5, wet: 0.2, big: 0, mid: 0, fl: 0, gust: 0, surf: newBeachSurf() };
       beachLoad();
     } else if (kind === 'fireworks') {
       fwReset();
@@ -3910,10 +3938,11 @@
   // the painting behind them is filled in (farm-plate), and each animal is drawn back on its own
   // spot with gentle motion (breathing, head bobs, pecking, tail swish), sun-side rim light,
   // soft ground shadows and a little depth parallax. The day starts in darkness; the painted sun
-  // rises from behind the barn and the light reaches each animal, which then wakes up.
+  // peeks just over the open hills at the start and the light reaches each animal, which then wakes up.
   function farmLoad() {
     if (farm.img || !root.Image) return;
     farm.img = {};
+    try { if (ac) loadRooster(); } catch (e) { }
     let left = 4;
     Object.keys(FARM_ART).forEach(k => {
       const im = new root.Image();
@@ -3960,10 +3989,11 @@
   // level 1, while still starting in darkness. A slow time term is only a gentle assist.
   function farmDayTarget(prog, t) { return Math.max(0, Math.min(1, (prog || 0) / 0.4 + (t || 0) / 800)); }
   function smooth01(v) { v = Math.max(0, Math.min(1, v)); return v * v * (3 - 2 * v); }
+  // 1.9.190: t tracks day directly so the peek is visible at t=0 (no 0.16 delay).
   function farmSunPos(day) {
-    const t = Math.max(0, Math.min(1, (day - 0.16) / 0.84));
+    const t = Math.max(0, Math.min(1, day || 0));
     const e = t * (0.75 + 0.25 * t);
-    return { x: FARM_SUN.x0 + (FARM_SUN.cx - FARM_SUN.x0) * e, y: FARM_SUN.y0 + (FARM_SUN.cy - FARM_SUN.y0) * e, alt: e };
+    return { x: FARM_SUN.x0 + (FARM_SUN.cx - FARM_SUN.x0) * e, y: FARM_SUN.y0 + (FARM_SUN.cy - FARM_SUN.y0) * e, alt: e, t: t };
   }
   function farmFront(day) { return 0.22 + smooth01((day - 0.28) / 0.55) * 0.86; }
   function farmAdvance(dt, prog, reduce) {
@@ -3978,7 +4008,7 @@
     const wx = reduce ? 0 : live ? T.gx : Math.sin(life.t * 0.23) * 0.6;
     const wy = reduce ? 0 : live ? T.gy : Math.sin(life.t * 0.17 + 1) * 0.4;
     T.x += (wx - T.x) * Math.min(1, dt * 2.5); T.y += (wy - T.y) * Math.min(1, dt * 2.5);
-    if (!farm.crowed && farmSunPos(day).y < 215) { farm.crowed = true; if (farm.st.rooster) farm.st.rooster.crow = 1.8; }
+    if (!farm.crowed && farmSunPos(day).alt >= 0.98) { farm.crowed = true; if (farm.st.rooster) farm.st.rooster.crow = 1.8; playRoosterSfx(); }
     Object.keys(FARM_RIG).forEach(k => {
       const R = FARM_RIG[k], S = farm.st[k];
       if (!S) return;
@@ -4118,7 +4148,7 @@
   function drawSun(c, box, ox, oy, day) {
     const sp = farmSunPos(day);
     const sx = box.left + ox + sp.x * box.scale, sy = box.top + oy + sp.y * box.scale;
-    const glow = Math.max(0, Math.sin(Math.PI * Math.max(0, Math.min(1, (day - 0.12) / 0.75))));
+    const glow = Math.max(0.28, Math.sin(Math.PI * Math.max(0, Math.min(1, (day - 0.12) / 0.75))));
     c.save();
     farmSkyClip(c, ox, oy, box);
     c.globalCompositeOperation = 'lighter';
@@ -4131,7 +4161,7 @@
     }
     c.globalCompositeOperation = 'source-over';
     const sw = FARM_SUN.w * box.scale, sh = FARM_SUN.h * box.scale;
-    c.globalAlpha = Math.min(1, 0.35 + day);
+    c.globalAlpha = Math.min(1, 0.78 + day * 0.22);
     c.drawImage(farm.img.sun, sx - (FARM_SUN.cx - FARM_SUN.x) * box.scale, sy - (FARM_SUN.cy - FARM_SUN.y) * box.scale, sw, sh);
     c.globalAlpha = 1;
     if (sp.alt < 0.85) { // low sun is redder
@@ -4622,7 +4652,98 @@
   }
 
 
-  function beachLoad() {
+  // 1.9.190 Beach (theme 0, level 3): two modest painted surfers ride the wash.
+  // They stay inside the sea rect, follow the inland foam vector, and have no gameplay effect.
+  function newBeachSurf() {
+    return {
+      riders: [
+        { lane: 0.32, wait: 0.8, p: 0, ride: 0, go: false, lean: 0, hue: 0, flip: 1 },
+        { lane: 0.58, wait: 4.6, p: 0, ride: 0, go: false, lean: 0, hue: 1, flip: 1 }
+      ]
+    };
+  }
+  function beachSurfPos(rider, tide) {
+    const M = BEACH_META;
+    const sea = M.sea;
+    const inland = M.inland;
+    const wash = (M.washPx || 42);
+    const x0 = sea.x + sea.w * (0.36 + rider.lane * 0.42);
+    const y0 = sea.y + 42 + rider.lane * 70;
+    const x = x0 + inland[0] * wash * (0.25 + (rider.p || 0) * 2.15);
+    const y = y0 + inland[1] * wash * (0.25 + (rider.p || 0) * 2.15) + Math.sin((tide || 0) * Math.PI * 2 + rider.lane * 3) * 3;
+    return {
+      x: Math.max(sea.x + 18, Math.min(sea.x + sea.w - 18, x)),
+      y: Math.max(sea.y + 16, Math.min(sea.y + sea.h - 22, y))
+    };
+  }
+  function stepBeachSurf(B, dt, reduce) {
+    if (!B.surf || !B.surf.riders) B.surf = newBeachSurf();
+    const riders = B.surf.riders;
+    const incoming = (B.tide || 0) > 0.12 && (B.tide || 0) < 0.88;
+    for (let i = 0; i < riders.length; i++) {
+      const r = riders[i];
+      if (reduce || B.held) {
+        r.lean *= 0.85;
+        continue;
+      }
+      if (!r.go) {
+        r.wait -= dt;
+        if (r.wait <= 0 && incoming) { r.go = true; r.p = 0; r.ride = 0; }
+        continue;
+      }
+      r.ride += dt;
+      r.p = Math.max(0, Math.min(1, r.ride / 4.6));
+      r.lean += ((r.go ? 0.55 : 0) - r.lean) * Math.min(1, dt * 4);
+      if (r.p >= 1 || !incoming) {
+        r.go = false;
+        r.p = 0;
+        r.ride = 0;
+        r.wait = 2.4 + (i * 1.8);
+        r.lean *= 0.5;
+      }
+    }
+  }
+  function drawBeachSurfers(c, box) {
+    const B = life.beach;
+    if (!B || !B.surf || !B.surf.riders) return;
+    const sc = box.scale;
+    const pal = [
+      { board: '#ff8a4a', wet: '#c45a2c', suit: '#2a2a3a', skin: '#e8b089' },
+      { board: '#3ecfc4', wet: '#1f8f88', suit: '#1c3a4a', skin: '#d9a06e' }
+    ];
+    for (let i = 0; i < B.surf.riders.length; i++) {
+      const r = B.surf.riders[i];
+      if (!r.go && r.p === 0 && r.wait > 0.4) continue;
+      const pos = beachSurfPos(r, B.tide);
+      const x = box.left + pos.x * sc, y = box.top + pos.y * sc;
+      const k = (18 + r.lane * 4) * sc;
+      const lean = (r.lean || 0) * 0.35;
+      const col = pal[r.hue % pal.length];
+      c.save();
+      c.translate(x, y);
+      c.rotate(-0.55 + lean);
+      c.globalAlpha = 0.92;
+      c.fillStyle = 'rgba(20,20,30,0.28)';
+      c.beginPath(); c.ellipse(1.2 * sc, 1.6 * sc, k * 0.28, k * 1.05, 0, 0, Math.PI * 2); c.fill();
+      c.fillStyle = col.board;
+      c.beginPath(); c.ellipse(0, 0, k * 0.26, k * 1.02, 0, 0, Math.PI * 2); c.fill();
+      c.fillStyle = col.wet;
+      c.beginPath(); c.ellipse(-k * 0.04, 0, k * 0.12, k * 0.85, 0, 0, Math.PI * 2); c.fill();
+      c.fillStyle = 'rgba(255,230,200,0.35)';
+      c.beginPath(); c.ellipse(-k * 0.08, -k * 0.2, k * 0.07, k * 0.4, 0, 0, Math.PI * 2); c.fill();
+      c.rotate(0.15);
+      c.fillStyle = col.suit;
+      c.beginPath(); c.ellipse(0, -k * 0.08, k * 0.16, k * 0.34, 0.15, 0, Math.PI * 2); c.fill();
+      c.fillStyle = col.skin;
+      c.beginPath(); c.arc(k * 0.02, -k * 0.48, k * 0.13, 0, Math.PI * 2); c.fill();
+      c.strokeStyle = col.skin;
+      c.lineWidth = Math.max(1, 1.6 * sc);
+      c.lineCap = 'round';
+      c.beginPath(); c.moveTo(k * 0.08, -k * 0.22); c.lineTo(k * 0.38, k * 0.05); c.stroke();
+      c.restore();
+    }
+  }
+    function beachLoad() {
     if (beach.img || !root.Image) return;
     beach.img = {};
     let left = 4;
@@ -4660,6 +4781,7 @@
     b.big = gust * 0.046 + Math.sin(t * 2.15) * 0.01;
     b.mid = gust * 0.033 + Math.sin(t * 2.4 + 0.9) * 0.01;
     b.fl = gust * 0.018 + Math.sin(t * 1.7 + 0.3) * 0.008;
+    stepBeachSurf(b, dt, reduce);
   }
   function beachPhoto(c, box, px, py, sx, sy, dw, dh, parx, pary) {
     c.drawImage(c._beachImg, px, py, sx, sy,
@@ -4758,6 +4880,7 @@
       const fy_ = box.top + (fb.y + iy + pWater * 0.15) * sc;
       c.drawImage(beach.img.foam, 0, 0, fb.w, fb.h, fx_, fy_, fb.w * sc, fb.h * sc);
     }
+    drawBeachSurfers(c, box);
 
     // Contact shadows (trunk bases, flower clump) — a gentle 3D sit.
     function trunkShadow(px, py, rx, ry, a) {
