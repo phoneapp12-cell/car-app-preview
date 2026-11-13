@@ -3009,10 +3009,10 @@ if (live) {
   assert.ok(g2.food[19][0] && g2.food[19][0].t === 2 && g2.food[19][0].rot === 1);
   assert.strictEqual(g2.clearFx, null);
   assert.strictEqual(tetGame.clearKind(12), 'crumbs');
-  assert.strictEqual(tetGame.TRACKS[12].key, 'F');
-  assert.strictEqual(tetGame.TRACKS[12].mode, 'major');
-  assert.strictEqual(tetGame.TRACKS[12].bpm, 90);
-  assert.strictEqual(tetGame.BGM_HASH[12], '4456f9a4');
+  assert.strictEqual(tetGame.TRACKS[12].key, 'A');
+  assert.strictEqual(tetGame.TRACKS[12].mode, 'minor');
+  assert.strictEqual(tetGame.TRACKS[12].bpm, 140.8);
+  assert.strictEqual(tetGame.BGM_HASH[12], '6308c33f');
   assert.ok(fs.existsSync('feed/' + tetGame.bgmSrc(12)));
   ['munch', 'crunch', 'squish', 'chomp'].forEach(k => {
     assert.ok(tetGame.FOOD_HASH[k] && fs.existsSync('feed/' + tetGame.foodSrc(k)), 'food sfx ' + k);
@@ -3022,4 +3022,96 @@ if (live) {
   assert.ok(src.includes('Swap by replacing m12-') || src.includes('placeholder'));
   assert.ok(src.includes('hp.frequency.value = 300') && src.includes('lp.frequency.value = 3500'));
 }
+
+// 1.9.200 Food sprites, cherry bombs, and Shane's Food song
+{
+  assert.strictEqual(tetGame.FOOD_THEME, 12);
+  assert.ok(tetGame.FOOD_SPRITES && tetGame.FOOD_SPRITES.hash === 'd7044f80');
+  assert.ok(fs.existsSync('feed/' + tetGame.FOOD_SPRITES.src), 'food sprite atlas');
+  assert.strictEqual(tetGame.FOOD_SPRITES.cell, 96);
+  ['1:0', '1:1', '2:0', '3:0', '4:0', '5:0', '6:0', '7:0', '8:0', '8:3'].forEach(k => {
+    assert.ok(tetGame.FOOD_SPRITES.layout[k], 'atlas layout ' + k);
+  });
+  assert.strictEqual(tetGame.FOOD_SPRITES.layout['1:0'].cols, 4);
+  assert.strictEqual(tetGame.FOOD_SPRITES.layout['4:0'].cols, 2);
+  assert.strictEqual(tetGame.FOOD_SPRITES.layout['8:0'].cols, 1);
+  assert.ok(!fs.existsSync('feed/tetris-bg/m12-4456f9a4.mp3'), 'placeholder loop removed');
+  assert.strictEqual(tetGame.TRACKS[12].bpm, 140.8);
+  assert.strictEqual(tetGame.TRACKS[12].offset, 0);
+  assert.strictEqual(tetGame.TRACKS[12].key, 'A');
+  assert.strictEqual(tetGame.TRACKS[12].mode, 'minor');
+  assert.strictEqual(tetGame.BGM_HASH[12], '6308c33f');
+  assert.ok(fs.existsSync('feed/' + tetGame.bgmSrc(12)));
+  assert.strictEqual(tetGame.CHERRY_T, 8);
+  assert.strictEqual(tetGame.SHAPES[8].length, 1);
+  assert.strictEqual(tetGame.SHAPES[8][0].length, 1);
+  assert.strictEqual(Number(tetGame.SHAPES[8][0][0]), 8);
+  assert.strictEqual(tetGame.foodKind(8), 'cherry');
+  assert.strictEqual(tetGame.foodSoundFor(8), 'boom');
+  assert.strictEqual(tetGame.FOOD_HASH.boom, '70ec46f6');
+  assert.ok(fs.existsSync('feed/' + tetGame.foodSrc('boom')), 'cherry boom sfx');
+  assert.strictEqual(tetGame.blockColor(8, 110, 12), '#e11d48');
+  const g = tetGame.newGame({ level: 12, practice: true });
+  g.lastCherry = false;
+  g.bag = [1, 2, 3, 4, 5, 6, 7];
+  assert.strictEqual(tetGame.takeNext(g, 0), tetGame.CHERRY_T);
+  assert.strictEqual(g.lastCherry, true);
+  const bagBefore = g.bag.slice();
+  assert.strictEqual(tetGame.takeNext(g, 0), 1, 'never two cherries in a row, even if rand would fire');
+  assert.deepStrictEqual(g.bag, bagBefore.slice(1));
+  g.lastCherry = false;
+  assert.strictEqual(tetGame.takeNext(g, 0.99), 2, 'high rand keeps the bag piece');
+  const gOff = tetGame.newGame({ level: 1, practice: true });
+  gOff.lastCherry = false;
+  gOff.bag = [3, 4];
+  assert.strictEqual(tetGame.takeNext(gOff, 0), 3, 'no cherry bombs off the Food stage');
+  const gR = tetGame.newGame({ level: 12, practice: true });
+  gR.board = tetGame.emptyBoard();
+  gR.piece = tetGame.spawn(8);
+  gR.piece.x = 4; gR.piece.y = 5;
+  const before = { x: gR.piece.x, y: gR.piece.y, rot: gR.piece.rot, m: gR.piece.m.map(r => r.slice()) };
+  tetGame.act(gR, 'rotate');
+  assert.strictEqual(gR.piece.x, before.x);
+  assert.strictEqual(gR.piece.y, before.y);
+  assert.strictEqual(gR.piece.rot, before.rot);
+  assert.deepStrictEqual(gR.piece.m, before.m);
+  const gB = tetGame.newGame({ level: 12, practice: true });
+  gB.board = tetGame.emptyBoard();
+  gB.food = tetGame.emptyFood();
+  gB.score = 0;
+  gB.next = 1;
+  // Cherry locks at (4,15). Beneath: (4,16),(4,17),(4,18). Diagonals: (3,16),(5,16).
+  // A banana at (4,19) is below the 3-cell window and should drop after the three above it vanish.
+  gB.board[16][4] = 5; gB.food[16][4] = { t: 5, rot: 0, lr: 0, lc: 0 };
+  gB.board[17][4] = 6; gB.food[17][4] = { t: 6, rot: 0, lr: 0, lc: 0 };
+  gB.board[18][4] = 7; gB.food[18][4] = { t: 7, rot: 0, lr: 0, lc: 0 };
+  gB.board[19][4] = 2; gB.food[19][4] = { t: 2, rot: 1, lr: 0, lc: 0 };
+  gB.board[15][3] = 4; gB.food[15][3] = { t: 4, rot: 0, lr: 0, lc: 0 };
+  gB.board[16][3] = 3; gB.food[16][3] = { t: 3, rot: 0, lr: 0, lc: 0 };
+  gB.board[16][5] = 1; gB.food[16][5] = { t: 1, rot: 0, lr: 0, lc: 0 };
+  gB.piece = { t: 8, m: [[8]], x: 4, y: 15, rot: 0 };
+  tetGame.lockPiece(gB);
+  assert.strictEqual(gB.board[15][4], 0, 'cherry is not stamped on the board');
+  assert.strictEqual(gB.board[16][4], 0);
+  assert.strictEqual(gB.board[17][4], 0);
+  assert.strictEqual(gB.board[18][4], 0);
+  assert.strictEqual(gB.board[19][4], 2, 'cell below the 3-deep blast dropped to the floor');
+  assert.ok(gB.food[19][4] && gB.food[19][4].t === 2 && gB.food[19][4].rot === 1);
+  assert.strictEqual(gB.board[16][3], 0, 'diagonal below is gone');
+  assert.strictEqual(gB.board[16][5], 0);
+  assert.strictEqual(gB.board[19][3], 4, 'the watermelon above the diagonal dropped to the floor');
+  assert.strictEqual(gB.board[18][3], 0);
+  assert.strictEqual(gB.board[19][5], 0, 'the other diagonal was removed, not dropped');
+  // 5 blocks removed (3 down + 2 diagonals); banana was not in the blast, only dropped.
+  assert.strictEqual(gB.score, tetGame.CHERRY_BONUS + tetGame.CHERRY_PER_CELL * 5);
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.ok(src.includes('function drawFoodSprite') && src.includes('function applyCherryBomb') && src.includes('function spawnCherryBurst'));
+  const rot = tetGame.rotateRun(12);
+  assert.ok(Array.isArray(rot) && rot.length >= 4);
+  rot.forEach(f => {
+    const pc = ((Math.round(69 + 12 * Math.log2(f / 440)) % 12) + 12) % 12;
+    assert.ok([9, 11, 0, 2, 4, 5, 7].includes(pc), 'rotate riff pitch class ' + pc + ' in A minor, f=' + f);
+  });
+}
+
 

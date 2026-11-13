@@ -12,7 +12,8 @@
     [[4, 4], [4, 4]],
     [[0, 5, 5], [5, 5, 0], [0, 0, 0]],
     [[0, 6, 0], [6, 6, 6], [0, 0, 0]],
-    [[7, 7, 0], [0, 7, 7], [0, 0, 0]]
+    [[7, 7, 0], [0, 7, 7], [0, 0, 0]],
+    [[8]]
   ];
   const COLORS = ['', '#22d3ee', '#3b82f6', '#f97316', '#facc15', '#22c55e', '#a855f7', '#ef4444'];
   const LINE_POINTS = [0, 100, 300, 500, 800];
@@ -193,10 +194,17 @@
   const FOOD_THEME = 12;
 
   // 1.9.199 Food (theme 12, level 12): pieces are painted food, fragments stay in each cell after lock.
-  const FOOD_KIND = ['', 'ice', 'banana', 'banana', 'melon', 'carrot', 'broccoli', 'chilli'];
+  const FOOD_KIND = ['', 'ice', 'banana', 'banana', 'melon', 'carrot', 'broccoli', 'chilli', 'cherry'];
+  const CHERRY_T = 8;
+  const CHERRY_ODDS = 13; // about 1 in 12–15 spawns
+  const CHERRY_BONUS = 50;
+  const CHERRY_PER_CELL = 25;
+  const CHERRY_COLOR = '#e11d48';
+  function isCherry(t) { return t === CHERRY_T; }
   function foodKind(t) { return FOOD_KIND[t] || 'munch'; }
   function foodSoundFor(t) {
     const k = foodKind(t);
+    if (k === 'cherry') return 'boom';
     if (k === 'carrot' || k === 'chilli') return 'crunch';
     if (k === 'banana' || k === 'ice') return 'squish';
     return 'munch';
@@ -280,6 +288,7 @@
       return cols[(t - 1) % cols.length];
     }
     if (themeFor(level == null ? 1 : level) === FOOD_THEME) {
+      if (t === CHERRY_T) return CHERRY_COLOR;
       const cols = (LOOKS[FOOD_THEME] && LOOKS[FOOD_THEME].colors) || COLORS.slice(1);
       return cols[(t - 1) % cols.length];
     }
@@ -461,7 +470,7 @@
     { bpm: 108.79, offset: 0.023, key: 'E', mode: 'minor' },
     { bpm: 123, offset: 0.218, key: 'G', mode: 'major' },
     { bpm: 127.45, offset: 0.266, key: 'D', mode: 'major' },
-    { bpm: 90, offset: 0, key: 'F', mode: 'major' }
+    { bpm: 140.8, offset: 0, key: 'A', mode: 'minor' }
   ];
   const MAJOR_IV = [0, 2, 4, 5, 7, 9, 11], MINOR_IV = [0, 2, 3, 5, 7, 8, 10];
   const PC = { C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, F: 5, 'F#': 6, Gb: 6, G: 7, 'G#': 8, Ab: 8, A: 9, 'A#': 10, Bb: 10, B: 11 };
@@ -1036,8 +1045,42 @@
     else if (seagullLoading) seagullLoading.then(function (b) { if (b && soundOn && ac) { ensureSeagullGain(); start(b); } });
   }
   // 1.9.199 Food landing / clear bites: synthesised, CC0-free originals. 300 Hz–3.5 kHz, mellow, louder than the music but gentle.
-  const FOOD_HASH = { munch: '25db313e', crunch: '5b730569', squish: '6f68e879', chomp: 'f2449c85' };
-  const FOOD_VOL = { munch: 0.66, crunch: 0.68, squish: 0.64, chomp: 0.72 };
+  const FOOD_HASH = { munch: '25db313e', crunch: '5b730569', squish: '6f68e879', chomp: 'f2449c85', boom: '70ec46f6' };
+  const FOOD_VOL = { munch: 0.66, crunch: 0.68, squish: 0.64, chomp: 0.72, boom: 0.76 };
+  const FOOD_SPRITES = { src: 'tetris-bg/food-sprites-d7044f80.webp', cell: 96, bleed: 2, hash: 'd7044f80', layout: {"1:0":{"x":4,"y":4,"w":384,"h":384,"cols":4,"rows":4},"1:1":{"x":392,"y":4,"w":384,"h":384,"cols":4,"rows":4},"1:2":{"x":780,"y":4,"w":384,"h":384,"cols":4,"rows":4},"1:3":{"x":1168,"y":4,"w":384,"h":384,"cols":4,"rows":4},"2:0":{"x":4,"y":392,"w":288,"h":288,"cols":3,"rows":3},"2:1":{"x":296,"y":392,"w":288,"h":288,"cols":3,"rows":3},"2:2":{"x":588,"y":392,"w":288,"h":288,"cols":3,"rows":3},"2:3":{"x":880,"y":392,"w":288,"h":288,"cols":3,"rows":3},"3:0":{"x":4,"y":684,"w":288,"h":288,"cols":3,"rows":3},"3:1":{"x":296,"y":684,"w":288,"h":288,"cols":3,"rows":3},"3:2":{"x":588,"y":684,"w":288,"h":288,"cols":3,"rows":3},"3:3":{"x":880,"y":684,"w":288,"h":288,"cols":3,"rows":3},"4:0":{"x":4,"y":976,"w":192,"h":192,"cols":2,"rows":2},"4:1":{"x":200,"y":976,"w":192,"h":192,"cols":2,"rows":2},"4:2":{"x":396,"y":976,"w":192,"h":192,"cols":2,"rows":2},"4:3":{"x":592,"y":976,"w":192,"h":192,"cols":2,"rows":2},"5:0":{"x":4,"y":1172,"w":288,"h":288,"cols":3,"rows":3},"5:1":{"x":296,"y":1172,"w":288,"h":288,"cols":3,"rows":3},"5:2":{"x":588,"y":1172,"w":288,"h":288,"cols":3,"rows":3},"5:3":{"x":880,"y":1172,"w":288,"h":288,"cols":3,"rows":3},"6:0":{"x":4,"y":1464,"w":288,"h":288,"cols":3,"rows":3},"6:1":{"x":296,"y":1464,"w":288,"h":288,"cols":3,"rows":3},"6:2":{"x":588,"y":1464,"w":288,"h":288,"cols":3,"rows":3},"6:3":{"x":880,"y":1464,"w":288,"h":288,"cols":3,"rows":3},"7:0":{"x":4,"y":1756,"w":288,"h":288,"cols":3,"rows":3},"7:1":{"x":296,"y":1756,"w":288,"h":288,"cols":3,"rows":3},"7:2":{"x":588,"y":1756,"w":288,"h":288,"cols":3,"rows":3},"7:3":{"x":880,"y":1756,"w":288,"h":288,"cols":3,"rows":3},"8:0":{"x":4,"y":2048,"w":96,"h":96,"cols":1,"rows":1},"8:1":{"x":104,"y":2048,"w":96,"h":96,"cols":1,"rows":1},"8:2":{"x":204,"y":2048,"w":96,"h":96,"cols":1,"rows":1},"8:3":{"x":304,"y":2048,"w":96,"h":96,"cols":1,"rows":1}} };
+  let foodSpriteImg = null, foodSpriteReady = false;
+  function loadFoodSprites() {
+    const Img = (root && root.Image) || (typeof Image !== 'undefined' ? Image : null);
+    if (foodSpriteImg || !Img) return;
+    const im = new Img();
+    im.onload = function () { foodSpriteReady = true; };
+    im.src = FOOD_SPRITES.src;
+    foodSpriteImg = im;
+  }
+  function foodSpriteRect(t, rot, lr, lc) {
+    const rec = FOOD_SPRITES.layout[t + ':' + ((rot || 0) % 4)];
+    if (!rec) return null;
+    const cell = FOOD_SPRITES.cell;
+    return { sx: rec.x + (lc || 0) * cell, sy: rec.y + (lr || 0) * cell, sw: cell, sh: cell };
+  }
+  function drawFoodSprite(ctx, x, y, size, alpha, meta, ghost) {
+    if (!foodSpriteReady || !foodSpriteImg) { loadFoodSprites(); return false; }
+    const rec = foodSpriteRect(meta.t, meta.rot || 0, meta.lr || 0, meta.lc || 0);
+    if (!rec) return false;
+    const bleed = FOOD_SPRITES.bleed;
+    const scale = size / FOOD_SPRITES.cell;
+    ctx.globalAlpha = alpha * (ghost ? 0.5 : 1);
+    ctx.drawImage(foodSpriteImg, rec.sx - bleed, rec.sy - bleed, rec.sw + 2 * bleed, rec.sh + 2 * bleed,
+      x - bleed * scale, y - bleed * scale, size + 2 * bleed * scale, size + 2 * bleed * scale);
+    if (ghost) {
+      ctx.globalAlpha = alpha * 0.8;
+      ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+      ctx.lineWidth = Math.max(1, size * 0.07);
+      ctx.strokeRect(x + 0.8, y + 0.8, size - 1.6, size - 1.6);
+    }
+    return true;
+  }
+
   function foodSrc(kind) { return 'tetris-bg/food-' + kind + '-' + FOOD_HASH[kind] + '.mp3'; }
   let foodBufs = {}, foodLoading = {}, foodGain = null;
   function ensureFoodGain() {
@@ -1074,10 +1117,11 @@
     };
     if (foodBufs[kind]) start(foodBufs[kind]);
     else if (foodLoading[kind]) foodLoading[kind].then(function (b) { if (b && soundOn && ac) { ensureFoodGain(); start(b); } });
-    duckMusic(0, kind === 'chomp' ? 0.4 : 0.28);
+    duckMusic(0, kind === 'chomp' ? 0.4 : (kind === 'boom' ? 0.45 : 0.28));
   }
-  function playFoodLand(t) { playFoodSfx(foodSoundFor(t)); }
+  function playFoodLand(t) { if (t === CHERRY_T) { playFoodBoom(); return; } playFoodSfx(foodSoundFor(t)); }
   function playFoodChomp() { playFoodSfx('chomp'); }
+  function playFoodBoom() { playFoodSfx('boom'); }
   let foodBurst = [];
   function spawnFoodBurst(g, p, alongRows) {
     if (!g) return;
@@ -1104,6 +1148,24 @@
         });
       }
     });
+    if (foodBurst.length > 80) foodBurst = foodBurst.slice(-80);
+  }
+  function spawnCherryBurst(g, x, y) {
+    const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : 0;
+    const cx = (x + 0.5) * CELL, cy = (y + 0.5) * CELL;
+    const cols = ['#e11d48', '#fb7185', '#be123c', '#fecdd3', '#9f1239', '#fff1f2'];
+    for (let k = 0; k < 22; k++) {
+      const ang = Math.random() * 6.28;
+      const spd = 28 + Math.random() * 70;
+      foodBurst.push({
+        x: cx, y: cy,
+        vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd - 20,
+        t0: now, dur: 340 + Math.random() * 260,
+        color: cols[k % cols.length],
+        juice: k % 3 !== 0,
+        r: 1.8 + Math.random() * 3.4
+      });
+    }
     if (foodBurst.length > 80) foodBurst = foodBurst.slice(-80);
   }
   function stepFoodBurst(dt) {
@@ -1697,7 +1759,73 @@
     const m = SHAPES[t].map(r => r.slice());
     return { t, m, x: Math.floor((COLS - m[0].length) / 2), y: t === 1 ? -1 : 0, rot: 0 };
   }
-  function takeNext(g) { if (g.bag.length === 0) g.bag = refillBag(); return g.bag.shift(); }
+  function takeNext(g, rand) {
+    function fromBag() {
+      if (g.bag.length === 0) g.bag = refillBag();
+      return g.bag.shift();
+    }
+    if (themeFor(g.level) !== FOOD_THEME) { g.lastCherry = false; return fromBag(); }
+    if (g.lastCherry) { g.lastCherry = false; return fromBag(); }
+    const r = (typeof rand === 'number') ? rand : Math.random();
+    if (r < 1 / CHERRY_ODDS) { g.lastCherry = true; return CHERRY_T; }
+    return fromBag();
+  }
+  function cherryBlastCells(x, y) {
+    const cells = [[x, y]];
+    for (let d = 1; d <= 3; d++) cells.push([x, y + d]);
+    cells.push([x - 1, y + 1], [x + 1, y + 1]);
+    return cells;
+  }
+  function dropColumns(board, food, hits, cols) {
+    (cols || []).forEach(c => {
+      if (c < 0 || c >= COLS) return;
+      const stack = [];
+      for (let r = 0; r < ROWS; r++) {
+        if (board[r] && board[r][c]) stack.push({
+          t: board[r][c],
+          food: food && food[r] ? food[r][c] : null,
+          hits: hits && hits[r] ? hits[r][c] : 0
+        });
+      }
+      let i = stack.length - 1;
+      for (let r = ROWS - 1; r >= 0; r--) {
+        if (i >= 0) {
+          board[r][c] = stack[i].t;
+          if (food && food[r]) food[r][c] = stack[i].food;
+          if (hits && hits[r]) hits[r][c] = stack[i].hits || 0;
+          i--;
+        } else {
+          if (board[r]) board[r][c] = 0;
+          if (food && food[r]) food[r][c] = null;
+          if (hits && hits[r]) hits[r][c] = 0;
+        }
+      }
+    });
+  }
+  function applyCherryBomb(g, p) {
+    const x = p.x, y = p.y;
+    const food = ensureFood(g);
+    const hits = g.hits;
+    const removed = [];
+    cherryBlastCells(x, y).forEach(([c, r]) => {
+      if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return;
+      if (c === x && r === y) return;
+      if (g.board[r] && g.board[r][c]) {
+        removed.push({ c: c, r: r, t: g.board[r][c] });
+        g.board[r][c] = 0;
+        if (food[r]) food[r][c] = null;
+        if (hits && hits[r]) hits[r][c] = 0;
+      }
+    });
+    const cols = [];
+    cherryBlastCells(x, y).forEach(([c]) => { if (c >= 0 && c < COLS && cols.indexOf(c) < 0) cols.push(c); });
+    dropColumns(g.board, food, hits, cols);
+    const bonus = CHERRY_BONUS + CHERRY_PER_CELL * removed.length;
+    g.score += bonus;
+    playFoodBoom();
+    spawnCherryBurst(g, x, y);
+    return { removed: removed, bonus: bonus, cols: cols };
+  }
   // 1.9.174 Tetris Effect stage for Farmyard (6) and Bullfrog (11) only.
   // Dark, beat-synced scenes; luminous tiles; action bursts. Other themes are unchanged.
   const FARM_ART = { plate: 'tetris-bg/farm-plate-87d14966.webp', land: 'tetris-bg/farm-land-dcf78c32.webp', atlas: 'tetris-bg/farm-animals-a062cf37.webp', sun: 'tetris-bg/farm-sun-378e81e0.webp' };
@@ -2239,7 +2367,7 @@
     opt = opt || {};
     const level = Math.max(1, opt.level || 1);
     const practice = !!opt.practice;
-    const g = { board: emptyBoard(), hits: emptyBoard(), food: emptyFood(), piece: spawn(1), bag: refillBag(), next: 0, hold: 0, canHold: true, score: 0, lines: (level - 1) * 10, level, over: false, paused: false, acc: 0, flashT: 0, popup: '', popupT: 0, practice, startLevel: level, clearFx: null, pendingLevel: null, levelUp: null, callout: null, clearCombo: 0, lastWasTetris: false, familyHigh: 0, highNoted: false, highScore: null, pendingHigh: false };
+    const g = { board: emptyBoard(), hits: emptyBoard(), food: emptyFood(), piece: spawn(1), bag: refillBag(), next: 0, hold: 0, canHold: true, score: 0, lines: (level - 1) * 10, level, over: false, paused: false, acc: 0, flashT: 0, popup: '', popupT: 0, practice, startLevel: level, clearFx: null, pendingLevel: null, levelUp: null, callout: null, clearCombo: 0, lastWasTetris: false, familyHigh: 0, highNoted: false, highScore: null, pendingHigh: false, lastCherry: false };
     g.piece = spawn(takeNext(g));
     g.next = takeNext(g);
     seedHighBar(g);
@@ -2600,15 +2728,20 @@
   function lockPiece(g) {
 
     const p = g.piece;
-    for (let r = 0; r < p.m.length; r++) {
-      for (let c = 0; c < p.m[r].length; c++) {
-        if (!p.m[r][c]) continue;
-        const y = p.y + r;
-        if (y < 0) { g.over = true; continue; }
-        g.board[y][p.x + c] = p.t;
+    if (p && p.t === CHERRY_T) {
+      if (p.y < 0) { g.over = true; sfx('over'); return g; }
+      applyCherryBomb(g, p);
+    } else {
+      for (let r = 0; r < p.m.length; r++) {
+        for (let c = 0; c < p.m[r].length; c++) {
+          if (!p.m[r][c]) continue;
+          const y = p.y + r;
+          if (y < 0) { g.over = true; continue; }
+          g.board[y][p.x + c] = p.t;
+        }
       }
+      stampFood(g, p);
     }
-    stampFood(g, p);
     if (g.over) { sfx('over'); return g; }
     resetRotRiff();
     const full = findFullRows(g);
@@ -2617,7 +2750,7 @@
     if (full.length) {
       applyClear(g, full);
     } else {
-      if (themeFor(g.level) === FOOD_THEME) { playFoodLand(p.t); spawnFoodBurst(g, p); }
+      if (themeFor(g.level) === FOOD_THEME) { if (p.t !== CHERRY_T) { playFoodLand(p.t); spawnFoodBurst(g, p); } }
       else sfx('lock');
       effectLand(g);
       g.clearCombo = 0;
@@ -2628,6 +2761,7 @@
     }
     maybeHighScore(g);
     g.piece = spawn(g.next);
+    if (themeFor(g.level) !== FOOD_THEME && g.piece && g.piece.t === CHERRY_T) g.piece = spawn(takeNext(g));
     g.next = takeNext(g);
     g.canHold = true;
     if (collides(g.board, g.piece.m, g.piece.x, g.piece.y)) { g.over = true; sfx('over'); }
@@ -2659,6 +2793,8 @@
       if (themeFor(g.level) !== FOOD_THEME) sfx('drop');
       if (d) effectDropTrail(g, fromY, p.y);
       lockPiece(g);
+    } else if ((a === 'rotate' || a === 'rotateBack') && p && p.t === CHERRY_T) {
+      /* rotation does nothing */
     } else if (a === 'rotate' || a === 'rotateBack') {
       const m = a === 'rotate' ? rotateCW(p.m) : rotateCCW(p.m);
       const kicks = [0, -1, 1, -2, 2];
@@ -2688,7 +2824,7 @@
   // (1.9.163 busted the URL but Shane still heard the old bullfrog track).
   // 1.9.199 Food (theme 12) uses a gentle synthesised F-major placeholder until Shane supplies a song.
   // Swap by replacing m12-<hash>.mp3 and updating BGM_HASH[12] plus TRACKS[12] bpm/offset/key/mode.
-  const BGM_HASH = ['da11a54a', '9813c57a', '9ca3b84e', '7776197f', '1814d32a', '63c9eafe', '7bc4ebcd', 'b76dd1d3', 'fdec4369', '812638a3', 'cdbe7d34', '8afd517f', '4456f9a4'];
+  const BGM_HASH = ['da11a54a', '9813c57a', '9ca3b84e', '7776197f', '1814d32a', '63c9eafe', '7bc4ebcd', 'b76dd1d3', 'fdec4369', '812638a3', 'cdbe7d34', '8afd517f', '6308c33f']; // 1.9.200 Shane's Food song; swap by replacing m12-<hash>.mp3 and updating BGM_HASH[12] plus TRACKS[12]
   function bgmSrc(ti) { return 'tetris-bg/m' + ti + '-' + BGM_HASH[ti] + '.mp3'; }
   let bgmGain = null, bgmNode = null, bgmIdx = -1, bgmBufs = {}, bgmLoading = {}, bgmAt = 0, bgmRate = 1, bgmWant = false, bgmWantTi = -1, bgmAnalyser = null, bgmBins = null;
   function silentUnlock() {
@@ -2828,7 +2964,8 @@
         highNoted: !!g.highNoted,
         scored: !!g.scored,
         hits: cloneBoard(ensureHits(g)),
-        food: cloneFood(ensureFood(g))
+        food: cloneFood(ensureFood(g)),
+        lastCherry: !!g.lastCherry
       }
     };
   }
@@ -2882,6 +3019,7 @@
     g.scored = !!s.scored;
     g.hits = s.hits ? cloneBoard(s.hits) : emptyBoard();
     g.food = s.food ? cloneFood(s.food) : emptyFood();
+    g.lastCherry = !!s.lastCherry;
     g.paused = true;
     g.clearFx = null;
     g.pendingLevel = null;
@@ -3646,7 +3784,7 @@
     c.fillRect(0, 0, w, h);
     c.restore();
   }
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_BUILD_EVERY_LOW, CITY_SAFE_TOP, CITY_CREW_N, CITY_ANIM_CLIMB, CITY_ANIM_PLACE, CITY_ANIM_DOWN, CITY_ANIM_FAST, cityHighestSettled, cityStackLow, cityBuildEvery, cityBuildWait, cityAnimDur, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, HIGH_SCORE_MS, HIGH_SCORE_FADE_MS, highScoreProg, maybeHighScore, startHighScore, tickHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, FARM_SUN, FARM_HZ, farmDayTarget, farmSunPos, ROOSTER_HASH, roosterSrc, stackColY, stackSkyline, stackPathAt, stackPathLen, newStackWash, stepStackWash, STACK_WASH_PERIOD, washCover, washSpill, washPool, stackWashInland, washCycle, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, fwSkyFlashAlpha, startFwSkyFlash, maybeFwSkyFlash, FW_SKY_FLASH_PEAK, FW_SKY_FLASH_FADE, FW_MAJOR_SCALE, FW_BIGGER_GROW, fwSkyFlashState: () => fw.skyFlash, fwProg: (p) => { if (p != null) fw.prog = p; return fw.prog; }, fwReset, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts, SNOW_THEME, snowProg, snowFallParams, newBoardSnow, stepBoardSnow, snowOnLineClear, snowReset, boardSnow: () => boardSnow, NZ_THEME, nzProg, nzBeatsPerRow, nzDropInterval, NZ_PAL, NZ_PAL_STEPS, NZ_PAL_FADE_MS, nzPalIndex, nzPaletteNow, mixHex, nzMixProgress, resetNzPal, setNzPal, tickNzPal, nzPalState, EXTREME_KEY, EXTREME_PEEK_MS, EXTREME_EXIT_MIN, EXTREME_TOP_RESERVE, SEAGULL_HASH, seagullSrc, startNzFlash, nzFlashAlpha, newNzGulls, stepNzGulls, nzGulls: () => nzGulls, nzFlashState: () => nzFlash, FOOD_THEME, FOOD_KIND, FOOD_HASH, FOOD_VOL, foodKind, foodSoundFor, foodSrc, emptyFood, ensureFood, cloneFood, dropFood, stampFood, foodMetaAt, rotShape, shapeCells, shapePath, playFoodSfx, playFoodLand, playFoodChomp };
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_BUILD_EVERY_LOW, CITY_SAFE_TOP, CITY_CREW_N, CITY_ANIM_CLIMB, CITY_ANIM_PLACE, CITY_ANIM_DOWN, CITY_ANIM_FAST, cityHighestSettled, cityStackLow, cityBuildEvery, cityBuildWait, cityAnimDur, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, HIGH_SCORE_MS, HIGH_SCORE_FADE_MS, highScoreProg, maybeHighScore, startHighScore, tickHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, FARM_SUN, FARM_HZ, farmDayTarget, farmSunPos, ROOSTER_HASH, roosterSrc, stackColY, stackSkyline, stackPathAt, stackPathLen, newStackWash, stepStackWash, STACK_WASH_PERIOD, washCover, washSpill, washPool, stackWashInland, washCycle, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, fwSkyFlashAlpha, startFwSkyFlash, maybeFwSkyFlash, FW_SKY_FLASH_PEAK, FW_SKY_FLASH_FADE, FW_MAJOR_SCALE, FW_BIGGER_GROW, fwSkyFlashState: () => fw.skyFlash, fwProg: (p) => { if (p != null) fw.prog = p; return fw.prog; }, fwReset, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts, SNOW_THEME, snowProg, snowFallParams, newBoardSnow, stepBoardSnow, snowOnLineClear, snowReset, boardSnow: () => boardSnow, NZ_THEME, nzProg, nzBeatsPerRow, nzDropInterval, NZ_PAL, NZ_PAL_STEPS, NZ_PAL_FADE_MS, nzPalIndex, nzPaletteNow, mixHex, nzMixProgress, resetNzPal, setNzPal, tickNzPal, nzPalState, EXTREME_KEY, EXTREME_PEEK_MS, EXTREME_EXIT_MIN, EXTREME_TOP_RESERVE, SEAGULL_HASH, seagullSrc, startNzFlash, nzFlashAlpha, newNzGulls, stepNzGulls, nzGulls: () => nzGulls, nzFlashState: () => nzFlash, FOOD_THEME, FOOD_KIND, FOOD_HASH, FOOD_VOL, foodKind, foodSoundFor, foodSrc, emptyFood, ensureFood, cloneFood, dropFood, stampFood, foodMetaAt, rotShape, shapeCells, shapePath, playFoodSfx, playFoodLand, playFoodChomp, playFoodBoom, CHERRY_T, CHERRY_ODDS, CHERRY_BONUS, CHERRY_PER_CELL, isCherry, takeNext, cherryBlastCells, dropColumns, applyCherryBomb, FOOD_SPRITES, loadFoodSprites };
 
   if (!root.document) return;
   const doc = root.document;
@@ -4397,6 +4535,11 @@
     ctx.beginPath();
     ctx.rect(x - 1.2, y - 1.2, size + 2.4, size + 2.4);
     ctx.clip();
+    if (foodSpriteReady && foodSpriteImg && drawFoodSprite(ctx, x, y, size, alpha, meta, ghost)) {
+      if (!ghost) drawBlockGloss(ctx, x, y, size, alpha * 0.45);
+      ctx.restore();
+      return;
+    }
     const ox = x - (meta.lc || 0) * size;
     const oy = y - (meta.lr || 0) * size;
     drawFoodShape(ctx, ox, oy, size, meta.t, meta.rot || 0, alpha, !!ghost, color);
@@ -4604,6 +4747,7 @@
   // 1.9.199 Painted produce around the Food board: gentle bob, soft 3D volume, no cartoon glyphs.
   let foodLife = { items: [], ready: false, w: 0, h: 0 };
   function newFoodLife(w, h) {
+    loadFoodSprites();
     const items = [
       { kind: 'apple', x: 0.10, y: 0.10, s: 22, ph: 0.2, col: '#e11d48' },
       { kind: 'citrus', x: 0.86, y: 0.12, s: 20, ph: 1.1, col: '#fb923c' },
