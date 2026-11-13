@@ -3292,3 +3292,39 @@ if (live) {
   // Themed noise on Farmyard / Beach / etc. is unchanged.
   assert.ok(moveFn.includes('if (farm)') && moveFn.includes('moveNoise'));
 }
+
+// 1.9.204 Bush walk background walks forward along the track
+{
+  assert.strictEqual(tetGame.BUSH_THEME, 3);
+  assert.strictEqual(tetGame.THEMES[3].name, 'Bush walk');
+  assert.strictEqual(tetGame.themeFor(8), 3);
+  assert.strictEqual(tetGame.themeFor(1), 6, 'other levels unchanged');
+  assert.ok(tetGame.TRACKS[3] && tetGame.TRACKS[3].bpm === 117.5);
+  const a = tetGame.bushWalkPose(0);
+  const b = tetGame.bushWalkPose(6);
+  assert.ok(b.scaleA > a.scaleA, 'slow zoom-forward along the track');
+  assert.ok(Math.abs(b.focusY - a.focusY) > 0.001, 'gaze moves up the path');
+  assert.ok(a.scaleA === 1);
+  assert.ok(b.scaleA <= 1 + tetGame.BUSH_ZOOM + 1e-6);
+  assert.ok(Math.abs(b.bobY) <= tetGame.BUSH_BOB + 1e-6);
+  assert.ok(Math.abs(b.bobX) <= tetGame.BUSH_SWAY + 1e-6);
+  assert.ok(Math.abs(b.bobY - a.bobY) > 0.2 || Math.abs(b.bobX - a.bobX) > 0.05, 'walking bob');
+  const mid = tetGame.bushWalkPose(3);
+  const later = tetGame.bushWalkPose(3.5);
+  assert.ok(Math.abs(later.bobY - mid.bobY) > 0.05, 'bob changes on a walking cadence');
+  const fade = tetGame.bushWalkPose(tetGame.BUSH_LOOP - 1);
+  assert.ok(fade.fade > 0 && fade.fade < 1, 'loop crossfades rather than jumping');
+  assert.ok(fade.scaleB <= fade.scaleA);
+  const red = tetGame.bushWalkPose(6, { reduce: true });
+  assert.ok(red.zoom < b.zoom && red.scaleA < b.scaleA, 'reduced motion zooms less');
+  assert.ok(Math.abs(red.bobY) <= 1 + 1e-6, 'reduced motion bob is about 1px');
+  const rec = tetGame.bushCoverRect(540, 960, 390, 844, 1.1, 0.51, 0.5, 0, 0);
+  assert.ok(rec.w > 390 && rec.h > 844, 'cover + zoom fills the viewport');
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.ok(src.includes('1.9.204 Bush walk') && src.includes('function bushTick') && src.includes('function bushPaint'));
+  assert.ok(src.includes('prefers-reduced-motion') && src.includes('fx-bush'));
+  const bushFn = src.slice(src.indexOf('const bush ='), src.indexOf('function applyLook'));
+  assert.ok(bushFn.includes('bushPaint') && !bushFn.includes('getElementById(\'board\').style') && !/board\.style\.transform/.test(bushFn), 'the board itself is not moved');
+  assert.ok(src.includes("PICS[BUSH_THEME]") || src.includes('PICS[3]') || src.includes('tetris-bg/3.webp'));
+  assert.ok(fs.existsSync('feed/tetris-bg/3.webp'), 'existing bush painting is reused');
+}
