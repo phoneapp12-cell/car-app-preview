@@ -3138,5 +3138,21 @@ if (live) {
   assert.ok(praise.has('amazing') || praise.has('brilliant'));
 }
 
-
+// 1.9.202 Food pieces are square tetromino blocks with food painted on
+{
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.ok(src.includes('1.9.202 Food is ordinary square tetromino cells'));
+  assert.ok(src.includes('function drawFoodCell') && src.includes('function drawFoodSprite'));
+  const cellFn = src.slice(src.indexOf('function drawFoodCell'), src.indexOf('function drawCell'));
+  assert.ok(cellFn.includes('ctx.fillRect(x + 1, y + 1, size - 2, size - 2)'), 'locked food cells are square blocks');
+  assert.ok(cellFn.includes("ctx.fillStyle = 'rgba(255,255,255,0.28)'") && cellFn.includes('drawBlockGloss'), 'same bevel and gloss as other levels');
+  assert.ok(cellFn.includes('strokeRect'), 'cell outline keeps the tetromino readable');
+  assert.ok(cellFn.includes('if (ghost)'), 'ghost stays a square landing preview');
+  assert.strictEqual(tetGame.FOOD_THEME, 12);
+  assert.strictEqual(tetGame.foodKind(1), 'ice');
+  assert.strictEqual(tetGame.foodKind(2), 'banana');
+  assert.strictEqual(tetGame.foodKind(6), 'grape');
+  assert.strictEqual(tetGame.CHERRY_T, 8);
+  assert.ok(fs.existsSync('feed/' + tetGame.FOOD_SPRITES.src));
+}
 

@@ -1069,15 +1069,11 @@
     if (!rec) return false;
     const bleed = FOOD_SPRITES.bleed;
     const scale = size / FOOD_SPRITES.cell;
-    ctx.globalAlpha = alpha * (ghost ? 0.5 : 1);
+    ctx.globalAlpha = alpha * (ghost ? 0.4 : 1);
+    // Paint the food fragment onto this square cell. Adjacent fragments still
+    // line up, so the art reads across the piece, but it is clipped to the block.
     ctx.drawImage(foodSpriteImg, rec.sx - bleed, rec.sy - bleed, rec.sw + 2 * bleed, rec.sh + 2 * bleed,
       x - bleed * scale, y - bleed * scale, size + 2 * bleed * scale, size + 2 * bleed * scale);
-    if (ghost) {
-      ctx.globalAlpha = alpha * 0.8;
-      ctx.strokeStyle = 'rgba(255,255,255,0.75)';
-      ctx.lineWidth = Math.max(1, size * 0.07);
-      ctx.strokeRect(x + 0.8, y + 0.8, size - 1.6, size - 1.6);
-    }
     return true;
   }
 
@@ -4509,20 +4505,70 @@
     ctx.globalAlpha = 1;
   }
   function drawFoodCell(ctx, x, y, size, alpha, meta, color, ghost) {
-    if (!meta || !meta.t) return;
+    // 1.9.202 Food is ordinary square tetromino cells (same bevel as other
+    // levels) with the food painted onto the block, so the piece outline reads
+    // clearly. The see-through board is unchanged.
+    if (!color && meta && meta.t) color = blockColor(meta.t, g && g.lines, g && g.level);
+    if (!color) return;
     ctx.save();
-    ctx.beginPath();
-    ctx.rect(x - 1.2, y - 1.2, size + 2.4, size + 2.4);
-    ctx.clip();
-    if (foodSpriteReady && foodSpriteImg && drawFoodSprite(ctx, x, y, size, alpha, meta, ghost)) {
-      if (!ghost) drawBlockGloss(ctx, x, y, size, alpha * 0.45);
+    if (ghost) {
+      const pad = Math.max(1.6, size * 0.08);
+      const ix = x + pad, iy = y + pad, iw = size - pad * 2, ih = size - pad * 2;
+      ctx.globalAlpha = 0.26 * (alpha || 1);
+      ctx.fillStyle = color;
+      ctx.fillRect(ix, iy, iw, ih);
+      if (meta && meta.t) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(ix, iy, iw, ih);
+        ctx.clip();
+        if (!(foodSpriteReady && foodSpriteImg && drawFoodSprite(ctx, x, y, size, (alpha || 1) * 0.7, meta, true))) {
+          const ox = x - (meta.lc || 0) * size;
+          const oy = y - (meta.lr || 0) * size;
+          drawFoodShape(ctx, ox, oy, size, meta.t, meta.rot || 0, (alpha || 1) * 0.45, true, color);
+        }
+        ctx.restore();
+      }
+      ctx.globalAlpha = 0.4;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = Math.max(4, size * 0.18);
+      ctx.strokeRect(ix + 0.5, iy + 0.5, iw - 1, ih - 1);
+      ctx.globalAlpha = 0.95;
+      ctx.lineWidth = Math.max(2.2, size * 0.11);
+      ctx.strokeRect(ix + 0.5, iy + 0.5, iw - 1, ih - 1);
+      ctx.globalAlpha = 0.7;
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(ix - 0.5, iy - 0.5, iw + 1, ih + 1);
       ctx.restore();
       return;
     }
-    const ox = x - (meta.lc || 0) * size;
-    const oy = y - (meta.lr || 0) * size;
-    drawFoodShape(ctx, ox, oy, size, meta.t, meta.rot || 0, alpha, !!ghost, color);
-    if (!ghost) drawBlockGloss(ctx, x, y, size, alpha * 0.85);
+    const a = alpha || 1;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = color;
+    ctx.fillRect(x + 1, y + 1, size - 2, size - 2);
+    if (meta && meta.t) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x + 1, y + 1, size - 2, size - 2);
+      ctx.clip();
+      if (!(foodSpriteReady && foodSpriteImg && drawFoodSprite(ctx, x, y, size, a, meta, false))) {
+        const ox = x - (meta.lc || 0) * size;
+        const oy = y - (meta.lr || 0) * size;
+        drawFoodShape(ctx, ox, oy, size, meta.t, meta.rot || 0, a, false, color);
+      }
+      ctx.restore();
+    }
+    ctx.globalAlpha = a;
+    ctx.fillStyle = 'rgba(255,255,255,0.28)';
+    ctx.fillRect(x + 1, y + 1, size - 2, 4);
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    ctx.fillRect(x + 1, y + size - 5, size - 2, 4);
+    drawBlockGloss(ctx, x, y, size, a);
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = Math.max(1, size * 0.05);
+    ctx.strokeRect(x + 1.5, y + 1.5, size - 3, size - 3);
+    ctx.globalAlpha = 1;
     ctx.restore();
   }
 
