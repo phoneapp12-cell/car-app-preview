@@ -1668,7 +1668,15 @@ if (live) {
   assert.strictEqual(tetGame.farmDayTarget(0, 0), 0);
   assert.strictEqual(tetGame.farmDayTarget(1, 60), 1);
   const lo = tetGame.farmSunPos(0), hi = tetGame.farmSunPos(1);
-  assert.ok(lo.y > 300 && Math.abs(hi.y - 84.5) < 0.01 && Math.abs(hi.x - 136.9) < 0.01, 'sun rises from behind the barn to the painted sun');
+  assert.ok(lo.y > 300 && Math.abs(hi.y - 84.5) < 0.01 && Math.abs(hi.x - 136.9) < 0.01, 'sun rises to the painted sun');
+  const sun = tetGame.FARM_SUN;
+  const hz = tetGame.FARM_HZ[Math.min(tetGame.FARM_HZ.length - 1, Math.round(lo.x / 6))];
+  const top = lo.y - sun.rTop;
+  const clip = hz - 2;
+  assert.ok(top < clip - 8 && top > clip - 28, 'just the top edge peeks above the horizon at t=0, peek=' + (clip - top).toFixed(1));
+  assert.ok(lo.y > clip, 'sun centre starts below the horizon');
+  assert.strictEqual(lo.alt, 0);
+  assert.ok(lo.x > 250, 'start is over the open hills, not on the barn');
   assert.ok(src177.includes("'deviceorientation'") && src177.includes('createRadialGradient') && src177.includes('destination-out'));
   assert.strictEqual(tetGame.isEffect(11), 'frog');
 }
@@ -1921,12 +1929,14 @@ if (live) {
     assert.ok(tetGame.CALLOUT_VOICES[id] && /^[0-9a-f]{8}$/.test(tetGame.CALLOUT_VOICES[id]));
     assert.ok(fs.existsSync('feed/' + tetGame.calloutSrc(id)), 'voice ' + id);
   });
-  // 1.9.187 bright energetic male callouts (en-US-RogerNeural); old Molly clips are gone
-  const VO187 = { amazing: 'c46de485', brilliant: 'f64c21f2', fantastic: '271ecea2', awesome: '3273dcf3', yougotthis: '7761c550', keepgoing: '6be51176' };
+  // 1.9.187 bright energetic male callouts (en-US-RogerNeural); old Molly clips are gone.
+  // 1.9.190: Shane's Fantastic! recording replaces vo-fantastic-271ecea2.
+  const VO187 = { amazing: 'c46de485', brilliant: 'f64c21f2', fantastic: '95c74d33', awesome: '3273dcf3', yougotthis: '7761c550', keepgoing: '6be51176' };
   Object.keys(VO187).forEach(id => {
     assert.strictEqual(tetGame.CALLOUT_VOICES[id], VO187[id]);
     assert.ok(fs.existsSync('feed/tetris-bg/vo-' + id + '-' + VO187[id] + '.mp3'));
   });
+  assert.ok(!fs.existsSync('feed/tetris-bg/vo-fantastic-271ecea2.mp3'), 'old Fantastic clip is gone');
   ['c4d7ae5c','225b6d4c','e2da3afd','20dd28a7','aee779f3','6b1d8446'].forEach(h => {
     const stale = fs.readdirSync('feed/tetris-bg').filter(f => f.indexOf(h) >= 0);
     assert.deepEqual(stale, [], 'old Molly clip ' + h + ' must be removed');
@@ -2390,4 +2400,50 @@ if (live) {
   assert.ok(!mid.on && mid.pulse < 0.2, 'halfway between City beats is quiet');
   const rot = tetGame.sfxFreqs(4, 'rotate');
   assert.ok(rot && rot.length, 'rotate riff follows the City track key');
+}
+
+
+// 1.9.190 Fantastic voice, farm sun peek + rooster crow, beach surfers
+{
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.strictEqual(tetGame.CALLOUT_VOICES.fantastic, '95c74d33');
+  assert.strictEqual(tetGame.calloutSrc('fantastic'), 'tetris-bg/vo-fantastic-95c74d33.mp3');
+  assert.ok(fs.existsSync('feed/tetris-bg/vo-fantastic-95c74d33.mp3'));
+  assert.ok(!fs.existsSync('feed/tetris-bg/vo-fantastic-271ecea2.mp3'));
+
+  assert.strictEqual(tetGame.farmDayTarget(0, 0), 0);
+  assert.strictEqual(tetGame.farmDayTarget(0.4, 0), 1);
+  const mid = tetGame.farmSunPos(0.2);
+  assert.ok(mid.t > 0 && mid.alt > 0, 'sun starts rising immediately, no 0.16 delay');
+  const full = tetGame.farmSunPos(1);
+  assert.ok(full.alt >= 0.99 && full.t === 1);
+  // Crow fires at full height, not mid-rise (old y < 215).
+  assert.ok(src.includes('farmSunPos(day).alt >= 0.98') && src.includes('playRoosterSfx()'));
+  assert.ok(!src.includes('farmSunPos(day).y < 215'));
+  assert.strictEqual(tetGame.ROOSTER_HASH, 'd5a4ffc5');
+  assert.strictEqual(tetGame.roosterSrc(), 'tetris-bg/rooster-d5a4ffc5.mp3');
+  assert.ok(fs.existsSync('feed/tetris-bg/rooster-d5a4ffc5.mp3'), 'CC0 rooster is shipped');
+  assert.ok(src.includes('duckMusic(0, Math.max(0.7, ROOSTER_DUR - 0.2))'), 'crow ducks the music');
+  assert.ok(src.includes('Freesound 456804') && src.includes('Breviceps'));
+
+  assert.ok(src.includes('function drawBeachSurfers') && src.includes('function stepBeachSurf') && src.includes('function newBeachSurf'));
+  const surf = tetGame.newBeachSurf();
+  assert.strictEqual(surf.riders.length, 2);
+  const sea = tetGame.beachMeta().sea;
+  const midTide = { surf: tetGame.newBeachSurf(), tide: 0.5 };
+  midTide.surf.riders.forEach(r => { r.go = true; r.p = 0; r.wait = 0; });
+  // Ride the full wash; every position stays inside the sea rect.
+  for (let step = 0; step <= 20; step++) {
+    midTide.surf.riders.forEach(r => { r.p = step / 20; });
+    midTide.surf.riders.forEach(r => {
+      const pos = tetGame.beachSurfPos(r, midTide.tide);
+      assert.ok(pos.x >= sea.x && pos.x <= sea.x + sea.w, 'surfer x in sea');
+      assert.ok(pos.y >= sea.y && pos.y <= sea.y + sea.h, 'surfer y in sea');
+    });
+    if (step < 20) tetGame.stepBeachSurf(midTide, 0.23, false);
+  }
+  // After a full ride they wait for another wave (no gameplay side effects to assert).
+  assert.ok(src.includes('drawBeachSurfers(c, box)'));
+  assert.ok(src.includes("themeFor(3)") || tetGame.themeFor(3) === 0);
+  assert.strictEqual(tetGame.themeFor(3), 0);
 }
