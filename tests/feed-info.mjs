@@ -2593,28 +2593,30 @@ if (live) {
 // 1.9.193 New Zealand soundtrack, beat-quantised gravity, seagulls, line-clear flash
 {
   const src = fs.readFileSync('feed/tetris.js', 'utf8');
-  const fsHash = crypto.createHash('sha256').update(fs.readFileSync('feed/tetris-bg/m9-6a43316b.mp3')).digest('hex').slice(0, 8);
+  const fsHash = crypto.createHash('sha256').update(fs.readFileSync('feed/tetris-bg/m9-812638a3.mp3')).digest('hex').slice(0, 8);
   assert.strictEqual(tetGame.themeFor(8), 9);
   assert.strictEqual(tetGame.NZ_THEME, 9);
   assert.strictEqual(tetGame.THEMES[9].name, 'New Zealand');
-  assert.strictEqual(tetGame.TRACKS[9].bpm, 143.25);
-  assert.strictEqual(tetGame.TRACKS[9].key, 'D#');
-  assert.strictEqual(tetGame.TRACKS[9].mode, 'major');
-  assert.ok(Math.abs(tetGame.TRACKS[9].offset - 0.035) < 1e-6);
-  assert.strictEqual(tetGame.BGM_HASH[9], '6a43316b');
-  assert.strictEqual(fsHash, '6a43316b');
-  assert.ok(fs.existsSync('feed/tetris-bg/m9-6a43316b.mp3'));
+  assert.strictEqual(tetGame.TRACKS[9].bpm, 108.79);
+  assert.strictEqual(tetGame.TRACKS[9].key, 'E');
+  assert.strictEqual(tetGame.TRACKS[9].mode, 'minor');
+  assert.ok(Math.abs(tetGame.TRACKS[9].offset - 0.023) < 1e-6);
+  assert.strictEqual(tetGame.BGM_HASH[9], '812638a3');
+  assert.strictEqual(fsHash, '812638a3');
+  assert.ok(fs.existsSync('feed/tetris-bg/m9-812638a3.mp3'));
+  assert.ok(!fs.existsSync('feed/tetris-bg/m9-6a43316b.mp3'), 'previous NZ track is gone');
   assert.ok(!fs.existsSync('feed/tetris-bg/m9-2b10c8ba.mp3'), 'old NZ track is gone');
   assert.strictEqual(tetGame.nzProg(70, 8), 0);
   assert.strictEqual(tetGame.nzProg(80, 8), 1);
   assert.ok(Math.abs(tetGame.nzBeatsPerRow(0) - 2) < 1e-9);
   assert.ok(Math.abs(tetGame.nzBeatsPerRow(0.55) - 1) < 1e-9);
   assert.ok(Math.abs(tetGame.nzBeatsPerRow(1) - 0.5) < 1e-9);
-  const beatMs = 60000 / 143.25;
+  const beatMs = 60000 / 108.79;
   const cap = tetGame.dropInterval(8);
   assert.ok(Math.abs(tetGame.nzDropInterval(70, 8) - 2 * beatMs) < 0.05, 'starts at 1 row every 2 beats');
   assert.ok(tetGame.nzDropInterval(70, 8) > tetGame.nzDropInterval(75, 8));
-  assert.strictEqual(tetGame.nzDropInterval(79, 8), cap, 'end of the level is not harder than the global curve');
+  assert.ok(tetGame.nzDropInterval(80, 8) >= cap, 'end of the level is not harder than the global curve');
+  assert.ok(Math.abs(tetGame.nzDropInterval(80, 8) - Math.max(cap, 0.5 * beatMs)) < 0.05);
   assert.ok(tetGame.nzDropInterval(79, 8) >= 0.5 * beatMs);
   assert.ok(src.includes('themeFor(g.level) === NZ_THEME') && src.includes('nzDropInterval(g.lines, g.level)'));
   assert.ok(src.includes('const grid = beat.period / 2'));
@@ -2815,4 +2817,76 @@ if (live) {
   assert.strictEqual(crew2.job.dur, 1500);
 }
 
+// 1.9.196 New Zealand v2 soundtrack, re-derived gravity, speed palettes, extreme full screen
+{
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  const html = fs.readFileSync('feed/tetris.html', 'utf8');
+  const fsHash = crypto.createHash('sha256').update(fs.readFileSync('feed/tetris-bg/m9-812638a3.mp3')).digest('hex').slice(0, 8);
+  assert.strictEqual(tetGame.TRACKS[9].bpm, 108.79);
+  assert.strictEqual(tetGame.TRACKS[9].key, 'E');
+  assert.strictEqual(tetGame.TRACKS[9].mode, 'minor');
+  assert.ok(Math.abs(tetGame.TRACKS[9].offset - 0.023) < 1e-6);
+  assert.strictEqual(tetGame.BGM_HASH[9], '812638a3');
+  assert.strictEqual(fsHash, '812638a3');
+  assert.ok(fs.existsSync('feed/tetris-bg/m9-812638a3.mp3'));
+  assert.ok(!fs.existsSync('feed/tetris-bg/m9-6a43316b.mp3'), '1.9.193 NZ track is gone');
+  const beatMs = 60000 / 108.79;
+  const cap = tetGame.dropInterval(8);
+  assert.ok(Math.abs(tetGame.nzDropInterval(70, 8) - 2 * beatMs) < 0.05);
+  assert.ok(Math.abs(tetGame.nzProg(75.5, 8) - 0.55) < 1e-9);
+  assert.ok(Math.abs(tetGame.nzDropInterval(75.5, 8) - beatMs) < 0.05, 'about 55% of the stage is 1 row per beat');
+  assert.ok(Math.abs(tetGame.nzBeatsPerRow(0.55) - 1) < 1e-9);
+  assert.ok(tetGame.nzDropInterval(80, 8) >= cap);
+  assert.ok(Math.abs(tetGame.nzDropInterval(80, 8) - Math.max(cap, 0.5 * beatMs)) < 0.05);
+
+  assert.strictEqual(tetGame.NZ_PAL.length, 4);
+  assert.ok(tetGame.NZ_PAL.every(p => p.length === 7 && p.every(c => /^#[0-9a-f]{6}$/.test(c))));
+  assert.deepStrictEqual(Array.from(tetGame.NZ_PAL_STEPS), [0, 0.28, 0.55, 0.85]);
+  assert.strictEqual(tetGame.NZ_PAL_FADE_MS, 1000);
+  assert.strictEqual(tetGame.nzPalIndex(0), 0);
+  assert.strictEqual(tetGame.nzPalIndex(0.27), 0);
+  assert.strictEqual(tetGame.nzPalIndex(0.28), 1);
+  assert.strictEqual(tetGame.nzPalIndex(0.55), 2);
+  assert.strictEqual(tetGame.nzPalIndex(0.85), 3);
+  assert.strictEqual(tetGame.nzPalIndex(1), 3);
+  tetGame.setNzPal({ from: 0, to: 0, hold: true, at: 1 });
+  assert.strictEqual(tetGame.blockColor(1, 70, 8), tetGame.NZ_PAL[0][0]);
+  assert.strictEqual(tetGame.blockColor(7, 70, 8), tetGame.NZ_PAL[0][6]);
+  tetGame.setNzPal({ from: 3, to: 3, hold: true, at: 1 });
+  assert.strictEqual(tetGame.blockColor(1, 79, 8), tetGame.NZ_PAL[3][0], 'already-placed and new blocks share the current palette');
+  assert.strictEqual(tetGame.blockColor(2, 79, 8), tetGame.NZ_PAL[3][1]);
+  tetGame.setNzPal({ from: 0, to: 1, hold: true, at: 0.5 });
+  const mid = tetGame.blockColor(1, 73, 8);
+  const expect = tetGame.mixHex(tetGame.NZ_PAL[0][0], tetGame.NZ_PAL[1][0], 0.5);
+  assert.strictEqual(mid, expect, 'palettes cross-fade');
+  assert.notStrictEqual(mid, tetGame.NZ_PAL[0][0]);
+  assert.notStrictEqual(mid, tetGame.NZ_PAL[1][0]);
+  tetGame.resetNzPal(70, 8);
+  const st0 = tetGame.tickNzPal(0, 70, 8);
+  assert.strictEqual(st0.to, 0);
+  const st1 = tetGame.tickNzPal(0, 73, 8);
+  assert.strictEqual(st1.from, 0);
+  assert.strictEqual(st1.to, 1);
+  assert.strictEqual(st1.t, 0);
+  tetGame.tickNzPal(1000, 73, 8);
+  assert.ok(tetGame.nzPalState().t >= 1000);
+  assert.strictEqual(tetGame.blockColor(1, 73, 8), tetGame.NZ_PAL[1][0]);
+  // Other stages keep their usual colours.
+  tetGame.resetNzPal(0, 1);
+  assert.notStrictEqual(tetGame.blockColor(1, 0, 1), tetGame.NZ_PAL[0][0]);
+  assert.ok(src.includes('tickNzPal(dt') && src.includes('blockColor(v, colLines, colLevel)'));
+  assert.ok(src.includes('drawBlockGloss') && src.includes('function drawGhost'));
+  assert.ok(src.includes("board: 'rgba(5,30,30,0.5)'"), 'see-through NZ board is unchanged');
+
+  assert.strictEqual(tetGame.EXTREME_KEY, 'tetris-extreme');
+  assert.strictEqual(tetGame.EXTREME_PEEK_MS, 4000);
+  assert.ok(html.includes('id="extremebtn"') && html.includes('id="xtoggle"') && html.includes('id="xhud"'));
+  assert.ok(html.includes('html.fs-x') && html.includes('fs-x-peek') && html.includes('Extreme full screen'));
+  assert.ok(src.includes('function setExtreme') && src.includes('function peekExtreme') && src.includes('localStorage.setItem(EXTREME_KEY'));
+  assert.ok(src.includes('function setFull') && src.includes("d.type !== 'ib-artfull'"));
+  assert.ok(src.includes('requestFullscreen') && src.includes('webkitRequestFullscreen'), 'browser Fullscreen API stays on');
+  assert.ok(src.includes("board.addEventListener('pointerdown'") && src.includes('touch-action: none') || html.includes('touch-action: none'));
+  assert.ok(html.includes('touch-action: none'), 'board touch controls stay');
+  assert.ok(src.includes("opts.extreme") && src.includes('xscore') && src.includes('xlevel'));
+}
 
