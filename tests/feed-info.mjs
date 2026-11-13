@@ -2436,7 +2436,7 @@ if (live) {
   const src = fs.readFileSync('feed/tetris.js', 'utf8');
   assert.strictEqual(tetGame.themeFor(3), 0);
   assert.strictEqual(tetGame.isEffect(0), 'beach');
-  assert.ok(src.includes('const STACK_SURF_N = 3') && src.includes('STACK_SURF_SPEED = 52'));
+  assert.ok(src.includes('const STACK_SURF_N = 2') && src.includes('STACK_SURF_SPEED = 52'));
   assert.ok(src.includes('function drawStackSurfers') && src.includes('function stepStackSurf') && src.includes('function stackSkyline'));
   assert.ok(src.includes('drawStackSurfers(ctx)') && src.includes('stackSurfReset()'));
   assert.ok(!src.includes('function drawBeachSurfers') && !src.includes('drawBeachSurfers(c, box)'));
@@ -2449,7 +2449,7 @@ if (live) {
   assert.ok(pts0.length >= 2);
   assert.ok(pts0.every(p => Math.abs(p.y - 20 * 28) < 0.01), 'empty skyline is the floor');
   const surf = tetGame.newStackSurf();
-  assert.strictEqual(surf.riders.length, 3);
+  assert.strictEqual(surf.riders.length, 2);
   tetGame.stepStackSurf(surf, empty, 0);
   surf.riders.forEach(r => {
     assert.ok(Math.abs(r.y - 20 * 28) < 2, 'on the floor at t=0');
@@ -2523,4 +2523,21 @@ if (live) {
   const afterStep = g2.board.map(r => r.slice());
   tetGame.stepStackSurf(rider, g2.board, 80);
   assert.deepStrictEqual(g2.board, afterStep, 're-route does not place or remove blocks');
+}
+
+
+// 1.9.192 Beach surfers are much bigger, mostly opaque, and there are two of them
+{
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.ok(src.includes('const STACK_SURF_N = 2'));
+  assert.ok(src.includes('const STACK_SURF_H = 42') && src.includes('const STACK_SURF_BOARD = 49'));
+  assert.ok(src.includes('const STACK_SURF_ALPHA = 0.9') || src.includes('const STACK_SURF_ALPHA = 0.90'));
+  assert.ok(src.includes('ctx.globalAlpha = STACK_SURF_ALPHA'));
+  assert.ok(src.includes('Soft shadow on the blocks') && src.includes('Arms out for balance') && src.includes('Head and hair'));
+  const surf = tetGame.newStackSurf();
+  assert.strictEqual(surf.riders.length, 2, 'two surfers, not three');
+  // Still drawn under the active piece and ghost.
+  const draw = src.indexOf('try { drawStackSurfers(ctx); }');
+  const ghost = src.indexOf('drawGhost(ctx, (p.x + c)');
+  assert.ok(draw > 0 && ghost > draw, 'surfers are drawn before the ghost and falling piece');
 }

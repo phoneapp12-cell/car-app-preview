@@ -2520,9 +2520,13 @@
   // and at the walls with a soft spray, turn around at the edges, and
   // re-route when lines clear. Empty well: they ride the floor. No gameplay effect.
   // The 1.9.190 sea-wash riders were removed so the well does not get cluttered.
-  const STACK_SURF_N = 3;
+  const STACK_SURF_N = 2;
   const STACK_SURF_SPEED = 52;
   const STACK_SURF_INSET = 6;
+  // 1.9.192: much bigger, mostly opaque figures — about 1.5 cells tall, board 1.75 cells.
+  const STACK_SURF_H = 42;
+  const STACK_SURF_BOARD = 49;
+  const STACK_SURF_ALPHA = 0.9;
   function stackColY(board, c) {
     if (!board || c < 0 || c >= COLS) return ROWS * CELL;
     for (let r = 0; r < ROWS; r++) if (board[r][c]) return r * CELL;
@@ -2598,8 +2602,8 @@
   function newStackSurf() {
     return {
       ready: false,
-      riders: [0, 1, 2].map(function (i) {
-        return { s: 28 + i * 88, dir: i === 1 ? -1 : 1, hue: i, x: 0, y: ROWS * CELL, ang: 0, bob: i * 1.7, dropT: 0 };
+      riders: [0, 1].map(function (i) {
+        return { s: 40 + i * 150, dir: i === 1 ? -1 : 1, hue: i, x: 0, y: ROWS * CELL, ang: 0, bob: i * 1.7, dropT: 0 };
       }),
       spray: [],
       pts: null,
@@ -2685,36 +2689,88 @@
   let stackSurf = newStackSurf();
   function stackSurfReset() { stackSurf = newStackSurf(); }
   const STACK_SURF_PAL = [
-    { board: '#ff8a4a', wet: '#c45a2c', suit: '#2a2a3a', skin: '#e8b089' },
-    { board: '#3ecfc4', wet: '#1f8f88', suit: '#1c3a4a', skin: '#d9a06e' },
-    { board: '#f4d35e', wet: '#d4a017', suit: '#2b3a4a', skin: '#f0c4a0' }
+    { board: '#ff7a3a', wet: '#c44a22', suit: '#1c2438', skin: '#e8b089', hair: '#2a1c14' },
+    { board: '#2ad4c8', wet: '#178a82', suit: '#1a3a48', skin: '#d9a06e', hair: '#3d2416' }
   ];
   function drawStackSurfer(ctx, r) {
     const col = STACK_SURF_PAL[r.hue % STACK_SURF_PAL.length];
-    const k = 11;
-    const bob = Math.sin(r.bob || 0) * 0.7;
+    const H = STACK_SURF_H, BL = STACK_SURF_BOARD;
+    const bob = Math.sin(r.bob || 0) * 1.1;
     const face = r.dir < 0 ? -1 : 1;
+    const deck = -5;
     ctx.save();
     ctx.translate(r.x, r.y + bob);
     ctx.scale(face, 1);
-    ctx.rotate((r.ang || 0) * face + (r.dropT || 0) * 0.3);
-    ctx.globalAlpha = 0.64;
-    ctx.fillStyle = 'rgba(20,20,30,0.22)';
-    ctx.beginPath(); ctx.ellipse(0.8, 1.4, k * 1.0, k * 0.2, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = col.board;
-    ctx.beginPath(); ctx.ellipse(0, -1.2, k * 1.05, k * 0.22, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = col.wet;
-    ctx.beginPath(); ctx.ellipse(-k * 0.15, -1.3, k * 0.7, k * 0.1, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(255,230,200,0.35)';
-    ctx.beginPath(); ctx.ellipse(-k * 0.2, -1.6, k * 0.35, k * 0.06, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = col.suit;
-    ctx.beginPath(); ctx.ellipse(0, -3.4, k * 0.18, k * 0.34, 0.12, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = col.skin;
-    ctx.beginPath(); ctx.arc(0.2, -6.2, k * 0.14, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = col.skin;
-    ctx.lineWidth = 1.2;
+    ctx.rotate((r.ang || 0) * face + (r.dropT || 0) * 0.28);
+    ctx.globalAlpha = STACK_SURF_ALPHA;
     ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(k * 0.06, -4.2); ctx.lineTo(k * 0.42, -2.1); ctx.stroke();
+    ctx.lineJoin = 'round';
+    // Soft shadow on the blocks under the board.
+    ctx.fillStyle = 'rgba(20, 16, 28, 0.34)';
+    ctx.beginPath(); ctx.ellipse(2, 3, BL * 0.46, 5.8, 0, 0, Math.PI * 2); ctx.fill();
+    // Board: underside, colourful deck, rail stripe, sun highlight. ~1.75 cells long.
+    ctx.fillStyle = 'rgba(30, 20, 18, 0.5)';
+    ctx.beginPath(); ctx.ellipse(1.6, deck + 2.4, BL * 0.50, 5.4, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = col.board;
+    ctx.beginPath(); ctx.ellipse(0, deck, BL * 0.50, 5.1, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = col.wet;
+    ctx.beginPath(); ctx.ellipse(-BL * 0.03, deck - 0.5, BL * 0.34, 2.3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255, 240, 210, 0.5)';
+    ctx.beginPath(); ctx.ellipse(-BL * 0.08, deck - 2.3, BL * 0.28, 1.3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
+    ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.ellipse(0, deck, BL * 0.50, 5.1, 0, 0, Math.PI * 2); ctx.stroke();
+    // Feet on the deck.
+    ctx.fillStyle = col.suit;
+    ctx.beginPath(); ctx.ellipse(-6, deck - 3.2, 4.4, 2.1, 0.12, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(7, deck - 3.4, 4.4, 2.1, -0.16, 0, Math.PI * 2); ctx.fill();
+    // Bent knees, crouched stance.
+    ctx.strokeStyle = col.suit;
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(-5, deck - 5);
+    ctx.quadraticCurveTo(-12, deck - 14, -2, deck - 21);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(7, deck - 5);
+    ctx.quadraticCurveTo(13, deck - 13, 2, deck - 21);
+    ctx.stroke();
+    ctx.fillStyle = col.suit;
+    ctx.beginPath(); ctx.arc(-11, deck - 13.5, 3.3, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(12, deck - 12.8, 3.3, 0, Math.PI * 2); ctx.fill();
+    // Torso, slightly leaned forward, with a 3D rim.
+    ctx.save();
+    ctx.translate(0, deck - 27);
+    ctx.rotate(-0.2);
+    ctx.fillStyle = col.suit;
+    ctx.beginPath(); ctx.ellipse(0, 0, 7.4, 11.6, 0.06, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
+    ctx.beginPath(); ctx.ellipse(2.8, -1.2, 3.1, 8.2, 0.1, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // Arms out for balance.
+    ctx.strokeStyle = col.skin;
+    ctx.lineWidth = 3.8;
+    ctx.beginPath();
+    ctx.moveTo(4, deck - 31);
+    ctx.quadraticCurveTo(16, deck - 37, 23, deck - 24);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-3, deck - 30);
+    ctx.quadraticCurveTo(-16, deck - 35, -23, deck - 22);
+    ctx.stroke();
+    ctx.fillStyle = col.skin;
+    ctx.beginPath(); ctx.arc(23, deck - 24, 2.7, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(-23, deck - 22, 2.7, 0, Math.PI * 2); ctx.fill();
+    // Head and hair. Hair tip sits about 1.5 cells above the deck.
+    const hx = 1.6, hy = deck - 35;
+    ctx.fillStyle = col.skin;
+    ctx.beginPath(); ctx.arc(hx, hy, 6.3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255, 230, 200, 0.4)';
+    ctx.beginPath(); ctx.arc(hx + 1.8, hy - 1.5, 3.0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = col.hair;
+    ctx.beginPath(); ctx.ellipse(hx - 0.6, hy - 3.3, 6.3, 4.5, -0.28, Math.PI * 0.15, Math.PI * 1.95); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(hx - 3.4, hy - 0.4, 3.5, 5.0, 0.28, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(hx + 2.5, hy - 5.3, 2.5, 2.1, -0.45, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
   function drawStackSurfers(ctx) {
