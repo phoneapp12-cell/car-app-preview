@@ -197,6 +197,56 @@
     html.fs .play { grid-column: 2; }
     html.fs .boardrow { flex-direction: row; }
   }
+
+  /* 1.9.205 Start overlay, How to play, and the pause strip. Stay visible in Extreme. */
+  .startov {
+    position: fixed; inset: 0; z-index: 30;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+    background: rgba(5, 8, 12, .55);
+    box-sizing: border-box;
+  }
+  .startov[hidden] { display: none; }
+  .startov-card {
+    width: 100%; max-width: 320px;
+    text-align: center;
+    padding: 28px 22px 22px;
+    background: rgba(10, 14, 20, .9);
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 22px;
+    box-sizing: border-box;
+  }
+  .startov-card h2 { margin: 0 0 18px; font-size: 32px; line-height: 1.15; letter-spacing: .02em; }
+  #startbtn {
+    display: block; width: 100%; flex: none;
+    min-height: 64px; margin: 0 0 12px; padding: 14px 18px;
+    font-size: 26px; font-weight: 700; letter-spacing: .02em;
+    border: none; border-radius: 16px;
+    background: #22c55e; color: #06210e;
+  }
+  #starthowto { display: block; width: 100%; flex: none; min-height: 46px; }
+  .pauseov {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 25;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    padding: 20px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(transparent, rgba(5,8,12,.9) 28%);
+    pointer-events: none;
+    box-sizing: border-box;
+  }
+  .pauseov[hidden] { display: none; }
+  .pauseov p, .pauseov button { pointer-events: auto; }
+  .pauseov p { margin: 0 0 4px; font-size: 18px; font-weight: 700; }
+  #pauseresume { min-width: 220px; min-height: 52px; font-size: 20px; font-weight: 700; }
+  #pausehowto { min-width: 220px; min-height: 44px; }
+  .howto-card { max-width: 440px; }
+  .howto-body { font-size: 16px; line-height: 1.45; color: rgba(255,255,255,.92); text-align: left; }
+  .howto-body h3 { margin: 16px 0 6px; font-size: 16px; letter-spacing: .04em; text-transform: uppercase; color: rgba(255,255,255,.7); }
+  .howto-body h3:first-child { margin-top: 4px; }
+  .howto-body p { margin: 0 0 8px; }
+  #howtoclose { width: 100%; flex: none; margin-top: 12px; }
+  html.fs .startov, html.fs-x .startov,
+  html.fs .pauseov, html.fs-x .pauseov,
+  html.fs #howto, html.fs-x #howto { position: fixed; }
 </style>
 </head>
 <body>
@@ -233,6 +283,7 @@
       <button type="button" class="wide" data-act="drop">Drop</button>
       <button type="button" data-act="hold">Hold</button>
       <button type="button" id="pausebtn" data-act="pause">Pause</button>
+      <button type="button" id="howtobtn" class="wide">How to play</button>
       <button type="button" id="restartbtn" data-act="restart">Restart</button>
       <button type="button" id="xexitbtn" class="wide">Exit extreme</button>
     </div>
@@ -253,6 +304,25 @@
       <p class="lp-note">Practice — won’t go on the family scoreboard</p>
       <div id="levellist" class="lp-list"></div>
       <button type="button" id="levelpickclose" class="wide">Close</button>
+    </div>
+  </div>
+
+  <div id="startov" class="startov" role="dialog" aria-modal="true" aria-label="Start Tetris">
+    <div class="startov-card">
+      <h2>Tetris</h2>
+      <button type="button" id="startbtn">Start</button>
+      <button type="button" id="starthowto" class="wide">How to play</button>
+    </div>
+  </div>
+  <div id="pauseov" class="pauseov" hidden>
+    <p>Paused</p>
+    <button type="button" id="pauseresume">Resume</button>
+    <button type="button" id="pausehowto" class="wide">How to play</button>
+  </div>
+  <div id="howto" class="lp" hidden role="dialog" aria-modal="true" aria-label="How to play">
+    <div class="lp-card howto-card">
+      <div id="howtobody"></div>
+      <button type="button" id="howtoclose" class="wide">Close</button>
     </div>
   </div>
   <script src="scores.js?v=1.9.204"></script>
