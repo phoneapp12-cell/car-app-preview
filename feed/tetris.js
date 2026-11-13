@@ -176,7 +176,8 @@
   // Level order (indexes into THEMES): Farmyard, Jeremiah was a bullfrog, Beach, Fireworks, City, Ocean, Bush walk, New Zealand, Snowy mountains, Night sky, Space travel, Triangles last.
   // 1.9.188: City (theme 4) moved to level 5; Ocean and the levels after it shift down one.
   // 1.9.192: Space travel is level 11; Triangles is last (level 12).
-  const ORDER = [6, 11, 0, 1, 4, 2, 3, 9, 10, 5, 7, 8];
+  // 1.9.198: Beach is level 2, Space travel is level 3 (Farmyard, Beach, Space travel, Bullfrog, Fireworks, City, Ocean, Bush walk, New Zealand, Snowy mountains, Night sky, Triangles).
+  const ORDER = [6, 0, 7, 11, 1, 4, 2, 3, 9, 10, 5, 8];
   function themeFor(level) { return ORDER[(Math.max(1, level) - 1) % ORDER.length]; }
   function stages() { return ORDER.map((ti, i) => ({ level: i + 1, theme: ti, name: THEMES[ti].name })); }
   function shouldSubmit(gm) { return !!(gm && !gm.practice && gm.score > 0); }
