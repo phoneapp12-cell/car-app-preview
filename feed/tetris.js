@@ -2514,7 +2514,230 @@
     return { g: g, started: !!snap.started, musicOn: snap.musicOn !== false, soundOn: snap.soundOn !== false };
   }
 
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_SAFE_TOP, CITY_CREW_N, cityBuildWait, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, maybeHighScore, startHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, FARM_SUN, FARM_HZ, farmDayTarget, farmSunPos, ROOSTER_HASH, roosterSrc, newBeachSurf, beachSurfPos, stepBeachSurf, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts };
+  // 1.9.191 Beach (theme 0, level 3): 2–3 small painterly surfers ride the
+  // top of the settled Tetris stack inside the well. They follow the skyline
+  // column by column, carve up and over block tops, drop at height changes
+  // and at the walls with a soft spray, turn around at the edges, and
+  // re-route when lines clear. Empty well: they ride the floor. No gameplay effect.
+  // The 1.9.190 sea-wash riders were removed so the well does not get cluttered.
+  const STACK_SURF_N = 3;
+  const STACK_SURF_SPEED = 52;
+  const STACK_SURF_INSET = 6;
+  function stackColY(board, c) {
+    if (!board || c < 0 || c >= COLS) return ROWS * CELL;
+    for (let r = 0; r < ROWS; r++) if (board[r][c]) return r * CELL;
+    return ROWS * CELL;
+  }
+  function stackSkyline(board) {
+    const pts = [];
+    for (let c = 0; c < COLS; c++) {
+      const y = stackColY(board, c);
+      const x0 = c * CELL + (c === 0 ? STACK_SURF_INSET : 0);
+      const x1 = (c + 1) * CELL - (c === COLS - 1 ? STACK_SURF_INSET : 0);
+      if (!pts.length) pts.push({ x: x0, y: y });
+      else if (Math.abs(pts[pts.length - 1].y - y) > 0.5) {
+        pts.push({ x: pts[pts.length - 1].x, y: y, drop: y > pts[pts.length - 1].y });
+      }
+      pts.push({ x: x1, y: y });
+    }
+    return pts;
+  }
+  function stackPathLen(pts) {
+    let n = 0;
+    for (let i = 1; i < pts.length; i++) n += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    return n;
+  }
+  function stackPathAt(pts, dist) {
+    if (!pts || pts.length < 2) return { x: STACK_SURF_INSET, y: ROWS * CELL, ang: 0, drop: false, rise: false, s: 0, len: 0 };
+    const total = stackPathLen(pts);
+    if (total <= 0) return { x: pts[0].x, y: pts[0].y, ang: 0, drop: false, rise: false, s: 0, len: 0 };
+    const s = Math.max(0, Math.min(total, dist));
+    let acc = 0;
+    for (let i = 1; i < pts.length; i++) {
+      const dx = pts[i].x - pts[i - 1].x, dy = pts[i].y - pts[i - 1].y;
+      const len = Math.hypot(dx, dy) || 1e-6;
+      if (acc + len >= s - 1e-6) {
+        const t = (s - acc) / len;
+        return {
+          x: pts[i - 1].x + dx * t,
+          y: pts[i - 1].y + dy * t,
+          ang: Math.atan2(dy, dx),
+          drop: !!(pts[i].drop || dy > 4),
+          rise: dy < -4,
+          s: s,
+          len: total
+        };
+      }
+      acc += len;
+    }
+    const last = pts[pts.length - 1], prev = pts[pts.length - 2];
+    return { x: last.x, y: last.y, ang: Math.atan2(last.y - prev.y, last.x - prev.x), drop: false, rise: false, s: total, len: total };
+  }
+  function stackNearestS(pts, x, y) {
+    let best = { s: 0, d2: Infinity, x: pts[0].x, y: pts[0].y };
+    let acc = 0;
+    for (let i = 1; i < pts.length; i++) {
+      const ax = pts[i - 1].x, ay = pts[i - 1].y, bx = pts[i].x, by = pts[i].y;
+      const dx = bx - ax, dy = by - ay;
+      const len2 = dx * dx + dy * dy || 1e-6;
+      const len = Math.sqrt(len2);
+      let t = ((x - ax) * dx + (y - ay) * dy) / len2;
+      t = Math.max(0, Math.min(1, t));
+      const px = ax + t * dx, py = ay + t * dy;
+      const d2 = (px - x) * (px - x) + (py - y) * (py - y);
+      if (d2 < best.d2) best = { s: acc + t * len, d2: d2, x: px, y: py };
+      acc += len;
+    }
+    return best;
+  }
+  function stackSkyKey(board) {
+    let k = '';
+    for (let c = 0; c < COLS; c++) k += stackColY(board, c) + ',';
+    return k;
+  }
+  function newStackSurf() {
+    return {
+      ready: false,
+      riders: [0, 1, 2].map(function (i) {
+        return { s: 28 + i * 88, dir: i === 1 ? -1 : 1, hue: i, x: 0, y: ROWS * CELL, ang: 0, bob: i * 1.7, dropT: 0 };
+      }),
+      spray: [],
+      pts: null,
+      key: '',
+      len: 0
+    };
+  }
+  function stackAddSpray(surf, x, y, dir, heavy) {
+    const n = heavy ? 7 : 4;
+    for (let i = 0; i < n; i++) {
+      const a = -1.35 + Math.random() * 2.7;
+      const sp = 14 + Math.random() * (heavy ? 34 : 20);
+      surf.spray.push({
+        x: x + (Math.random() - 0.5) * 8,
+        y: y - 2,
+        vx: Math.cos(a) * sp + (dir || 0) * 8,
+        vy: Math.sin(a) * sp * 0.25 - 16 - Math.random() * 14,
+        t: 0,
+        life: 0.28 + Math.random() * 0.22,
+        sz: 1.1 + Math.random() * 1.5
+      });
+    }
+  }
+  function stepStackSurf(surf, board, dt, flags) {
+    flags = flags || {};
+    if (!surf || !board) return surf;
+    const sec = dt / 1000;
+    const pts = stackSkyline(board);
+    const key = stackSkyKey(board);
+    const len = stackPathLen(pts);
+    if (key !== surf.key) {
+      if (surf.key) {
+        for (let i = 0; i < surf.riders.length; i++) {
+          const r = surf.riders[i];
+          const n = stackNearestS(pts, r.x, r.y);
+          if (n.y - r.y > 10) stackAddSpray(surf, n.x, n.y, r.dir, true);
+          r.s = n.s;
+        }
+      }
+      surf.key = key;
+      surf.pts = pts;
+      surf.len = len;
+      surf.ready = true;
+    } else {
+      surf.pts = pts;
+      surf.len = len;
+    }
+    if (surf.spray.length) {
+      for (let i = 0; i < surf.spray.length; i++) {
+        const d = surf.spray[i];
+        d.t += sec;
+        d.x += d.vx * sec;
+        d.y += d.vy * sec;
+        d.vy += 90 * sec;
+      }
+      surf.spray = surf.spray.filter(function (d) { return d.t < d.life; });
+    }
+    const reduce = !!flags.reduce;
+    for (let i = 0; i < surf.riders.length; i++) {
+      const r = surf.riders[i];
+      r.bob += sec * 6;
+      if (reduce) {
+        const p = stackPathAt(surf.pts, r.s);
+        r.x = p.x; r.y = p.y; r.ang = p.ang;
+        continue;
+      }
+      const before = stackPathAt(surf.pts, r.s);
+      let speed = STACK_SURF_SPEED;
+      if (before.drop) speed *= 1.35;
+      if (before.rise) speed *= 0.85;
+      r.s += r.dir * speed * sec;
+      let turned = false;
+      if (r.s <= 0) { r.s = 0; r.dir = 1; turned = true; }
+      if (r.s >= surf.len) { r.s = surf.len; r.dir = -1; turned = true; }
+      const p = stackPathAt(surf.pts, r.s);
+      if (turned) stackAddSpray(surf, p.x, p.y, r.dir, false);
+      if (p.drop && !before.drop) stackAddSpray(surf, p.x, p.y, r.dir, true);
+      r.x = p.x; r.y = p.y; r.ang = p.ang;
+      r.dropT = p.drop ? Math.min(1, (r.dropT || 0) + sec * 8) : Math.max(0, (r.dropT || 0) - sec * 6);
+    }
+    return surf;
+  }
+  let stackSurf = newStackSurf();
+  function stackSurfReset() { stackSurf = newStackSurf(); }
+  const STACK_SURF_PAL = [
+    { board: '#ff8a4a', wet: '#c45a2c', suit: '#2a2a3a', skin: '#e8b089' },
+    { board: '#3ecfc4', wet: '#1f8f88', suit: '#1c3a4a', skin: '#d9a06e' },
+    { board: '#f4d35e', wet: '#d4a017', suit: '#2b3a4a', skin: '#f0c4a0' }
+  ];
+  function drawStackSurfer(ctx, r) {
+    const col = STACK_SURF_PAL[r.hue % STACK_SURF_PAL.length];
+    const k = 11;
+    const bob = Math.sin(r.bob || 0) * 0.7;
+    const face = r.dir < 0 ? -1 : 1;
+    ctx.save();
+    ctx.translate(r.x, r.y + bob);
+    ctx.scale(face, 1);
+    ctx.rotate((r.ang || 0) * face + (r.dropT || 0) * 0.3);
+    ctx.globalAlpha = 0.64;
+    ctx.fillStyle = 'rgba(20,20,30,0.22)';
+    ctx.beginPath(); ctx.ellipse(0.8, 1.4, k * 1.0, k * 0.2, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = col.board;
+    ctx.beginPath(); ctx.ellipse(0, -1.2, k * 1.05, k * 0.22, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = col.wet;
+    ctx.beginPath(); ctx.ellipse(-k * 0.15, -1.3, k * 0.7, k * 0.1, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,230,200,0.35)';
+    ctx.beginPath(); ctx.ellipse(-k * 0.2, -1.6, k * 0.35, k * 0.06, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = col.suit;
+    ctx.beginPath(); ctx.ellipse(0, -3.4, k * 0.18, k * 0.34, 0.12, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = col.skin;
+    ctx.beginPath(); ctx.arc(0.2, -6.2, k * 0.14, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = col.skin;
+    ctx.lineWidth = 1.2;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(k * 0.06, -4.2); ctx.lineTo(k * 0.42, -2.1); ctx.stroke();
+    ctx.restore();
+  }
+  function drawStackSurfers(ctx) {
+    if (!g || isEffect((g.clearFx ? themeFor(g.clearFx.level) : themeFor(g.level))) !== 'beach') return;
+    if (!stackSurf.ready && g.board) stepStackSurf(stackSurf, g.board, 0);
+    if (!stackSurf.ready) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, COLS * CELL, ROWS * CELL);
+    ctx.clip();
+    for (let i = 0; i < stackSurf.spray.length; i++) {
+      const d = stackSurf.spray[i];
+      const k = Math.max(0, 1 - d.t / d.life);
+      ctx.globalAlpha = 0.42 * k;
+      ctx.fillStyle = 'rgba(255,248,235,1)';
+      ctx.beginPath(); ctx.arc(d.x, d.y, d.sz * (0.7 + 0.3 * k), 0, 6.283); ctx.fill();
+    }
+    const list = stackSurf.riders.slice().sort(function (a, b) { return a.y - b.y; });
+    for (let i = 0; i < list.length; i++) drawStackSurfer(ctx, list[i]);
+    ctx.restore();
+  }
+
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_SAFE_TOP, CITY_CREW_N, cityBuildWait, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, maybeHighScore, startHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, FARM_SUN, FARM_HZ, farmDayTarget, farmSunPos, ROOSTER_HASH, roosterSrc, stackColY, stackSkyline, stackPathAt, stackPathLen, newStackSurf, stepStackSurf, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts };
 
   if (!root.document) return;
   const doc = root.document;
@@ -2570,7 +2793,7 @@
   function press(a) {
     if (!started) started = true;
     const next = act(g, a);
-    if (a === 'restart') { g = next; invReset(); cityReset(); life.hold = null; life.singHold = null; life.beachHold = null; fw.hold = null; ocean.hold = null; sparkHold = null; blockSparks = []; lifeReset(); if (isEffect(themeFor(g.level))) { lifeCast(isEffect(themeFor(g.level))); } if (root.IBScores) root.IBScores.close(); }
+    if (a === 'restart') { g = next; invReset(); cityReset(); stackSurfReset(); life.hold = null; life.singHold = null; life.beachHold = null; fw.hold = null; ocean.hold = null; sparkHold = null; blockSparks = []; lifeReset(); if (isEffect(themeFor(g.level))) { lifeCast(isEffect(themeFor(g.level))); } if (root.IBScores) root.IBScores.close(); }
     syncHud();
     try { persistLive(); } catch (e) { }
   }
@@ -2719,6 +2942,7 @@
     applyLook(themeIdx);
     invReset();
     cityReset();
+    stackSurfReset();
     syncHud();
   }
   function showShanePicker(force) {
@@ -3509,6 +3733,8 @@
     for (const w of list) drawCityWorker(ctx, w, city.t);
   }
 
+
+
   function rgbaHex(h, a) {
     if (!h || h[0] !== '#') return 'rgba(255,255,255,' + a + ')';
     const n = parseInt(h.slice(1), 16);
@@ -3820,7 +4046,7 @@
     if (kind === 'farm') {
       farmCast();
     } else if (kind === 'beach') {
-      life.beach = { tide: 0.5, wet: 0.2, big: 0, mid: 0, fl: 0, gust: 0, surf: newBeachSurf() };
+      life.beach = { tide: 0.5, wet: 0.2, big: 0, mid: 0, fl: 0, gust: 0 };
       beachLoad();
     } else if (kind === 'fireworks') {
       fwReset();
@@ -4652,98 +4878,7 @@
   }
 
 
-  // 1.9.190 Beach (theme 0, level 3): two modest painted surfers ride the wash.
-  // They stay inside the sea rect, follow the inland foam vector, and have no gameplay effect.
-  function newBeachSurf() {
-    return {
-      riders: [
-        { lane: 0.32, wait: 0.8, p: 0, ride: 0, go: false, lean: 0, hue: 0, flip: 1 },
-        { lane: 0.58, wait: 4.6, p: 0, ride: 0, go: false, lean: 0, hue: 1, flip: 1 }
-      ]
-    };
-  }
-  function beachSurfPos(rider, tide) {
-    const M = BEACH_META;
-    const sea = M.sea;
-    const inland = M.inland;
-    const wash = (M.washPx || 42);
-    const x0 = sea.x + sea.w * (0.36 + rider.lane * 0.42);
-    const y0 = sea.y + 42 + rider.lane * 70;
-    const x = x0 + inland[0] * wash * (0.25 + (rider.p || 0) * 2.15);
-    const y = y0 + inland[1] * wash * (0.25 + (rider.p || 0) * 2.15) + Math.sin((tide || 0) * Math.PI * 2 + rider.lane * 3) * 3;
-    return {
-      x: Math.max(sea.x + 18, Math.min(sea.x + sea.w - 18, x)),
-      y: Math.max(sea.y + 16, Math.min(sea.y + sea.h - 22, y))
-    };
-  }
-  function stepBeachSurf(B, dt, reduce) {
-    if (!B.surf || !B.surf.riders) B.surf = newBeachSurf();
-    const riders = B.surf.riders;
-    const incoming = (B.tide || 0) > 0.12 && (B.tide || 0) < 0.88;
-    for (let i = 0; i < riders.length; i++) {
-      const r = riders[i];
-      if (reduce || B.held) {
-        r.lean *= 0.85;
-        continue;
-      }
-      if (!r.go) {
-        r.wait -= dt;
-        if (r.wait <= 0 && incoming) { r.go = true; r.p = 0; r.ride = 0; }
-        continue;
-      }
-      r.ride += dt;
-      r.p = Math.max(0, Math.min(1, r.ride / 4.6));
-      r.lean += ((r.go ? 0.55 : 0) - r.lean) * Math.min(1, dt * 4);
-      if (r.p >= 1 || !incoming) {
-        r.go = false;
-        r.p = 0;
-        r.ride = 0;
-        r.wait = 2.4 + (i * 1.8);
-        r.lean *= 0.5;
-      }
-    }
-  }
-  function drawBeachSurfers(c, box) {
-    const B = life.beach;
-    if (!B || !B.surf || !B.surf.riders) return;
-    const sc = box.scale;
-    const pal = [
-      { board: '#ff8a4a', wet: '#c45a2c', suit: '#2a2a3a', skin: '#e8b089' },
-      { board: '#3ecfc4', wet: '#1f8f88', suit: '#1c3a4a', skin: '#d9a06e' }
-    ];
-    for (let i = 0; i < B.surf.riders.length; i++) {
-      const r = B.surf.riders[i];
-      if (!r.go && r.p === 0 && r.wait > 0.4) continue;
-      const pos = beachSurfPos(r, B.tide);
-      const x = box.left + pos.x * sc, y = box.top + pos.y * sc;
-      const k = (18 + r.lane * 4) * sc;
-      const lean = (r.lean || 0) * 0.35;
-      const col = pal[r.hue % pal.length];
-      c.save();
-      c.translate(x, y);
-      c.rotate(-0.55 + lean);
-      c.globalAlpha = 0.92;
-      c.fillStyle = 'rgba(20,20,30,0.28)';
-      c.beginPath(); c.ellipse(1.2 * sc, 1.6 * sc, k * 0.28, k * 1.05, 0, 0, Math.PI * 2); c.fill();
-      c.fillStyle = col.board;
-      c.beginPath(); c.ellipse(0, 0, k * 0.26, k * 1.02, 0, 0, Math.PI * 2); c.fill();
-      c.fillStyle = col.wet;
-      c.beginPath(); c.ellipse(-k * 0.04, 0, k * 0.12, k * 0.85, 0, 0, Math.PI * 2); c.fill();
-      c.fillStyle = 'rgba(255,230,200,0.35)';
-      c.beginPath(); c.ellipse(-k * 0.08, -k * 0.2, k * 0.07, k * 0.4, 0, 0, Math.PI * 2); c.fill();
-      c.rotate(0.15);
-      c.fillStyle = col.suit;
-      c.beginPath(); c.ellipse(0, -k * 0.08, k * 0.16, k * 0.34, 0.15, 0, Math.PI * 2); c.fill();
-      c.fillStyle = col.skin;
-      c.beginPath(); c.arc(k * 0.02, -k * 0.48, k * 0.13, 0, Math.PI * 2); c.fill();
-      c.strokeStyle = col.skin;
-      c.lineWidth = Math.max(1, 1.6 * sc);
-      c.lineCap = 'round';
-      c.beginPath(); c.moveTo(k * 0.08, -k * 0.22); c.lineTo(k * 0.38, k * 0.05); c.stroke();
-      c.restore();
-    }
-  }
-    function beachLoad() {
+  function beachLoad() {
     if (beach.img || !root.Image) return;
     beach.img = {};
     let left = 4;
@@ -4781,7 +4916,6 @@
     b.big = gust * 0.046 + Math.sin(t * 2.15) * 0.01;
     b.mid = gust * 0.033 + Math.sin(t * 2.4 + 0.9) * 0.01;
     b.fl = gust * 0.018 + Math.sin(t * 1.7 + 0.3) * 0.008;
-    stepBeachSurf(b, dt, reduce);
   }
   function beachPhoto(c, box, px, py, sx, sy, dw, dh, parx, pary) {
     c.drawImage(c._beachImg, px, py, sx, sy,
@@ -4880,7 +5014,6 @@
       const fy_ = box.top + (fb.y + iy + pWater * 0.15) * sc;
       c.drawImage(beach.img.foam, 0, 0, fb.w, fb.h, fx_, fy_, fb.w * sc, fb.h * sc);
     }
-    drawBeachSurfers(c, box);
 
     // Contact shadows (trunk bases, flower clump) — a gentle 3D sit.
     function trunkShadow(px, py, rx, ry, a) {
@@ -6075,6 +6208,10 @@
     }
     try { if (!clearing) invStep(dt); } catch (e) { }
     try { if (!clearing) cityStep(dt); } catch (e) { }
+    try {
+      if (g && isEffect(cellThemeIdx()) === 'beach') stepStackSurf(stackSurf, g.board, dt, { reduce: reduceMotion() });
+      else if (stackSurf.ready) stackSurfReset();
+    } catch (e) { }
     musicTick(g.level, musicWanted(g.level, started, g));
     if (g.flashT > 0) g.flashT -= dt;
     if (g.popupT > 0) g.popupT -= dt;
@@ -6113,6 +6250,7 @@
       try { if (!sparkHold) tickBlockSpark(now, drawBoard, (!g.over && !fx) ? g.piece : null, reduceMotion()); } catch (e) { }
       try { invDraw(ctx); } catch (e) { }
       try { drawCityCrew(ctx); } catch (e) { }
+      try { drawStackSurfers(ctx); } catch (e) { }
       try { drawEffectTrails(ctx); drawEffectRipples(ctx); } catch (e) { }
       if (!g.over && !fx) {
         const p = g.piece;

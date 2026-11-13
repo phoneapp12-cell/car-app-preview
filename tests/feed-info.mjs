@@ -2426,24 +2426,101 @@ if (live) {
   assert.ok(src.includes('duckMusic(0, Math.max(0.7, ROOSTER_DUR - 0.2))'), 'crow ducks the music');
   assert.ok(src.includes('Freesound 456804') && src.includes('Breviceps'));
 
-  assert.ok(src.includes('function drawBeachSurfers') && src.includes('function stepBeachSurf') && src.includes('function newBeachSurf'));
-  const surf = tetGame.newBeachSurf();
-  assert.strictEqual(surf.riders.length, 2);
-  const sea = tetGame.beachMeta().sea;
-  const midTide = { surf: tetGame.newBeachSurf(), tide: 0.5 };
-  midTide.surf.riders.forEach(r => { r.go = true; r.p = 0; r.wait = 0; });
-  // Ride the full wash; every position stays inside the sea rect.
-  for (let step = 0; step <= 20; step++) {
-    midTide.surf.riders.forEach(r => { r.p = step / 20; });
-    midTide.surf.riders.forEach(r => {
-      const pos = tetGame.beachSurfPos(r, midTide.tide);
-      assert.ok(pos.x >= sea.x && pos.x <= sea.x + sea.w, 'surfer x in sea');
-      assert.ok(pos.y >= sea.y && pos.y <= sea.y + sea.h, 'surfer y in sea');
-    });
-    if (step < 20) tetGame.stepBeachSurf(midTide, 0.23, false);
-  }
-  // After a full ride they wait for another wave (no gameplay side effects to assert).
-  assert.ok(src.includes('drawBeachSurfers(c, box)'));
-  assert.ok(src.includes("themeFor(3)") || tetGame.themeFor(3) === 0);
+  // 1.9.191 moved the surfers onto the settled stack; sea-wash riders are gone.
+  assert.ok(!src.includes('function drawBeachSurfers') && !src.includes('function newBeachSurf'));
   assert.strictEqual(tetGame.themeFor(3), 0);
+}
+
+// 1.9.191 Beach surfers ride the settled Tetris stack, not the painted wash
+{
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.strictEqual(tetGame.themeFor(3), 0);
+  assert.strictEqual(tetGame.isEffect(0), 'beach');
+  assert.ok(src.includes('const STACK_SURF_N = 3') && src.includes('STACK_SURF_SPEED = 52'));
+  assert.ok(src.includes('function drawStackSurfers') && src.includes('function stepStackSurf') && src.includes('function stackSkyline'));
+  assert.ok(src.includes('drawStackSurfers(ctx)') && src.includes('stackSurfReset()'));
+  assert.ok(!src.includes('function drawBeachSurfers') && !src.includes('drawBeachSurfers(c, box)'));
+
+  const empty = tetGame.emptyBoard();
+  for (let c = 0; c < 10; c++) {
+    assert.strictEqual(tetGame.stackColY(empty, c), 20 * 28, 'empty columns ride the well floor');
+  }
+  const pts0 = tetGame.stackSkyline(empty);
+  assert.ok(pts0.length >= 2);
+  assert.ok(pts0.every(p => Math.abs(p.y - 20 * 28) < 0.01), 'empty skyline is the floor');
+  const surf = tetGame.newStackSurf();
+  assert.strictEqual(surf.riders.length, 3);
+  tetGame.stepStackSurf(surf, empty, 0);
+  surf.riders.forEach(r => {
+    assert.ok(Math.abs(r.y - 20 * 28) < 2, 'on the floor at t=0');
+    assert.ok(r.x >= 0 && r.x <= 10 * 28);
+  });
+  const before = empty.map(row => row.slice());
+  // Ride long enough to hit a wall and turn.
+  const left = surf.riders.find(r => r.dir < 0) || surf.riders[0];
+  left.s = 0;
+  left.dir = -1;
+  tetGame.stepStackSurf(surf, empty, 200);
+  assert.strictEqual(left.dir, 1, 'turns around at the left wall');
+  assert.ok(left.x >= 0, 'stays inside the well');
+  // Snapshot the board is untouched (no gameplay effect).
+  assert.deepStrictEqual(empty, before, 'stepping surfers does not change the board');
+
+  // Jagged stack: follow the skyline, including vertical drops.
+  const g = tetGame.newGame({ level: 3, practice: true });
+  g.board = tetGame.emptyBoard();
+  for (let c = 0; c < 10; c++) {
+    const top = 18 - (c % 4); // 18,17,16,15,18...
+    for (let r = top; r < 20; r++) g.board[r][c] = 2;
+  }
+  const jagged = tetGame.newStackSurf();
+  tetGame.stepStackSurf(jagged, g.board, 0);
+  function onSkyline(board, x, y, tol) {
+    const C = 10, CELL = 28;
+    const col = Math.max(0, Math.min(C - 1, Math.floor(x / CELL)));
+    const yHere = tetGame.stackColY(board, col);
+    const nearLeft = (x - col * CELL) < 2 && col > 0;
+    const nearRight = ((col + 1) * CELL - x) < 2 && col < C - 1;
+    if (nearLeft) {
+      const lo = Math.min(yHere, tetGame.stackColY(board, col - 1));
+      const hi = Math.max(yHere, tetGame.stackColY(board, col - 1));
+      return y >= lo - tol && y <= hi + tol;
+    }
+    if (nearRight) {
+      const lo = Math.min(yHere, tetGame.stackColY(board, col + 1));
+      const hi = Math.max(yHere, tetGame.stackColY(board, col + 1));
+      return y >= lo - tol && y <= hi + tol;
+    }
+    return Math.abs(y - yHere) <= tol;
+  }
+  jagged.riders.forEach(r => {
+    assert.ok(onSkyline(g.board, r.x, r.y, 2), 'starts on the jagged skyline');
+  });
+  for (let i = 0; i < 40; i++) tetGame.stepStackSurf(jagged, g.board, 80);
+  jagged.riders.forEach(r => {
+    assert.ok(onSkyline(g.board, r.x, r.y, 2.5), 'stays on the skyline while carving');
+    assert.ok(r.x >= 0 && r.x <= 10 * 28);
+  });
+
+  // Re-route when a line clears: a full bottom row plus a step above, then clear the row.
+  const g2 = tetGame.newGame({ level: 3, practice: true });
+  g2.board = tetGame.emptyBoard();
+  for (let c = 0; c < 10; c++) g2.board[19][c] = 3;
+  for (let c = 0; c < 4; c++) g2.board[18][c] = 4;
+  const rider = tetGame.newStackSurf();
+  tetGame.stepStackSurf(rider, g2.board, 0);
+  const full = tetGame.findFullRows(g2);
+  assert.ok(full.length === 1 && full[0] === 19, 'bottom row is full');
+  const boardBefore = g2.board.map(r => r.slice());
+  tetGame.applyClear(g2, full);
+  assert.ok(g2.board[19].some(v => v === 4) || g2.board[19].every(v => !v) || g2.board[19][0] === 4, 'row dropped or cleared');
+  // After the clear, the previous bottom row is gone; remaining blocks sit lower.
+  tetGame.stepStackSurf(rider, g2.board, 16);
+  rider.riders.forEach(r => {
+    assert.ok(onSkyline(g2.board, r.x, r.y, 3), 're-routes onto the post-clear skyline');
+  });
+  // applyClear changed the board; stepping again must not change it further.
+  const afterStep = g2.board.map(r => r.slice());
+  tetGame.stepStackSurf(rider, g2.board, 80);
+  assert.deepStrictEqual(g2.board, afterStep, 're-route does not place or remove blocks');
 }
