@@ -3156,3 +3156,139 @@ if (live) {
   assert.ok(fs.existsSync('feed/' + tetGame.FOOD_SPRITES.src));
 }
 
+
+// 1.9.203 bananas explode when a newly locked banana touches a placed one
+{
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.ok(src.includes('function applyBananaBurst') && src.includes('function spawnBananaBurst'));
+  assert.ok(src.includes('function bananaTouchesLocked') && src.includes('function connectedBananaCells'));
+  assert.ok(src.includes('1.9.203: J and L bananas explode'));
+  assert.strictEqual(tetGame.BANANA_BONUS, 100);
+  assert.strictEqual(tetGame.BANANA_PER_CELL, 25);
+  assert.strictEqual(tetGame.isBanana(2), true);
+  assert.strictEqual(tetGame.isBanana(3), true);
+  assert.strictEqual(tetGame.isBanana(1), false);
+  assert.strictEqual(tetGame.isBanana(8), false);
+  assert.ok(fs.existsSync('feed/' + tetGame.foodSrc('boom')), 'reuses the food-boom style sfx');
+
+  function place(g, t, rot, x, y) {
+    const m = tetGame.rotShape(t, rot);
+    const p = { t: t, m: m, x: x, y: y, rot: rot };
+    for (let r = 0; r < m.length; r++) {
+      for (let c = 0; c < m[r].length; c++) {
+        if (!m[r][c]) continue;
+        const yy = y + r, xx = x + c;
+        if (yy >= 0 && yy < 20 && xx >= 0 && xx < 10) g.board[yy][xx] = t;
+      }
+    }
+    tetGame.stampFood(g, p);
+    return p;
+  }
+
+  // J at (0,17): cells (0,17),(0,18),(1,18),(2,18). L at (3,17) touches at (2,18)/(3,18).
+  const gB = tetGame.newGame({ level: 12, practice: true });
+  gB.board = tetGame.emptyBoard();
+  gB.food = tetGame.emptyFood();
+  gB.score = 0;
+  gB.next = 1;
+  place(gB, 2, 0, 0, 17);
+  // Watermelon above the J, should settle after the bananas clear.
+  gB.board[16][1] = 4; gB.food[16][1] = { t: 4, rot: 0, lr: 0, lc: 0 };
+  gB.piece = { t: 3, m: tetGame.rotShape(3, 0), x: 3, y: 17, rot: 0 };
+  tetGame.lockPiece(gB);
+  assert.strictEqual(gB.board[17][0], 0, 'locked J cells are gone');
+  assert.strictEqual(gB.board[18][0], 0);
+  assert.strictEqual(gB.board[18][1], 0);
+  assert.strictEqual(gB.board[18][2], 0);
+  assert.strictEqual(gB.board[17][5], 0, 'locking L cells are gone');
+  assert.strictEqual(gB.board[18][3], 0);
+  assert.strictEqual(gB.board[18][4], 0);
+  assert.strictEqual(gB.board[18][5], 0);
+  assert.strictEqual(gB.board[19][1], 4, 'cell above the bananas settled to the floor');
+  assert.ok(gB.food[19][1] && gB.food[19][1].t === 4);
+  assert.strictEqual(gB.board[16][1], 0);
+  assert.strictEqual(gB.score, tetGame.BANANA_BONUS + tetGame.BANANA_PER_CELL * 8);
+
+  // A banana that does not touch another banana just locks.
+  const gSolo = tetGame.newGame({ level: 12, practice: true });
+  gSolo.board = tetGame.emptyBoard();
+  gSolo.food = tetGame.emptyFood();
+  gSolo.score = 0;
+  gSolo.next = 1;
+  place(gSolo, 2, 0, 0, 17);
+  gSolo.piece = { t: 3, m: tetGame.rotShape(3, 0), x: 6, y: 17, rot: 0 };
+  tetGame.lockPiece(gSolo);
+  assert.strictEqual(gSolo.board[18][0], 2, 'untouched J stays');
+  assert.strictEqual(gSolo.board[18][6], 3, 'untouched L stays');
+  assert.strictEqual(gSolo.score, 0);
+
+  // Diagonal only: no explosion.
+  const gDiag = tetGame.newGame({ level: 12, practice: true });
+  gDiag.board = tetGame.emptyBoard();
+  gDiag.food = tetGame.emptyFood();
+  gDiag.score = 0;
+  gDiag.next = 1;
+  place(gDiag, 2, 0, 0, 17);
+  gDiag.piece = { t: 3, m: tetGame.rotShape(3, 0), x: 3, y: 16, rot: 0 };
+  assert.strictEqual(tetGame.bananaTouchesLocked(gDiag.board, gDiag.piece), false);
+  tetGame.lockPiece(gDiag);
+  assert.strictEqual(gDiag.board[18][2], 2);
+  assert.strictEqual(gDiag.board[17][3], 3);
+  assert.strictEqual(gDiag.score, 0);
+
+  // After gravity leftovers, a third banana can join a connected group of both types.
+  const gGroup = tetGame.newGame({ level: 12, practice: true });
+  gGroup.board = tetGame.emptyBoard();
+  gGroup.food = tetGame.emptyFood();
+  gGroup.score = 0;
+  gGroup.next = 1;
+  place(gGroup, 2, 0, 0, 17);
+  place(gGroup, 3, 0, 3, 17);
+  gGroup.piece = { t: 2, m: tetGame.rotShape(2, 0), x: 6, y: 17, rot: 0 };
+  tetGame.lockPiece(gGroup);
+  assert.strictEqual(gGroup.score, tetGame.BANANA_BONUS + tetGame.BANANA_PER_CELL * 12);
+  assert.ok(gGroup.board.every(row => row.every(v => v !== 2 && v !== 3)), 'the whole connected banana group cleared');
+
+  // Other levels: J and L sitting together do not explode.
+  const gOff = tetGame.newGame({ level: 1, practice: true });
+  assert.notStrictEqual(tetGame.themeFor(gOff.level), tetGame.FOOD_THEME);
+  gOff.board = tetGame.emptyBoard();
+  gOff.food = tetGame.emptyFood();
+  gOff.score = 0;
+  gOff.next = 1;
+  place(gOff, 2, 0, 0, 17);
+  gOff.piece = { t: 3, m: tetGame.rotShape(3, 0), x: 3, y: 17, rot: 0 };
+  tetGame.lockPiece(gOff);
+  assert.strictEqual(gOff.board[18][0], 2, 'no banana burst off the Food stage');
+  assert.strictEqual(gOff.board[18][3], 3);
+  assert.strictEqual(gOff.score, 0);
+  assert.strictEqual(tetGame.applyBananaBurst(gOff, gOff.piece), null);
+}
+
+// 1.9.203 rooster only on Farmyard; default move sfx no longer play static noise
+{
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.strictEqual(tetGame.THEMES[6].name, 'Farmyard');
+  assert.strictEqual(tetGame.isEffect(6), 'farm');
+  assert.strictEqual(tetGame.isEffect(5), null, 'Night sky is not an effect theme');
+  assert.strictEqual(tetGame.themeFor(1), 6);
+  assert.strictEqual(tetGame.themeFor(11), 5, 'Night sky is level 11');
+  assert.ok(tetGame.farmThemeActive(6) && tetGame.farmThemeActive(tetGame.themeFor(1)));
+  assert.ok(!tetGame.farmThemeActive(5) && !tetGame.farmThemeActive(0) && !tetGame.farmThemeActive(7));
+  assert.ok(src.includes('function stopRoosterSfx') && src.includes('function farmThemeActive'));
+  assert.ok(src.includes('if (!farmThemeActive(themeIdx)) return;'));
+  assert.ok(src.includes('if (!roosterWant || !farmThemeActive(themeIdx)'));
+  assert.ok(src.includes('if (!farmThemeActive(ti)) stopRoosterSfx();'));
+  assert.ok(src.includes('if (prevKind === \'farm\' || prev === 6) stopRoosterSfx();'));
+  assert.ok(src.includes('if (kindNow && life.kind === kindNow)'));
+  assert.ok(src.includes('always clear farm/beach/fireworks/ocean life when leaving'));
+  const moveStart = src.indexOf('function playMoveSfx');
+  const moveFn = src.slice(moveStart, src.indexOf('\n  function ', moveStart + 20));
+  const defAt = moveFn.indexOf('in-key soft tick only');
+  assert.ok(defAt > 0, 'default move path is the tone-only 1.9.203 tick');
+  const def = moveFn.slice(defAt);
+  assert.ok(def.includes('moveTone'));
+  assert.ok(!def.includes('moveNoise'), 'default move/lock/drop path has no white-noise burst');
+  // Themed noise on Farmyard / Beach / etc. is unchanged.
+  assert.ok(moveFn.includes('if (farm)') && moveFn.includes('moveNoise'));
+}

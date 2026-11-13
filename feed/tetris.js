@@ -202,6 +202,10 @@
   const CHERRY_COLOR = '#e11d48';
   function isCherry(t) { return t === CHERRY_T; }
   function foodKind(t) { return FOOD_KIND[t] || 'munch'; }
+  // 1.9.203: J and L bananas explode when a newly locked banana touches a placed one.
+  const BANANA_BONUS = 100;
+  const BANANA_PER_CELL = 25;
+  function isBanana(t) { return foodKind(t) === 'banana'; }
   function foodSoundFor(t) {
     const k = foodKind(t);
     if (k === 'cherry') return 'boom';
@@ -993,12 +997,50 @@
     roosterLoading = fetch(roosterSrc()).then(r => r.arrayBuffer()).then(ab => ac.decodeAudioData(ab.slice(0))).then(b => { roosterBuf = b; return b; }).catch(() => { roosterLoading = null; return null; });
     return roosterLoading;
   }
+  let roosterNode = null, roosterWant = false;
+  function farmThemeActive(ti) {
+    if (ti == null) ti = themeIdx;
+    return ti === 6 || isEffect(ti) === 'farm';
+  }
+  function stopRoosterSfx() {
+    roosterWant = false;
+    if (roosterNode) { try { roosterNode.stop(); } catch (e) { } roosterNode = null; }
+    if (roosterGain) {
+      try {
+        const t0 = ac ? ac.currentTime : 0;
+        roosterGain.gain.cancelScheduledValues(t0);
+        roosterGain.gain.setValueAtTime(0, t0);
+      } catch (e) { }
+    }
+  }
   function playRoosterSfx() {
+    // 1.9.203: the crow may only start, or finish loading, on Farmyard (theme 6).
+    if (!farmThemeActive(themeIdx)) return;
     if (!soundOn || !ac) return;
+    roosterWant = true;
     ensureRoosterGain();
+    try { roosterGain.gain.setValueAtTime(1, ac.currentTime); } catch (e) { }
     loadRooster();
     duckMusic(0, Math.max(0.7, ROOSTER_DUR - 0.2));
-    const start = (buf) => { playDecoded(buf, roosterGain, ROOSTER_VOL, ac.currentTime); };
+    const start = (buf) => {
+      if (!roosterWant || !farmThemeActive(themeIdx) || !buf || !soundOn || !ac) return;
+      ensureRoosterGain();
+      try { roosterGain.gain.setValueAtTime(1, ac.currentTime); } catch (e) { }
+      if (roosterNode) { try { roosterNode.stop(); } catch (e) { } roosterNode = null; }
+      const src = ac.createBufferSource();
+      const g = ac.createGain();
+      const t0 = ac.currentTime;
+      const dur = Math.max(0.2, buf.duration || ROOSTER_DUR);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.linearRampToValueAtTime(ROOSTER_VOL, t0 + 0.012);
+      g.gain.setValueAtTime(ROOSTER_VOL, t0 + Math.max(0.05, dur - 0.04));
+      g.gain.linearRampToValueAtTime(0.0001, t0 + dur);
+      src.buffer = buf;
+      src.connect(g); g.connect(roosterGain);
+      src.start(t0); src.stop(t0 + dur + 0.02);
+      roosterNode = src;
+      src.onended = function () { if (roosterNode === src) roosterNode = null; };
+    };
     if (roosterBuf) start(roosterBuf);
     else if (roosterLoading) roosterLoading.then(b => { if (b && soundOn && ac) { ensureRoosterGain(); start(b); } });
   }
@@ -1163,6 +1205,32 @@
       });
     }
     if (foodBurst.length > 80) foodBurst = foodBurst.slice(-80);
+  }
+  function spawnBananaBurst(g, cells) {
+    const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : 0;
+    const cols = ['#facc15', '#eab308', '#fde047', '#fef08a', '#ca8a04', '#f59e0b', '#fffbeb'];
+    (cells || []).forEach(function (cell) {
+      const cx = (cell.c + 0.5) * CELL, cy = (cell.r + 0.5) * CELL;
+      // A fat yellow splat at the cell, plus a spray of juice droplets so the
+      // burst stays readable on the picnic painting.
+      foodBurst.push({
+        x: cx, y: cy, vx: 0, vy: -6, t0: now, dur: 280,
+        color: '#fde047', juice: true, r: 11
+      });
+      for (let k = 0; k < 12; k++) {
+        const ang = Math.random() * 6.28;
+        const spd = 26 + Math.random() * 70;
+        foodBurst.push({
+          x: cx, y: cy,
+          vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd - 18,
+          t0: now, dur: 380 + Math.random() * 280,
+          color: cols[k % cols.length],
+          juice: k % 3 !== 0,
+          r: 2.4 + Math.random() * 4.2
+        });
+      }
+    });
+    if (foodBurst.length > 140) foodBurst = foodBurst.slice(-140);
   }
   function stepFoodBurst(dt) {
     const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : 0;
@@ -1494,9 +1562,10 @@
       moveNoise(0.07, 0.14 * volMul, dest, t0, 800, 0.9, 2000);
       if (name === 'rotate' || name === 'drop') moveTone(f * 1.2, 0.08, 0.14 * volMul, dest, t0 + 0.04, f * 1.5);
     } else {
-      // Sensible default: in-key soft tick, still themed by pitch.
+      // 1.9.203: in-key soft tick only. The old default also played a burst of
+      // filtered white noise on every move/lock/drop, which read as static on
+      // Night sky and the other non-effect stages that share this path.
       moveTone(f, name === 'drop' ? 0.16 : 0.1, 0.32 * volMul, dest, t0, name === 'drop' ? f * 0.75 : f * 0.92);
-      moveNoise(0.07, 0.16 * volMul, dest, t0, 900, 0.9, 2600, 1600);
     }
   }
 
@@ -1822,6 +1891,78 @@
     spawnCherryBurst(g, x, y);
     return { removed: removed, bonus: bonus, cols: cols };
   }
+  function eachPieceCell(p, fn) {
+    if (!p || !p.m) return;
+    for (let r = 0; r < p.m.length; r++) {
+      for (let c = 0; c < p.m[r].length; c++) {
+        if (!p.m[r][c]) continue;
+        const x = p.x + c, y = p.y + r;
+        if (y >= 0 && y < ROWS && x >= 0 && x < COLS) fn(x, y);
+      }
+    }
+  }
+  function bananaTouchesLocked(board, p) {
+    const self = Object.create(null);
+    eachPieceCell(p, function (x, y) { self[x + ',' + y] = true; });
+    let hit = false;
+    eachPieceCell(p, function (x, y) {
+      const n = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+      for (let i = 0; i < n.length; i++) {
+        const nx = x + n[i][0], ny = y + n[i][1];
+        if (ny < 0 || ny >= ROWS || nx < 0 || nx >= COLS) continue;
+        if (self[nx + ',' + ny]) continue;
+        if (isBanana(board[ny] && board[ny][nx])) hit = true;
+      }
+    });
+    return hit;
+  }
+  function connectedBananaCells(board, seeds) {
+    const seen = Object.create(null);
+    const out = [];
+    const q = [];
+    (seeds || []).forEach(function (s) {
+      const x = s[0], y = s[1], k = x + ',' + y;
+      if (!seen[k]) { seen[k] = true; q.push([x, y]); }
+    });
+    const n = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+    while (q.length) {
+      const cur = q.pop(), x = cur[0], y = cur[1];
+      if (!isBanana(board[y] && board[y][x])) continue;
+      out.push({ c: x, r: y, t: board[y][x] });
+      for (let i = 0; i < n.length; i++) {
+        const nx = x + n[i][0], ny = y + n[i][1], k = nx + ',' + ny;
+        if (ny < 0 || ny >= ROWS || nx < 0 || nx >= COLS || seen[k]) continue;
+        if (!isBanana(board[ny] && board[ny][nx])) continue;
+        seen[k] = true;
+        q.push([nx, ny]);
+      }
+    }
+    return out;
+  }
+  function applyBananaBurst(g, p) {
+    if (!g || !p || themeFor(g.level) !== FOOD_THEME || !isBanana(p.t)) return null;
+    if (!bananaTouchesLocked(g.board, p)) return null;
+    const seeds = [];
+    eachPieceCell(p, function (x, y) { seeds.push([x, y]); });
+    const group = connectedBananaCells(g.board, seeds);
+    if (!group.length) return null;
+    const food = ensureFood(g);
+    const hits = g.hits;
+    const cols = [];
+    group.forEach(function (cell) {
+      const c = cell.c, r = cell.r;
+      if (g.board[r]) g.board[r][c] = 0;
+      if (food[r]) food[r][c] = null;
+      if (hits && hits[r]) hits[r][c] = 0;
+      if (cols.indexOf(c) < 0) cols.push(c);
+    });
+    dropColumns(g.board, food, hits, cols);
+    const bonus = BANANA_BONUS + BANANA_PER_CELL * group.length;
+    g.score += bonus;
+    playFoodBoom();
+    spawnBananaBurst(g, group);
+    return { removed: group, bonus: bonus, cols: cols };
+  }
   // 1.9.174 Tetris Effect stage for Farmyard (6) and Bullfrog (11) only.
   // Dark, beat-synced scenes; luminous tiles; action bursts. Other themes are unchanged.
   const FARM_ART = { plate: 'tetris-bg/farm-plate-87d14966.webp', land: 'tetris-bg/farm-land-dcf78c32.webp', atlas: 'tetris-bg/farm-animals-a062cf37.webp', sun: 'tetris-bg/farm-sun-378e81e0.webp' };
@@ -2093,8 +2234,14 @@
     try {
       if (life.hold == null && life.seeded) {
         const ti = lookIdx < 0 ? themeIdx : lookIdx;
-        const lines = (g.clearFx ? g.clearFx.lines + g.clearFx.n : g.lines) || 0;
-        lifeAdvance(sec, effectProg(lines), musicBeat(ti), reduceMotion());
+        const kindNow = isEffect(ti);
+        if (kindNow && life.kind === kindNow) {
+          const lines = (g.clearFx ? g.clearFx.lines + g.clearFx.n : g.lines) || 0;
+          lifeAdvance(sec, effectProg(lines), musicBeat(ti), reduceMotion());
+        } else {
+          if (life.kind === 'farm') stopRoosterSfx();
+          lifeReset();
+        }
       }
     } catch (e) { }
     efx.lastMs = dt;
@@ -2336,6 +2483,7 @@
     const ti = copy.theme;
     themeIdx = ti;
     noteIdx = 0;
+    if (!farmThemeActive(ti)) stopRoosterSfx();
     const pal = (LOOKS[ti] && LOOKS[ti].colors) || COLORS.slice(1);
     const parts = burstParts(ti, 4, pal, true, null);
     let reduce = false;
@@ -2724,9 +2872,11 @@
   function lockPiece(g) {
 
     const p = g.piece;
+    let foodSpecial = false;
     if (p && p.t === CHERRY_T) {
       if (p.y < 0) { g.over = true; sfx('over'); return g; }
       applyCherryBomb(g, p);
+      foodSpecial = true;
     } else {
       for (let r = 0; r < p.m.length; r++) {
         for (let c = 0; c < p.m[r].length; c++) {
@@ -2737,6 +2887,7 @@
         }
       }
       stampFood(g, p);
+      if (applyBananaBurst(g, p)) foodSpecial = true;
     }
     if (g.over) { sfx('over'); return g; }
     resetRotRiff();
@@ -2746,7 +2897,7 @@
     if (full.length) {
       applyClear(g, full);
     } else {
-      if (themeFor(g.level) === FOOD_THEME) { if (p.t !== CHERRY_T) { playFoodLand(p.t); spawnFoodBurst(g, p); } }
+      if (themeFor(g.level) === FOOD_THEME) { if (!foodSpecial) { playFoodLand(p.t); spawnFoodBurst(g, p); } }
       else sfx('lock');
       effectLand(g);
       g.clearCombo = 0;
@@ -2922,6 +3073,8 @@
     bgmFading = false;
     bgmBufs = {}; bgmLoading = {};
     foodBufs = {}; foodLoading = {}; foodGain = null;
+    stopRoosterSfx();
+    roosterGain = null; roosterNode = null; roosterWant = false;
   }
 
   const LIVE_KEY = 'ib-tetris-live';
@@ -3780,7 +3933,7 @@
     c.fillRect(0, 0, w, h);
     c.restore();
   }
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_BUILD_EVERY_LOW, CITY_SAFE_TOP, CITY_CREW_N, CITY_ANIM_CLIMB, CITY_ANIM_PLACE, CITY_ANIM_DOWN, CITY_ANIM_FAST, cityHighestSettled, cityStackLow, cityBuildEvery, cityBuildWait, cityAnimDur, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, HIGH_SCORE_MS, HIGH_SCORE_FADE_MS, highScoreProg, maybeHighScore, startHighScore, tickHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, FARM_SUN, FARM_HZ, farmDayTarget, farmSunPos, ROOSTER_HASH, roosterSrc, stackColY, stackSkyline, stackPathAt, stackPathLen, newStackWash, stepStackWash, STACK_WASH_PERIOD, washCover, washSpill, washPool, stackWashInland, washCycle, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, fwSkyFlashAlpha, startFwSkyFlash, maybeFwSkyFlash, FW_SKY_FLASH_PEAK, FW_SKY_FLASH_FADE, FW_MAJOR_SCALE, FW_BIGGER_GROW, fwSkyFlashState: () => fw.skyFlash, fwProg: (p) => { if (p != null) fw.prog = p; return fw.prog; }, fwReset, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts, SNOW_THEME, snowProg, snowFallParams, newBoardSnow, stepBoardSnow, snowOnLineClear, snowReset, boardSnow: () => boardSnow, NZ_THEME, nzProg, nzBeatsPerRow, nzDropInterval, NZ_PAL, NZ_PAL_STEPS, NZ_PAL_FADE_MS, nzPalIndex, nzPaletteNow, mixHex, nzMixProgress, resetNzPal, setNzPal, tickNzPal, nzPalState, EXTREME_KEY, EXTREME_PEEK_MS, EXTREME_EXIT_MIN, EXTREME_TOP_RESERVE, SEAGULL_HASH, seagullSrc, startNzFlash, nzFlashAlpha, newNzGulls, stepNzGulls, nzGulls: () => nzGulls, nzFlashState: () => nzFlash, FOOD_THEME, FOOD_KIND, FOOD_HASH, FOOD_VOL, foodKind, foodSoundFor, foodSrc, emptyFood, ensureFood, cloneFood, dropFood, stampFood, foodMetaAt, rotShape, shapeCells, shapePath, playFoodSfx, playFoodLand, playFoodChomp, playFoodBoom, CHERRY_T, CHERRY_ODDS, CHERRY_BONUS, CHERRY_PER_CELL, isCherry, takeNext, cherryBlastCells, dropColumns, applyCherryBomb, FOOD_SPRITES, loadFoodSprites };
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_BUILD_EVERY_LOW, CITY_SAFE_TOP, CITY_CREW_N, CITY_ANIM_CLIMB, CITY_ANIM_PLACE, CITY_ANIM_DOWN, CITY_ANIM_FAST, cityHighestSettled, cityStackLow, cityBuildEvery, cityBuildWait, cityAnimDur, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, HIGH_SCORE_MS, HIGH_SCORE_FADE_MS, highScoreProg, maybeHighScore, startHighScore, tickHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, FARM_SUN, FARM_HZ, farmDayTarget, farmSunPos, ROOSTER_HASH, roosterSrc, farmThemeActive, playRoosterSfx, stopRoosterSfx, stackColY, stackSkyline, stackPathAt, stackPathLen, newStackWash, stepStackWash, STACK_WASH_PERIOD, washCover, washSpill, washPool, stackWashInland, washCycle, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, fwSkyFlashAlpha, startFwSkyFlash, maybeFwSkyFlash, FW_SKY_FLASH_PEAK, FW_SKY_FLASH_FADE, FW_MAJOR_SCALE, FW_BIGGER_GROW, fwSkyFlashState: () => fw.skyFlash, fwProg: (p) => { if (p != null) fw.prog = p; return fw.prog; }, fwReset, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts, SNOW_THEME, snowProg, snowFallParams, newBoardSnow, stepBoardSnow, snowOnLineClear, snowReset, boardSnow: () => boardSnow, NZ_THEME, nzProg, nzBeatsPerRow, nzDropInterval, NZ_PAL, NZ_PAL_STEPS, NZ_PAL_FADE_MS, nzPalIndex, nzPaletteNow, mixHex, nzMixProgress, resetNzPal, setNzPal, tickNzPal, nzPalState, EXTREME_KEY, EXTREME_PEEK_MS, EXTREME_EXIT_MIN, EXTREME_TOP_RESERVE, SEAGULL_HASH, seagullSrc, startNzFlash, nzFlashAlpha, newNzGulls, stepNzGulls, nzGulls: () => nzGulls, nzFlashState: () => nzFlash, FOOD_THEME, FOOD_KIND, FOOD_HASH, FOOD_VOL, foodKind, foodSoundFor, foodSrc, emptyFood, ensureFood, cloneFood, dropFood, stampFood, foodMetaAt, rotShape, shapeCells, shapePath, playFoodSfx, playFoodLand, playFoodChomp, playFoodBoom, CHERRY_T, CHERRY_ODDS, CHERRY_BONUS, CHERRY_PER_CELL, isCherry, takeNext, cherryBlastCells, dropColumns, applyCherryBomb, isBanana, BANANA_BONUS, BANANA_PER_CELL, bananaTouchesLocked, connectedBananaCells, applyBananaBurst, spawnBananaBurst, FOOD_SPRITES, loadFoodSprites };
 
   if (!root.document) return;
   const doc = root.document;
@@ -4699,6 +4852,8 @@
   let lookIdx = -1, boardBg = LOOKS[0].board;
   function applyLook(i) {
     if (i === lookIdx) return;
+    const prev = lookIdx;
+    const prevKind = prev >= 0 ? isEffect(prev) : null;
     lookIdx = i;
     const L = LOOKS[i];
     for (let k = 1; k < COLORS.length; k++) COLORS[k] = L.colors[k - 1];
@@ -4718,7 +4873,20 @@
     if (kind === 'fireworks') doc.documentElement.style.background = '#000';
     else doc.documentElement.style.background = 'linear-gradient(rgba(0,0,0,.28),rgba(0,0,0,.28)), url("' + PICS[i] + '") center / cover no-repeat, ' + L.bg;
     try { const nx = new root.Image(); nx.src = PICS[(i + 1) % PICS.length]; } catch (e) { }
-    if (kind) { efxClearAll(); lifeReset(); if (kind === 'farm') farmLoad(); if (kind === 'frog') frogLoad(); if (kind === 'beach') beachLoad(); if (kind === 'fireworks') fwLoad(); if (kind === 'ocean') oceanLoad(); }
+    // 1.9.203: always clear farm/beach/fireworks/ocean life when leaving an
+    // effect theme, even if the next stage has no effect (Space, City, Night
+    // sky, …). Otherwise farmAdvance kept running and the rooster could crow
+    // off Farmyard, and fireworks noise could keep bursting on later levels.
+    if (prevKind === 'farm' || prev === 6) stopRoosterSfx();
+    if (kind || prevKind || (life && life.seeded)) {
+      efxClearAll();
+      lifeReset();
+      if (kind === 'farm') farmLoad();
+      if (kind === 'frog') frogLoad();
+      if (kind === 'beach') beachLoad();
+      if (kind === 'fireworks') fwLoad();
+      if (kind === 'ocean') oceanLoad();
+    }
     doc.documentElement.style.backgroundAttachment = 'fixed';
     doc.body.style.background = 'transparent';
     drawMini(doc.getElementById('next'), g.next, false);
@@ -5736,7 +5904,14 @@
     const wx = reduce ? 0 : live ? T.gx : Math.sin(life.t * 0.23) * 0.6;
     const wy = reduce ? 0 : live ? T.gy : Math.sin(life.t * 0.17 + 1) * 0.4;
     T.x += (wx - T.x) * Math.min(1, dt * 2.5); T.y += (wy - T.y) * Math.min(1, dt * 2.5);
-    if (!farm.crowed && farmSunPos(day).alt >= 0.98) { farm.crowed = true; if (farm.st.rooster) farm.st.rooster.crow = 1.8; playRoosterSfx(); }
+    if (!farm.crowed && farmSunPos(day).alt >= 0.98) {
+      // Do not crow after leaving Farmyard (life used to keep advancing on later stages).
+      if (farmThemeActive(themeIdx) && (lookIdx < 0 || farmThemeActive(lookIdx))) {
+        farm.crowed = true;
+        if (farm.st.rooster) farm.st.rooster.crow = 1.8;
+        playRoosterSfx();
+      }
+    }
     Object.keys(FARM_RIG).forEach(k => {
       const R = FARM_RIG[k], S = farm.st[k];
       if (!S) return;
