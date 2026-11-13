@@ -2123,11 +2123,36 @@
   const CITY_THEME = 4;
   // Seconds between placements (first and later). Modest and easy to tune.
   const CITY_BUILD_EVERY = [6, 10];
+  // 1.9.195: 3x as often while the highest settled block is below half the well
+  // (rows 11–19, or empty). Re-checked each time the next brick is scheduled.
+  const CITY_BUILD_EVERY_LOW = [2, 10 / 3];
   const CITY_SAFE_TOP = 6; // never build in the top 6 rows — keep it a fun challenge, not unfair
   const CITY_CREW_N = 2;
-  function cityBuildWait() {
-    const lo = CITY_BUILD_EVERY[0], hi = CITY_BUILD_EVERY[1];
+  const CITY_ANIM_CLIMB = 1500, CITY_ANIM_PLACE = 420, CITY_ANIM_DOWN = 1300; // 3.22s total
+  const CITY_ANIM_FAST = 1 / 3; // 1.073s, fits inside the 2s fast wait
+  function cityHighestSettled(g) {
+    if (!g || !g.board) return ROWS;
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) if (g.board[r][c]) return r;
+    }
+    return ROWS;
+  }
+  function cityStackLow(g) {
+    // Halfway is row 10 (10 cells up from the floor). Below that is a low stack.
+    return cityHighestSettled(g) > (ROWS / 2);
+  }
+  function cityBuildEvery(g) {
+    return cityStackLow(g) ? CITY_BUILD_EVERY_LOW : CITY_BUILD_EVERY;
+  }
+  function cityBuildWait(g) {
+    const ev = cityBuildEvery(g);
+    const lo = ev[0], hi = ev[1];
     return (lo + Math.random() * Math.max(0, hi - lo)) * 1000;
+  }
+  function cityAnimDur(stage, gOrFast) {
+    const base = stage === 'climb' ? CITY_ANIM_CLIMB : stage === 'place' ? CITY_ANIM_PLACE : CITY_ANIM_DOWN;
+    const fast = typeof gOrFast === 'boolean' ? gOrFast : cityStackLow(gOrFast);
+    return fast ? base * CITY_ANIM_FAST : base;
   }
   function pieceDropCovers(g, c, r) {
     const p = g.piece;
@@ -2175,10 +2200,10 @@
   function cityWorker(i) {
     return { id: i, x: 28 + i * 70, y: ROWS * CELL - 8, dir: i % 2 ? 1 : -1, walk: i * 0.4, pose: 'wander', brick: 0, climb: 0 };
   }
-  function resetCityCrew(crew, level) {
+  function resetCityCrew(crew, level, g) {
     crew.ready = themeFor(level) === CITY_THEME;
     crew.t = 0;
-    crew.wait = crew.ready ? cityBuildWait() : 0;
+    crew.wait = crew.ready ? cityBuildWait(g) : 0;
     crew.ladderC = 1;
     crew.workers = [];
     for (let i = 0; i < CITY_CREW_N; i++) crew.workers.push(cityWorker(i));
@@ -2189,7 +2214,7 @@
   function seedCityCrew(crew, g, opts) {
     opts = opts || {};
     if (themeFor(g.level) !== CITY_THEME) { crew.ready = false; crew.workers = []; crew.dust = []; crew.job = null; return crew; }
-    resetCityCrew(crew, g.level);
+    resetCityCrew(crew, g.level, g);
     crew.wait = 1e9; // still picture for screenshots: no new jobs
     if (opts.ladderC != null) crew.ladderC = opts.ladderC;
     if (opts.workers) {
@@ -2227,7 +2252,7 @@
       if (crew.ready) { crew.ready = false; crew.workers = []; crew.dust = []; crew.job = null; }
       return crew;
     }
-    if (!crew.ready) resetCityCrew(crew, g.level);
+    if (!crew.ready) resetCityCrew(crew, g.level, g);
     crew.t += dt;
     if (crew.dust.length) {
       const k = dt / 1000;
@@ -2258,7 +2283,8 @@
           const wr = crew.workers[0] || cityWorker(0);
           if (!crew.workers.length) crew.workers.push(wr);
           crew.ladderC = pick.c;
-          crew.job = { c: pick.c, r: pick.r, typ: 1 + ((Math.random() * 7) | 0), stage: 'climb', p: 0, dur: 1500, wid: wr.id };
+          const fast = cityStackLow(g);
+          crew.job = { c: pick.c, r: pick.r, typ: 1 + ((Math.random() * 7) | 0), stage: 'climb', p: 0, dur: cityAnimDur('climb', fast), fast: fast, wid: wr.id };
           wr.pose = 'climb';
           wr.brick = crew.job.typ;
           wr.dir = 1;
@@ -2277,7 +2303,7 @@
         wr.x = foot.x + (top.x - foot.x) * u;
         wr.y = foot.y + (top.y - foot.y) * u;
         wr.walk += dt / 180;
-        if (job.p >= 1) { job.stage = 'place'; job.p = 0; job.dur = 420; wr.pose = 'hammer'; }
+        if (job.p >= 1) { job.stage = 'place'; job.p = 0; job.dur = cityAnimDur('place', !!job.fast); wr.pose = 'hammer'; }
       } else if (job.stage === 'place') {
         wr.pose = 'hammer';
         wr.x = top.x;
@@ -2294,7 +2320,7 @@
             if (flags.onTock) flags.onTock();
           }
         }
-        if (job.p >= 1) { job.stage = 'down'; job.p = 0; job.dur = 1300; wr.pose = 'climb'; wr.brick = 0; }
+        if (job.p >= 1) { job.stage = 'down'; job.p = 0; job.dur = cityAnimDur('down', !!job.fast); wr.pose = 'climb'; wr.brick = 0; }
       } else if (job.stage === 'down') {
         wr.pose = 'climb';
         wr.brick = 0;
@@ -2306,7 +2332,7 @@
           wr.pose = 'wander';
           wr.y = ROWS * CELL - 8;
           crew.job = null;
-          crew.wait = cityBuildWait();
+          crew.wait = cityBuildWait(g);
         }
       }
     }
@@ -3354,7 +3380,7 @@
     c.fillRect(0, 0, w, h);
     c.restore();
   }
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_SAFE_TOP, CITY_CREW_N, cityBuildWait, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, HIGH_SCORE_MS, HIGH_SCORE_FADE_MS, highScoreProg, maybeHighScore, startHighScore, tickHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, FARM_SUN, FARM_HZ, farmDayTarget, farmSunPos, ROOSTER_HASH, roosterSrc, stackColY, stackSkyline, stackPathAt, stackPathLen, newStackWash, stepStackWash, STACK_WASH_PERIOD, washCover, washSpill, washPool, stackWashInland, washCycle, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, fwSkyFlashAlpha, startFwSkyFlash, maybeFwSkyFlash, FW_SKY_FLASH_PEAK, FW_SKY_FLASH_FADE, FW_MAJOR_SCALE, FW_BIGGER_GROW, fwSkyFlashState: () => fw.skyFlash, fwProg: (p) => { if (p != null) fw.prog = p; return fw.prog; }, fwReset, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts, SNOW_THEME, snowProg, snowFallParams, newBoardSnow, stepBoardSnow, snowOnLineClear, snowReset, boardSnow: () => boardSnow, NZ_THEME, nzProg, nzBeatsPerRow, nzDropInterval, SEAGULL_HASH, seagullSrc, startNzFlash, nzFlashAlpha, newNzGulls, stepNzGulls, nzGulls: () => nzGulls, nzFlashState: () => nzFlash };
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_BUILD_EVERY_LOW, CITY_SAFE_TOP, CITY_CREW_N, CITY_ANIM_CLIMB, CITY_ANIM_PLACE, CITY_ANIM_DOWN, CITY_ANIM_FAST, cityHighestSettled, cityStackLow, cityBuildEvery, cityBuildWait, cityAnimDur, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, HIGH_SCORE_MS, HIGH_SCORE_FADE_MS, highScoreProg, maybeHighScore, startHighScore, tickHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, FARM_SUN, FARM_HZ, farmDayTarget, farmSunPos, ROOSTER_HASH, roosterSrc, stackColY, stackSkyline, stackPathAt, stackPathLen, newStackWash, stepStackWash, STACK_WASH_PERIOD, washCover, washSpill, washPool, stackWashInland, washCycle, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, fwSkyFlashAlpha, startFwSkyFlash, maybeFwSkyFlash, FW_SKY_FLASH_PEAK, FW_SKY_FLASH_FADE, FW_MAJOR_SCALE, FW_BIGGER_GROW, fwSkyFlashState: () => fw.skyFlash, fwProg: (p) => { if (p != null) fw.prog = p; return fw.prog; }, fwReset, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts, SNOW_THEME, snowProg, snowFallParams, newBoardSnow, stepBoardSnow, snowOnLineClear, snowReset, boardSnow: () => boardSnow, NZ_THEME, nzProg, nzBeatsPerRow, nzDropInterval, SEAGULL_HASH, seagullSrc, startNzFlash, nzFlashAlpha, newNzGulls, stepNzGulls, nzGulls: () => nzGulls, nzFlashState: () => nzFlash };
 
   if (!root.document) return;
   const doc = root.document;
@@ -4112,7 +4138,7 @@
   function invReset() { resetInvaders(inv, g.level); }
   function invSeed(opts) { seedInvaders(inv, g, opts); }
   function invStep(dt) { stepInvaders(inv, g, dt, { started: started, onThump: (k) => sfx(k || 'thump') }); }
-  function cityReset() { resetCityCrew(city, g.level); }
+  function cityReset() { resetCityCrew(city, g.level, g); }
   function citySeed(opts) { seedCityCrew(city, g, (opts && opts.city) || {}); }
   function cityStep(dt) { stepCityCrew(city, g, dt, { started: started, onTock: () => sfx('tock') }); }
   function invSprite(ctx, rows, x, y, color) {
