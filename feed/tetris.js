@@ -192,51 +192,6 @@
   // Red and blue for the first 5 lines of the level, then pink and lime after half the lines needed (5 of 10).
   const TRI_THEME = 8;
   const FOOD_THEME = 12;
-  const BUSH_THEME = 3;
-  // 1.9.204 Bush walk (theme 3, level 8): the painted track slowly walks forward.
-  const BUSH_LOOP = 28;
-  const BUSH_FADE = 2.8;
-  const BUSH_ZOOM = 0.22;
-  const BUSH_FOCUS_X = 0.51;
-  const BUSH_FOCUS_Y0 = 0.52;
-  const BUSH_FOCUS_Y1 = 0.42;
-  const BUSH_BPM = 117.5;
-  const BUSH_BOB = 4;
-  const BUSH_SWAY = 2;
-  function bushWalkPose(t, opt) {
-    opt = opt || {};
-    const reduce = !!opt.reduce;
-    const bpm = (opt.bpm > 0) ? opt.bpm : ((TRACKS[BUSH_THEME] && TRACKS[BUSH_THEME].bpm) || BUSH_BPM);
-    const loop = reduce ? 90 : BUSH_LOOP;
-    const fadeDur = reduce ? 4 : BUSH_FADE;
-    const zoom = reduce ? 0.045 : BUSH_ZOOM;
-    const bobAmp = reduce ? 1 : BUSH_BOB;
-    const swayAmp = reduce ? 0.5 : BUSH_SWAY;
-    const time = (t || 0);
-    const u = ((time % loop) + loop) % loop;
-    const fadeStart = Math.max(0, loop - fadeDur);
-    const fade = u <= fadeStart ? 0 : Math.min(1, (u - fadeStart) / fadeDur);
-    const ease = function (p) { p = Math.max(0, Math.min(1, p)); return p * p * (3 - 2 * p); };
-    const scaleA = 1 + zoom * ease(u / loop);
-    const scaleB = 1;
-    const strideHz = (bpm / 60) / 2;
-    const ph = time * strideHz * Math.PI * 2;
-    const bobY = Math.sin(ph * 2) * bobAmp;
-    const bobX = Math.sin(ph) * swayAmp;
-    const walk = ease(u / loop);
-    return {
-      t: u, loop: loop, fade: fade, scaleA: scaleA, scaleB: scaleB,
-      bobX: bobX, bobY: bobY, zoom: zoom, bpm: bpm, reduce: reduce,
-      focusX: BUSH_FOCUS_X,
-      focusY: BUSH_FOCUS_Y0 + (BUSH_FOCUS_Y1 - BUSH_FOCUS_Y0) * walk
-    };
-  }
-  function bushCoverRect(iw, ih, vw, vh, scale, fx, fy, ox, oy) {
-    const s0 = Math.max(vw / Math.max(1, iw), vh / Math.max(1, ih));
-    const s = s0 * (scale || 1);
-    const dw = iw * s, dh = ih * s;
-    return { x: vw * 0.5 - (fx || 0.5) * dw + (ox || 0), y: vh * 0.5 - (fy || 0.5) * dh + (oy || 0), w: dw, h: dh };
-  }
 
   // 1.9.199 Food (theme 12, level 12): pieces are painted food, fragments stay in each cell after lock.
   const FOOD_KIND = ['', 'ice', 'banana', 'banana', 'melon', 'carrot', 'grape', 'chilli', 'cherry'];
@@ -2980,6 +2935,16 @@
       themeIdx = themeFor(next.level);
       return next;
     }
+    // 1.9.206 Continue: same level/stage, empty board, score and lines back to the start of that level.
+    if (a === 'continue') {
+      if (!g.over) return g;
+      noteIdx = 0;
+      const level = Math.max(1, g.level || 1);
+      const next = newGame({ level, practice: !!g.practice });
+      if (g.practice) next.startLevel = g.startLevel || 1;
+      themeIdx = themeFor(next.level);
+      return next;
+    }
     if (g.over || g.paused) return g;
     if (g.clearFx || g.levelUp || g.highScore) return g;
     const p = g.piece;
@@ -4033,7 +3998,7 @@
     );
   }
 
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_BUILD_EVERY_LOW, CITY_SAFE_TOP, CITY_CREW_N, CITY_ANIM_CLIMB, CITY_ANIM_PLACE, CITY_ANIM_DOWN, CITY_ANIM_FAST, cityHighestSettled, cityStackLow, cityBuildEvery, cityBuildWait, cityAnimDur, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, HIGH_SCORE_MS, HIGH_SCORE_FADE_MS, highScoreProg, maybeHighScore, startHighScore, tickHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, FARM_SUN, FARM_HZ, FARM_SUNRISE_PROG, FARM_SUNRISE_SEC, farmDayTarget, farmSunPos, ROOSTER_HASH, roosterSrc, farmThemeActive, playRoosterSfx, stopRoosterSfx, stackColY, stackSkyline, stackPathAt, stackPathLen, newStackWash, stepStackWash, STACK_WASH_PERIOD, washCover, washSpill, washPool, stackWashInland, washCycle, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, fwSkyFlashAlpha, startFwSkyFlash, maybeFwSkyFlash, FW_SKY_FLASH_PEAK, FW_SKY_FLASH_FADE, FW_MAJOR_SCALE, FW_BIGGER_GROW, fwSkyFlashState: () => fw.skyFlash, fwProg: (p) => { if (p != null) fw.prog = p; return fw.prog; }, fwReset, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts, SNOW_THEME, snowProg, snowFallParams, newBoardSnow, stepBoardSnow, snowOnLineClear, snowReset, boardSnow: () => boardSnow, NZ_THEME, nzProg, nzBeatsPerRow, nzDropInterval, NZ_PAL, NZ_PAL_STEPS, NZ_PAL_FADE_MS, nzPalIndex, nzPaletteNow, mixHex, nzMixProgress, resetNzPal, setNzPal, tickNzPal, nzPalState, EXTREME_KEY, EXTREME_PEEK_MS, EXTREME_EXIT_MIN, EXTREME_TOP_RESERVE, SEAGULL_HASH, seagullSrc, startNzFlash, nzFlashAlpha, newNzGulls, stepNzGulls, nzGulls: () => nzGulls, nzFlashState: () => nzFlash, FOOD_THEME, BUSH_THEME, BUSH_LOOP, BUSH_FADE, BUSH_ZOOM, BUSH_FOCUS_X, BUSH_FOCUS_Y0, BUSH_FOCUS_Y1, BUSH_BPM, BUSH_BOB, BUSH_SWAY, bushWalkPose, bushCoverRect, FOOD_KIND, FOOD_HASH, FOOD_VOL, foodKind, foodSoundFor, foodSrc, emptyFood, ensureFood, cloneFood, dropFood, stampFood, foodMetaAt, rotShape, shapeCells, shapePath, playFoodSfx, playFoodLand, playFoodChomp, playFoodBoom, CHERRY_T, CHERRY_ODDS, CHERRY_BONUS, CHERRY_PER_CELL, isCherry, takeNext, cherryBlastCells, dropColumns, applyCherryBomb, isBanana, BANANA_BONUS, BANANA_PER_CELL, bananaTouchesLocked, connectedBananaCells, applyBananaBurst, spawnBananaBurst, FOOD_SPRITES, loadFoodSprites, PAUSE_CLOSE_MS, CLOSE_MSG, nowMs, setNowMs, nextPausedAt, shouldCloseAfterPause, howToPlayLevels, howToPlayHtml };
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_BUILD_EVERY_LOW, CITY_SAFE_TOP, CITY_CREW_N, CITY_ANIM_CLIMB, CITY_ANIM_PLACE, CITY_ANIM_DOWN, CITY_ANIM_FAST, cityHighestSettled, cityStackLow, cityBuildEvery, cityBuildWait, cityAnimDur, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, HIGH_SCORE_MS, HIGH_SCORE_FADE_MS, highScoreProg, maybeHighScore, startHighScore, tickHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, FARM_SUN, FARM_HZ, FARM_SUNRISE_PROG, FARM_SUNRISE_SEC, farmDayTarget, farmSunPos, ROOSTER_HASH, roosterSrc, farmThemeActive, playRoosterSfx, stopRoosterSfx, stackColY, stackSkyline, stackPathAt, stackPathLen, newStackWash, stepStackWash, STACK_WASH_PERIOD, washCover, washSpill, washPool, stackWashInland, washCycle, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, fwSkyFlashAlpha, startFwSkyFlash, maybeFwSkyFlash, FW_SKY_FLASH_PEAK, FW_SKY_FLASH_FADE, FW_MAJOR_SCALE, FW_BIGGER_GROW, fwSkyFlashState: () => fw.skyFlash, fwProg: (p) => { if (p != null) fw.prog = p; return fw.prog; }, fwReset, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts, SNOW_THEME, snowProg, snowFallParams, newBoardSnow, stepBoardSnow, snowOnLineClear, snowReset, boardSnow: () => boardSnow, NZ_THEME, nzProg, nzBeatsPerRow, nzDropInterval, NZ_PAL, NZ_PAL_STEPS, NZ_PAL_FADE_MS, nzPalIndex, nzPaletteNow, mixHex, nzMixProgress, resetNzPal, setNzPal, tickNzPal, nzPalState, EXTREME_KEY, EXTREME_PEEK_MS, EXTREME_EXIT_MIN, EXTREME_TOP_RESERVE, SEAGULL_HASH, seagullSrc, startNzFlash, nzFlashAlpha, newNzGulls, stepNzGulls, nzGulls: () => nzGulls, nzFlashState: () => nzFlash, FOOD_THEME, FOOD_KIND, FOOD_HASH, FOOD_VOL, foodKind, foodSoundFor, foodSrc, emptyFood, ensureFood, cloneFood, dropFood, stampFood, foodMetaAt, rotShape, shapeCells, shapePath, playFoodSfx, playFoodLand, playFoodChomp, playFoodBoom, CHERRY_T, CHERRY_ODDS, CHERRY_BONUS, CHERRY_PER_CELL, isCherry, takeNext, cherryBlastCells, dropColumns, applyCherryBomb, isBanana, BANANA_BONUS, BANANA_PER_CELL, bananaTouchesLocked, connectedBananaCells, applyBananaBurst, spawnBananaBurst, FOOD_SPRITES, loadFoodSprites, PAUSE_CLOSE_MS, CLOSE_MSG, nowMs, setNowMs, nextPausedAt, shouldCloseAfterPause, howToPlayLevels, howToPlayHtml };
 
   if (!root.document) return;
   const doc = root.document;
@@ -4067,7 +4032,9 @@
     set('best', g.practice ? best : Math.max(best, g.score));
     const pb = doc.getElementById('pausebtn'); if (pb) pb.textContent = g.paused ? 'Resume' : 'Pause';
     const rb = doc.getElementById('restartbtn'); if (rb) rb.textContent = g.over ? 'Play again' : 'Restart';
+    const cb = doc.getElementById('continuebtn'); if (cb) cb.hidden = !g.over;
     const pl = doc.getElementById('practicelabel'); if (pl) pl.hidden = !g.practice;
+    try { syncOverOv(); } catch (e) { }
     if (g.over) {
       if (!g.practice) {
         best = Math.max(best, g.score);
@@ -4081,7 +4048,7 @@
   function gameOverScores(gm) {
     const S = root.IBScores; if (!S || !started || !shouldSubmit(gm)) return;
     const sent = S.submit('tetris', { score: gm.score, lines: gm.lines, level: gm.level }, { note: gm.lines + ' lines' });
-    setTimeout(() => { if (g === gm && gm.over) S.open('tetris', { ...SB, over: true, score: gm.score, detail: gm.lines + ' line' + (gm.lines === 1 ? '' : 's') + ' · level ' + gm.level, sent, onAgain: () => press('restart') }); }, 1200);
+    setTimeout(() => { if (g === gm && gm.over) S.open('tetris', { ...SB, over: true, score: gm.score, detail: gm.lines + ' line' + (gm.lines === 1 ? '' : 's') + ' · level ' + gm.level, sent, onAgain: () => press('restart'), onContinue: () => press('continue') }); }, 1200);
   }
   function openScores() {
     const S = root.IBScores; if (!S) return;
@@ -4091,7 +4058,7 @@
   function press(a) {
     if (!started) return g;
     const next = act(g, a);
-    if (a === 'restart') { g = next; invReset(); cityReset(); stackWashReset(); snowReset(); life.hold = null; life.singHold = null; life.beachHold = null; fw.hold = null; ocean.hold = null; sparkHold = null; blockSparks = []; lifeReset(); if (isEffect(themeFor(g.level))) { lifeCast(isEffect(themeFor(g.level))); } if (root.IBScores) root.IBScores.close(); }
+    if (a === 'restart' || a === 'continue') { g = next; invReset(); cityReset(); stackWashReset(); snowReset(); life.hold = null; life.singHold = null; life.beachHold = null; fw.hold = null; ocean.hold = null; sparkHold = null; blockSparks = []; lifeReset(); if (isEffect(themeFor(g.level))) { lifeCast(isEffect(themeFor(g.level))); } if (root.IBScores) root.IBScores.close(); }
     syncHud();
     try { persistLive(); } catch (e) { }
     try { syncPauseClose(); } catch (e) { }
@@ -4104,10 +4071,19 @@
     const el = doc.getElementById(id);
     if (el) el.hidden = !!on;
   }
+  function syncOverOv() {
+    const show = !!(started && g && g.over && !g.demo);
+    const el = doc.getElementById('overov');
+    if (el) el.hidden = !show;
+    const sc = doc.getElementById('overscore');
+    if (sc && show) sc.textContent = String(g.score);
+    if (show) elHidden('pauseov', true);
+  }
   function showStart() {
     const el = doc.getElementById('startov');
     if (el) el.hidden = false;
     elHidden('pauseov', true);
+    elHidden('overov', true);
   }
   function hideStart() {
     elHidden('startov', true);
@@ -4237,8 +4213,6 @@
   root.Tetris.pausedAt = () => pausedAt;
 
   root.Tetris.live = () => g;
-  root.Tetris.bushTime = function (t) { if (t != null) bush.t = t; return bush.t; };
-  root.Tetris.bushReady = function () { return !!(bush.ready && bush.cv); };
   root.Tetris.view = () => ({ x: g.piece.x, y: g.piece.y, t: g.piece.t, score: g.score, lines: g.lines, level: g.level, practice: !!g.practice, startLevel: g.startLevel || 1, paused: g.paused, over: g.over, started, musicOn, soundOn });
   // Seed a still board (used for screenshots and checks). No overlay, no gravity, music off.
   root.Tetris.show = function (opts) {
@@ -4261,10 +4235,6 @@
     themeIdx = themeFor(g.level);
     lookIdx = -1;
     applyLook(themeIdx);
-    if (themeIdx === BUSH_THEME) {
-      bushLoad();
-      if (opts.bushTime != null) bush.t = opts.bushTime;
-    }
     if (isEffect(themeIdx)) {
       life.hold = opts.lifeTime != null ? opts.lifeTime : 0;
       lifeFastForward(life.hold, effectProg(g.lines));
@@ -4494,7 +4464,7 @@
     const el = performance.now() - s.t;
     if (!s.moved) {
       if (!started) return;
-      if (g.over) { press('restart'); return; }
+      if (g.over) return;
       if (g.paused) { press('pause'); return; }
       press('rotate');
       return;
@@ -5103,122 +5073,6 @@
     }));
   }
   let lookIdx = -1, boardBg = LOOKS[0].board;
-  // 1.9.204 Bush walk backdrop: a dedicated canvas behind the board so the
-  // painting can walk forward while the well and pieces stay still.
-  const bush = { img: null, ready: false, cv: null, ctx: null, w: 0, h: 0, t: 0, last: 0, on: false, near: null };
-  function bushLoad() {
-    if (bush.img || !root.Image) return;
-    const im = new root.Image();
-    im.onload = function () { bush.ready = true; };
-    im.src = PICS[BUSH_THEME];
-    bush.img = im;
-  }
-  function bushSize() {
-    if (!bush.cv) return;
-    const d = Math.min(2, root.devicePixelRatio || 1);
-    bush.w = root.innerWidth; bush.h = root.innerHeight;
-    bush.cv.width = Math.round(bush.w * d); bush.cv.height = Math.round(bush.h * d);
-    bush.ctx.setTransform(d, 0, 0, d, 0, 0);
-    bush.near = null;
-  }
-  function bushInit() {
-    if (bush.cv || !doc.body || !doc.createElement) return;
-    const cv = doc.createElement('canvas');
-    if (!cv.getContext) return;
-    cv.className = 'fx-bush';
-    cv.setAttribute('aria-hidden', 'true');
-    cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:0';
-    const fxCv = doc.querySelector('canvas.fx');
-    if (fxCv && fxCv.parentNode) fxCv.parentNode.insertBefore(cv, fxCv);
-    else doc.body.insertBefore(cv, doc.body.firstChild);
-    const wrap = doc.querySelector('.wrap'); if (wrap) { wrap.style.position = 'relative'; wrap.style.zIndex = '1'; }
-    bush.cv = cv; bush.ctx = cv.getContext('2d');
-    bushSize();
-    root.addEventListener('resize', bushSize);
-  }
-  function bushShow(on) {
-    bush.on = !!on;
-    if (on) { bushLoad(); bushInit(); if (bush.cv) bush.cv.style.display = 'block'; }
-    else if (bush.cv) bush.cv.style.display = 'none';
-    if (!on) { bush.last = 0; }
-  }
-  function bushLayer(ctx, img, rec, alpha) {
-    if (alpha <= 0) return;
-    ctx.globalAlpha = alpha;
-    ctx.drawImage(img, rec.x, rec.y, rec.w, rec.h);
-  }
-  function bushNearMask(w, h) {
-    if (bush.near && bush.near.w === w && bush.near.h === h) return bush.near.cv;
-    const cv = doc.createElement('canvas');
-    cv.width = Math.max(1, Math.round(w)); cv.height = Math.max(1, Math.round(h));
-    const c = cv.getContext('2d');
-    const g = c.createLinearGradient(0, 0, 0, h);
-    g.addColorStop(0, 'rgba(0,0,0,0)');
-    g.addColorStop(0.38, 'rgba(0,0,0,0)');
-    g.addColorStop(0.58, 'rgba(0,0,0,0.28)');
-    g.addColorStop(1, 'rgba(0,0,0,0.95)');
-    c.fillStyle = g; c.fillRect(0, 0, w, h);
-    const sx = c.createLinearGradient(0, 0, w, 0);
-    sx.addColorStop(0, 'rgba(0,0,0,0.85)');
-    sx.addColorStop(0.22, 'rgba(0,0,0,0)');
-    sx.addColorStop(0.78, 'rgba(0,0,0,0)');
-    sx.addColorStop(1, 'rgba(0,0,0,0.85)');
-    c.globalCompositeOperation = 'lighter';
-    c.fillStyle = sx; c.fillRect(0, 0, w, h);
-    bush.near = { cv: cv, w: w, h: h };
-    return cv;
-  }
-  function bushPaint(ctx, w, h, pose, img) {
-    const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
-    if (!iw || !ih) return;
-    function rec(scale, ox, oy) {
-      return bushCoverRect(iw, ih, w, h, scale, pose.focusX, pose.focusY, ox, oy);
-    }
-    ctx.clearRect(0, 0, w, h);
-    const a = 1 - pose.fade;
-    bushLayer(ctx, img, rec(pose.scaleA, pose.bobX, pose.bobY), a);
-    if (pose.fade > 0.001) bushLayer(ctx, img, rec(pose.scaleB, pose.bobX, pose.bobY), pose.fade);
-    // Foreground plants take a slightly longer step, for a light 3D parallax.
-    const nearScale = pose.scaleA * (1 + (pose.reduce ? 0.03 : 0.08));
-    const near = rec(nearScale, pose.bobX * 1.45, pose.bobY * 1.55);
-    const tmp = bush.nearTmp || (bush.nearTmp = doc.createElement('canvas'));
-    if (tmp.width !== Math.round(w) || tmp.height !== Math.round(h)) { tmp.width = Math.round(w); tmp.height = Math.round(h); }
-    const tc = tmp.getContext('2d');
-    tc.setTransform(1, 0, 0, 1, 0, 0);
-    tc.clearRect(0, 0, w, h);
-    tc.globalAlpha = 1;
-    tc.drawImage(img, near.x, near.y, near.w, near.h);
-    if (pose.fade > 0.001) {
-      tc.globalAlpha = pose.fade;
-      const nearB = rec(pose.scaleB * (1 + (pose.reduce ? 0.03 : 0.08)), pose.bobX * 1.45, pose.bobY * 1.55);
-      tc.drawImage(img, nearB.x, nearB.y, nearB.w, nearB.h);
-    }
-    tc.globalAlpha = 1;
-    tc.globalCompositeOperation = 'destination-in';
-    tc.drawImage(bushNearMask(w, h), 0, 0);
-    tc.globalCompositeOperation = 'source-over';
-    ctx.globalAlpha = a * 0.95 + pose.fade * 0.95;
-    ctx.drawImage(tmp, 0, 0);
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = 'rgba(0,0,0,0.28)';
-    ctx.fillRect(0, 0, w, h);
-  }
-  function bushTick(now) {
-    const on = (lookIdx < 0 ? themeIdx : lookIdx) === BUSH_THEME || (g && themeFor(g.clearFx ? g.clearFx.level : g.level) === BUSH_THEME);
-    if (!on) { bushShow(false); return; }
-    bushShow(true);
-    if (!bush.cv || !bush.ctx) return;
-    const tNow = (now || (root.performance ? root.performance.now() : 0)) / 1000;
-    const dt = bush.last ? Math.min(0.08, Math.max(0, tNow - bush.last)) : 0;
-    bush.last = tNow;
-    bush.t += dt;
-    if (!bush.ready || !bush.img) { bushLoad(); return; }
-    const reduce = reduceMotion();
-    const bpm = (TRACKS[BUSH_THEME] && TRACKS[BUSH_THEME].bpm) || BUSH_BPM;
-    const pose = bushWalkPose(bush.t, { reduce: reduce, bpm: bpm });
-    bushPaint(bush.ctx, bush.w, bush.h, pose, bush.img);
-  }
-
   function applyLook(i) {
     if (i === lookIdx) return;
     const prev = lookIdx;
@@ -5242,8 +5096,6 @@
     if (kind === 'fireworks') doc.documentElement.style.background = '#000';
     else doc.documentElement.style.background = 'linear-gradient(rgba(0,0,0,.28),rgba(0,0,0,.28)), url("' + PICS[i] + '") center / cover no-repeat, ' + L.bg;
     try { const nx = new root.Image(); nx.src = PICS[(i + 1) % PICS.length]; } catch (e) { }
-    if (i === BUSH_THEME) { bushLoad(); bushShow(true); }
-    else bushShow(false);
     // 1.9.203: always clear farm/beach/fireworks/ocean life when leaving an
     // effect theme, even if the next stage has no effect (Space, City, Night
     // sky, …). Otherwise farmAdvance kept running and the rooster could crow
@@ -8264,7 +8116,6 @@
   let last = performance.now();
   function loop(now) {
     applyLook(themeFor(g.clearFx ? g.clearFx.level : g.level));
-    try { bushTick(now); } catch (e) { }
     try { fxDraw(now); } catch (e) { fx.off = true; }
     const dt = now - last;
     last = now;
@@ -8408,16 +8259,16 @@
         ctx.fillText(cu.text, board.width / 2, cy);
         ctx.globalAlpha = 1;
       }
-      if (!g.demo && !g.levelUp && !g.highScore && (!started || g.over || g.paused)) {
+      if (!g.demo && !g.levelUp && !g.highScore && !g.over && (!started || g.paused)) {
         ctx.fillStyle = 'rgba(10,11,14,0.72)';
         ctx.fillRect(0, 0, board.width, board.height);
         ctx.fillStyle = '#ffffff';
         ctx.textAlign = 'center';
         ctx.font = '600 26px ' + FONT;
-        ctx.fillText(g.over ? 'Game over' : g.paused ? 'Paused' : 'Tetris', board.width / 2, board.height / 2 - 14);
+        ctx.fillText(g.paused ? 'Paused' : 'Tetris', board.width / 2, board.height / 2 - 14);
         ctx.font = '400 14px ' + FONT;
         ctx.fillStyle = 'rgba(255,255,255,0.75)';
-        ctx.fillText(g.over ? 'Score ' + g.score + '. Tap to play again' : g.paused ? 'Tap or press P to resume' : 'Tap the board to start', board.width / 2, board.height / 2 + 14);
+        ctx.fillText(g.paused ? 'Tap or press P to resume' : 'Tap the board to start', board.width / 2, board.height / 2 + 14);
       }
       ctx.restore();
     }
@@ -8612,7 +8463,7 @@
   function extremeEmptyTarget(el) {
     if (!el || !el.closest) return false;
     if (el.closest('#board') || el.closest('#xtoggle') || el.closest('#extremebtn') || el.closest('#xexitbtn')) return false;
-    if (el.closest('[data-act]') || el.closest('#levelpick') || el.closest('#startov') || el.closest('#howto') || el.closest('#pauseov') || el.closest('button')) return false;
+    if (el.closest('[data-act]') || el.closest('#levelpick') || el.closest('#startov') || el.closest('#overov') || el.closest('#howto') || el.closest('#pauseov') || el.closest('button')) return false;
     return true;
   }
   { let holdT = 0;

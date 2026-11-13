@@ -139,12 +139,16 @@
       h += table(localBests(game), { empty: 'No scores on this phone yet.' });
     }
     if (opt.inline) return h;
-    h += `<div class="ibs-btns">${opt.onAgain ? '<button type="button" class="pri" data-ibs="again">Play again</button>' : ''}<button type="button" data-ibs="close"${opt.onAgain ? '' : ' class="pri"'}>Close</button></div>`;
+    const btns = [];
+    if (opt.onContinue) btns.push('<button type="button" class="pri" data-ibs="continue">Continue</button>');
+    if (opt.onAgain) btns.push('<button type="button"' + (opt.onContinue ? '' : ' class="pri"') + ' data-ibs="again">Play again</button>');
+    btns.push('<button type="button" data-ibs="close"' + (opt.onAgain || opt.onContinue ? '' : ' class="pri"') + '>Close</button>');
+    h += `<div class="ibs-btns">${btns.join('')}</div>`;
     return h;
   }
   let cur = null;
   function close() { if (cur) { cur.el.remove(); const f = cur.onClose; cur = null; if (f) f(); } }
-  // opt: { over, score, detail, youLabel, note, sent (promise or result), onAgain, onClose, acc, btn }
+  // opt: { over, score, detail, youLabel, note, sent (promise or result), onAgain, onContinue, onClose, acc, btn }
   function open(game, opt) {
     opt = opt || {}; style(); close();
     const el = d.createElement('div'); el.className = 'ibs-ov'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Family scoreboard');
@@ -152,7 +156,8 @@
     el.innerHTML = `<div class="ibs-card">${html(game, who() ? undefined : null, opt)}</div>`;
     el.addEventListener('click', e => {
       const b = e.target.closest && e.target.closest('[data-ibs]');
-      if (b && b.dataset.ibs === 'again') { const f = opt.onAgain; opt.onClose = null; close(); if (f) f(); }
+      if (b && b.dataset.ibs === 'continue') { const f = opt.onContinue; opt.onClose = null; close(); if (f) f(); }
+      else if (b && b.dataset.ibs === 'again') { const f = opt.onAgain; opt.onClose = null; close(); if (f) f(); }
       else if ((b && b.dataset.ibs === 'close') || e.target === el) close();
     });
     d.body.appendChild(el);

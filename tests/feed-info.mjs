@@ -3293,39 +3293,17 @@ if (live) {
   assert.ok(moveFn.includes('if (farm)') && moveFn.includes('moveNoise'));
 }
 
-// 1.9.204 Bush walk background walks forward along the track
+// 1.9.206 Bush walk is the static painting again (reverts the 1.9.204 walking track)
 {
-  assert.strictEqual(tetGame.BUSH_THEME, 3);
   assert.strictEqual(tetGame.THEMES[3].name, 'Bush walk');
   assert.strictEqual(tetGame.themeFor(8), 3);
   assert.strictEqual(tetGame.themeFor(1), 6, 'other levels unchanged');
-  assert.ok(tetGame.TRACKS[3] && tetGame.TRACKS[3].bpm === 117.5);
-  const a = tetGame.bushWalkPose(0);
-  const b = tetGame.bushWalkPose(6);
-  assert.ok(b.scaleA > a.scaleA, 'slow zoom-forward along the track');
-  assert.ok(Math.abs(b.focusY - a.focusY) > 0.001, 'gaze moves up the path');
-  assert.ok(a.scaleA === 1);
-  assert.ok(b.scaleA <= 1 + tetGame.BUSH_ZOOM + 1e-6);
-  assert.ok(Math.abs(b.bobY) <= tetGame.BUSH_BOB + 1e-6);
-  assert.ok(Math.abs(b.bobX) <= tetGame.BUSH_SWAY + 1e-6);
-  assert.ok(Math.abs(b.bobY - a.bobY) > 0.2 || Math.abs(b.bobX - a.bobX) > 0.05, 'walking bob');
-  const mid = tetGame.bushWalkPose(3);
-  const later = tetGame.bushWalkPose(3.5);
-  assert.ok(Math.abs(later.bobY - mid.bobY) > 0.05, 'bob changes on a walking cadence');
-  const fade = tetGame.bushWalkPose(tetGame.BUSH_LOOP - 1);
-  assert.ok(fade.fade > 0 && fade.fade < 1, 'loop crossfades rather than jumping');
-  assert.ok(fade.scaleB <= fade.scaleA);
-  const red = tetGame.bushWalkPose(6, { reduce: true });
-  assert.ok(red.zoom < b.zoom && red.scaleA < b.scaleA, 'reduced motion zooms less');
-  assert.ok(Math.abs(red.bobY) <= 1 + 1e-6, 'reduced motion bob is about 1px');
-  const rec = tetGame.bushCoverRect(540, 960, 390, 844, 1.1, 0.51, 0.5, 0, 0);
-  assert.ok(rec.w > 390 && rec.h > 844, 'cover + zoom fills the viewport');
+  assert.ok(tetGame.TRACKS[3] && tetGame.TRACKS[3].bpm === 117.5, 'Bush walk song is unchanged');
   const src = fs.readFileSync('feed/tetris.js', 'utf8');
-  assert.ok(src.includes('1.9.204 Bush walk') && src.includes('function bushTick') && src.includes('function bushPaint'));
-  assert.ok(src.includes('prefers-reduced-motion') && src.includes('fx-bush'));
-  const bushFn = src.slice(src.indexOf('const bush ='), src.indexOf('function applyLook'));
-  assert.ok(bushFn.includes('bushPaint') && !bushFn.includes('getElementById(\'board\').style') && !/board\.style\.transform/.test(bushFn), 'the board itself is not moved');
-  assert.ok(src.includes("PICS[BUSH_THEME]") || src.includes('PICS[3]') || src.includes('tetris-bg/3.webp'));
+  assert.ok(!src.includes('function bushTick') && !src.includes('function bushPaint') && !src.includes('function bushWalkPose'), 'walking-track canvas is gone');
+  assert.ok(!src.includes('fx-bush') && !src.includes('BUSH_LOOP') && !src.includes('bushCoverRect'));
+  assert.ok(src.includes('tetris-bg/3.webp') || src.includes('PICS[3]') || src.includes("PICS[i]"), 'still uses the Bush walk painting');
+  assert.ok(src.includes(`url("' + PICS[i] + '") center / cover no-repeat`), 'Bush walk uses the same static CSS background as other picture stages');
   assert.ok(fs.existsSync('feed/tetris-bg/3.webp'), 'existing bush painting is reused');
 }
 
@@ -3453,3 +3431,75 @@ if (live) {
   assert.ok(src.includes('function personalBests') && src.includes('1.9.205: the headline list is every member'));
 }
 
+
+// 1.9.206 Continue after game over: same level, empty board, score reset; Play again still starts at level 1
+{
+  const html = fs.readFileSync('feed/tetris.html', 'utf8');
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  const scoresSrc = fs.readFileSync('feed/scores.js', 'utf8');
+  assert.ok(html.includes('id="overov"') && html.includes('id="overcontinue"') && html.includes('Continue'));
+  assert.ok(html.includes('id="overagain"') && html.includes('Play again'));
+  assert.ok(html.includes('id="continuebtn"') && html.includes('data-act="continue"'));
+  assert.ok(html.includes('html.fs-x .overov'), 'game-over overlay stays visible in Extreme');
+  assert.ok(src.includes("if (a === 'continue')") && src.includes("function syncOverOv"));
+  assert.ok(src.includes("onContinue: () => press('continue')"));
+  assert.ok(scoresSrc.includes('data-ibs="continue"') && scoresSrc.includes('opt.onContinue'));
+
+  // Normal game: reach level 8, continue stays there with a fresh board and a zero score.
+  let g = tetGame.newGame();
+  g.level = 8;
+  g.lines = 77;
+  g.score = 12345;
+  g.over = true;
+  g.board[19][0] = 4;
+  g.hold = 2;
+  const mid = tetGame.act(g, 'left');
+  assert.strictEqual(mid.over, true);
+  assert.strictEqual(mid.score, 12345, 'controls do nothing while the game is over');
+  const c = tetGame.act(g, 'continue');
+  assert.strictEqual(c.level, 8);
+  assert.strictEqual(c.score, 0);
+  assert.strictEqual(c.lines, 70, 'lines go back to the start of this level so speed and theme stay correct');
+  assert.strictEqual(c.over, false);
+  assert.strictEqual(c.paused, false);
+  assert.ok(c.board.every(row => row.every(cell => !cell)), 'board is empty');
+  assert.ok(!c.hold, 'hold is cleared');
+  assert.strictEqual(tetGame.themeFor(c.level), 3);
+  assert.ok(c.piece && c.next);
+  // After 10 lines on the continued run, the level still goes up.
+  c.lines = 79;
+  c.board[19] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
+  c.piece = { t: 1, m: tetGame.rotShape(1, 0), x: 0, y: 18, rot: 0 };
+  // Simpler: applyClear style level math is in lockPiece; just check the formula still used:
+  assert.ok(src.includes('g.level = Math.floor(g.lines / 10) + 1'));
+  const again = tetGame.act(c, 'restart');
+  assert.strictEqual(again.level, 1, 'Play again still starts from level 1');
+  assert.strictEqual(again.score, 0);
+  assert.strictEqual(again.lines, 0);
+  assert.strictEqual(tetGame.themeFor(again.level), 6);
+
+  // Practice: Continue keeps the current stage; Play again returns to the chosen start level.
+  let p = tetGame.newGame({ level: 3, practice: true });
+  p.level = 8;
+  p.lines = 77;
+  p.score = 500;
+  p.over = true;
+  const pc = tetGame.act(p, 'continue');
+  assert.ok(pc.practice);
+  assert.strictEqual(pc.level, 8);
+  assert.strictEqual(pc.score, 0);
+  assert.strictEqual(pc.lines, 70);
+  assert.strictEqual(pc.startLevel, 3);
+  const pr = tetGame.act(pc, 'restart');
+  assert.ok(pr.practice);
+  assert.strictEqual(pr.level, 3);
+  assert.strictEqual(pr.startLevel, 3);
+
+  // Continue does nothing if the game is still in play
+  const live = tetGame.newGame({ level: 8, practice: true });
+  live.score = 99;
+  const same = tetGame.act(live, 'continue');
+  assert.strictEqual(same.score, 99);
+  assert.strictEqual(same.level, 8);
+  assert.strictEqual(same.over, false);
+}

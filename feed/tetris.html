@@ -244,7 +244,22 @@
   .howto-body h3:first-child { margin-top: 4px; }
   .howto-body p { margin: 0 0 8px; }
   #howtoclose { width: 100%; flex: none; margin-top: 12px; }
+  #continuebtn, #overcontinue {
+    min-height: 56px; padding: 12px 18px;
+    font-size: 22px; font-weight: 700; letter-spacing: .02em;
+    border: none; border-radius: 16px;
+    background: #22c55e; color: #06210e;
+  }
+  #overcontinue {
+    display: block; width: 100%; flex: none;
+    min-height: 64px; margin: 0 0 12px; font-size: 26px;
+  }
+  #continuebtn[hidden] { display: none !important; }
+  .over-score { margin: 0 0 18px; font-size: 18px; color: rgba(255,255,255,.86); }
+  .over-score strong { font-size: 28px; color: #fff; }
+  #overagain { display: block; width: 100%; flex: none; min-height: 46px; }
   html.fs .startov, html.fs-x .startov,
+  html.fs .overov, html.fs-x .overov,
   html.fs .pauseov, html.fs-x .pauseov,
   html.fs #howto, html.fs-x #howto { position: fixed; }
 </style>
@@ -284,6 +299,7 @@
       <button type="button" data-act="hold">Hold</button>
       <button type="button" id="pausebtn" data-act="pause">Pause</button>
       <button type="button" id="howtobtn" class="wide">How to play</button>
+      <button type="button" id="continuebtn" data-act="continue" hidden>Continue</button>
       <button type="button" id="restartbtn" data-act="restart">Restart</button>
       <button type="button" id="xexitbtn" class="wide">Exit extreme</button>
     </div>
@@ -312,6 +328,14 @@
       <h2>Tetris</h2>
       <button type="button" id="startbtn">Start</button>
       <button type="button" id="starthowto" class="wide">How to play</button>
+    </div>
+  </div>
+  <div id="overov" class="startov overov" hidden role="dialog" aria-modal="true" aria-label="Game over">
+    <div class="startov-card">
+      <h2>Game over</h2>
+      <p class="over-score">Score <strong id="overscore">0</strong></p>
+      <button type="button" id="overcontinue" data-act="continue">Continue</button>
+      <button type="button" id="overagain" class="wide" data-act="restart">Play again</button>
     </div>
   </div>
   <div id="pauseov" class="pauseov" hidden>
