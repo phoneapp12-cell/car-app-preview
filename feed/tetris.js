@@ -173,13 +173,15 @@
   // Colourful picture behind each theme (same order as THEMES), softened with a dark veil so the blocks stand out.
   const PICS = THEMES.map((_, i) => 'tetris-bg/' + i + '.webp');
   let themeIdx = 0;
-  // Level order (indexes into THEMES): Farmyard, Jeremiah was a bullfrog, Beach, Fireworks, City, Ocean, Bush walk, New Zealand, Snowy mountains, Night sky, Triangles, Space travel last.
+  // Level order (indexes into THEMES): Farmyard, Jeremiah was a bullfrog, Beach, Fireworks, City, Ocean, Bush walk, New Zealand, Snowy mountains, Night sky, Space travel, Triangles last.
   // 1.9.188: City (theme 4) moved to level 5; Ocean and the levels after it shift down one.
-  const ORDER = [6, 11, 0, 1, 4, 2, 3, 9, 10, 5, 8, 7];
+  // 1.9.192: Space travel is level 11; Triangles is last (level 12).
+  const ORDER = [6, 11, 0, 1, 4, 2, 3, 9, 10, 5, 7, 8];
   function themeFor(level) { return ORDER[(Math.max(1, level) - 1) % ORDER.length]; }
   function stages() { return ORDER.map((ti, i) => ({ level: i + 1, theme: ti, name: THEMES[ti].name })); }
   function shouldSubmit(gm) { return !!(gm && !gm.practice && gm.score > 0); }
   // 1.9.151 Triangle Tetris (theme 8, level 11, second to last): blocks are triangles, and only two colours at a time.
+  // 1.9.192: Triangles is the last level (level 12).
   // Red and blue for the first 5 lines of the level, then pink and lime after half the lines needed (5 of 10).
   const TRI_THEME = 8;
   const TRI_PAL = { early: ['#e25b62', '#4e88d6'], late: ['#ef8cba', '#8dce5c'] };
@@ -194,6 +196,7 @@
     return pal ? pal[(t - 1) % 2] : COLORS[t];
   }
   // 1.9.150 Space travel (theme 7, last level) plays like Space Invaders: bombs only clear one settled block,
+  // 1.9.192: Space travel is level 11; Triangles is last.
   // never the falling piece, and blocks above do not drop.
   // 1.9.154 First bomb comes in 4–6s, then every 6–10s, aiming at columns with blocks.
   const SPACE_THEME = 7;
@@ -614,9 +617,11 @@
   const LINECLEAR_VOL = 0.85;
   const LINECLEAR_DUR = 1.67;
   function lineClearSrc() { return 'tetris-bg/lineclear-' + LINECLEAR_HASH + '.mp3'; }
+  // 1.9.192: Amazing, Brilliant, Awesome and Keep going are the RogerNeural clips
+  // re-toned to Shane's game-over voice; Fantastic (Shane) and You got this stay as they were.
   const CALLOUT_VOICES = {
-    amazing: 'c46de485', brilliant: 'f64c21f2', fantastic: '95c74d33',
-    awesome: '3273dcf3', yougotthis: '7761c550', keepgoing: '6be51176'
+    amazing: 'f68cdbb0', brilliant: '791b3eb0', fantastic: '95c74d33',
+    awesome: 'c083a2f5', yougotthis: '7761c550', keepgoing: '66d1b6c8'
   };
   const CALLOUT_TEXT = {
     amazing: 'Amazing!', brilliant: 'Brilliant!', fantastic: 'Fantastic!',
@@ -1834,7 +1839,7 @@
   function levelUpCopy(fromLevel, toLevel) {
     const ti = themeFor(toLevel);
     const name = (THEMES[ti] && THEMES[ti].name) || '';
-    if (themeFor(fromLevel) === SPACE_THEME) {
+    if (fromLevel > 0 && fromLevel % ORDER.length === 0) {
       return { beat: true, title: 'YOU DID IT!', sub: 'You beat every level!', theme: ti, level: toLevel };
     }
     return { beat: false, title: 'LEVEL UP!', sub: 'Level ' + toLevel + ': ' + name, theme: ti, level: toLevel };
@@ -2026,6 +2031,7 @@
     g.lastWasTetris = full.length === 4;
     const high = g.board.some((row, r) => r <= 7 && row.some(v => v));
     maybeCallout(g, { n: full.length, combo: g.clearCombo, b2b: b2b, high: high, near: false, level: g.level });
+    snowOnLineClear(g);
     return full.length;
   }
 
@@ -2793,7 +2799,187 @@
     ctx.restore();
   }
 
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_SAFE_TOP, CITY_CREW_N, cityBuildWait, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, maybeHighScore, startHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, FARM_SUN, FARM_HZ, farmDayTarget, farmSunPos, ROOSTER_HASH, roosterSrc, stackColY, stackSkyline, stackPathAt, stackPathLen, newStackSurf, stepStackSurf, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts };
+  // 1.9.192 Snowy mountains (theme 10, level 9): snowfall ramps from light flurries
+  // to a heavy fall by the end of the level, and soft white caps settle on exposed
+  // column tops. Visual only, drawn under the active piece and ghost.
+  const SNOW_THEME = 10;
+  function snowProg(lines, level) {
+    const lv = Math.max(1, level || 1);
+    const base = (lv - 1) * 10;
+    return Math.max(0, Math.min(1, ((lines || 0) - base) / 10));
+  }
+  function snowFallParams(prog) {
+    const p = Math.max(0, Math.min(1, prog || 0));
+    const e = p * p * 0.35 + p * 0.65;
+    return {
+      count: Math.round(10 + 48 * e),
+      fxCount: Math.round(18 + 72 * e),
+      size0: 1.15 + 1.55 * e,
+      size1: 2.2 + 2.5 * e,
+      speed0: 26 + 16 * e,
+      speed1: 42 + 22 * e,
+      wind: 8 + 16 * e,
+      settle: 0.09 + 0.15 * e
+    };
+  }
+  function newBoardSnow() {
+    const cap = [];
+    const tops = [];
+    for (let c = 0; c < COLS; c++) { cap.push(0); tops.push(-1); }
+    return { ready: false, cap: cap, tops: tops, flakes: [], t: 0 };
+  }
+  let boardSnow = newBoardSnow();
+  function snowReset() { boardSnow = newBoardSnow(); }
+  function snowTopRow(board, c) {
+    if (!board || c < 0 || c >= COLS) return -1;
+    for (let r = 0; r < ROWS; r++) if (board[r][c]) return r;
+    return -1;
+  }
+  function snowSpawnFlake(par, first) {
+    const sz = par.size0 + Math.random() * Math.max(0.2, par.size1 - par.size0);
+    const sp = par.speed0 + Math.random() * Math.max(4, par.speed1 - par.speed0);
+    return {
+      x: Math.random() * COLS * CELL,
+      y: first ? Math.random() * ROWS * CELL : -6 - Math.random() * 18,
+      sp: sp, sz: sz, ph: Math.random() * 6.28, a: 0.72 + Math.random() * 0.22
+    };
+  }
+  function stepBoardSnow(sn, board, dt, prog, flags) {
+    sn = sn || boardSnow;
+    if (!sn) return sn;
+    const reduce = !!(flags && flags.reduce);
+    const par = snowFallParams(prog);
+    const ms = Math.max(0, dt || 0) / 1000;
+    sn.t += ms;
+    // Reset a cap when that column's exposed top changes (new brick or a line clear).
+    for (let c = 0; c < COLS; c++) {
+      const top = snowTopRow(board, c);
+      if (top !== sn.tops[c]) {
+        sn.cap[c] = 0;
+        sn.tops[c] = top;
+      }
+      if (top >= 0 && !reduce) {
+        sn.cap[c] = Math.min(1, sn.cap[c] + par.settle * ms);
+      } else if (top >= 0 && reduce) {
+        sn.cap[c] = Math.max(sn.cap[c], 0.4);
+      } else {
+        sn.cap[c] = 0;
+      }
+    }
+    if (reduce) { sn.flakes = []; sn.ready = true; return sn; }
+    const want = par.count;
+    while (sn.flakes.length < want) sn.flakes.push(snowSpawnFlake(par, !sn.ready));
+    if (sn.flakes.length > want) sn.flakes.length = want;
+    const drift = par.wind;
+    for (let i = 0; i < sn.flakes.length; i++) {
+      const f = sn.flakes[i];
+      f.y += f.sp * ms;
+      f.x += Math.sin(sn.t * 0.7 + f.ph) * drift * ms;
+      if (f.x < -8) f.x += COLS * CELL + 16;
+      if (f.x > COLS * CELL + 8) f.x -= COLS * CELL + 16;
+      const c = Math.max(0, Math.min(COLS - 1, Math.floor(f.x / CELL)));
+      const topY = stackColY(board, c);
+      if (f.y >= topY - 1) {
+        if (sn.tops[c] >= 0) sn.cap[c] = Math.min(1, sn.cap[c] + 0.08 + 0.06 * (f.sz / 4));
+        sn.flakes[i] = snowSpawnFlake(par, false);
+      }
+    }
+    sn.ready = true;
+    return sn;
+  }
+  function snowOnLineClear(g, sn) {
+    sn = sn || boardSnow;
+    if (!sn) return;
+    for (let c = 0; c < COLS; c++) {
+      sn.cap[c] = 0;
+      sn.tops[c] = g && g.board ? snowTopRow(g.board, c) : -1;
+    }
+  }
+  function drawSnowCaps(ctx) {
+    if (!g || themeFor(g.clearFx ? g.clearFx.level : g.level) !== SNOW_THEME) return;
+    if (!boardSnow.ready && g.board) stepBoardSnow(boardSnow, g.board, 0, snowProg(g.lines, g.level));
+    const board = g.clearFx && g.clearFx.snap ? g.clearFx.snap : g.board;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, COLS * CELL, ROWS * CELL);
+    ctx.clip();
+    for (let c = 0; c < COLS; c++) {
+      const amt = boardSnow.cap[c] || 0;
+      const top = snowTopRow(board, c);
+      if (top < 0 || amt <= 0.02) continue;
+      const x = c * CELL;
+      const y = top * CELL;
+      const h = 3.2 + 6.2 * amt;
+      const inset = 1.4;
+      const w = CELL - inset * 2;
+      ctx.globalAlpha = 0.72 + 0.22 * amt;
+      const grd = ctx.createLinearGradient(x, y, x, y + h);
+      grd.addColorStop(0, 'rgba(255,255,255,0.98)');
+      grd.addColorStop(0.55, 'rgba(236,248,255,0.92)');
+      grd.addColorStop(1, 'rgba(210,230,245,0.15)');
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.moveTo(x + inset, y + 1.2);
+      ctx.quadraticCurveTo(x + CELL * 0.22, y - h * 0.55, x + CELL * 0.5, y - h * 0.72);
+      ctx.quadraticCurveTo(x + CELL * 0.78, y - h * 0.55, x + CELL - inset, y + 1.2);
+      ctx.quadraticCurveTo(x + CELL * 0.5, y + 2.4, x + inset, y + 1.2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = 0.55 * amt;
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.beginPath();
+      ctx.ellipse(x + CELL * 0.38, y - h * 0.28, w * 0.18, h * 0.18, -0.3, 0, 6.283);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+  function drawBoardSnow(ctx) {
+    if (!g || themeFor(g.clearFx ? g.clearFx.level : g.level) !== SNOW_THEME) return;
+    if (!boardSnow.ready) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, COLS * CELL, ROWS * CELL);
+    ctx.clip();
+    for (let i = 0; i < boardSnow.flakes.length; i++) {
+      const f = boardSnow.flakes[i];
+      ctx.globalAlpha = f.a;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(f.x, f.y, f.sz, 0, 6.283); ctx.fill();
+      if (f.sz > 2.4) {
+        ctx.globalAlpha = f.a * 0.55;
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        ctx.lineWidth = 0.7;
+        ctx.beginPath();
+        ctx.moveTo(f.x - f.sz, f.y); ctx.lineTo(f.x + f.sz, f.y);
+        ctx.moveTo(f.x, f.y - f.sz); ctx.lineTo(f.x, f.y + f.sz);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+  function syncSnowFx(prog) {
+    if (!fx || !fx.list) return;
+    fx.snowProg = prog;
+    const par = snowFallParams(prog);
+    const proto = (CRITTERS[SNOW_THEME] || []).find(function (k) { return k.m === 'snow'; });
+    if (!proto) return;
+    let n = 0;
+    for (let i = 0; i < fx.list.length; i++) if (fx.list[i].k && fx.list[i].k.m === 'snow') n++;
+    while (n < par.fxCount) {
+      const c = fxSpawn(proto, false);
+      c.sz = par.size0 + Math.random() * (par.size1 - par.size0);
+      c.sp = par.speed0 + Math.random() * (par.speed1 - par.speed0);
+      fx.list.push(c);
+      n++;
+    }
+    if (n > par.fxCount) {
+      for (let i = fx.list.length - 1; i >= 0 && n > par.fxCount; i--) {
+        if (fx.list[i].k && fx.list[i].k.m === 'snow') { fx.list.splice(i, 1); n--; }
+      }
+    }
+  }
+
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_SAFE_TOP, CITY_CREW_N, cityBuildWait, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, maybeHighScore, startHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, FARM_SUN, FARM_HZ, farmDayTarget, farmSunPos, ROOSTER_HASH, roosterSrc, stackColY, stackSkyline, stackPathAt, stackPathLen, newStackSurf, stepStackSurf, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts, SNOW_THEME, snowProg, snowFallParams, newBoardSnow, stepBoardSnow, snowOnLineClear, snowReset, boardSnow: () => boardSnow };
 
   if (!root.document) return;
   const doc = root.document;
@@ -2849,7 +3035,7 @@
   function press(a) {
     if (!started) started = true;
     const next = act(g, a);
-    if (a === 'restart') { g = next; invReset(); cityReset(); stackSurfReset(); life.hold = null; life.singHold = null; life.beachHold = null; fw.hold = null; ocean.hold = null; sparkHold = null; blockSparks = []; lifeReset(); if (isEffect(themeFor(g.level))) { lifeCast(isEffect(themeFor(g.level))); } if (root.IBScores) root.IBScores.close(); }
+    if (a === 'restart') { g = next; invReset(); cityReset(); stackSurfReset(); snowReset(); life.hold = null; life.singHold = null; life.beachHold = null; fw.hold = null; ocean.hold = null; sparkHold = null; blockSparks = []; lifeReset(); if (isEffect(themeFor(g.level))) { lifeCast(isEffect(themeFor(g.level))); } if (root.IBScores) root.IBScores.close(); }
     syncHud();
     try { persistLive(); } catch (e) { }
   }
@@ -2962,6 +3148,10 @@
     const sb = doc.getElementById('soundbtn'); if (sb) sb.textContent = 'Sound off';
     invSeed(opts);
     citySeed(opts);
+    snowReset();
+    if (themeFor(g.level) === SNOW_THEME && g.board) {
+      stepBoardSnow(boardSnow, g.board, opts.snowTime != null ? opts.snowTime : 0, snowProg(g.lines, g.level), { reduce: reduceMotion() });
+    }
   };
   doc.addEventListener('click', e => {
     const b = e.target.closest && e.target.closest('[data-act]');
@@ -2999,6 +3189,7 @@
     invReset();
     cityReset();
     stackSurfReset();
+    snowReset();
     syncHud();
   }
   function showShanePicker(force) {
@@ -3469,13 +3660,20 @@
     if (fx.off) return;
     fxInit(); if (!fx.ctx) return;
     if (fx.theme !== lookIdx) fxTheme(lookIdx < 0 ? 0 : lookIdx);
+    if ((lookIdx < 0 ? themeIdx : lookIdx) === SNOW_THEME && g) {
+      try { syncSnowFx(snowProg(g.lines, g.level)); } catch (e) { }
+    }
     const t = now / 1000, dt = Math.min(0.05, fx.last ? t - fx.last : 0); fx.last = t;
     const c = fx.ctx; c.clearRect(0, 0, fx.w, fx.h);
     for (let i = 0; i < fx.list.length; i++) {
       let o = fx.list[i]; const k = o.k, m = k.m;
       let a = k.a, rot = 0, flip = o.dir > 0;
       if (k.vy) o.y0 += k.vy * dt;
-      if (m === 'snow') { o.y += o.sp * dt; o.x += Math.sin(t * 0.7 + o.ph) * 10 * dt; }
+      if (m === 'snow') {
+        const par = snowFallParams(fx.snowProg || 0);
+        o.y += (o.sp || par.speed0) * dt;
+        o.x += Math.sin(t * 0.55 + o.ph) * par.wind * dt;
+      }
       else if (m === 'tri') { o.y -= o.sp * dt; o.x += Math.sin(t * 0.4 + o.ph) * 6 * dt; rot = t * 0.3 + o.ph; }
       else if (m === 'fly' || m === 'walk') { o.x += o.dir * o.sp * dt; o.y = o.y0 + (m === 'fly' ? Math.sin(t * 0.8 + o.ph) * 6 : 0); }
       else if (m === 'flutter') { o.x += o.dir * o.sp * dt; o.y = o.y0 + Math.sin(t * 1.6 + o.ph) * 18; rot = Math.sin(t * 6 + o.ph) * 0.15; }
@@ -5175,6 +5373,7 @@
       });
     }
     fwFlash(x, y, z, col, scale);
+    playFwSfx(scale, z);
   }
   function fwLaunch(box, destX, destY, typ, col, scale, z, flight) {
     if (fw.rockets.length >= FW_MAX_R) { fwBurst(destX, destY, z, typ, col, scale); return; }
@@ -5185,6 +5384,7 @@
       x: x0, y: y0, x0: x0, y0: y0, destX: destX, destY: destY, t: 0, max: T,
       typ: typ, col: col, scale: scale || 1, z: z || 1
     });
+    playFwWhoosh();
   }
   function fwSkyPos(box, prefer) {
     const nx = prefer && prefer.x != null ? prefer.x : (0.12 + Math.random() * 0.76);
@@ -5349,46 +5549,77 @@
       return n && (s / n) > 110;
     } catch (e) { return false; }
   }
-  // Soft mid booms + low-passed crackle for line clears / Tetris / LEVEL UP only.
-  // Ordinary beat-synced launches stay quiet so they do not double the bangs already in the bed.
-  function playFwSfx(kind) {
-    if (!soundOn || !ac || !sfxGain || !noiseBuf) return;
-    const hot = fwBedHot();
-    if (kind === 'clear' && hot) return;
+  // 1.9.192: every visible burst plays a matching synthesised boom at the moment
+  // it bursts, plus an optional soft low whoosh on launch. Deep and warm, high-passed
+  // at 300 Hz so phone speakers can play it, low-passed at 3.5 kHz, no sharp crackle.
+  // Loudness and depth follow burst size (20%–275%), with slight random pitch and a
+  // cap on how many can sound at once.
+  const FW_SFX_MAX = 3;
+  let fwSfxN = 0;
+  function playFwWhoosh() {
+    if (!soundOn || !ac || !sfxGain || !noiseBuf || fw.hold) return;
+    if (fwSfxN >= FW_SFX_MAX) return;
     const dest = sfxGain;
-    const t0 = ac.currentTime + 0.01;
-    const grow = fwSize(fw.prog);
-    const depth = 0.85 + 0.2 * Math.min(1.6, Math.max(0.5, grow)); // a little more body on late bursts, still mellow
-    const boom = (kind === 'big' ? (hot ? 0.07 : 0.13) : 0.09) * Math.min(1.15, depth);
-    const crack = (kind === 'big' ? (hot ? 0.04 : 0.07) : 0.055) * Math.min(1.1, depth);
-    const rum = ac.createBufferSource();
-    rum.buffer = noiseBuf;
+    const t0 = ac.currentTime + 0.008;
+    const pit = 0.94 + Math.random() * 0.12;
+    const src = ac.createBufferSource();
+    src.buffer = noiseBuf;
     const hp = ac.createBiquadFilter();
     hp.type = 'highpass'; hp.frequency.value = 300; hp.Q.value = 0.7;
     const lp = ac.createBiquadFilter();
-    lp.type = 'lowpass'; lp.frequency.value = 680; lp.Q.value = 0.5;
+    lp.type = 'lowpass'; lp.frequency.value = 900 * pit; lp.Q.value = 0.5;
+    lp.frequency.linearRampToValueAtTime(1400 * pit, t0 + 0.18);
     const g = ac.createGain();
     g.gain.setValueAtTime(0.0001, t0);
-    g.gain.linearRampToValueAtTime(boom, t0 + 0.04);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + (kind === 'big' ? 0.7 : 0.42));
-    rum.connect(hp); hp.connect(lp); lp.connect(g); g.connect(dest);
-    rum.start(t0); rum.stop(t0 + 0.75);
-    const pops = kind === 'big' ? 4 : 2;
-    for (let k = 0; k < pops; k++) {
-      const at = t0 + 0.03 + k * 0.08;
-      const src = ac.createBufferSource();
-      src.buffer = noiseBuf;
-      const bp = ac.createBiquadFilter();
-      bp.type = 'bandpass'; bp.frequency.value = 540 + k * 160; bp.Q.value = 0.85;
-      const clp = ac.createBiquadFilter();
-      clp.type = 'lowpass'; clp.frequency.value = 2600; clp.Q.value = 0.5;
-      const cg = ac.createGain();
-      cg.gain.setValueAtTime(0.0001, at);
-      cg.gain.linearRampToValueAtTime(crack - k * 0.008, at + 0.016);
-      cg.gain.exponentialRampToValueAtTime(0.0001, at + 0.14);
-      src.connect(bp); bp.connect(clp); clp.connect(cg); cg.connect(dest);
-      src.start(at); src.stop(at + 0.18);
-    }
+    g.gain.linearRampToValueAtTime(0.045, t0 + 0.04);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.28);
+    src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(dest);
+    src.start(t0); src.stop(t0 + 0.32);
+  }
+  function playFwSfx(scale, z) {
+    if (!soundOn || !ac || !sfxGain || !noiseBuf || fw.hold) return;
+    if (fwSfxN >= FW_SFX_MAX) return;
+    const sc = Math.max(0.2, Math.min(2.75, scale == null ? 1 : scale));
+    const k = (sc - 0.2) / 2.55;
+    const depth = 0.75 + 0.35 * k * Math.min(1.3, z || 1);
+    const pit = 0.93 + Math.random() * 0.14;
+    const boom = (0.055 + 0.10 * k) * depth;
+    const dur = 0.38 + 0.34 * k;
+    const dest = sfxGain;
+    const t0 = ac.currentTime + 0.008;
+    fwSfxN++;
+    const hold = dur + 0.05;
+    if (typeof root.setTimeout === 'function') root.setTimeout(function () { fwSfxN = Math.max(0, fwSfxN - 1); }, hold * 1000);
+    else fwSfxN = Math.max(0, fwSfxN - 1);
+    // Warm tonal body at or above ~300 Hz so phone speakers can play it.
+    const f0 = (310 + 40 * (1 - k)) * pit;
+    const o = ac.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(Math.max(300, f0), t0);
+    o.frequency.exponentialRampToValueAtTime(Math.max(300, f0 * 0.72), t0 + dur * 0.7);
+    const hp = ac.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 300; hp.Q.value = 0.7;
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 3500; lp.Q.value = 0.5;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(boom, t0 + 0.024);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(hp); hp.connect(lp); lp.connect(g); g.connect(dest);
+    o.start(t0); o.stop(t0 + dur + 0.02);
+    // Soft noise bloom, same 300 Hz–3.5 kHz window. No sharp crackle.
+    const rum = ac.createBufferSource();
+    rum.buffer = noiseBuf;
+    const rhp = ac.createBiquadFilter();
+    rhp.type = 'highpass'; rhp.frequency.value = 300; rhp.Q.value = 0.7;
+    const rlp = ac.createBiquadFilter();
+    rlp.type = 'lowpass'; rlp.frequency.value = 1200 + 400 * k; rlp.Q.value = 0.5;
+    const rg = ac.createGain();
+    rg.gain.setValueAtTime(0.0001, t0);
+    rg.gain.linearRampToValueAtTime(boom * 0.55, t0 + 0.03);
+    rg.gain.exponentialRampToValueAtTime(0.0001, t0 + dur * 0.85);
+    rum.connect(rhp); rhp.connect(rlp); rlp.connect(rg); rg.connect(dest);
+    rum.start(t0); rum.stop(t0 + dur);
   }
   function drawFireworksScene(c, w, h, reduce) {
     const box = photoBox();
@@ -6268,6 +6499,10 @@
       if (g && isEffect(cellThemeIdx()) === 'beach') stepStackSurf(stackSurf, g.board, dt, { reduce: reduceMotion() });
       else if (stackSurf.ready) stackSurfReset();
     } catch (e) { }
+    try {
+      if (g && themeFor(g.clearFx ? g.clearFx.level : g.level) === SNOW_THEME) stepBoardSnow(boardSnow, g.board, dt, snowProg(g.lines, g.level), { reduce: reduceMotion() });
+      else if (boardSnow.ready) snowReset();
+    } catch (e) { }
     musicTick(g.level, musicWanted(g.level, started, g));
     if (g.flashT > 0) g.flashT -= dt;
     if (g.popupT > 0) g.popupT -= dt;
@@ -6307,6 +6542,7 @@
       try { invDraw(ctx); } catch (e) { }
       try { drawCityCrew(ctx); } catch (e) { }
       try { drawStackSurfers(ctx); } catch (e) { }
+      try { drawSnowCaps(ctx); drawBoardSnow(ctx); } catch (e) { }
       try { drawEffectTrails(ctx); drawEffectRipples(ctx); } catch (e) { }
       if (!g.over && !fx) {
         const p = g.piece;

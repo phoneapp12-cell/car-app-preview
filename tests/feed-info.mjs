@@ -125,32 +125,33 @@ tetGame.act(gHold, 'hold');
 assert.strictEqual(gHold.hold, held);
 assert.strictEqual(gHold.canHold, false);
 // 1.9.166 triangle Tetris on the Triangles theme (level 11, second to last): two-colour palette, gameplay unchanged
+// 1.9.192: Triangles is last (level 12); Space travel is level 11.
 assert.strictEqual(tetGame.themeFor(1), 6);
 assert.strictEqual(tetGame.themeFor(2), 11);
 assert.strictEqual(tetGame.themeFor(3), 0);
-assert.strictEqual(tetGame.themeFor(11), 8);
-assert.strictEqual(tetGame.themeFor(12), 7);
+assert.strictEqual(tetGame.themeFor(11), 7);
+assert.strictEqual(tetGame.themeFor(12), 8);
 assert.strictEqual(tetGame.THEMES[8].name, 'Triangles');
 assert.strictEqual(tetGame.THEMES[11].name, 'Jeremiah was a bullfrog');
 assert.strictEqual(tetGame.TRI_THEME, 8);
 // Palette follows the Triangles theme wherever it sits: first 5 lines of the level red/blue, then pink/lime.
-assert.deepStrictEqual(tetGame.trianglePalette(100, 11), tetGame.TRI_PAL.early);
-assert.deepStrictEqual(tetGame.trianglePalette(104, 11), tetGame.TRI_PAL.early);
-assert.deepStrictEqual(tetGame.trianglePalette(105, 11), tetGame.TRI_PAL.late);
-assert.deepStrictEqual(tetGame.trianglePalette(109, 11), tetGame.TRI_PAL.late);
+assert.deepStrictEqual(tetGame.trianglePalette(100, 12), tetGame.TRI_PAL.early);
+assert.deepStrictEqual(tetGame.trianglePalette(104, 12), tetGame.TRI_PAL.early);
+assert.deepStrictEqual(tetGame.trianglePalette(105, 12), tetGame.TRI_PAL.late);
+assert.deepStrictEqual(tetGame.trianglePalette(109, 12), tetGame.TRI_PAL.late);
 assert.strictEqual(tetGame.triangleLate(104), false);
 assert.strictEqual(tetGame.triangleLate(105), true);
-assert.strictEqual(tetGame.blockColor(1, 100, 11), tetGame.TRI_PAL.early[0]); // red
-assert.strictEqual(tetGame.blockColor(2, 100, 11), tetGame.TRI_PAL.early[1]); // blue
-assert.strictEqual(tetGame.blockColor(3, 105, 11), tetGame.TRI_PAL.late[0]);  // pink
-assert.strictEqual(tetGame.blockColor(4, 105, 11), tetGame.TRI_PAL.late[1]);  // lime
-const triCols = new Set([1, 2, 3, 4, 5, 6, 7].map(t => tetGame.blockColor(t, 102, 11)));
+assert.strictEqual(tetGame.blockColor(1, 100, 12), tetGame.TRI_PAL.early[0]); // red
+assert.strictEqual(tetGame.blockColor(2, 100, 12), tetGame.TRI_PAL.early[1]); // blue
+assert.strictEqual(tetGame.blockColor(3, 105, 12), tetGame.TRI_PAL.late[0]);  // pink
+assert.strictEqual(tetGame.blockColor(4, 105, 12), tetGame.TRI_PAL.late[1]);  // lime
+const triCols = new Set([1, 2, 3, 4, 5, 6, 7].map(t => tetGame.blockColor(t, 102, 12)));
 assert.deepStrictEqual([...triCols].sort(), [...tetGame.TRI_PAL.early].sort());
 assert.strictEqual(tetGame.trianglePalette(0, 1), null, 'other themes keep their own colours');
 assert.strictEqual(tetGame.trianglePalette(14, 2), null, 'bullfrog on level 2 is not triangles');
 assert.strictEqual(tetGame.blockColor(1, 0, 1), tetGame.COLORS[1]);
 const gTri = tetGame.newGame();
-gTri.level = 11; gTri.lines = 102;
+gTri.level = 12; gTri.lines = 102;
 const beforeX = 4;
 gTri.piece = { t: 4, m: [[4, 4], [4, 4]], x: beforeX, y: 0 };
 tetGame.act(gTri, 'left');
@@ -165,7 +166,7 @@ assert.deepStrictEqual(Array.from(waitFirst), [0.8, 1.6]);
 assert.deepStrictEqual(Array.from(waitLater), [0.8, 1.6]);
 assert.deepStrictEqual(Array.from(tetGame.bombWaitRange(36, true)), [0.8, 1.6]);
 const gSp = tetGame.newGame();
-gSp.level = 12; gSp.lines = 110;
+gSp.level = 11; gSp.lines = 100;
 gSp.board = tetGame.emptyBoard();
 for (let r = 16; r < 20; r++) gSp.board[r][4] = 3;
 gSp.board[15][4] = 5;
@@ -984,38 +985,38 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
 
 // 1.9.166 Shane-only Tetris level picker (practice mode, not posted to the family scoreboard)
 {
-  const names = ['Farmyard', 'Jeremiah was a bullfrog', 'Beach', 'Fireworks', 'City', 'Ocean', 'Bush walk', 'New Zealand', 'Snowy mountains', 'Night sky', 'Triangles', 'Space travel'];
-  assert.deepStrictEqual(Array.from(tetGame.ORDER), [6, 11, 0, 1, 4, 2, 3, 9, 10, 5, 8, 7]);
+  const names = ['Farmyard', 'Jeremiah was a bullfrog', 'Beach', 'Fireworks', 'City', 'Ocean', 'Bush walk', 'New Zealand', 'Snowy mountains', 'Night sky', 'Space travel', 'Triangles'];
+  assert.deepStrictEqual(Array.from(tetGame.ORDER), [6, 11, 0, 1, 4, 2, 3, 9, 10, 5, 7, 8]);
   assert.deepStrictEqual(Array.from(tetGame.stages().map(s => s.name)), names);
   assert.deepStrictEqual(Array.from(tetGame.stages().map(s => s.level)), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
-  const gPr = tetGame.newGame({ level: 11, practice: true });
-  assert.strictEqual(gPr.level, 11);
-  assert.strictEqual(gPr.lines, 100);
+  const gPr = tetGame.newGame({ level: 12, practice: true });
+  assert.strictEqual(gPr.level, 12);
+  assert.strictEqual(gPr.lines, 110);
   assert.strictEqual(gPr.practice, true);
-  assert.strictEqual(gPr.startLevel, 11);
+  assert.strictEqual(gPr.startLevel, 12);
   assert.strictEqual(gPr.score, 0);
   assert.strictEqual(tetGame.themeFor(gPr.level), 8);
   assert.deepStrictEqual(tetGame.trianglePalette(gPr.lines, gPr.level), tetGame.TRI_PAL.early);
-  assert.strictEqual(tetGame.dropInterval(gPr.level), tetGame.dropInterval(11));
+  assert.strictEqual(tetGame.dropInterval(gPr.level), tetGame.dropInterval(12));
   assert.strictEqual(tetGame.shouldSubmit(gPr), false, 'practice never goes on the family board');
-  const gSp = tetGame.newGame({ level: 12, practice: true });
-  assert.strictEqual(gSp.level, 12);
-  assert.strictEqual(gSp.lines, 110);
+  const gSp = tetGame.newGame({ level: 11, practice: true });
+  assert.strictEqual(gSp.level, 11);
+  assert.strictEqual(gSp.lines, 100);
   assert.strictEqual(tetGame.themeFor(gSp.level), 7);
   const gFrog = tetGame.newGame({ level: 2, practice: true });
   assert.strictEqual(tetGame.themeFor(gFrog.level), 11);
   assert.strictEqual(tetGame.THEMES[11].name, 'Jeremiah was a bullfrog');
   // Levelling up in practice, then restart, returns to the chosen stage
-  gPr.lines = 109; gPr.level = 11; gPr.board = tetGame.emptyBoard();
+  gPr.lines = 119; gPr.level = 12; gPr.board = tetGame.emptyBoard();
   for (let c = 0; c < 9; c++) gPr.board[19][c] = 1;
   gPr.piece = { t: 4, m: [[4]], x: 9, y: 19 }; gPr.next = 4;
   tetGame.lockPiece(gPr);
-  assert.strictEqual(gPr.level, 12, 'practice can still move on to the next stage');
+  assert.strictEqual(gPr.level, 13, 'practice can still move on to the next stage');
   const again = tetGame.act(gPr, 'restart');
   assert.strictEqual(again.practice, true);
-  assert.strictEqual(again.level, 11);
-  assert.strictEqual(again.lines, 100);
-  assert.strictEqual(again.startLevel, 11);
+  assert.strictEqual(again.level, 12);
+  assert.strictEqual(again.lines, 110);
+  assert.strictEqual(again.startLevel, 12);
   assert.strictEqual(again.score, 0);
   const plain = tetGame.newGame();
   assert.strictEqual(plain.practice, false);
@@ -1101,7 +1102,7 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
     }
     return { seen, maxAir, inv };
   }
-  const gPick = tetGame.newGame({ level: 12, practice: true });
+  const gPick = tetGame.newGame({ level: 11, practice: true });
   assert.strictEqual(gPick.practice, true);
   assert.strictEqual(tetGame.themeFor(gPick.level), tetGame.SPACE_THEME);
   stackOn(gPick);
@@ -1110,14 +1111,14 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   assert.ok(pick.maxAir >= 2, 'more than one bomb can be in the air');
 
   const gNat = tetGame.newGame();
-  gNat.lines = 110; gNat.level = 12;
+  gNat.lines = 100; gNat.level = 11;
   assert.strictEqual(tetGame.themeFor(gNat.level), tetGame.SPACE_THEME);
   stackOn(gNat);
   const nat = countDrops(gNat);
-  assert.ok(nat.seen >= 3, 'natural level 12: several bombs drop within 6s, got ' + nat.seen);
+  assert.ok(nat.seen >= 3, 'natural level 11: several bombs drop within 6s, got ' + nat.seen);
 
   // Screenshot seed must still hold bombs back
-  const gDemo = tetGame.newGame({ level: 12, practice: true });
+  const gDemo = tetGame.newGame({ level: 11, practice: true });
   stackOn(gDemo);
   const demo = tetGame.seedInvaders(tetGame.newInvaders(), gDemo, {});
   const beforeD = blocks(gDemo.board);
@@ -1359,12 +1360,13 @@ if (live) {
   const c6 = tetGame.levelUpCopy(5, 6);
   assert.strictEqual(c6.sub, 'Level 6: Ocean');
   const c12 = tetGame.levelUpCopy(11, 12);
-  assert.strictEqual(c12.sub, 'Level 12: Space travel');
+  assert.strictEqual(c12.sub, 'Level 12: Triangles');
   const beaten = tetGame.levelUpCopy(12, 13);
   assert.strictEqual(beaten.beat, true);
   assert.strictEqual(beaten.title, 'YOU DID IT!');
   assert.strictEqual(beaten.sub, 'You beat every level!');
-  assert.strictEqual(tetGame.themeFor(12), tetGame.SPACE_THEME);
+  assert.strictEqual(tetGame.themeFor(11), tetGame.SPACE_THEME);
+  assert.strictEqual(tetGame.themeFor(12), tetGame.TRI_THEME);
 
   const PC = { C: 0, 'C#': 1, D: 2, 'D#': 3, E: 4, F: 5, 'F#': 6, G: 7, 'G#': 8, A: 9, 'A#': 10, B: 11 };
   const IV = { major: [0, 2, 4, 5, 7, 9, 11], minor: [0, 2, 3, 5, 7, 8, 10] };
@@ -1422,7 +1424,7 @@ if (live) {
   assert.strictEqual(pick.level, 12);
   tetGame.tickClear(pick, 1000);
   assert.ok(pick.levelUp);
-  assert.strictEqual(pick.levelUp.sub, 'Level 12: Space travel');
+  assert.strictEqual(pick.levelUp.sub, 'Level 12: Triangles');
 
   const last = tetGame.newGame({ level: 12, practice: true });
   last.lines = 119;
@@ -1770,7 +1772,8 @@ if (live) {
   assert.ok(meta.y != null && meta.h && meta.w === 540);
   assert.ok(src.includes('function drawFireworksScene') && src.includes('function fwAdvance') && src.includes('function fwLoad') && src.includes('function playFwSfx') && src.includes('function fwOnClear') && src.includes('function fwOnLevelUp'));
   assert.ok(src.includes('peony') && src.includes('chrys') && src.includes('willow') && src.includes('ring') && src.includes('crackle'));
-  assert.ok(src.includes('fwBedHot') && src.includes("kind === 'clear' && hot"));
+  // 1.9.192: every visible burst has its own boom; the old bed-hot mute is gone.
+  assert.ok(src.includes('function playFwSfx') && src.includes('function playFwWhoosh') && src.includes('FW_SFX_MAX'));
   // 1.9.179 beach, 1.9.178 lightning/sparkle/frog, 1.9.177 farm stay intact
   assert.ok(src.includes('function drawBeachScene') && src.includes('function drawLightningBolts') && src.includes('function drawBlockGloss') && src.includes('function drawFrogScene'));
   assert.ok(tetGame.beachArt && tetGame.beachArt().plate.indexOf('beach-plate-') >= 0);
@@ -1931,11 +1934,18 @@ if (live) {
   });
   // 1.9.187 bright energetic male callouts (en-US-RogerNeural); old Molly clips are gone.
   // 1.9.190: Shane's Fantastic! recording replaces vo-fantastic-271ecea2.
-  const VO187 = { amazing: 'c46de485', brilliant: 'f64c21f2', fantastic: '95c74d33', awesome: '3273dcf3', yougotthis: '7761c550', keepgoing: '6be51176' };
+  // 1.9.192: Amazing/Brilliant/Awesome/Keep going re-toned to the game-over voice;
+  // Fantastic (Shane) and You got this (7761c550) are unchanged.
+  const VO187 = { amazing: 'f68cdbb0', brilliant: '791b3eb0', fantastic: '95c74d33', awesome: 'c083a2f5', yougotthis: '7761c550', keepgoing: '66d1b6c8' };
   Object.keys(VO187).forEach(id => {
     assert.strictEqual(tetGame.CALLOUT_VOICES[id], VO187[id]);
     assert.ok(fs.existsSync('feed/tetris-bg/vo-' + id + '-' + VO187[id] + '.mp3'));
   });
+  ['c46de485','f64c21f2','3273dcf3','6be51176'].forEach(h => {
+    const stale = fs.readdirSync('feed/tetris-bg').filter(f => f.indexOf(h) >= 0);
+    assert.deepEqual(stale, [], 'old Roger tone ' + h + ' must be removed');
+  });
+  assert.ok(!fs.existsSync('feed/tetris-bg/vo-yougotthis-01213bf7.mp3'), 'You got this was not re-toned');
   assert.ok(!fs.existsSync('feed/tetris-bg/vo-fantastic-271ecea2.mp3'), 'old Fantastic clip is gone');
   ['c4d7ae5c','225b6d4c','e2da3afd','20dd28a7','aee779f3','6b1d8446'].forEach(h => {
     const stale = fs.readdirSync('feed/tetris-bg').filter(f => f.indexOf(h) >= 0);
@@ -2299,13 +2309,13 @@ if (live) {
   assert.ok(gClear.board.every((row, r) => r === 19 || row.every(v => !v) || true));
 
   // A falling bomb passes the current piece and chips the topmost locked cell
-  const gPass = tetGame.newGame({ level: 12, practice: true });
-  gPass.level = 12; gPass.lines = 110;
+  const gPass = tetGame.newGame({ level: 11, practice: true });
+  gPass.level = 11; gPass.lines = 100;
   gPass.board = tetGame.emptyBoard();
   gPass.hits = tetGame.emptyBoard();
   for (let r = 16; r < 20; r++) gPass.board[r][4] = 3;
   gPass.piece = { t: 4, m: [[4, 4], [4, 4]], x: 4, y: 8 };
-  const invP = tetGame.resetInvaders(tetGame.newInvaders(), 12);
+  const invP = tetGame.resetInvaders(tetGame.newInvaders(), 11);
   invP.wait = 1e9; // only the one bomb under test
   invP.bombs.push({ x: 4 * 28 + 14, y: 8 * 28, col: 4, vy: 3 * 28 });
   const sounds = [];
@@ -2325,7 +2335,7 @@ if (live) {
 
 // 1.9.188 City workers (level 5) place one block cell on the stack from a long ladder
 {
-  assert.deepStrictEqual(Array.from(tetGame.ORDER), [6, 11, 0, 1, 4, 2, 3, 9, 10, 5, 8, 7]);
+  assert.deepStrictEqual(Array.from(tetGame.ORDER), [6, 11, 0, 1, 4, 2, 3, 9, 10, 5, 7, 8]);
   assert.strictEqual(tetGame.themeFor(5), tetGame.CITY_THEME);
   assert.strictEqual(tetGame.CITY_THEME, 4);
   assert.strictEqual(tetGame.THEMES[4].name, 'City');
@@ -2540,4 +2550,58 @@ if (live) {
   const draw = src.indexOf('try { drawStackSurfers(ctx); }');
   const ghost = src.indexOf('drawGhost(ctx, (p.x + c)');
   assert.ok(draw > 0 && ghost > draw, 'surfers are drawn before the ghost and falling piece');
+}
+
+
+// 1.9.192 Snowy mountains: snowfall ramps through the level, caps settle on exposed tops
+{
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.strictEqual(tetGame.SNOW_THEME, 10);
+  assert.strictEqual(tetGame.themeFor(9), 10);
+  assert.strictEqual(tetGame.THEMES[10].name, 'Snowy mountains');
+  assert.strictEqual(tetGame.snowProg(80, 9), 0);
+  assert.strictEqual(tetGame.snowProg(90, 9), 1);
+  assert.ok(tetGame.snowProg(85, 9) > tetGame.snowProg(80, 9) && tetGame.snowProg(85, 9) < 1);
+  const lo = tetGame.snowFallParams(0), hi = tetGame.snowFallParams(1);
+  assert.ok(lo.count < hi.count && lo.size1 < hi.size1 && lo.speed1 < hi.speed1 && lo.wind < hi.wind);
+  assert.ok(hi.count >= 40 && hi.size1 > lo.size0);
+  const board = tetGame.emptyBoard();
+  for (let r = 16; r < 20; r++) for (let c = 0; c < 5; c++) board[r][c] = 2;
+  const sn = tetGame.newBoardSnow();
+  assert.ok(sn.cap.every(v => v === 0));
+  tetGame.stepBoardSnow(sn, board, 4000, 0.85, { reduce: false });
+  const built = sn.cap.slice(0, 5);
+  const empty = sn.cap.slice(5);
+  assert.ok(built.every(v => v > 0.2), 'caps build on exposed column tops, got ' + built.join(','));
+  assert.ok(empty.every(v => v === 0), 'no caps on empty columns');
+  assert.ok(sn.flakes.length >= lo.count, 'falling flakes on the well');
+  const gSnow = tetGame.newGame({ level: 9, practice: true });
+  gSnow.board = board;
+  tetGame.stepBoardSnow(sn, gSnow.board, 200, 0.4);
+  tetGame.snowOnLineClear(gSnow, sn);
+  assert.ok(sn.cap.every(v => v === 0), 'caps clear with lines');
+  // Re-forms on the new tops.
+  tetGame.stepBoardSnow(sn, gSnow.board, 3000, 0.4);
+  assert.ok(sn.cap.slice(0, 5).every(v => v > 0.1), 'caps re-form on still-exposed tops');
+  assert.ok(src.includes('function drawSnowCaps') && src.includes('function drawBoardSnow') && src.includes('function syncSnowFx'));
+  const capsAt = src.indexOf('try { drawSnowCaps(ctx); drawBoardSnow(ctx); }');
+  const ghostAt = src.indexOf('drawGhost(ctx, (p.x + c)');
+  assert.ok(capsAt > 0 && ghostAt > capsAt, 'snow caps and flakes are drawn under the ghost and falling piece');
+  assert.ok(src.includes('snowOnLineClear(g)'));
+}
+
+// 1.9.192 Fireworks: a matching synthesised boom at the exact moment every visible burst opens
+{
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.ok(src.includes('function playFwSfx') && src.includes('function playFwWhoosh'));
+  assert.ok(src.includes('const FW_SFX_MAX = 3'));
+  assert.ok(/hp\.frequency\.value = 300/.test(src) && /lp\.frequency\.value = 3500/.test(src));
+  assert.ok(src.includes('No sharp crackle') && src.includes('0.93 + Math.random() * 0.14'));
+  assert.ok(src.includes('playFwSfx(scale, z)') && src.includes('playFwWhoosh()'));
+  const burstFn = src.split('function fwBurst')[1].split('function fwLaunch')[0];
+  assert.ok(burstFn.includes('playFwSfx(scale, z)'), 'boom fires from fwBurst, the moment it bursts');
+  const launchFn = src.split('function fwLaunch')[1].split('function fwSkyPos')[0];
+  assert.ok(launchFn.includes('playFwWhoosh()'), 'soft whoosh on launch');
+  assert.ok(!/function fwOnLevelUp[\s\S]{0,600}playFwSfx\('big'\)/.test(src));
+  assert.ok(!/function fwOnClear[\s\S]{0,900}playFwSfx\(/.test(src), 'line-clear does not batch a second bang on top of per-burst booms');
 }
