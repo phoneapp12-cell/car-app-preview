@@ -158,7 +158,7 @@
   // Colours and see-through backgrounds for each theme (same order as THEMES).
   const LOOKS = [
     { colors: ['#22d3ee', '#0ea5e9', '#fb923c', '#fde047', '#2dd4bf', '#f472b6', '#f87171'], bg: 'linear-gradient(180deg,#38bdf8 0%,#7dd3fc 45%,#fcd34d 85%,#f5d08a 100%)', board: 'rgba(8,47,73,0.5)' },
-    { colors: ['#facc15', '#f472b6', '#22d3ee', '#a855f7', '#4ade80', '#fb923c', '#f43f5e'], bg: 'linear-gradient(180deg,#020308 0%,#050814 55%,#0a1020 100%)', board: 'rgba(4,6,16,0.52)' },
+    { colors: ['#facc15', '#f472b6', '#22d3ee', '#a855f7', '#4ade80', '#fb923c', '#f43f5e'], bg: '#000', board: 'rgba(4,6,16,0.52)' },
     { colors: ['#22d3ee', '#3b82f6', '#06b6d4', '#a5f3fc', '#14b8a6', '#818cf8', '#38bdf8'], bg: 'linear-gradient(180deg,#0b8fb0 0%,#065a82 40%,#03263f 100%)', board: 'rgba(2,20,36,0.55)' },
     { colors: ['#a3e635', '#65a30d', '#d97706', '#fbbf24', '#4ade80', '#b45309', '#e11d48'], bg: 'linear-gradient(180deg,#365314 0%,#1a2e05 55%,#3b2a14 100%)', board: 'rgba(16,20,6,0.55)' },
     { colors: ['#f472b6', '#22d3ee', '#a855f7', '#facc15', '#34d399', '#fb923c', '#60a5fa'], bg: 'linear-gradient(180deg,#0f172a 0%,#312e81 55%,#831843 100%)', board: 'rgba(10,10,25,0.55)' },
@@ -2765,9 +2765,9 @@
   // The 1.9.190 sea-wash riders were removed so the well does not get cluttered.
   // 1.9.193: those surfers were removed. A painterly sea-blue wave band
   // with a soft white foam crest now rides the same skyline instead.
-  const STACK_WAVE_SPEED = 48;
-  const STACK_WAVE_INSET = 6;
-  const STACK_WAVE_H = 15;
+  // 1.9.194: that travelling band was reworked into a beach-wash sheet
+  // that spreads over the tops and pours off the blocks.
+  const STACK_WASH_INSET = 6;
   function stackColY(board, c) {
     if (!board || c < 0 || c >= COLS) return ROWS * CELL;
     for (let r = 0; r < ROWS; r++) if (board[r][c]) return r * CELL;
@@ -2777,8 +2777,8 @@
     const pts = [];
     for (let c = 0; c < COLS; c++) {
       const y = stackColY(board, c);
-      const x0 = c * CELL + (c === 0 ? STACK_WAVE_INSET : 0);
-      const x1 = (c + 1) * CELL - (c === COLS - 1 ? STACK_WAVE_INSET : 0);
+      const x0 = c * CELL + (c === 0 ? STACK_WASH_INSET : 0);
+      const x1 = (c + 1) * CELL - (c === COLS - 1 ? STACK_WASH_INSET : 0);
       if (!pts.length) pts.push({ x: x0, y: y });
       else if (Math.abs(pts[pts.length - 1].y - y) > 0.5) {
         pts.push({ x: pts[pts.length - 1].x, y: y, drop: y > pts[pts.length - 1].y });
@@ -2793,7 +2793,7 @@
     return n;
   }
   function stackPathAt(pts, dist) {
-    if (!pts || pts.length < 2) return { x: STACK_WAVE_INSET, y: ROWS * CELL, ang: 0, drop: false, rise: false, s: 0, len: 0 };
+    if (!pts || pts.length < 2) return { x: STACK_WASH_INSET, y: ROWS * CELL, ang: 0, drop: false, rise: false, s: 0, len: 0 };
     const total = stackPathLen(pts);
     if (total <= 0) return { x: pts[0].x, y: pts[0].y, ang: 0, drop: false, rise: false, s: 0, len: 0 };
     const s = Math.max(0, Math.min(total, dist));
@@ -2840,152 +2840,292 @@
     for (let c = 0; c < COLS; c++) k += stackColY(board, c) + ',';
     return k;
   }
-  // 1.9.193: the stack surfers are gone. A translucent painterly sea-blue wave
-  // band with a soft white foam crest rides the settled skyline, curling and
-  // rolling left to right and back. Visual only, under the piece and ghost.
-  function newStackWave() {
-    return { ready: false, s: 36, dir: 1, t: 0, spray: [], pts: null, key: '', len: 0, x: 0, y: ROWS * CELL, ang: 0 };
+  // 1.9.194: the travelling wave band is gone. A translucent sheet of sea
+  // water with a foamy leading edge washes up over the block tops, spreading
+  // out thin like a wave running up sand, spills over the edges and down the
+  // sides in small cascading streams and drips with soft foam, pools briefly
+  // on lower ledges, then recedes. Slow 8s cycle, like the painted surf.
+  // Visual only, under the piece and ghost. Re-forms after line clears;
+  // washes the floor when the well is empty.
+  const STACK_WASH_PERIOD = 8;
+  function washEaseOut(x) { x = Math.max(0, Math.min(1, x)); return 1 - (1 - x) * (1 - x); }
+  function washEaseIn(x) { x = Math.max(0, Math.min(1, x)); return x * x; }
+  function washCycle(tSec) {
+    const T = STACK_WASH_PERIOD;
+    const t = ((tSec % T) + T) % T;
+    return { t: t, p: t / T, period: T };
   }
-  function stackAddSpray(wave, x, y, dir, heavy) {
-    const n = heavy ? 8 : 5;
-    for (let i = 0; i < n; i++) {
-      const a = -1.4 + Math.random() * 2.8;
-      const sp = 16 + Math.random() * (heavy ? 32 : 18);
-      wave.spray.push({
-        x: x + (Math.random() - 0.5) * 8,
-        y: y - 2,
-        vx: Math.cos(a) * sp + (dir || 0) * 8,
-        vy: Math.sin(a) * sp * 0.2 - 18 - Math.random() * 12,
-        t: 0,
-        life: 0.28 + Math.random() * 0.22,
-        sz: 1.2 + Math.random() * 1.6
-      });
-    }
+  // 0–0.34 wash-up, 0.34–0.50 peak, 0.50–1 recede (slower, like a real wave).
+  function washCover(p) {
+    if (p < 0.34) return washEaseOut(p / 0.34);
+    if (p < 0.50) return 1;
+    return washEaseIn(Math.max(0, 1 - (p - 0.50) / 0.50));
   }
-  function stepStackWave(wave, board, dt, flags) {
+  function washSpill(p) {
+    if (p < 0.22) return 0;
+    if (p < 0.40) return washEaseOut((p - 0.22) / 0.18);
+    if (p < 0.56) return 1;
+    if (p < 0.80) return Math.max(0, 1 - (p - 0.56) / 0.24);
+    return 0;
+  }
+  function washPool(p) {
+    if (p < 0.30) return 0;
+    if (p < 0.46) return washEaseOut((p - 0.30) / 0.16);
+    if (p < 0.62) return 1;
+    if (p < 0.92) return Math.max(0, 1 - (p - 0.62) / 0.30);
+    return 0;
+  }
+  function stackWashInland(board, c) {
+    const ys = [];
+    for (let i = 0; i < COLS; i++) ys.push(stackColY(board, i));
+    const yMin = Math.min.apply(null, ys), yMax = Math.max.apply(null, ys);
+    const span = Math.max(CELL, yMax - yMin);
+    const heightInland = (yMax - ys[c]) / span;
+    const sideInland = c / Math.max(1, COLS - 1);
+    const hW = span > CELL * 0.5 ? 0.7 : 0;
+    return hW * heightInland + (1 - hW) * sideInland;
+  }
+  function newStackWash() {
+    const wet = [], pool = [], tops = [];
+    for (let c = 0; c < COLS; c++) { wet.push(0); pool.push(0); tops.push(ROWS * CELL); }
+    return { ready: false, t: 0, key: '', drips: [], streams: [], wet: wet, pool: pool, tops: tops };
+  }
+  function stackWashTarget(board, c, cover) {
+    const inland = stackWashInland(board, c);
+    const soft = 0.24;
+    return Math.max(0, Math.min(1, (cover - inland + soft) / soft));
+  }
+  function stackAddDrip(wash, x, y, dir) {
+    wash.drips.push({
+      x: x + (Math.random() - 0.5) * 4,
+      y: y + 1,
+      vx: (dir || 0) * (8 + Math.random() * 10) + (Math.random() - 0.5) * 6,
+      vy: 20 + Math.random() * 28,
+      t: 0,
+      life: 0.32 + Math.random() * 0.28,
+      sz: 1.1 + Math.random() * 1.5
+    });
+  }
+  function stepStackWashTick(wash, board, dt, flags) {
     flags = flags || {};
-    if (!wave || !board) return wave;
+    if (!wash || !board) return wash;
     const sec = Math.max(0, dt || 0) / 1000;
-    wave.t += sec;
-    const pts = stackSkyline(board);
+    wash.t += sec;
     const key = stackSkyKey(board);
-    const len = stackPathLen(pts);
-    if (key !== wave.key) {
-      if (wave.key) {
-        const n = stackNearestS(pts, wave.x, wave.y);
-        if (n.y - wave.y > 10) stackAddSpray(wave, n.x, n.y, wave.dir, true);
-        wave.s = n.s;
+    const keyChanged = key !== wash.key;
+    wash.key = key;
+    wash.ready = true;
+    const p = washCycle(wash.t).p;
+    const cover = washCover(p);
+    const spill = washSpill(p);
+    const poolAmt = washPool(p);
+    const reduce = !!flags.reduce;
+    const streams = [];
+    for (let c = 0; c < COLS; c++) {
+      const y = stackColY(board, c);
+      wash.tops[c] = y;
+      const target = reduce ? (c < 6 ? 0.7 : 0.15) : stackWashTarget(board, c, cover);
+      if (keyChanged) wash.wet[c] = target;
+      else {
+        const k = target > wash.wet[c] ? 7 : 1.8;
+        wash.wet[c] += (target - wash.wet[c]) * Math.min(1, sec * k);
       }
-      wave.key = key;
-      wave.pts = pts;
-      wave.len = len;
-      wave.ready = true;
-    } else {
-      wave.pts = pts;
-      wave.len = len;
+      const leftY = c > 0 ? stackColY(board, c - 1) : y;
+      const rightY = c < COLS - 1 ? stackColY(board, c + 1) : y;
+      const catchL = Math.max(0, leftY < y ? 0 : (c > 0 ? leftY - y : 0));
+      const catchR = Math.max(0, rightY < y ? 0 : (c < COLS - 1 ? rightY - y : 0));
+      const catchment = Math.min(1, (catchL + catchR) / (CELL * 3));
+      const pTarget = (catchment > 0.08 ? catchment : 0) * poolAmt * Math.max(wash.wet[c], spill * 0.5);
+      if (keyChanged) wash.pool[c] = pTarget;
+      else {
+        const pk = pTarget > wash.pool[c] ? 5 : 1.2;
+        wash.pool[c] += (pTarget - wash.pool[c]) * Math.min(1, sec * pk);
+      }
+      if (spill > 0.04 && wash.wet[c] > 0.2 && !reduce) {
+        if (c > 0 && y < leftY - 6) {
+          streams.push({ c: c, side: -1, x: c * CELL, y0: y, y1: leftY, flow: spill * wash.wet[c] });
+        }
+        if (c < COLS - 1 && y < rightY - 6) {
+          streams.push({ c: c, side: 1, x: (c + 1) * CELL, y0: y, y1: rightY, flow: spill * wash.wet[c] });
+        }
+      }
     }
-    if (wave.spray.length) {
-      for (let i = 0; i < wave.spray.length; i++) {
-        const d = wave.spray[i];
+    wash.streams = streams;
+    if (!reduce && spill > 0.2 && streams.length) {
+      for (let i = 0; i < streams.length; i++) {
+        const s = streams[i];
+        if (Math.random() < Math.min(0.85, sec * 8 * s.flow)) stackAddDrip(wash, s.x, s.y0 + 2, s.side);
+      }
+    }
+    if (wash.drips.length) {
+      for (let i = 0; i < wash.drips.length; i++) {
+        const d = wash.drips[i];
         d.t += sec;
         d.x += d.vx * sec;
         d.y += d.vy * sec;
-        d.vy += 90 * sec;
+        d.vy += 220 * sec;
       }
-      wave.spray = wave.spray.filter(function (d) { return d.t < d.life; });
+      wash.drips = wash.drips.filter(function (d) { return d.t < d.life; });
     }
-    const reduce = !!flags.reduce;
-    const before = stackPathAt(wave.pts, wave.s);
-    if (!reduce) {
-      let speed = STACK_WAVE_SPEED;
-      if (before.drop) speed *= 1.28;
-      if (before.rise) speed *= 0.86;
-      wave.s += wave.dir * speed * sec;
-      let turned = false;
-      if (wave.s <= 0) { wave.s = 0; wave.dir = 1; turned = true; }
-      if (wave.s >= wave.len) { wave.s = wave.len; wave.dir = -1; turned = true; }
-      const p = stackPathAt(wave.pts, wave.s);
-      if (turned) stackAddSpray(wave, p.x, p.y, wave.dir, false);
-      if (p.drop && !before.drop) stackAddSpray(wave, p.x, p.y, wave.dir, true);
-      wave.x = p.x; wave.y = p.y; wave.ang = p.ang;
-    } else {
-      wave.x = before.x; wave.y = before.y; wave.ang = before.ang;
-    }
-    return wave;
+    return wash;
   }
-  let stackWave = newStackWave();
-  function stackWaveReset() { stackWave = newStackWave(); }
-  function drawStackWave(ctx) {
+  function stepStackWash(wash, board, dt, flags) {
+    const ms = Math.max(0, dt || 0);
+    if (ms > 50) {
+      const step = 32;
+      for (let acc = 0; acc < ms; acc += step) stepStackWashTick(wash, board, Math.min(step, ms - acc), flags);
+      return wash;
+    }
+    return stepStackWashTick(wash, board, ms, flags);
+  }
+  let stackWash = newStackWash();
+  function stackWashReset() { stackWash = newStackWash(); }
+  function drawStackWash(ctx) {
     if (!g || isEffect((g.clearFx ? themeFor(g.clearFx.level) : themeFor(g.level))) !== 'beach') return;
-    if (!stackWave.ready && g.board) stepStackWave(stackWave, g.board, 0);
-    if (!stackWave.ready || !stackWave.pts || stackWave.pts.length < 2) return;
-    const pts = stackWave.pts;
-    const bob = Math.sin(stackWave.t * 2.15) * 1.7;
+    if (!stackWash.ready && g.board) stepStackWash(stackWash, g.board, 0);
+    if (!stackWash.ready) return;
+    const board = g.board;
+    const p = washCycle(stackWash.t).p;
+    const cover = washCover(p);
+    const bob = Math.sin(stackWash.t * 1.35) * 1.05;
     ctx.save();
     ctx.beginPath();
     ctx.rect(0, 0, COLS * CELL, ROWS * CELL);
     ctx.clip();
-    ctx.beginPath();
-    ctx.moveTo(pts[0].x, pts[0].y + bob);
-    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y + bob);
-    for (let i = pts.length - 1; i >= 0; i--) ctx.lineTo(pts[i].x, pts[i].y + bob + STACK_WAVE_H);
-    ctx.closePath();
-    const band = ctx.createLinearGradient(0, 0, 0, ROWS * CELL);
-    band.addColorStop(0, 'rgba(70, 175, 210, 0.55)');
-    band.addColorStop(1, 'rgba(20, 90, 140, 0.42)');
-    ctx.globalAlpha = 0.9;
-    ctx.fillStyle = 'rgba(46, 150, 196, 0.48)';
-    ctx.fill();
-    ctx.globalAlpha = 0.28;
-    ctx.fillStyle = 'rgba(30, 110, 160, 0.7)';
-    ctx.beginPath();
-    ctx.moveTo(pts[0].x, pts[0].y + bob + STACK_WAVE_H * 0.55);
-    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y + bob + STACK_WAVE_H * 0.55);
-    for (let i = pts.length - 1; i >= 0; i--) ctx.lineTo(pts[i].x, pts[i].y + bob + STACK_WAVE_H);
-    ctx.closePath();
-    ctx.fill();
-    ctx.globalAlpha = 0.55;
-    ctx.strokeStyle = 'rgba(180, 225, 240, 0.8)';
-    ctx.lineWidth = 3.4;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(pts[0].x, pts[0].y + bob + 3.2);
-    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y + bob + 3.2);
-    ctx.stroke();
-    ctx.globalAlpha = 0.95;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.92)';
-    ctx.lineWidth = 2.3;
-    ctx.beginPath();
-    ctx.moveTo(pts[0].x, pts[0].y + bob);
-    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y + bob);
-    ctx.stroke();
-    const cx = stackWave.x, cy = stackWave.y + bob - 1, dir = stackWave.dir || 1;
-    ctx.globalAlpha = 0.7;
-    ctx.fillStyle = 'rgba(40, 145, 190, 0.5)';
-    ctx.beginPath();
-    ctx.ellipse(cx, cy + 3, 18, 8, stackWave.ang || 0, 0, 6.283);
-    ctx.fill();
-    ctx.globalAlpha = 0.95;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
-    ctx.beginPath();
-    ctx.moveTo(cx - dir * 16, cy + 3);
-    ctx.quadraticCurveTo(cx - dir * 2, cy - 11, cx + dir * 14, cy - 2);
-    ctx.quadraticCurveTo(cx + dir * 8, cy + 7, cx - dir * 5, cy + 6);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(cx - dir * 14, cy + 2);
-    ctx.quadraticCurveTo(cx - dir * 1, cy - 10, cx + dir * 13, cy - 1);
-    ctx.stroke();
-    for (let i = 0; i < stackWave.spray.length; i++) {
-      const d = stackWave.spray[i];
+    // Residual wet sheen, then the spreading sheet on each top.
+    for (let c = 0; c < COLS; c++) {
+      const y = stackColY(board, c);
+      const sheen = Math.max(stackWash.wet[c] * 0.35, stackWash.wet[c] > 0.02 ? 0.08 : 0);
+      if (sheen > 0.02) {
+        ctx.globalAlpha = 0.18 * sheen;
+        ctx.fillStyle = 'rgba(30, 70, 90, 0.7)';
+        ctx.fillRect(c * CELL, y, CELL, Math.min(7, ROWS * CELL - y));
+      }
+      const wet = stackWash.wet[c];
+      if (wet < 0.03) continue;
+      const inland = stackWashInland(board, c);
+      const thin = Math.max(0.18, Math.min(1, (cover - inland + 0.1) / 0.45));
+      const h = (6 + 13 * wet * thin);
+      const x0 = c * CELL + (c === 0 ? STACK_WASH_INSET : -1);
+      const x1 = (c + 1) * CELL - (c === COLS - 1 ? STACK_WASH_INSET : -1);
+      const y0 = y + bob * (0.35 + 0.65 * wet);
+      const grd = ctx.createLinearGradient(x0, y0, x0, y0 + h);
+      grd.addColorStop(0, 'rgba(160, 220, 235, ' + (0.58 * wet) + ')');
+      grd.addColorStop(0.35, 'rgba(60, 165, 205, ' + (0.62 * wet) + ')');
+      grd.addColorStop(1, 'rgba(20, 90, 140, ' + (0.36 * wet) + ')');
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.moveTo(x0, y0 + 1.2);
+      ctx.lineTo(x1, y0 + 1.2);
+      ctx.lineTo(x1, y0 + h);
+      ctx.lineTo(x0, y0 + h);
+      ctx.closePath();
+      ctx.fill();
+      // Foam film on the surface, thinner toward the front.
+      ctx.globalAlpha = 0.55 * wet * thin;
+      ctx.strokeStyle = 'rgba(230, 245, 250, 0.85)';
+      ctx.lineWidth = 1.6 + 1.1 * thin;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y0);
+      ctx.stroke();
+    }
+    // Foamy leading edge — scallops where the wash is just arriving.
+    for (let c = 0; c < COLS; c++) {
+      const wet = stackWash.wet[c];
+      if (wet < 0.12 || wet > 0.88) continue;
+      const y = stackColY(board, c) + bob * 0.5;
+      const x0 = c * CELL, mid = x0 + CELL * 0.5;
+      const a = 0.75 * (1 - Math.abs(wet - 0.5) * 1.6);
+      if (a < 0.08) continue;
+      ctx.globalAlpha = Math.max(0, a);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.beginPath();
+      ctx.ellipse(mid, y - 1.2, 9 + 4 * wet, 3.2, 0, 0, 6.283);
+      ctx.fill();
+      ctx.globalAlpha = Math.max(0, a * 0.7);
+      ctx.beginPath();
+      ctx.ellipse(mid - 7, y + 0.6, 4.5, 2.1, -0.2, 0, 6.283);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(mid + 7, y + 0.4, 4.2, 1.9, 0.2, 0, 6.283);
+      ctx.fill();
+    }
+    // Pools on lower ledges.
+    for (let c = 0; c < COLS; c++) {
+      const amt = stackWash.pool[c];
+      if (amt < 0.06) continue;
+      const y = stackColY(board, c) + bob * 0.3;
+      const cx = c * CELL + CELL * 0.5;
+      const w = 8 + 9 * amt, h = 3 + 5 * amt;
+      ctx.globalAlpha = 0.55 * amt;
+      const pg = ctx.createRadialGradient(cx, y + 2, 1, cx, y + 3, w);
+      pg.addColorStop(0, 'rgba(80, 175, 210, 0.7)');
+      pg.addColorStop(0.65, 'rgba(30, 110, 160, 0.5)');
+      pg.addColorStop(1, 'rgba(30, 110, 160, 0)');
+      ctx.fillStyle = pg;
+      ctx.beginPath();
+      ctx.ellipse(cx, y + 3, w, h, 0, 0, 6.283);
+      ctx.fill();
+      ctx.globalAlpha = 0.7 * amt;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.ellipse(cx, y + 1, w * 0.85, h * 0.45, 0, 0, Math.PI);
+      ctx.stroke();
+    }
+    // Cascading streams down drop faces, with foam at the lip and the landing.
+    const streams = stackWash.streams || [];
+    for (let i = 0; i < streams.length; i++) {
+      const s = streams[i];
+      const flow = s.flow;
+      const x = s.x + s.side * 1.2;
+      const len = Math.max(8, (s.y1 - s.y0) * (0.55 + 0.45 * flow));
+      const y1 = s.y0 + len;
+      const wob = Math.sin(stackWash.t * 6 + s.c * 1.3) * 1.6 * s.side;
+      ctx.globalAlpha = 0.42 * flow;
+      ctx.strokeStyle = 'rgba(70, 170, 205, 0.9)';
+      ctx.lineWidth = 3.2 + 2.2 * flow;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x, s.y0 + 1);
+      ctx.quadraticCurveTo(x + wob, s.y0 + len * 0.45, x + wob * 0.3, y1);
+      ctx.stroke();
+      ctx.globalAlpha = 0.35 * flow;
+      ctx.strokeStyle = 'rgba(200, 230, 240, 0.85)';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(x - s.side * 1.1, s.y0 + 2);
+      ctx.quadraticCurveTo(x + wob * 0.6, s.y0 + len * 0.5, x, y1 - 2);
+      ctx.stroke();
+      // Foam lip
+      ctx.globalAlpha = 0.8 * flow;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+      ctx.beginPath();
+      ctx.ellipse(x, s.y0 + 1, 5.5, 2.4, 0, 0, 6.283);
+      ctx.fill();
+      // Splash foam where it lands
+      ctx.globalAlpha = 0.55 * flow;
+      ctx.beginPath();
+      ctx.ellipse(x + wob * 0.2, y1 - 1, 6 + 3 * flow, 2.4, 0, 0, 6.283);
+      ctx.fill();
+    }
+    // Drips
+    for (let i = 0; i < stackWash.drips.length; i++) {
+      const d = stackWash.drips[i];
       const k = Math.max(0, 1 - d.t / d.life);
-      ctx.globalAlpha = 0.55 * k;
-      ctx.fillStyle = 'rgba(255,255,255,1)';
-      ctx.beginPath(); ctx.arc(d.x, d.y, d.sz * (0.7 + 0.3 * k), 0, 6.283); ctx.fill();
+      ctx.globalAlpha = 0.7 * k;
+      ctx.fillStyle = 'rgba(210, 235, 245, 1)';
+      ctx.beginPath();
+      ctx.ellipse(d.x, d.y, d.sz * 0.7, d.sz * (1.1 + 0.4 * k), 0, 0, 6.283);
+      ctx.fill();
+      ctx.globalAlpha = 0.4 * k;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(d.x, d.y - 0.4, d.sz * 0.45, 0, 6.283);
+      ctx.fill();
     }
     ctx.restore();
   }
@@ -3170,7 +3310,51 @@
     }
   }
 
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_SAFE_TOP, CITY_CREW_N, cityBuildWait, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, HIGH_SCORE_MS, HIGH_SCORE_FADE_MS, highScoreProg, maybeHighScore, startHighScore, tickHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, FARM_SUN, FARM_HZ, farmDayTarget, farmSunPos, ROOSTER_HASH, roosterSrc, stackColY, stackSkyline, stackPathAt, stackPathLen, newStackWave, stepStackWave, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts, SNOW_THEME, snowProg, snowFallParams, newBoardSnow, stepBoardSnow, snowOnLineClear, snowReset, boardSnow: () => boardSnow, NZ_THEME, nzProg, nzBeatsPerRow, nzDropInterval, SEAGULL_HASH, seagullSrc, startNzFlash, nzFlashAlpha, newNzGulls, stepNzGulls, nzGulls: () => nzGulls, nzFlashState: () => nzFlash };
+  // 1.9.194 full-screen flash: 70ms at peak, then a 150ms fade. Only the occasional
+  // biggest burst (scale >= 2) once the show has grown to about 150%, and at most
+  // one every 8–12s. Small and medium bursts get no flash.
+  const FW_SKY_FLASH_PEAK = 0.07;
+  const FW_SKY_FLASH_FADE = 0.15;
+  const FW_MAJOR_SCALE = 2;
+  const FW_BIGGER_GROW = 1.5;
+  function fwSkyFlashAlpha(tSec) {
+    if (tSec == null || tSec < 0) return 0;
+    if (tSec <= FW_SKY_FLASH_PEAK) return 1;
+    if (tSec <= FW_SKY_FLASH_PEAK + FW_SKY_FLASH_FADE) return Math.max(0, 1 - (tSec - FW_SKY_FLASH_PEAK) / FW_SKY_FLASH_FADE);
+    return 0;
+  }
+  function startFwSkyFlash(opts) {
+    opts = opts || {};
+    fw.skyFlash = { t: 0, peak: FW_SKY_FLASH_PEAK, fade: FW_SKY_FLASH_FADE, hold: !!opts.hold, at: opts.at != null ? opts.at : 0 };
+  }
+  function tickFwSkyFlash(dtSec) {
+    if (!fw.skyFlash) return;
+    if (fw.skyFlash.hold) return;
+    fw.skyFlash.t += dtSec;
+    if (fw.skyFlash.t >= FW_SKY_FLASH_PEAK + FW_SKY_FLASH_FADE) fw.skyFlash = null;
+  }
+  function maybeFwSkyFlash(scale) {
+    if (fw.hold) return false;
+    if (fwSize(fw.prog) < FW_BIGGER_GROW) return false;
+    if (!(scale >= FW_MAJOR_SCALE)) return false;
+    const now = fw.clock || 0;
+    if (fw.skyFlashNext != null && now < fw.skyFlashNext) return false;
+    startFwSkyFlash();
+    fw.skyFlashNext = now + 8 + Math.random() * 4;
+    return true;
+  }
+  function drawFwSkyFlash(c, w, h) {
+    if (!fw.skyFlash || !c) return;
+    const tm = fw.skyFlash.hold ? (fw.skyFlash.at || 0) : fw.skyFlash.t;
+    const a = fwSkyFlashAlpha(tm);
+    if (a < 0.01) return;
+    c.save();
+    c.globalAlpha = a;
+    c.fillStyle = '#ffffff';
+    c.fillRect(0, 0, w, h);
+    c.restore();
+  }
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_SAFE_TOP, CITY_CREW_N, cityBuildWait, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, HIGH_SCORE_MS, HIGH_SCORE_FADE_MS, highScoreProg, maybeHighScore, startHighScore, tickHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, FARM_SUN, FARM_HZ, farmDayTarget, farmSunPos, ROOSTER_HASH, roosterSrc, stackColY, stackSkyline, stackPathAt, stackPathLen, newStackWash, stepStackWash, STACK_WASH_PERIOD, washCover, washSpill, washPool, stackWashInland, washCycle, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, fwSkyFlashAlpha, startFwSkyFlash, maybeFwSkyFlash, FW_SKY_FLASH_PEAK, FW_SKY_FLASH_FADE, FW_MAJOR_SCALE, FW_BIGGER_GROW, fwSkyFlashState: () => fw.skyFlash, fwProg: (p) => { if (p != null) fw.prog = p; return fw.prog; }, fwReset, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts, SNOW_THEME, snowProg, snowFallParams, newBoardSnow, stepBoardSnow, snowOnLineClear, snowReset, boardSnow: () => boardSnow, NZ_THEME, nzProg, nzBeatsPerRow, nzDropInterval, SEAGULL_HASH, seagullSrc, startNzFlash, nzFlashAlpha, newNzGulls, stepNzGulls, nzGulls: () => nzGulls, nzFlashState: () => nzFlash };
 
   if (!root.document) return;
   const doc = root.document;
@@ -3226,7 +3410,7 @@
   function press(a) {
     if (!started) started = true;
     const next = act(g, a);
-    if (a === 'restart') { g = next; invReset(); cityReset(); stackWaveReset(); snowReset(); life.hold = null; life.singHold = null; life.beachHold = null; fw.hold = null; ocean.hold = null; sparkHold = null; blockSparks = []; lifeReset(); if (isEffect(themeFor(g.level))) { lifeCast(isEffect(themeFor(g.level))); } if (root.IBScores) root.IBScores.close(); }
+    if (a === 'restart') { g = next; invReset(); cityReset(); stackWashReset(); snowReset(); life.hold = null; life.singHold = null; life.beachHold = null; fw.hold = null; ocean.hold = null; sparkHold = null; blockSparks = []; lifeReset(); if (isEffect(themeFor(g.level))) { lifeCast(isEffect(themeFor(g.level))); } if (root.IBScores) root.IBScores.close(); }
     syncHud();
     try { persistLive(); } catch (e) { }
   }
@@ -3317,7 +3501,7 @@
         life.frog.blink = opts.frogSing.blink != null ? opts.frogSing.blink : 0;
       }
     } else life.singHold = null;
-    if (opts.fireworks) { fw.hold = opts.fireworks; fw.posed = false; if (opts.fireworks.prog != null) fw.prog = opts.fireworks.prog; if (opts.fireworks.size != null) { const s0 = (opts.fireworks.size - 0.20) / 2.55; fw.prog = Math.max(0, Math.min(1, s0)); } } else { fw.hold = null; fw.posed = false; }
+    if (opts.fireworks) { fw.hold = opts.fireworks; fw.posed = false; if (opts.fireworks.prog != null) fw.prog = opts.fireworks.prog; if (opts.fireworks.size != null) { const s0 = (opts.fireworks.size - 0.20) / 2.55; fw.prog = Math.max(0, Math.min(1, s0)); } if (opts.fireworks.skyFlash) startFwSkyFlash({ hold: true, at: opts.fireworks.skyFlash.at != null ? opts.fireworks.skyFlash.at : 0.03 }); } else { fw.hold = null; fw.posed = false; fw.skyFlash = null; }
     if (opts.ocean) { ocean.hold = opts.ocean; ocean.posed = false; } else { ocean.hold = null; ocean.posed = false; }
     if (opts.sparkle) holdBlockSpark(opts.sparkle); else { sparkHold = null; }
     if (opts.callout) {
@@ -3340,9 +3524,9 @@
     invSeed(opts);
     citySeed(opts);
     snowReset();
-    stackWaveReset();
+    stackWashReset();
     if (isEffect(themeFor(g.level)) === 'beach' && g.board) {
-      stepStackWave(stackWave, g.board, opts.waveTime != null ? opts.waveTime : 0, { reduce: reduceMotion() });
+      stepStackWash(stackWash, g.board, opts.washTime != null ? opts.washTime : (opts.waveTime != null ? opts.waveTime : 0), { reduce: reduceMotion() });
     }
     if (opts.nzFlash) startNzFlash({ hold: true, at: opts.nzFlash.at != null ? opts.nzFlash.at : 80 });
     else if (themeFor(g.level) !== NZ_THEME) nzFlash = null;
@@ -3389,7 +3573,7 @@
     applyLook(themeIdx);
     invReset();
     cityReset();
-    stackWaveReset();
+    stackWashReset();
     snowReset();
     syncHud();
   }
@@ -3753,7 +3937,8 @@
     }
     // 1.9.175: always the original theme photo (center / cover), including Farmyard and Bullfrog.
     // 1.9.180 Fireworks is the exception: a black night sky (Shane asked for a black background).
-    if (kind === 'fireworks') doc.documentElement.style.background = L.bg;
+    // 1.9.194: Fireworks is plain black — no painted backdrop, no rainforest silhouette.
+    if (kind === 'fireworks') doc.documentElement.style.background = '#000';
     else doc.documentElement.style.background = 'linear-gradient(rgba(0,0,0,.28),rgba(0,0,0,.28)), url("' + PICS[i] + '") center / cover no-repeat, ' + L.bg;
     try { const nx = new root.Image(); nx.src = PICS[(i + 1) % PICS.length]; } catch (e) { }
     if (kind) { efxClearAll(); lifeReset(); if (kind === 'farm') farmLoad(); if (kind === 'frog') frogLoad(); if (kind === 'beach') beachLoad(); if (kind === 'fireworks') fwLoad(); if (kind === 'ocean') oceanLoad(); }
@@ -5506,18 +5691,20 @@
 
   // 1.9.180 Level 4 Fireworks: black sky, 3D bursts of many sizes and colours, faint rainforest
   // silhouette along the bottom, lit briefly by each burst. Launches follow the 131 BPM pulse.
+  // 1.9.194: the rainforest silhouette and any painted backdrop are gone. The sky is plain
+  // black, fireworks only. Occasional major bursts (scale >= 200%, after growth reaches
+  // 150%) fire a full-screen white flash, at most one every 8–12s. Existing booms stay.
 
   function fwLoad() {
-    if (fw.ready || fw.loading || !root.Image) return;
-    fw.loading = true;
-    const im = new root.Image();
-    im.onload = function () { fw.sil = im; fw.ready = true; fw.loading = false; };
-    im.onerror = function () { fw.ready = true; fw.loading = false; };
-    im.src = FW_ART.sil;
+    // 1.9.194: the silhouette is no longer drawn; mark ready without loading it.
+    fw.sil = null;
+    fw.ready = true;
+    fw.loading = false;
   }
   function fwReset() {
     fw.rockets = []; fw.parts = []; fw.flashes = [];
     fw.lit = 0; fw.beatLatch = false; fw.beatN = 0; fw.posed = false;
+    fw.skyFlash = null; fw.clock = 0; fw.skyFlashNext = null;
   }
   function fwPick() { return FW_COLS[(Math.random() * FW_COLS.length) | 0]; }
   function fwAddPart(p) {
@@ -5583,6 +5770,7 @@
     }
     fwFlash(x, y, z, col, scale);
     playFwSfx(scale, z);
+    maybeFwSkyFlash(scale);
   }
   function fwLaunch(box, destX, destY, typ, col, scale, z, flight) {
     if (fw.rockets.length >= FW_MAX_R) { fwBurst(destX, destY, z, typ, col, scale); return; }
@@ -5700,6 +5888,8 @@
   }
   function fwAdvance(dt, beat, reduce, prog) {
     if (prog != null) fw.prog = prog;
+    if (!fw.hold) fw.clock = (fw.clock || 0) + dt;
+    tickFwSkyFlash(dt);
     if (fw.hold) {
       if (!fw.posed) fwPose(fw.hold);
       return;
@@ -5835,13 +6025,9 @@
     if (!box || !box.dw) return;
     if (fw.hold && !fw.posed) fwPose(fw.hold);
     const sc = box.scale;
-    // Night sky in the photo box (black, with a hint of deep blue toward the ground).
-    const g = c.createLinearGradient(0, box.top, 0, box.top + box.dh);
-    g.addColorStop(0, '#020308');
-    g.addColorStop(0.55, '#050814');
-    g.addColorStop(1, '#0a1020');
-    c.fillStyle = g;
-    c.fillRect(box.left, box.top, box.dw, box.dh);
+    // 1.9.194: plain black sky, no painted backdrop.
+    c.fillStyle = '#000';
+    c.fillRect(0, 0, w, h);
 
     // Burst lighting of the sky
     c.save();
@@ -5918,36 +6104,12 @@
     }
     c.restore();
 
-    // Faint rainforest silhouette, briefly lit by bursts.
-    if (fw.sil && fw.sil.complete) {
-      const sy = box.top + (FW_ART.silY / PHOTO_H) * box.dh;
-      const sh = (FW_META.h / PHOTO_H) * box.dh;
-      const light = Math.min(1, fw.lit);
-      c.save();
-      c.globalAlpha = 0.72 + light * 0.28;
-      c.drawImage(fw.sil, box.left, sy, box.dw, sh);
-      if (light > 0.04) {
-        c.globalCompositeOperation = 'lighter';
-        c.globalAlpha = light * 0.22;
-        c.fillStyle = 'rgba(' + Math.round(fw.litR * 255) + ',' + Math.round(fw.litG * 255) + ',' + Math.round(fw.litB * 255) + ',1)';
-        // Light only the silhouette, using the image as a mask via destination-in on a temp path is heavy;
-        // a soft ground wash plus the already-drawn sil is enough.
-        const lg = c.createLinearGradient(0, sy, 0, sy + sh);
-        lg.addColorStop(0, 'rgba(' + Math.round(fw.litR * 255) + ',' + Math.round(fw.litG * 255) + ',' + Math.round(fw.litB * 255) + ',0)');
-        lg.addColorStop(0.45, 'rgba(' + Math.round(fw.litR * 255) + ',' + Math.round(fw.litG * 255) + ',' + Math.round(fw.litB * 255) + ',0.35)');
-        lg.addColorStop(1, 'rgba(' + Math.round(fw.litR * 255) + ',' + Math.round(fw.litG * 255) + ',' + Math.round(fw.litB * 255) + ',0.15)');
-        c.globalCompositeOperation = 'source-atop';
-        // source-atop would need the sil as the only content; clip to sil rect and use multiply-like wash
-        c.globalCompositeOperation = 'lighter';
-        c.fillStyle = lg;
-        c.fillRect(box.left, sy, box.dw, sh);
-      }
-      c.restore();
-    }
+    // 1.9.194: rainforest silhouette removed; fireworks only on a blank black sky.
 
     // Light veil so the board stays readable without muting the bursts too much.
     c.fillStyle = 'rgba(0,0,0,0.16)';
     c.fillRect(box.left, box.top, box.dw, box.dh);
+    drawFwSkyFlash(c, w, h);
   }
 
 
@@ -6727,8 +6889,8 @@
     try { if (!clearing) invStep(dt); } catch (e) { }
     try { if (!clearing) cityStep(dt); } catch (e) { }
     try {
-      if (g && isEffect(cellThemeIdx()) === 'beach') stepStackWave(stackWave, g.board, dt, { reduce: reduceMotion() });
-      else if (stackWave.ready) stackWaveReset();
+      if (g && isEffect(cellThemeIdx()) === 'beach') stepStackWash(stackWash, g.board, dt, { reduce: reduceMotion() });
+      else if (stackWash.ready) stackWashReset();
     } catch (e) { }
     try {
       if (g && themeFor(g.clearFx ? g.clearFx.level : g.level) === SNOW_THEME) stepBoardSnow(boardSnow, g.board, dt, snowProg(g.lines, g.level), { reduce: reduceMotion() });
@@ -6778,7 +6940,7 @@
       try { if (!sparkHold) tickBlockSpark(now, drawBoard, (!g.over && !fx) ? g.piece : null, reduceMotion()); } catch (e) { }
       try { invDraw(ctx); } catch (e) { }
       try { drawCityCrew(ctx); } catch (e) { }
-      try { drawStackWave(ctx); } catch (e) { }
+      try { drawStackWash(ctx); } catch (e) { }
       try { drawSnowCaps(ctx); drawBoardSnow(ctx); } catch (e) { }
       try { drawEffectTrails(ctx); drawEffectRipples(ctx); } catch (e) { }
       if (!g.over && !fx) {
