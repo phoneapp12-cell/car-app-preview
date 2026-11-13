@@ -153,7 +153,10 @@
       bells: ['A4', 'C5', 'D5', 'E5', 'G5', 'A5'] },
     { name: 'Jeremiah was a bullfrog', beat: 0.6, pad: 'triangle', ambient: 'none', critter: 'none', pitch: 0.9, sfx: 'triangle',
       chords: [['G2', 'D3', 'G3', 'B3'], ['C3', 'G3', 'C4', 'E4'], ['D3', 'A3', 'D4', 'FS4'], ['G2', 'D3', 'G3', 'B3']],
-      bells: ['G4', 'A4', 'B4', 'D5', 'E5', 'G5'] }
+      bells: ['G4', 'A4', 'B4', 'D5', 'E5', 'G5'] },
+    { name: 'Food', beat: 0.667, pad: 'sine', ambient: 'none', critter: 'none', pitch: 1, sfx: 'sine',
+      chords: [['F2', 'C3', 'F3', 'A3'], ['AS2', 'F3', 'AS3', 'D4'], ['C3', 'G3', 'C4', 'E4'], ['D3', 'A3', 'D4', 'F4']],
+      bells: ['F4', 'G4', 'A4', 'C5', 'D5', 'F5'] }
   ];
   // Colours and see-through backgrounds for each theme (same order as THEMES).
   const LOOKS = [
@@ -168,7 +171,8 @@
     { colors: ['#f43f5e', '#f59e0b', '#14b8a6', '#facc15', '#a855f7', '#06b6d4', '#ec4899'], bg: 'linear-gradient(135deg,#0f766e 0%,#7e22ce 50%,#ea580c 100%)', board: 'rgba(20,10,40,0.5)' },
     { colors: ['#ef4444', '#14b8a6', '#22c55e', '#facc15', '#38bdf8', '#e5e7eb', '#f97316'], bg: 'linear-gradient(180deg,#2563eb 0%,#22d3ee 45%,#15803d 100%)', board: 'rgba(5,30,30,0.5)' },
     { colors: ['#e0f2fe', '#93c5fd', '#f9a8d4', '#fde68a', '#5eead4', '#c4b5fd', '#fca5a5'], bg: 'linear-gradient(180deg,#f9a8d4 0%,#818cf8 45%,#1e3a8a 100%)', board: 'rgba(15,23,60,0.5)' },
-    { colors: ['#4ade80', '#16a34a', '#f472b6', '#facc15', '#22d3ee', '#a3e635', '#fb923c'], bg: 'linear-gradient(180deg,#fb923c 0%,#f472b6 35%,#0e7490 70%,#14532d 100%)', board: 'rgba(5,30,20,0.5)' }
+    { colors: ['#4ade80', '#16a34a', '#f472b6', '#facc15', '#22d3ee', '#a3e635', '#fb923c'], bg: 'linear-gradient(180deg,#fb923c 0%,#f472b6 35%,#0e7490 70%,#14532d 100%)', board: 'rgba(5,30,20,0.5)' },
+    { colors: ['#fde6c8', '#facc15', '#eab308', '#fb7185', '#f97316', '#22c55e', '#ef4444'], bg: 'linear-gradient(180deg,#f5d0a0 0%,#c4b59a 40%,#6b4f3a 100%)', board: 'rgba(40,24,12,0.48)' }
   ];
   // Colourful picture behind each theme (same order as THEMES), softened with a dark veil so the blocks stand out.
   const PICS = THEMES.map((_, i) => 'tetris-bg/' + i + '.webp');
@@ -177,7 +181,8 @@
   // 1.9.188: City (theme 4) moved to level 5; Ocean and the levels after it shift down one.
   // 1.9.192: Space travel is level 11; Triangles is last (level 12).
   // 1.9.198: Beach is level 2, Space travel is level 3 (Farmyard, Beach, Space travel, Bullfrog, Fireworks, City, Ocean, Bush walk, New Zealand, Snowy mountains, Night sky, Triangles).
-  const ORDER = [6, 0, 7, 11, 1, 4, 2, 3, 9, 10, 5, 8];
+  // 1.9.199: Food is level 12, just before Triangles (still last).
+  const ORDER = [6, 0, 7, 11, 1, 4, 2, 3, 9, 10, 5, 12, 8];
   function themeFor(level) { return ORDER[(Math.max(1, level) - 1) % ORDER.length]; }
   function stages() { return ORDER.map((ti, i) => ({ level: i + 1, theme: ti, name: THEMES[ti].name })); }
   function shouldSubmit(gm) { return !!(gm && !gm.practice && gm.score > 0); }
@@ -185,6 +190,81 @@
   // 1.9.192: Triangles is the last level (level 12).
   // Red and blue for the first 5 lines of the level, then pink and lime after half the lines needed (5 of 10).
   const TRI_THEME = 8;
+  const FOOD_THEME = 12;
+
+  // 1.9.199 Food (theme 12, level 12): pieces are painted food, fragments stay in each cell after lock.
+  const FOOD_KIND = ['', 'ice', 'banana', 'banana', 'melon', 'carrot', 'broccoli', 'chilli'];
+  function foodKind(t) { return FOOD_KIND[t] || 'munch'; }
+  function foodSoundFor(t) {
+    const k = foodKind(t);
+    if (k === 'carrot' || k === 'chilli') return 'crunch';
+    if (k === 'banana' || k === 'ice') return 'squish';
+    return 'munch';
+  }
+  function emptyFood() { return Array.from({ length: ROWS }, () => Array(COLS).fill(null)); }
+  function ensureFood(g) {
+    if (!g.food || g.food.length !== ROWS) g.food = emptyFood();
+    return g.food;
+  }
+  function cloneFood(food) {
+    return (food || []).map(row => (row || []).map(cell => cell ? { t: cell.t, rot: cell.rot || 0, lr: cell.lr || 0, lc: cell.lc || 0 } : null));
+  }
+  function dropFood(food, rows) {
+    const next = (food || emptyFood()).filter((_, i) => rows.indexOf(i) < 0);
+    while (next.length < ROWS) next.unshift(Array(COLS).fill(null));
+    return next;
+  }
+  function stampFood(g, p) {
+    if (!g || !p || !p.m) return;
+    const food = ensureFood(g);
+    const rot = (p.rot || 0) % 4;
+    for (let r = 0; r < p.m.length; r++) {
+      for (let c = 0; c < p.m[r].length; c++) {
+        if (!p.m[r][c]) continue;
+        const y = p.y + r, x = p.x + c;
+        if (y >= 0 && y < ROWS && x >= 0 && x < COLS) food[y][x] = { t: p.t, rot: rot, lr: r, lc: c };
+      }
+    }
+  }
+  function foodMetaAt(g, col, row, falling) {
+    if (falling && g && g.piece && g.piece.m) {
+      const p = g.piece;
+      const lr = row - p.y, lc = col - p.x;
+      if (p.m[lr] && p.m[lr][lc]) return { t: p.t, rot: p.rot || 0, lr: lr, lc: lc };
+    }
+    if (g && g.food && g.food[row] && g.food[row][col]) return g.food[row][col];
+    const t = g && g.board && g.board[row] && g.board[row][col];
+    return t ? { t: t, rot: 0, lr: 0, lc: 0 } : null;
+  }
+  function rotShape(t, rot) {
+    let m = SHAPES[t].map(r => r.slice());
+    const n = ((rot || 0) % 4 + 4) % 4;
+    for (let i = 0; i < n; i++) m = rotateCW(m);
+    return m;
+  }
+  function shapeCells(m) {
+    const cells = [];
+    (m || []).forEach((row, r) => row.forEach((v, c) => { if (v) cells.push({ r: r, c: c }); }));
+    return cells;
+  }
+  function shapePath(m) {
+    const cells = shapeCells(m);
+    const key = (r, c) => r + ',' + c;
+    const set = new Set(cells.map(p => key(p.r, p.c)));
+    const nbrs = p => [[1, 0], [-1, 0], [0, 1], [0, -1]].map(d => ({ r: p.r + d[0], c: p.c + d[1] })).filter(q => set.has(key(q.r, q.c)));
+    if (!cells.length) return [];
+    let start = cells[0];
+    cells.forEach(p => { if (nbrs(p).length <= 1) start = p; });
+    const path = [start];
+    const used = new Set([key(start.r, start.c)]);
+    while (path.length < cells.length) {
+      const nxt = nbrs(path[path.length - 1]).find(q => !used.has(key(q.r, q.c)));
+      if (!nxt) break;
+      used.add(key(nxt.r, nxt.c));
+      path.push(nxt);
+    }
+    return path;
+  }
   const TRI_PAL = { early: ['#e25b62', '#4e88d6'], late: ['#ef8cba', '#8dce5c'] };
   function triangleLate(lines) { return (Math.max(0, lines | 0) % 10) >= 5; }
   function trianglePalette(lines, level) {
@@ -197,6 +277,10 @@
     if (pal) return pal[(t - 1) % 2];
     if (themeFor(level == null ? 1 : level) === NZ_THEME) {
       const cols = nzPaletteNow();
+      return cols[(t - 1) % cols.length];
+    }
+    if (themeFor(level == null ? 1 : level) === FOOD_THEME) {
+      const cols = (LOOKS[FOOD_THEME] && LOOKS[FOOD_THEME].colors) || COLORS.slice(1);
       return cols[(t - 1) % cols.length];
     }
     return COLORS[t];
@@ -376,7 +460,8 @@
     { bpm: 117.5, offset: 0.209, key: 'A', mode: 'major' },
     { bpm: 108.79, offset: 0.023, key: 'E', mode: 'minor' },
     { bpm: 123, offset: 0.218, key: 'G', mode: 'major' },
-    { bpm: 127.45, offset: 0.266, key: 'D', mode: 'major' }
+    { bpm: 127.45, offset: 0.266, key: 'D', mode: 'major' },
+    { bpm: 90, offset: 0, key: 'F', mode: 'major' }
   ];
   const MAJOR_IV = [0, 2, 4, 5, 7, 9, 11], MINOR_IV = [0, 2, 3, 5, 7, 8, 10];
   const PC = { C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, F: 5, 'F#': 6, Gb: 6, G: 7, 'G#': 8, Ab: 8, A: 9, 'A#': 10, Bb: 10, B: 11 };
@@ -950,6 +1035,98 @@
     if (seagullBuf) start(seagullBuf);
     else if (seagullLoading) seagullLoading.then(function (b) { if (b && soundOn && ac) { ensureSeagullGain(); start(b); } });
   }
+  // 1.9.199 Food landing / clear bites: synthesised, CC0-free originals. 300 Hz–3.5 kHz, mellow, louder than the music but gentle.
+  const FOOD_HASH = { munch: '25db313e', crunch: '5b730569', squish: '6f68e879', chomp: 'f2449c85' };
+  const FOOD_VOL = { munch: 0.66, crunch: 0.68, squish: 0.64, chomp: 0.72 };
+  function foodSrc(kind) { return 'tetris-bg/food-' + kind + '-' + FOOD_HASH[kind] + '.mp3'; }
+  let foodBufs = {}, foodLoading = {}, foodGain = null;
+  function ensureFoodGain() {
+    if (!ac || foodGain) return;
+    foodGain = ac.createGain();
+    foodGain.gain.value = 1;
+    foodGain.connect(ac.destination);
+  }
+  function loadFoodSfx(kind) {
+    if (foodBufs[kind]) return Promise.resolve(foodBufs[kind]);
+    if (foodLoading[kind]) return foodLoading[kind];
+    if (!ac || !FOOD_HASH[kind]) return Promise.resolve(null);
+    foodLoading[kind] = fetch(foodSrc(kind)).then(r => r.arrayBuffer()).then(ab => ac.decodeAudioData(ab.slice(0))).then(b => { foodBufs[kind] = b; return b; }).catch(() => { foodLoading[kind] = null; return null; });
+    return foodLoading[kind];
+  }
+  function playFoodSfx(kind) {
+    if (!soundOn || !ac || !FOOD_HASH[kind]) return;
+    ensureFoodGain();
+    loadFoodSfx(kind);
+    const rate = 0.96 + Math.random() * 0.08;
+    const start = function (buf) {
+      if (!buf || !foodGain || !ac) return;
+      const src = ac.createBufferSource();
+      src.buffer = buf;
+      src.playbackRate.value = rate;
+      const hp = ac.createBiquadFilter();
+      hp.type = 'highpass'; hp.frequency.value = 300; hp.Q.value = 0.7;
+      const lp = ac.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 3500; lp.Q.value = 0.5;
+      const g0 = ac.createGain();
+      g0.gain.value = FOOD_VOL[kind] || 0.66;
+      src.connect(hp); hp.connect(lp); lp.connect(g0); g0.connect(foodGain);
+      src.start(ac.currentTime);
+    };
+    if (foodBufs[kind]) start(foodBufs[kind]);
+    else if (foodLoading[kind]) foodLoading[kind].then(function (b) { if (b && soundOn && ac) { ensureFoodGain(); start(b); } });
+    duckMusic(0, kind === 'chomp' ? 0.4 : 0.28);
+  }
+  function playFoodLand(t) { playFoodSfx(foodSoundFor(t)); }
+  function playFoodChomp() { playFoodSfx('chomp'); }
+  let foodBurst = [];
+  function spawnFoodBurst(g, p, alongRows) {
+    if (!g) return;
+    const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : 0;
+    const cells = [];
+    if (alongRows && alongRows.length) {
+      alongRows.forEach(r => { for (let c = 0; c < COLS; c++) if ((g.board[r] && g.board[r][c]) || (g.food && g.food[r] && g.food[r][c])) cells.push({ c: c, r: r, t: (g.board[r] && g.board[r][c]) || 4 }); });
+    } else if (p && p.m) {
+      p.m.forEach((row, r) => row.forEach((v, c) => { if (v && p.y + r >= 0) cells.push({ c: p.x + c, r: p.y + r, t: p.t }); }));
+    }
+    cells.forEach((cell) => {
+      const kind = foodSoundFor(cell.t);
+      const n = alongRows ? 5 : 3;
+      for (let k = 0; k < n; k++) {
+        const ang = Math.random() * 6.28;
+        const spd = 18 + Math.random() * 32;
+        foodBurst.push({
+          x: (cell.c + 0.5) * CELL, y: (cell.r + 0.5) * CELL,
+          vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd - 12,
+          t0: now, dur: 280 + Math.random() * 180,
+          color: kind === 'squish' ? '#fb7185' : (kind === 'crunch' ? '#f9d7b5' : '#fef3c7'),
+          juice: kind === 'squish',
+          r: 1.4 + Math.random() * 2.2
+        });
+      }
+    });
+    if (foodBurst.length > 80) foodBurst = foodBurst.slice(-80);
+  }
+  function stepFoodBurst(dt) {
+    const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : 0;
+    foodBurst = foodBurst.filter(p => (now - p.t0) < p.dur);
+    foodBurst.forEach(p => { p.x += p.vx * dt / 1000; p.y += p.vy * dt / 1000; p.vy += 80 * dt / 1000; });
+  }
+  function drawFoodBurst(ctx) {
+    if (!ctx || !foodBurst.length) return;
+    const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : 0;
+    foodBurst.forEach(p => {
+      const u = (now - p.t0) / p.dur;
+      if (u < 0 || u > 1) return;
+      ctx.save();
+      ctx.globalAlpha = 0.9 * (1 - u);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      if (p.juice) ctx.ellipse(p.x, p.y, p.r * (1.1 - 0.3 * u), p.r * 0.7, u, 0, 6.283);
+      else ctx.arc(p.x, p.y, p.r * (1 - 0.35 * u), 0, 6.283);
+      ctx.fill();
+      ctx.restore();
+    });
+  }
     function boardOccupied(g) {
     return !!(g && g.board && g.board.some(function (row) { return row.some(function (v) { return v; }); }));
   }
@@ -1069,7 +1246,7 @@
 
   function resetRotRiff() { rotStep = 0; rotAt = 0; }
   // Theme timbres for the rotate riff: musical, mellow, distinct from the move taps.
-  const ROT_KIND = ['pluck', 'bellpad', 'harp', 'wood', 'city', 'bellpad', 'marimba', 'space', 'triangle', 'pluck', 'ice', 'marimba'];
+  const ROT_KIND = ['pluck', 'bellpad', 'harp', 'wood', 'city', 'bellpad', 'marimba', 'space', 'triangle', 'pluck', 'ice', 'marimba', 'pluck'];
   function rotNote(freq, dur, vol, dest, t0, kind, shimmer) {
     const f = Math.max(300, Math.min(800, freq));
     const att = 0.014;
@@ -1268,7 +1445,7 @@
   function sfx(name, lines) {
     if (!soundOn || !ac) return;
     if (name === 'over') { playGameOverSfx(); return; }
-    if (name === 'clear' || name === 'tetris') { playLineClearSfx(name === 'tetris' ? 4 : (lines || 1)); return; }
+    if (name === 'clear' || name === 'tetris') { playLineClearSfx(name === 'tetris' ? 4 : (lines || 1)); if (themeIdx === FOOD_THEME) playFoodChomp(); return; }
     if (name === 'rotate') { playRotateSfx(true); return; }
     if (name === 'rotateFail') { playRotateSfx(false); return; }
     if (name === 'move' || name === 'soft' || name === 'drop' || name === 'lock') { playMoveSfx(name); return; }
@@ -1518,7 +1695,7 @@
   }
   function spawn(t) {
     const m = SHAPES[t].map(r => r.slice());
-    return { t, m, x: Math.floor((COLS - m[0].length) / 2), y: t === 1 ? -1 : 0 };
+    return { t, m, x: Math.floor((COLS - m[0].length) / 2), y: t === 1 ? -1 : 0, rot: 0 };
   }
   function takeNext(g) { if (g.bag.length === 0) g.bag = refillBag(); return g.bag.shift(); }
   // 1.9.174 Tetris Effect stage for Farmyard (6) and Bullfrog (11) only.
@@ -1836,11 +2013,11 @@
 
   // 1.9.158 Line-clear flourish: a soft coloured sweep, themed sparkles, a short pause, then the rows drop.
   // Pause stays under 400ms so the game still flows. More lines = a bigger burst; four lines get a soft banner.
-  const CLEAR_KIND = { 1: 'leaves', 2: 'bubbles', 3: 'leaves', 5: 'stars', 7: 'stars', 10: 'snow', 11: 'frog' };
+  const CLEAR_KIND = { 1: 'leaves', 2: 'bubbles', 3: 'leaves', 5: 'stars', 7: 'stars', 10: 'snow', 11: 'frog', 12: 'crumbs' };
   function clearDuration(n) { return Math.min(400, 240 + 40 * Math.max(1, Math.min(4, n || 1))); }
   function clearKind(ti) { return CLEAR_KIND[ti] || 'sparkle'; }
   function clearPartCount(n) { return Math.min(36, 8 + 8 * Math.max(1, Math.min(4, n || 1))); }
-  function startClear(g, rows, snap, lines, level, snapHits) {
+  function startClear(g, rows, snap, lines, level, snapHits, snapFood) {
     const n = rows.length;
     const ti = themeFor(level);
     const kind = clearKind(ti);
@@ -1874,9 +2051,10 @@
         hop: 18 + Math.random() * 16
       });
     }
-    g.clearFx = { t: 0, dur, rows: rows.slice(), snap, snapHits: snapHits ? snapHits.map(r => r.slice()) : null, n, kind, parts, lines, level, hold: false, at: 0, banner: n === 4 };
+    g.clearFx = { t: 0, dur, rows: rows.slice(), snap, snapHits: snapHits ? snapHits.map(r => r.slice()) : null, snapFood: snapFood ? cloneFood(snapFood) : null, n, kind, parts, lines, level, hold: false, at: 0, banner: n === 4 };
     if (isEffect(ti)) { effectOnClear(g.clearFx, ti); lifeReact(); }
     if (ti === NZ_THEME) startNzFlash();
+    if (ti === FOOD_THEME) spawnFoodBurst(g, null, rows);
     return g.clearFx;
   }
   function tickClear(g, dt) {
@@ -2061,7 +2239,7 @@
     opt = opt || {};
     const level = Math.max(1, opt.level || 1);
     const practice = !!opt.practice;
-    const g = { board: emptyBoard(), hits: emptyBoard(), piece: spawn(1), bag: refillBag(), next: 0, hold: 0, canHold: true, score: 0, lines: (level - 1) * 10, level, over: false, paused: false, acc: 0, flashT: 0, popup: '', popupT: 0, practice, startLevel: level, clearFx: null, pendingLevel: null, levelUp: null, callout: null, clearCombo: 0, lastWasTetris: false, familyHigh: 0, highNoted: false, highScore: null, pendingHigh: false };
+    const g = { board: emptyBoard(), hits: emptyBoard(), food: emptyFood(), piece: spawn(1), bag: refillBag(), next: 0, hold: 0, canHold: true, score: 0, lines: (level - 1) * 10, level, over: false, paused: false, acc: 0, flashT: 0, popup: '', popupT: 0, practice, startLevel: level, clearFx: null, pendingLevel: null, levelUp: null, callout: null, clearCombo: 0, lastWasTetris: false, familyHigh: 0, highNoted: false, highScore: null, pendingHigh: false };
     g.piece = spawn(takeNext(g));
     g.next = takeNext(g);
     seedHighBar(g);
@@ -2175,9 +2353,11 @@
     const oldLevel = g.level;
     const snap = g.board.map(r => r.slice());
     const snapHits = ensureHits(g).map(r => r.slice());
-    startClear(g, full, snap, g.lines, g.level, snapHits);
+    const snapFood = cloneFood(ensureFood(g));
+    startClear(g, full, snap, g.lines, g.level, snapHits, snapFood);
     g.board = dropRows(g.board, full, 0);
     g.hits = dropRows(g.hits, full, 0);
+    g.food = dropFood(g.food, full);
     const pts = LINE_POINTS[full.length] * g.level;
     g.lines += full.length;
     g.score += pts;
@@ -2428,6 +2608,7 @@
         g.board[y][p.x + c] = p.t;
       }
     }
+    stampFood(g, p);
     if (g.over) { sfx('over'); return g; }
     resetRotRiff();
     const full = findFullRows(g);
@@ -2436,7 +2617,9 @@
     if (full.length) {
       applyClear(g, full);
     } else {
-      sfx('lock'); effectLand(g);
+      if (themeFor(g.level) === FOOD_THEME) { playFoodLand(p.t); spawnFoodBurst(g, p); }
+      else sfx('lock');
+      effectLand(g);
       g.clearCombo = 0;
       g.lastWasTetris = false;
       const high = highBefore;
@@ -2473,7 +2656,7 @@
       const fromY = p.y;
       while (!collides(g.board, p.m, p.x, p.y + 1)) { p.y++; d++; }
       g.score += d * 2;
-      sfx('drop');
+      if (themeFor(g.level) !== FOOD_THEME) sfx('drop');
       if (d) effectDropTrail(g, fromY, p.y);
       lockPiece(g);
     } else if (a === 'rotate' || a === 'rotateBack') {
@@ -2481,8 +2664,8 @@
       const kicks = [0, -1, 1, -2, 2];
       let turned = false;
       for (const k of kicks) {
-        if (!collides(g.board, m, p.x + k, p.y)) { p.m = m; p.x += k; sfx('rotate'); effectAction('rotate', g); turned = true; break; }
-        if (!collides(g.board, m, p.x + k, p.y - 1)) { p.m = m; p.x += k; p.y -= 1; sfx('rotate'); effectAction('rotate', g); turned = true; break; }
+        if (!collides(g.board, m, p.x + k, p.y)) { p.m = m; p.x += k; p.rot = ((p.rot || 0) + (a === 'rotate' ? 1 : 3)) % 4; sfx('rotate'); effectAction('rotate', g); turned = true; break; }
+        if (!collides(g.board, m, p.x + k, p.y - 1)) { p.m = m; p.x += k; p.y -= 1; p.rot = ((p.rot || 0) + (a === 'rotate' ? 1 : 3)) % 4; sfx('rotate'); effectAction('rotate', g); turned = true; break; }
       }
       if (!turned) sfx('rotateFail');
     } else if (a === 'hold' && g.canHold) {
@@ -2503,7 +2686,9 @@
   // effects cannot pause or mute a separate HTML audio element on iOS/Android WebView.
   // Filenames include a content hash because some phone media caches ignore ?v= query strings
   // (1.9.163 busted the URL but Shane still heard the old bullfrog track).
-  const BGM_HASH = ['da11a54a', '9813c57a', '9ca3b84e', '7776197f', '1814d32a', '63c9eafe', '7bc4ebcd', 'b76dd1d3', 'fdec4369', '812638a3', 'cdbe7d34', '8afd517f'];
+  // 1.9.199 Food (theme 12) uses a gentle synthesised F-major placeholder until Shane supplies a song.
+  // Swap by replacing m12-<hash>.mp3 and updating BGM_HASH[12] plus TRACKS[12] bpm/offset/key/mode.
+  const BGM_HASH = ['da11a54a', '9813c57a', '9ca3b84e', '7776197f', '1814d32a', '63c9eafe', '7bc4ebcd', 'b76dd1d3', 'fdec4369', '812638a3', 'cdbe7d34', '8afd517f', '4456f9a4'];
   function bgmSrc(ti) { return 'tetris-bg/m' + ti + '-' + BGM_HASH[ti] + '.mp3'; }
   let bgmGain = null, bgmNode = null, bgmIdx = -1, bgmBufs = {}, bgmLoading = {}, bgmAt = 0, bgmRate = 1, bgmWant = false, bgmWantTi = -1, bgmAnalyser = null, bgmBins = null;
   function silentUnlock() {
@@ -2604,6 +2789,7 @@
     hsBuf = null; hsLoading = null; hsGain = null;
     bgmFading = false;
     bgmBufs = {}; bgmLoading = {};
+    foodBufs = {}; foodLoading = {}; foodGain = null;
   }
 
   const LIVE_KEY = 'ib-tetris-live';
@@ -2611,7 +2797,7 @@
   function cloneBoard(b) { return (b || []).map(r => (r || []).slice()); }
   function clonePiece(p) {
     if (!p) return null;
-    return { t: p.t, x: p.x, y: p.y, m: (p.m || []).map(r => r.slice()) };
+    return { t: p.t, x: p.x, y: p.y, m: (p.m || []).map(r => r.slice()), rot: p.rot || 0 };
   }
   function snapshotGame(g, extra) {
     extra = extra || {};
@@ -2641,7 +2827,8 @@
         familyHigh: g.familyHigh || 0,
         highNoted: !!g.highNoted,
         scored: !!g.scored,
-        hits: cloneBoard(ensureHits(g))
+        hits: cloneBoard(ensureHits(g)),
+        food: cloneFood(ensureFood(g))
       }
     };
   }
@@ -2694,6 +2881,7 @@
     g.highNoted = !!s.highNoted;
     g.scored = !!s.scored;
     g.hits = s.hits ? cloneBoard(s.hits) : emptyBoard();
+    g.food = s.food ? cloneFood(s.food) : emptyFood();
     g.paused = true;
     g.clearFx = null;
     g.pendingLevel = null;
@@ -3458,7 +3646,7 @@
     c.fillRect(0, 0, w, h);
     c.restore();
   }
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_BUILD_EVERY_LOW, CITY_SAFE_TOP, CITY_CREW_N, CITY_ANIM_CLIMB, CITY_ANIM_PLACE, CITY_ANIM_DOWN, CITY_ANIM_FAST, cityHighestSettled, cityStackLow, cityBuildEvery, cityBuildWait, cityAnimDur, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, HIGH_SCORE_MS, HIGH_SCORE_FADE_MS, highScoreProg, maybeHighScore, startHighScore, tickHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, FARM_SUN, FARM_HZ, farmDayTarget, farmSunPos, ROOSTER_HASH, roosterSrc, stackColY, stackSkyline, stackPathAt, stackPathLen, newStackWash, stepStackWash, STACK_WASH_PERIOD, washCover, washSpill, washPool, stackWashInland, washCycle, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, fwSkyFlashAlpha, startFwSkyFlash, maybeFwSkyFlash, FW_SKY_FLASH_PEAK, FW_SKY_FLASH_FADE, FW_MAJOR_SCALE, FW_BIGGER_GROW, fwSkyFlashState: () => fw.skyFlash, fwProg: (p) => { if (p != null) fw.prog = p; return fw.prog; }, fwReset, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts, SNOW_THEME, snowProg, snowFallParams, newBoardSnow, stepBoardSnow, snowOnLineClear, snowReset, boardSnow: () => boardSnow, NZ_THEME, nzProg, nzBeatsPerRow, nzDropInterval, NZ_PAL, NZ_PAL_STEPS, NZ_PAL_FADE_MS, nzPalIndex, nzPaletteNow, mixHex, nzMixProgress, resetNzPal, setNzPal, tickNzPal, nzPalState, EXTREME_KEY, EXTREME_PEEK_MS, EXTREME_EXIT_MIN, EXTREME_TOP_RESERVE, SEAGULL_HASH, seagullSrc, startNzFlash, nzFlashAlpha, newNzGulls, stepNzGulls, nzGulls: () => nzGulls, nzFlashState: () => nzFlash };
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_BUILD_EVERY_LOW, CITY_SAFE_TOP, CITY_CREW_N, CITY_ANIM_CLIMB, CITY_ANIM_PLACE, CITY_ANIM_DOWN, CITY_ANIM_FAST, cityHighestSettled, cityStackLow, cityBuildEvery, cityBuildWait, cityAnimDur, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, HIGH_SCORE_MS, HIGH_SCORE_FADE_MS, highScoreProg, maybeHighScore, startHighScore, tickHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, FARM_SUN, FARM_HZ, farmDayTarget, farmSunPos, ROOSTER_HASH, roosterSrc, stackColY, stackSkyline, stackPathAt, stackPathLen, newStackWash, stepStackWash, STACK_WASH_PERIOD, washCover, washSpill, washPool, stackWashInland, washCycle, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, fwSkyFlashAlpha, startFwSkyFlash, maybeFwSkyFlash, FW_SKY_FLASH_PEAK, FW_SKY_FLASH_FADE, FW_MAJOR_SCALE, FW_BIGGER_GROW, fwSkyFlashState: () => fw.skyFlash, fwProg: (p) => { if (p != null) fw.prog = p; return fw.prog; }, fwReset, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts, SNOW_THEME, snowProg, snowFallParams, newBoardSnow, stepBoardSnow, snowOnLineClear, snowReset, boardSnow: () => boardSnow, NZ_THEME, nzProg, nzBeatsPerRow, nzDropInterval, NZ_PAL, NZ_PAL_STEPS, NZ_PAL_FADE_MS, nzPalIndex, nzPaletteNow, mixHex, nzMixProgress, resetNzPal, setNzPal, tickNzPal, nzPalState, EXTREME_KEY, EXTREME_PEEK_MS, EXTREME_EXIT_MIN, EXTREME_TOP_RESERVE, SEAGULL_HASH, seagullSrc, startNzFlash, nzFlashAlpha, newNzGulls, stepNzGulls, nzGulls: () => nzGulls, nzFlashState: () => nzFlash, FOOD_THEME, FOOD_KIND, FOOD_HASH, FOOD_VOL, foodKind, foodSoundFor, foodSrc, emptyFood, ensureFood, cloneFood, dropFood, stampFood, foodMetaAt, rotShape, shapeCells, shapePath, playFoodSfx, playFoodLand, playFoodChomp };
 
   if (!root.document) return;
   const doc = root.document;
@@ -3535,6 +3723,8 @@
     if (opts.board) g.board = opts.board;
     if (opts.hits) g.hits = opts.hits;
     else if (opts.board) g.hits = emptyBoard();
+    if (opts.food) g.food = cloneFood(opts.food);
+    else if (opts.board) g.food = emptyFood();
     if (opts.piece) g.piece = opts.piece;
     if (opts.next != null) g.next = opts.next;
     if (opts.hold != null) { g.hold = opts.hold; g.canHold = true; }
@@ -3927,8 +4117,300 @@
     ctx.stroke();
     ctx.restore();
   }
-  function drawCell(ctx, x, y, color, size, alpha, col, row) {
 
+  function foodHex(c, a) {
+    const n = parseInt(String(c || '#fff').replace('#', ''), 16);
+    const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + (a == null ? 1 : a) + ')';
+  }
+  function foodShade(c, amt) {
+    const n = parseInt(String(c || '#fff').replace('#', ''), 16);
+    const k = amt < 0 ? 1 + amt : 1;
+    let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    if (amt < 0) { r *= k; g *= k; b *= k; }
+    else { r = r + (255 - r) * amt; g = g + (255 - g) * amt; b = b + (255 - b) * amt; }
+    const hex = v => ('0' + Math.max(0, Math.min(255, Math.round(v))).toString(16)).slice(-2);
+    return '#' + hex(r) + hex(g) + hex(b);
+  }
+  function foodStrokeAround(ctx, draw, color, size, ghost) {
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = ghost ? color : 'rgba(0,0,0,0.22)';
+    ctx.lineWidth = Math.max(1.2, size * (ghost ? 0.12 : 0.06));
+    draw();
+    ctx.stroke();
+    if (ghost) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+      ctx.lineWidth = Math.max(1, size * 0.045);
+      draw();
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  function drawFoodShape(ctx, ox, oy, size, t, rot, alpha, ghost, color) {
+    const m = rotShape(t, rot);
+    const path = shapePath(m);
+    const cells = shapeCells(m);
+    if (!path.length) return;
+    const pts = path.map(p => ({ x: ox + (p.c + 0.5) * size, y: oy + (p.r + 0.5) * size }));
+    const kind = foodKind(t);
+    const col = color || blockColor(t, 0, 12);
+    ctx.globalAlpha = alpha;
+    const width = size * (kind === 'ice' ? 0.62 : (kind === 'broccoli' ? 0.78 : 0.72));
+    function tube(pts, w0, w1) {
+      if (pts.length === 1) {
+        ctx.beginPath();
+        ctx.arc(pts[0].x, pts[0].y, w0 * 0.5, 0, 6.283);
+        return;
+      }
+      // Build a rounded envelope along the polyline.
+      const left = [], right = [];
+      for (let i = 0; i < pts.length; i++) {
+        const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
+        let dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
+        dx /= len; dy /= len;
+        const w = w0 + (w1 - w0) * (i / (pts.length - 1));
+        left.push({ x: pts[i].x - dy * w, y: pts[i].y + dx * w });
+        right.push({ x: pts[i].x + dy * w, y: pts[i].y - dx * w });
+      }
+      ctx.beginPath();
+      ctx.moveTo(left[0].x, left[0].y);
+      for (let i = 1; i < left.length; i++) ctx.lineTo(left[i].x, left[i].y);
+      const last = pts[pts.length - 1], prev = pts[pts.length - 2];
+      const endA = Math.atan2(last.y - prev.y, last.x - prev.x);
+      ctx.arc(last.x, last.y, w1, endA - 1.2, endA + Math.PI + 1.2, false);
+      for (let i = right.length - 1; i >= 0; i--) ctx.lineTo(right[i].x, right[i].y);
+      const first = pts[0], nxt = pts[1];
+      const startA = Math.atan2(first.y - nxt.y, first.x - nxt.x);
+      ctx.arc(first.x, first.y, w0, startA - 1.2, startA + Math.PI + 1.2, false);
+      ctx.closePath();
+    }
+    if (kind === 'melon') {
+      let minC = 9, minR = 9, maxC = -1, maxR = -1;
+      cells.forEach(p => { minC = Math.min(minC, p.c); maxC = Math.max(maxC, p.c); minR = Math.min(minR, p.r); maxR = Math.max(maxR, p.r); });
+      const cx = ox + ((minC + maxC + 1) / 2) * size;
+      const cy = oy + ((minR + maxR + 1) / 2) * size;
+      const rad = size * 0.98;
+      const drawMelon = function () {
+        ctx.beginPath();
+        ctx.arc(cx, cy, rad, 0, 6.283);
+      };
+      if (ghost) {
+        ctx.fillStyle = foodHex(col, 0.26);
+        drawMelon(); ctx.fill();
+        foodStrokeAround(ctx, drawMelon, col, size, true);
+      } else {
+        ctx.fillStyle = '#3f7d3a';
+        drawMelon(); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx, cy, rad * 0.86, 0, 6.283);
+        ctx.fillStyle = '#f8f1e4'; ctx.fill();
+        ctx.beginPath(); ctx.arc(cx, cy, rad * 0.78, 0, 6.283);
+        const flesh = ctx.createRadialGradient(cx - rad * 0.2, cy - rad * 0.25, rad * 0.1, cx, cy, rad * 0.8);
+        flesh.addColorStop(0, '#fb9aa6');
+        flesh.addColorStop(1, '#e11d48');
+        ctx.fillStyle = flesh; ctx.fill();
+        ctx.fillStyle = 'rgba(20,10,10,0.78)';
+        for (let i = 0; i < 7; i++) {
+          const a = -0.6 + i * 0.7, d = rad * (0.22 + (i % 3) * 0.14);
+          ctx.beginPath();
+          ctx.ellipse(cx + Math.cos(a) * d, cy + Math.sin(a) * d, size * 0.055, size * 0.09, a, 0, 6.283);
+          ctx.fill();
+        }
+        ctx.fillStyle = 'rgba(255,255,255,0.28)';
+        ctx.beginPath();
+        ctx.ellipse(cx - rad * 0.28, cy - rad * 0.3, rad * 0.28, rad * 0.16, -0.5, 0, 6.283);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+        ctx.lineWidth = Math.max(1, size * 0.04);
+        drawMelon(); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      return;
+    }
+    if (kind === 'broccoli') {
+      // Stem toward the unique end, florets as clustered bumps on every cell.
+      const stem = path[0];
+      const sx = ox + (stem.c + 0.5) * size, sy = oy + (stem.r + 0.5) * size;
+      const mid = path[Math.min(1, path.length - 1)];
+      const mx = ox + (mid.c + 0.5) * size, my = oy + (mid.r + 0.5) * size;
+      const drawStem = function () {
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(mx, my);
+      };
+      if (ghost) {
+        cells.forEach(p => {
+          ctx.beginPath();
+          ctx.arc(ox + (p.c + 0.5) * size, oy + (p.r + 0.5) * size, size * 0.42, 0, 6.283);
+          ctx.fillStyle = foodHex(col, 0.26);
+          ctx.fill();
+          foodStrokeAround(ctx, function () { ctx.beginPath(); ctx.arc(ox + (p.c + 0.5) * size, oy + (p.r + 0.5) * size, size * 0.42, 0, 6.283); }, col, size, true);
+        });
+        ctx.globalAlpha = 1;
+        return;
+      }
+      ctx.strokeStyle = '#6b4f2a';
+      ctx.lineWidth = size * 0.28;
+      ctx.lineCap = 'round';
+      drawStem(); ctx.stroke();
+      ctx.strokeStyle = '#8b6914';
+      ctx.lineWidth = size * 0.16;
+      drawStem(); ctx.stroke();
+      cells.forEach((p, i) => {
+        const cx = ox + (p.c + 0.5) * size, cy = oy + (p.r + 0.5) * size;
+        const bumps = 5;
+        for (let k = 0; k < bumps; k++) {
+          const a = i * 0.7 + k * 1.3;
+          const rr = size * (0.28 - k * 0.025);
+          const bx = cx + Math.cos(a) * size * 0.16;
+          const by = cy + Math.sin(a) * size * 0.14 - size * 0.04;
+          const grd = ctx.createRadialGradient(bx - rr * 0.3, by - rr * 0.35, rr * 0.1, bx, by, rr);
+          grd.addColorStop(0, foodShade(col, 0.28));
+          grd.addColorStop(0.55, col);
+          grd.addColorStop(1, foodShade(col, -0.35));
+          ctx.beginPath();
+          ctx.arc(bx, by, rr, 0, 6.283);
+          ctx.fillStyle = grd;
+          ctx.fill();
+        }
+      });
+      ctx.globalAlpha = 1;
+      return;
+    }
+    // Path foods: ice, banana, carrot, chilli
+    let wStart = width * 0.5, wEnd = width * 0.5;
+    if (kind === 'carrot' || kind === 'chilli') { wStart = width * 0.58; wEnd = width * 0.22; }
+    if (kind === 'banana') { wStart = width * 0.48; wEnd = width * 0.38; }
+    if (kind === 'ice') { wStart = width * 0.5; wEnd = width * 0.5; }
+    const midW = (wStart + wEnd) * 0.5;
+    const spine = function () {
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      if (pts.length === 2) ctx.lineTo(pts[1].x, pts[1].y);
+      else {
+        ctx.lineTo((pts[0].x + pts[1].x) / 2, (pts[0].y + pts[1].y) / 2);
+        for (let i = 1; i < pts.length - 1; i++) {
+          ctx.quadraticCurveTo(pts[i].x, pts[i].y, (pts[i].x + pts[i + 1].x) / 2, (pts[i].y + pts[i + 1].y) / 2);
+        }
+        ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+      }
+    };
+    const drawBody = function () { tube(pts, wStart, wEnd); };
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    if (ghost) {
+      ctx.strokeStyle = foodHex(col, 0.28);
+      ctx.lineWidth = midW * 2;
+      spine(); ctx.stroke();
+      ctx.strokeStyle = col;
+      ctx.lineWidth = Math.max(2.2, size * 0.11);
+      spine(); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+      ctx.lineWidth = Math.max(1, size * 0.045);
+      spine(); ctx.stroke();
+      ctx.globalAlpha = 1;
+      return;
+    }
+    const grd = ctx.createLinearGradient(pts[0].x, pts[0].y, pts[pts.length - 1].x, pts[pts.length - 1].y);
+    if (kind === 'ice') {
+      grd.addColorStop(0, '#fff1dc');
+      grd.addColorStop(0.2, '#fde6c8');
+      grd.addColorStop(0.55, '#fbcfe8');
+      grd.addColorStop(1, '#fda4af');
+    } else if (kind === 'banana') {
+      grd.addColorStop(0, foodShade(col, 0.2));
+      grd.addColorStop(0.45, col);
+      grd.addColorStop(1, foodShade(col, -0.12));
+    } else if (kind === 'carrot') {
+      grd.addColorStop(0, '#fb923c');
+      grd.addColorStop(0.5, col);
+      grd.addColorStop(1, '#c2410c');
+    } else {
+      grd.addColorStop(0, '#f87171');
+      grd.addColorStop(0.5, col);
+      grd.addColorStop(1, '#991b1b');
+    }
+    ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+    ctx.lineWidth = midW * 2 + Math.max(1.5, size * 0.05);
+    spine(); ctx.stroke();
+    ctx.strokeStyle = grd;
+    ctx.lineWidth = midW * 2;
+    spine(); ctx.stroke();
+    // highlights along the curved spine
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = Math.max(1.2, size * 0.08);
+    ctx.save();
+    ctx.translate(-size * 0.08, -size * 0.1);
+    spine(); ctx.stroke();
+    ctx.restore();
+    const tip = pts[0], nxt = pts[1] || tip;
+    const ang = Math.atan2(tip.y - (nxt.y), tip.x - (nxt.x));
+    if (kind === 'ice') {
+      // wooden stick at the first end
+      const sx = tip.x + Math.cos(ang) * size * 0.55;
+      const sy = tip.y + Math.sin(ang) * size * 0.55;
+      ctx.save();
+      ctx.translate(tip.x, tip.y);
+      ctx.rotate(ang);
+      ctx.fillStyle = '#c4a574';
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(-size * 0.1, -size * 0.13, size * 0.72, size * 0.26, 4) : ctx.rect(-size * 0.1, -size * 0.13, size * 0.72, size * 0.26);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.fillRect(0, -size * 0.1, size * 0.5, size * 0.06);
+      ctx.restore();
+    } else if (kind === 'banana') {
+      ctx.fillStyle = '#6b4226';
+      ctx.beginPath();
+      ctx.ellipse(tip.x + Math.cos(ang) * size * 0.28, tip.y + Math.sin(ang) * size * 0.28, size * 0.09, size * 0.14, ang, 0, 6.283);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(90,60,20,0.28)';
+      ctx.lineWidth = 1.2;
+      spine(); ctx.stroke();
+    } else if (kind === 'carrot') {
+      // leafy top at the fat end
+      ctx.save();
+      ctx.translate(tip.x, tip.y);
+      ctx.rotate(ang);
+      ctx.strokeStyle = '#4d7c0f';
+      ctx.lineWidth = Math.max(1.2, size * 0.07);
+      ctx.lineCap = 'round';
+      for (let i = -1; i <= 1; i++) {
+        ctx.beginPath();
+        ctx.moveTo(size * 0.05, 0);
+        ctx.quadraticCurveTo(size * 0.28, i * size * 0.18, size * 0.48, i * size * 0.28);
+        ctx.stroke();
+      }
+      ctx.restore();
+    } else if (kind === 'chilli') {
+      ctx.fillStyle = '#3f6212';
+      ctx.beginPath();
+      ctx.ellipse(tip.x + Math.cos(ang) * size * 0.32, tip.y + Math.sin(ang) * size * 0.32, size * 0.08, size * 0.16, ang, 0, 6.283);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  function drawFoodCell(ctx, x, y, size, alpha, meta, color, ghost) {
+    if (!meta || !meta.t) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x - 1.2, y - 1.2, size + 2.4, size + 2.4);
+    ctx.clip();
+    const ox = x - (meta.lc || 0) * size;
+    const oy = y - (meta.lr || 0) * size;
+    drawFoodShape(ctx, ox, oy, size, meta.t, meta.rot || 0, alpha, !!ghost, color);
+    if (!ghost) drawBlockGloss(ctx, x, y, size, alpha * 0.85);
+    ctx.restore();
+  }
+
+  function drawCell(ctx, x, y, color, size, alpha, col, row, meta) {
+
+    if (themeFor(g.level) === FOOD_THEME) {
+      const fm = meta || foodMetaAt(g, col, row);
+      drawFoodCell(ctx, x, y, size, alpha, fm, color, false);
+      return;
+    }
     if (themeFor(g.level) === TRI_THEME) {
       ctx.globalAlpha = alpha;
       triPath(ctx, x, y, size, col, row);
@@ -3962,10 +4444,16 @@
     drawBlockGloss(ctx, x, y, size, alpha);
     ctx.globalAlpha = 1;
   }
-  function drawGhost(ctx, x, y, color, size, col, row) {
+  function drawGhost(ctx, x, y, color, size, col, row, meta) {
     // 1.9.183 Stronger landing preview: see-through fill, colour outline, faint glow.
     // No gloss or bevel, so it is never mistaken for a locked block.
     ctx.save();
+    if (themeFor(g.level) === FOOD_THEME) {
+      const fm = meta || foodMetaAt(g, col, row, true);
+      drawFoodCell(ctx, x, y, size, 1, fm, color, true);
+      ctx.restore();
+      return;
+    }
     if (themeFor(g.level) === TRI_THEME) {
       ctx.globalAlpha = 0.28;
       ctx.fillStyle = color;
@@ -4036,7 +4524,9 @@
     m.forEach((row, r) => row.forEach((v, c) => { if (v) { minR = Math.min(minR, r); maxR = Math.max(maxR, r); minC = Math.min(minC, c); maxC = Math.max(maxC, c); } }));
     const w = (maxC - minC + 1) * s, h = (maxR - minR + 1) * s;
     const ox = (cv.width - w) / 2, oy = (cv.height - h) / 2;
-    m.forEach((row, r) => row.forEach((v, c) => { if (v) drawCell(ctx, ox + (c - minC) * s, oy + (r - minR) * s, blockColor(t, g.lines, g.level), s, dim ? 0.35 : 1, c, r); }));
+    m.forEach((row, r) => row.forEach((v, c) => {
+      if (v) drawCell(ctx, ox + (c - minC) * s, oy + (r - minR) * s, blockColor(t, g.lines, g.level), s, dim ? 0.35 : 1, c, r, { t: t, rot: 0, lr: r, lc: c });
+    }));
   }
   let lookIdx = -1, boardBg = LOOKS[0].board;
   function applyLook(i) {
@@ -4107,8 +4597,77 @@
     [{ e: ['🐸'], n: 3, m: 'walk', sp: [10, 20], y: [0.9, 0.97], sz: [26, 34], a: 0.95 },
      { e: ['🪷'], n: 5, m: 'drift', sp: [6, 12], sz: [16, 24], a: 0.85 },
      { e: ['🐞', '🦋'], n: 3, m: 'flutter', sp: [14, 22], y: [0.3, 0.8], sz: [16, 22], a: 0.9 },
-     { e: ['o'], n: 8, m: 'bubble', sp: [10, 20], sz: [3, 6], a: 0.45 }]
+     { e: ['o'], n: 8, m: 'bubble', sp: [10, 20], sz: [3, 6], a: 0.45 }],
+    []
   ];
+
+  // 1.9.199 Painted produce around the Food board: gentle bob, soft 3D volume, no cartoon glyphs.
+  let foodLife = { items: [], ready: false, w: 0, h: 0 };
+  function newFoodLife(w, h) {
+    const items = [
+      { kind: 'apple', x: 0.10, y: 0.10, s: 22, ph: 0.2, col: '#e11d48' },
+      { kind: 'citrus', x: 0.86, y: 0.12, s: 20, ph: 1.1, col: '#fb923c' },
+      { kind: 'grape', x: 0.08, y: 0.78, s: 16, ph: 2.0, col: '#7c3aed' },
+      { kind: 'apple', x: 0.90, y: 0.80, s: 18, ph: 2.8, col: '#16a34a' },
+      { kind: 'citrus', x: 0.14, y: 0.22, s: 14, ph: 3.6, col: '#facc15' },
+      { kind: 'grape', x: 0.84, y: 0.24, s: 15, ph: 4.4, col: '#4d7c0f' }
+    ];
+    foodLife = { items: items, ready: true, w: w, h: h };
+    return foodLife;
+  }
+  function stepFoodLife(st, dt, w, h, opts) {
+    opts = opts || {};
+    if (!st || !st.ready || st.w !== w || st.h !== h) st = newFoodLife(w, h);
+    if (opts.reduce) return st;
+    st.t = (st.t || 0) + dt;
+    return st;
+  }
+  function drawFoodLife(ctx, st, w, h, reduce) {
+    if (!ctx || !st || !st.ready) return;
+    const t = (st.t || 0) / 1000;
+    ctx.save();
+    try { clipAroundBoard(ctx, w, h); } catch (e) { }
+    st.items.forEach(it => {
+      const bob = reduce ? 0 : Math.sin(t * 1.1 + it.ph) * 5;
+      const sway = reduce ? 0 : Math.cos(t * 0.8 + it.ph) * 3;
+      const x = it.x * w + sway, y = it.y * h + bob;
+      const s = it.s;
+      const shine = 0.5 + 0.5 * Math.sin(t * 1.4 + it.ph);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(1 + 0.04 * Math.sin(t * 0.9 + it.ph), 1);
+      // contact shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.18)';
+      ctx.beginPath();
+      ctx.ellipse(0, s * 0.55, s * 0.55, s * 0.18, 0, 0, 6.283);
+      ctx.fill();
+      if (it.kind === 'grape') {
+        for (let i = 0; i < 6; i++) {
+          const a = i * 1.05, rr = s * 0.32;
+          const gx = Math.cos(a) * s * 0.32, gy = Math.sin(a) * s * 0.28;
+          const g = ctx.createRadialGradient(gx - rr * 0.3, gy - rr * 0.35, 1, gx, gy, rr);
+          g.addColorStop(0, foodShade(it.col, 0.35));
+          g.addColorStop(1, foodShade(it.col, -0.25));
+          ctx.beginPath(); ctx.arc(gx, gy, rr, 0, 6.283); ctx.fillStyle = g; ctx.fill();
+        }
+      } else {
+        const g = ctx.createRadialGradient(-s * 0.28, -s * 0.32, s * 0.1, 0, 0, s);
+        g.addColorStop(0, foodShade(it.col, 0.4));
+        g.addColorStop(0.55, it.col);
+        g.addColorStop(1, foodShade(it.col, -0.35));
+        ctx.beginPath(); ctx.arc(0, 0, s * 0.48, 0, 6.283); ctx.fillStyle = g; ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,' + (0.22 + 0.12 * shine) + ')';
+        ctx.beginPath(); ctx.ellipse(-s * 0.16, -s * 0.18, s * 0.14, s * 0.08, -0.5, 0, 6.283); ctx.fill();
+        if (it.kind === 'apple') {
+          ctx.strokeStyle = '#3f6212'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.moveTo(0, -s * 0.48); ctx.quadraticCurveTo(s * 0.08, -s * 0.7, s * 0.16, -s * 0.62); ctx.stroke();
+        }
+      }
+      ctx.restore();
+    });
+    ctx.restore();
+  }
+
   const fx = { cv: null, ctx: null, w: 0, h: 0, list: [], theme: -1, last: 0, cache: new Map(), off: false };
   try { fx.off = !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { }
   const rnd = (a, b) => a + Math.random() * (b - a);
@@ -4218,6 +4777,13 @@
       } catch (e) { }
     } else if (nzGulls && nzGulls.ready) nzGullsReset();
     try { drawNzFlash(c, fx.w, fx.h); } catch (e) { }
+    const foodOn = (lookIdx < 0 ? themeIdx : lookIdx) === FOOD_THEME || (g && themeFor(g.clearFx ? g.clearFx.level : g.level) === FOOD_THEME);
+    if (foodOn) {
+      try {
+        foodLife = stepFoodLife(foodLife, dt * 1000, fx.w, fx.h, { reduce: fx.off || reduceMotion() });
+        drawFoodLife(c, foodLife, fx.w, fx.h, fx.off || reduceMotion());
+      } catch (e) { }
+    } else if (foodLife && foodLife.ready) foodLife.ready = false;
   }
   // Pixel invaders on the Space travel board. They drift; bombs fall slowly down a column.
   const INV_SPRITES = [
@@ -6742,6 +7308,13 @@
     } else if (o.kind === 'frog') {
       if (isHop) drawFrog(ctx, x, y, Math.max(4.5, o.size * 0.85));
       else drawPad(ctx, x, y, o.size * 1.3, o.color);
+    } else if (o.kind === 'crumbs') {
+      ctx.fillStyle = o.color;
+      ctx.beginPath();
+      ctx.ellipse(x, y, o.size * 0.9, o.size * 0.6, o.rot + o.spin * age, 0, 6.283);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(251,113,133,0.55)';
+      ctx.beginPath(); ctx.arc(x + o.size * 0.4, y - o.size * 0.3, o.size * 0.35, 0, 6.283); ctx.fill();
     } else {
       ctx.fillStyle = rgbaHex(o.color, 0.35);
       ctx.beginPath(); ctx.arc(x, y, o.size * 1.8, 0, 6.283); ctx.fill();
@@ -6928,6 +7501,13 @@
       } else if (o.kind === 'frog') {
         if (isHop) drawFrog(ctx, x, y, Math.max(4.5, o.size * 0.85));
         else drawPad(ctx, x, y, o.size * 1.3, o.color);
+      } else if (o.kind === 'crumbs') {
+        ctx.fillStyle = o.color;
+        ctx.beginPath();
+        ctx.ellipse(x, y, o.size * 0.9, o.size * 0.6, o.rot + o.spin * age, 0, 6.283);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(251,113,133,0.55)';
+        ctx.beginPath(); ctx.arc(x + o.size * 0.4, y - o.size * 0.3, o.size * 0.35, 0, 6.283); ctx.fill();
       } else {
         ctx.fillStyle = rgbaHex(o.color, 0.35);
         ctx.beginPath(); ctx.arc(x, y, o.size * 1.8, 0, 6.283); ctx.fill();
@@ -7049,10 +7629,12 @@
       const colLines = fx ? fx.lines : g.lines;
       const colLevel = fx ? fx.level : g.level;
       const hitBoard = fx && fx.snapHits ? fx.snapHits : (g.hits || null);
+      const foodBoard = fx && fx.snapFood ? fx.snapFood : (g.food || null);
       for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
         const v = drawBoard[r][c];
         if (v) {
-          drawCell(ctx, c * CELL, r * CELL, blockColor(v, colLines, colLevel), CELL, 1, c, r);
+          const fm = (foodBoard && foodBoard[r] && foodBoard[r][c]) ? foodBoard[r][c] : { t: v, rot: 0, lr: 0, lc: 0 };
+          drawCell(ctx, c * CELL, r * CELL, blockColor(v, colLines, colLevel), CELL, 1, c, r, fm);
           const hits = hitBoard && hitBoard[r] ? (hitBoard[r][c] || 0) : 0;
           if (hits) drawBlockHits(ctx, c * CELL, r * CELL, CELL, hits, now);
         }
@@ -7068,13 +7650,14 @@
         let gy = p.y;
         while (!collides(g.board, p.m, p.x, gy + 1)) gy++;
         p.m.forEach((row, r) => row.forEach((v, c) => {
-          if (v && gy + r >= 0) drawGhost(ctx, (p.x + c) * CELL, (gy + r) * CELL, blockColor(p.t, g.lines, g.level), CELL, p.x + c, gy + r);
+          if (v && gy + r >= 0) drawGhost(ctx, (p.x + c) * CELL, (gy + r) * CELL, blockColor(p.t, g.lines, g.level), CELL, p.x + c, gy + r, { t: p.t, rot: p.rot || 0, lr: r, lc: c });
         }));
         p.m.forEach((row, r) => row.forEach((v, c) => {
-          if (v && p.y + r >= 0) drawCell(ctx, (p.x + c) * CELL, (p.y + r) * CELL, blockColor(p.t, g.lines, g.level), CELL, 1, p.x + c, p.y + r);
+          if (v && p.y + r >= 0) drawCell(ctx, (p.x + c) * CELL, (p.y + r) * CELL, blockColor(p.t, g.lines, g.level), CELL, 1, p.x + c, p.y + r, { t: p.t, rot: p.rot || 0, lr: r, lc: c });
         }));
       }
       try { drawBlockSparks(ctx, now, CELL); } catch (e) { }
+      try { stepFoodBurst(16); drawFoodBurst(ctx); } catch (e) { }
       if (fx) drawClearFx(ctx, fx);
       if (g.levelUp) drawLevelUp(ctx, g.levelUp);
       if (g.highScore) drawHighScore(ctx, g.highScore);

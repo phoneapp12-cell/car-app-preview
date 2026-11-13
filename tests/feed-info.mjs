@@ -130,28 +130,29 @@ assert.strictEqual(tetGame.themeFor(1), 6);
 assert.strictEqual(tetGame.themeFor(2), 0);
 assert.strictEqual(tetGame.themeFor(3), 7);
 assert.strictEqual(tetGame.themeFor(11), 5);
-assert.strictEqual(tetGame.themeFor(12), 8);
+assert.strictEqual(tetGame.themeFor(12), 12);
+assert.strictEqual(tetGame.themeFor(13), 8);
 assert.strictEqual(tetGame.THEMES[8].name, 'Triangles');
 assert.strictEqual(tetGame.THEMES[11].name, 'Jeremiah was a bullfrog');
 assert.strictEqual(tetGame.TRI_THEME, 8);
 // Palette follows the Triangles theme wherever it sits: first 5 lines of the level red/blue, then pink/lime.
-assert.deepStrictEqual(tetGame.trianglePalette(100, 12), tetGame.TRI_PAL.early);
-assert.deepStrictEqual(tetGame.trianglePalette(104, 12), tetGame.TRI_PAL.early);
-assert.deepStrictEqual(tetGame.trianglePalette(105, 12), tetGame.TRI_PAL.late);
-assert.deepStrictEqual(tetGame.trianglePalette(109, 12), tetGame.TRI_PAL.late);
+assert.deepStrictEqual(tetGame.trianglePalette(100, 13), tetGame.TRI_PAL.early);
+assert.deepStrictEqual(tetGame.trianglePalette(104, 13), tetGame.TRI_PAL.early);
+assert.deepStrictEqual(tetGame.trianglePalette(105, 13), tetGame.TRI_PAL.late);
+assert.deepStrictEqual(tetGame.trianglePalette(109, 13), tetGame.TRI_PAL.late);
 assert.strictEqual(tetGame.triangleLate(104), false);
 assert.strictEqual(tetGame.triangleLate(105), true);
-assert.strictEqual(tetGame.blockColor(1, 100, 12), tetGame.TRI_PAL.early[0]); // red
-assert.strictEqual(tetGame.blockColor(2, 100, 12), tetGame.TRI_PAL.early[1]); // blue
-assert.strictEqual(tetGame.blockColor(3, 105, 12), tetGame.TRI_PAL.late[0]);  // pink
-assert.strictEqual(tetGame.blockColor(4, 105, 12), tetGame.TRI_PAL.late[1]);  // lime
-const triCols = new Set([1, 2, 3, 4, 5, 6, 7].map(t => tetGame.blockColor(t, 102, 12)));
+assert.strictEqual(tetGame.blockColor(1, 100, 13), tetGame.TRI_PAL.early[0]); // red
+assert.strictEqual(tetGame.blockColor(2, 100, 13), tetGame.TRI_PAL.early[1]); // blue
+assert.strictEqual(tetGame.blockColor(3, 105, 13), tetGame.TRI_PAL.late[0]);  // pink
+assert.strictEqual(tetGame.blockColor(4, 105, 13), tetGame.TRI_PAL.late[1]);  // lime
+const triCols = new Set([1, 2, 3, 4, 5, 6, 7].map(t => tetGame.blockColor(t, 102, 13)));
 assert.deepStrictEqual([...triCols].sort(), [...tetGame.TRI_PAL.early].sort());
 assert.strictEqual(tetGame.trianglePalette(0, 1), null, 'other themes keep their own colours');
 assert.strictEqual(tetGame.trianglePalette(14, 2), null, 'bullfrog on level 2 is not triangles');
 assert.strictEqual(tetGame.blockColor(1, 0, 1), tetGame.COLORS[1]);
 const gTri = tetGame.newGame();
-gTri.level = 12; gTri.lines = 102;
+gTri.level = 13; gTri.lines = 122;
 const beforeX = 4;
 gTri.piece = { t: 4, m: [[4, 4], [4, 4]], x: beforeX, y: 0 };
 tetGame.act(gTri, 'left');
@@ -985,19 +986,24 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
 
 // 1.9.166 Shane-only Tetris level picker (practice mode, not posted to the family scoreboard)
 {
-  const names = ['Farmyard', 'Beach', 'Space travel', 'Jeremiah was a bullfrog', 'Fireworks', 'City', 'Ocean', 'Bush walk', 'New Zealand', 'Snowy mountains', 'Night sky', 'Triangles'];
-  assert.deepStrictEqual(Array.from(tetGame.ORDER), [6, 0, 7, 11, 1, 4, 2, 3, 9, 10, 5, 8]);
+  const names = ['Farmyard', 'Beach', 'Space travel', 'Jeremiah was a bullfrog', 'Fireworks', 'City', 'Ocean', 'Bush walk', 'New Zealand', 'Snowy mountains', 'Night sky', 'Food', 'Triangles'];
+  assert.deepStrictEqual(Array.from(tetGame.ORDER), [6, 0, 7, 11, 1, 4, 2, 3, 9, 10, 5, 12, 8]);
   assert.deepStrictEqual(Array.from(tetGame.stages().map(s => s.name)), names);
-  assert.deepStrictEqual(Array.from(tetGame.stages().map(s => s.level)), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  assert.deepStrictEqual(Array.from(tetGame.stages().map(s => s.level)), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
   const gPr = tetGame.newGame({ level: 12, practice: true });
   assert.strictEqual(gPr.level, 12);
   assert.strictEqual(gPr.lines, 110);
   assert.strictEqual(gPr.practice, true);
   assert.strictEqual(gPr.startLevel, 12);
   assert.strictEqual(gPr.score, 0);
-  assert.strictEqual(tetGame.themeFor(gPr.level), 8);
-  assert.deepStrictEqual(tetGame.trianglePalette(gPr.lines, gPr.level), tetGame.TRI_PAL.early);
+  assert.strictEqual(tetGame.themeFor(gPr.level), tetGame.FOOD_THEME);
   assert.strictEqual(tetGame.dropInterval(gPr.level), tetGame.dropInterval(12));
+  const gTriPr = tetGame.newGame({ level: 13, practice: true });
+  assert.strictEqual(gTriPr.level, 13);
+  assert.strictEqual(gTriPr.lines, 120);
+  assert.strictEqual(tetGame.themeFor(gTriPr.level), 8);
+  assert.deepStrictEqual(tetGame.trianglePalette(gTriPr.lines, gTriPr.level), tetGame.TRI_PAL.early);
+  assert.strictEqual(tetGame.dropInterval(gTriPr.level), tetGame.dropInterval(13));
   assert.strictEqual(tetGame.shouldSubmit(gPr), false, 'practice never goes on the family board');
   const gSp = tetGame.newGame({ level: 3, practice: true });
   assert.strictEqual(gSp.level, 3);
@@ -1035,7 +1041,7 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
 // 1.9.166 Tetris sounds follow the music (tempo/key), and Space bombs actually drop
 {
   const almost = (a, b, eps) => assert.ok(Math.abs(a - b) <= (eps || 1e-6), a + ' != ' + b);
-  assert.strictEqual(tetGame.TRACKS.length, 12);
+  assert.strictEqual(tetGame.TRACKS.length, 13);
   tetGame.TRACKS.forEach((tr, i) => {
     assert.ok(tr.bpm > 50 && tr.bpm < 200, 'bpm m' + i);
     assert.ok(tr.offset >= 0 && tr.offset < 60 / tr.bpm + 1e-6, 'offset phase m' + i);
@@ -1058,7 +1064,7 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   };
   const PC = { C: 0, 'C#': 1, D: 2, 'D#': 3, E: 4, F: 5, 'F#': 6, G: 7, 'G#': 8, A: 9, 'A#': 10, B: 11 };
   const IV = { major: [0, 2, 4, 5, 7, 9, 11], minor: [0, 2, 3, 5, 7, 8, 10] };
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 13; i++) {
     const tr = tetGame.TRACKS[i];
     const scale = new Set(IV[tr.mode].map(n => (n + PC[tr.key]) % 12));
     const rot = tetGame.sfxFreqs(i, 'rotate');
@@ -1275,7 +1281,7 @@ if (live) {
 // 1.9.166 Hashed audio filenames, versioned game scripts, Tetris music stays on through line clears
 {
   const sha8 = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex').slice(0, 8);
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 13; i++) {
     const src = tetGame.bgmSrc(i);
     assert.match(src, new RegExp('^tetris-bg/m' + i + '-[0-9a-f]{8}\\.mp3$'));
     const h = sha8('feed/' + src);
@@ -1361,18 +1367,21 @@ if (live) {
   const c6 = tetGame.levelUpCopy(6, 7);
   assert.strictEqual(c6.sub, 'Level 7: Ocean');
   const c12 = tetGame.levelUpCopy(11, 12);
-  assert.strictEqual(c12.sub, 'Level 12: Triangles');
-  const beaten = tetGame.levelUpCopy(12, 13);
+  assert.strictEqual(c12.sub, 'Level 12: Food');
+  const c13 = tetGame.levelUpCopy(12, 13);
+  assert.strictEqual(c13.sub, 'Level 13: Triangles');
+  const beaten = tetGame.levelUpCopy(13, 14);
   assert.strictEqual(beaten.beat, true);
   assert.strictEqual(beaten.title, 'YOU DID IT!');
   assert.strictEqual(beaten.sub, 'You beat every level!');
   assert.strictEqual(tetGame.themeFor(3), tetGame.SPACE_THEME);
-  assert.strictEqual(tetGame.themeFor(12), tetGame.TRI_THEME);
+  assert.strictEqual(tetGame.themeFor(12), tetGame.FOOD_THEME);
+  assert.strictEqual(tetGame.themeFor(13), tetGame.TRI_THEME);
 
   const PC = { C: 0, 'C#': 1, D: 2, 'D#': 3, E: 4, F: 5, 'F#': 6, G: 7, 'G#': 8, A: 9, 'A#': 10, B: 11 };
   const IV = { major: [0, 2, 4, 5, 7, 9, 11], minor: [0, 2, 3, 5, 7, 8, 10] };
   const pcOf = hz => { const midi = 69 + 12 * Math.log2(hz / 440); return ((Math.round(midi) % 12) + 12) % 12; };
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 13; i++) {
     const notes = tetGame.levelUpNotes(i);
     assert.ok(notes && notes.length >= 4, 'level-up notes theme ' + i);
     const tr = tetGame.TRACKS[i];
@@ -1425,13 +1434,22 @@ if (live) {
   assert.strictEqual(pick.level, 12);
   tetGame.tickClear(pick, 1000);
   assert.ok(pick.levelUp);
-  assert.strictEqual(pick.levelUp.sub, 'Level 12: Triangles');
+  assert.strictEqual(pick.levelUp.sub, 'Level 12: Food');
 
-  const last = tetGame.newGame({ level: 12, practice: true });
-  last.lines = 119;
+  const toTri = tetGame.newGame({ level: 12, practice: true });
+  toTri.lines = 119;
+  almostFull(toTri, [19]);
+  tetGame.lockPiece(toTri);
+  assert.strictEqual(toTri.level, 13);
+  tetGame.tickClear(toTri, 1000);
+  assert.ok(toTri.levelUp);
+  assert.strictEqual(toTri.levelUp.sub, 'Level 13: Triangles');
+
+  const last = tetGame.newGame({ level: 13, practice: true });
+  last.lines = 129;
   almostFull(last, [19]);
   tetGame.lockPiece(last);
-  assert.strictEqual(last.level, 13);
+  assert.strictEqual(last.level, 14);
   tetGame.tickClear(last, 1000);
   assert.ok(last.levelUp);
   assert.strictEqual(last.levelUp.title, 'YOU DID IT!');
@@ -1983,7 +2001,7 @@ if (live) {
   assert.ok(src.includes('function playRotateSfx') && src.includes('function rotateRun') && src.includes('nearest16th'));
   assert.ok(src.includes("if (name === 'rotate') { playRotateSfx(true)"));
   assert.ok(src.includes("if (!turned) sfx('rotateFail')"));
-  assert.ok(Array.isArray(tetGame.ROT_KIND) && tetGame.ROT_KIND.length === 12);
+  assert.ok(Array.isArray(tetGame.ROT_KIND) && tetGame.ROT_KIND.length === 13);
   const meta16 = { bpm: 120, offset: 0 };
   const almost16 = (a, b, eps) => assert.ok(Math.abs(a - b) <= (eps || 1e-9), '16th got ' + a + ' want ' + b);
   almost16(tetGame.quantizeDelay(0.22, 1, meta16, 'nearest16th'), 0.03);
@@ -1991,7 +2009,7 @@ if (live) {
   almost16(tetGame.quantizeDelay(0.20, 1, meta16, 'nearest16th'), 0);
   almost16(tetGame.quantizeDelay(0.08, 1, meta16, 'nearest16th'), 0.045);
   almost16(tetGame.quantizeDelay(0.06, 1, meta16, 'nearest16th'), 0); // 65ms to the 16th would exceed the 48ms cap
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 13; i++) {
     const run = tetGame.rotateRun(i);
     assert.ok(run && run.length >= 6, 'rotate run theme ' + i);
     const tr = tetGame.TRACKS[i];
@@ -2336,7 +2354,7 @@ if (live) {
 
 // 1.9.188 City workers (level 5) place one block cell on the stack from a long ladder
 {
-  assert.deepStrictEqual(Array.from(tetGame.ORDER), [6, 0, 7, 11, 1, 4, 2, 3, 9, 10, 5, 8]);
+  assert.deepStrictEqual(Array.from(tetGame.ORDER), [6, 0, 7, 11, 1, 4, 2, 3, 9, 10, 5, 12, 8]);
   assert.strictEqual(tetGame.themeFor(6), tetGame.CITY_THEME);
   assert.strictEqual(tetGame.CITY_THEME, 4);
   assert.strictEqual(tetGame.THEMES[4].name, 'City');
@@ -2918,8 +2936,8 @@ if (live) {
 
 // 1.9.198 Level order: Beach is level 2, Space travel is level 3; Triangles stays last
 {
-  assert.deepStrictEqual(Array.from(tetGame.stages().map(s => s.name)), ['Farmyard', 'Beach', 'Space travel', 'Jeremiah was a bullfrog', 'Fireworks', 'City', 'Ocean', 'Bush walk', 'New Zealand', 'Snowy mountains', 'Night sky', 'Triangles']);
-  assert.deepStrictEqual(Array.from(tetGame.ORDER), [6, 0, 7, 11, 1, 4, 2, 3, 9, 10, 5, 8]);
+  assert.deepStrictEqual(Array.from(tetGame.stages().map(s => s.name)), ['Farmyard', 'Beach', 'Space travel', 'Jeremiah was a bullfrog', 'Fireworks', 'City', 'Ocean', 'Bush walk', 'New Zealand', 'Snowy mountains', 'Night sky', 'Food', 'Triangles']);
+  assert.deepStrictEqual(Array.from(tetGame.ORDER), [6, 0, 7, 11, 1, 4, 2, 3, 9, 10, 5, 12, 8]);
   assert.strictEqual(tetGame.themeFor(1), 6);
   assert.strictEqual(tetGame.themeFor(2), 0);
   assert.strictEqual(tetGame.themeFor(3), tetGame.SPACE_THEME);
@@ -2931,11 +2949,13 @@ if (live) {
   assert.strictEqual(tetGame.themeFor(9), tetGame.NZ_THEME);
   assert.strictEqual(tetGame.themeFor(10), 10);
   assert.strictEqual(tetGame.themeFor(11), 5);
-  assert.strictEqual(tetGame.themeFor(12), tetGame.TRI_THEME);
+  assert.strictEqual(tetGame.themeFor(12), tetGame.FOOD_THEME);
+  assert.strictEqual(tetGame.themeFor(13), tetGame.TRI_THEME);
   assert.strictEqual(tetGame.levelUpCopy(1, 2).sub, 'Level 2: Beach');
   assert.strictEqual(tetGame.levelUpCopy(2, 3).sub, 'Level 3: Space travel');
-  assert.strictEqual(tetGame.levelUpCopy(11, 12).sub, 'Level 12: Triangles');
-  const beaten = tetGame.levelUpCopy(12, 13);
+  assert.strictEqual(tetGame.levelUpCopy(11, 12).sub, 'Level 12: Food');
+  assert.strictEqual(tetGame.levelUpCopy(12, 13).sub, 'Level 13: Triangles');
+  const beaten = tetGame.levelUpCopy(13, 14);
   assert.strictEqual(beaten.beat, true);
   assert.strictEqual(beaten.title, 'YOU DID IT!');
   const firstEnc = new Set();
@@ -2946,5 +2966,60 @@ if (live) {
   }
   assert.ok(firstEnc.has('yougotthis') || firstEnc.has('keepgoing'), 'encouragement stays on level 1');
   assert.ok(!laterEnc.has('yougotthis') && !laterEnc.has('keepgoing'), 'no encouragement from level 2 onward');
+}
+
+
+// 1.9.199 Food is level 12; Triangles stays last; pieces, sounds and placeholder music
+{
+  assert.strictEqual(tetGame.THEMES.length, 13);
+  assert.strictEqual(tetGame.THEMES[12].name, 'Food');
+  assert.strictEqual(tetGame.FOOD_THEME, 12);
+  assert.strictEqual(tetGame.LOOKS.length, 13);
+  assert.strictEqual(tetGame.PICS[12], 'tetris-bg/12.webp');
+  assert.ok(fs.existsSync('feed/tetris-bg/12.webp'), 'painted Food background is shipped');
+  assert.deepStrictEqual(Array.from(tetGame.foodKind ? [tetGame.foodKind(1), tetGame.foodKind(2), tetGame.foodKind(3), tetGame.foodKind(4), tetGame.foodKind(5), tetGame.foodKind(6), tetGame.foodKind(7)] : []), ['ice', 'banana', 'banana', 'melon', 'carrot', 'broccoli', 'chilli']);
+  assert.strictEqual(tetGame.foodSoundFor(1), 'squish');
+  assert.strictEqual(tetGame.foodSoundFor(2), 'squish');
+  assert.strictEqual(tetGame.foodSoundFor(3), 'squish');
+  assert.strictEqual(tetGame.foodSoundFor(4), 'munch');
+  assert.strictEqual(tetGame.foodSoundFor(5), 'crunch');
+  assert.strictEqual(tetGame.foodSoundFor(6), 'munch');
+  assert.strictEqual(tetGame.foodSoundFor(7), 'crunch');
+  assert.strictEqual(tetGame.blockColor(1, 110, 12), tetGame.LOOKS[12].colors[0]);
+  assert.strictEqual(tetGame.blockColor(5, 110, 12), tetGame.LOOKS[12].colors[4]);
+  const g = tetGame.newGame({ level: 12, practice: true });
+  assert.ok(g.food && g.food.length === 20);
+  g.board = tetGame.emptyBoard();
+  g.piece = { t: 4, m: [[4, 4], [4, 4]], x: 4, y: 16, rot: 0 };
+  g.next = 1;
+  tetGame.lockPiece(g);
+  assert.strictEqual(g.board[16][4], 4);
+  assert.ok(g.food[16][4] && g.food[16][4].t === 4 && g.food[16][4].lc === 0);
+  assert.ok(g.food[17][5] && g.food[17][5].lr === 1 && g.food[17][5].lc === 1);
+  // A cleared row drops food fragments with the cells.
+  const g2 = tetGame.newGame({ level: 12, practice: true });
+  g2.board = tetGame.emptyBoard();
+  g2.food = tetGame.emptyFood();
+  for (let c = 0; c < 9; c++) { g2.board[19][c] = 5; g2.food[19][c] = { t: 5, rot: 0, lr: 0, lc: c % 3 }; }
+  g2.board[18][0] = 2; g2.food[18][0] = { t: 2, rot: 1, lr: 0, lc: 0 };
+  g2.piece = { t: 1, m: [[1]], x: 9, y: 19, rot: 0 }; g2.next = 4;
+  tetGame.lockPiece(g2);
+  tetGame.tickClear(g2, 1000);
+  assert.strictEqual(g2.board[19][0], 2, 'the banana fragment dropped a row');
+  assert.ok(g2.food[19][0] && g2.food[19][0].t === 2 && g2.food[19][0].rot === 1);
+  assert.strictEqual(g2.clearFx, null);
+  assert.strictEqual(tetGame.clearKind(12), 'crumbs');
+  assert.strictEqual(tetGame.TRACKS[12].key, 'F');
+  assert.strictEqual(tetGame.TRACKS[12].mode, 'major');
+  assert.strictEqual(tetGame.TRACKS[12].bpm, 90);
+  assert.strictEqual(tetGame.BGM_HASH[12], '4456f9a4');
+  assert.ok(fs.existsSync('feed/' + tetGame.bgmSrc(12)));
+  ['munch', 'crunch', 'squish', 'chomp'].forEach(k => {
+    assert.ok(tetGame.FOOD_HASH[k] && fs.existsSync('feed/' + tetGame.foodSrc(k)), 'food sfx ' + k);
+  });
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.ok(src.includes('function drawFoodCell') && src.includes('function playFoodSfx') && src.includes('function drawFoodLife'));
+  assert.ok(src.includes('Swap by replacing m12-') || src.includes('placeholder'));
+  assert.ok(src.includes('hp.frequency.value = 300') && src.includes('lp.frequency.value = 3500'));
 }
 
