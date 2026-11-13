@@ -2375,9 +2375,10 @@ if (live) {
   g3.board = tetGame.emptyBoard();
   for (let r = 16; r < 20; r++) for (let c = 2; c < 10; c++) g3.board[r][c] = 2;
   g3.piece = { t: 4, m: [[4, 4], [4, 4]], x: 0, y: 0 };
-  const crew = tetGame.resetCityCrew(tetGame.newCityCrew(), 5);
+  const crew = tetGame.resetCityCrew(tetGame.newCityCrew(), 5, g3);
   assert.ok(crew.ready);
-  assert.ok(crew.wait >= 6000 && crew.wait <= 10000, 'first wait uses CITY_BUILD_EVERY');
+  // 1.9.195: a low stack (g3 tops at row 16) uses the 3x-fast wait, not [6, 10]s.
+  assert.ok(crew.wait >= 2000 && crew.wait <= 10000 / 3 + 1e-6, 'first wait is fast while the stack is low');
   crew.wait = 0;
   tetGame.stepCityCrew(crew, g3, 30, { started: true });
   assert.ok(crew.job, 'a job starts when the wait elapses');
@@ -2733,4 +2734,85 @@ if (live) {
   assert.equal(tetGame.maybeFwSkyFlash(2.6), false, 'at most one flash every 8–12s');
   assert.ok(src.includes('playFwSfx(scale, z)') && src.includes('maybeFwSkyFlash(scale)'), 'existing booms stay; flash is extra');
 }
+
+// 1.9.195 City builders work at 3x while the stack is below halfway, then revert
+{
+  assert.deepStrictEqual(Array.from(tetGame.CITY_BUILD_EVERY), [6, 10]);
+  assert.ok(Math.abs(tetGame.CITY_BUILD_EVERY_LOW[0] - 2) < 1e-9);
+  assert.ok(Math.abs(tetGame.CITY_BUILD_EVERY_LOW[1] - 10 / 3) < 1e-9);
+  assert.strictEqual(tetGame.CITY_SAFE_TOP, 6);
+  assert.strictEqual(tetGame.CITY_ANIM_CLIMB, 1500);
+  assert.strictEqual(tetGame.CITY_ANIM_PLACE, 420);
+  assert.strictEqual(tetGame.CITY_ANIM_DOWN, 1300);
+  assert.ok(Math.abs(tetGame.CITY_ANIM_FAST - 1 / 3) < 1e-12);
+  const animN = tetGame.CITY_ANIM_CLIMB + tetGame.CITY_ANIM_PLACE + tetGame.CITY_ANIM_DOWN;
+  const animF = animN * tetGame.CITY_ANIM_FAST;
+  assert.ok(Math.abs(animN - 3220) < 1e-9);
+  assert.ok(animF <= 2000 && Math.abs(animF - 3220 / 3) < 1e-6, 'fast climb/place/down fit inside 2s');
+  assert.strictEqual(tetGame.cityAnimDur('climb', false), 1500);
+  assert.strictEqual(tetGame.cityAnimDur('place', false), 420);
+  assert.strictEqual(tetGame.cityAnimDur('down', false), 1300);
+  assert.ok(Math.abs(tetGame.cityAnimDur('climb', true) - 500) < 1e-9);
+  assert.ok(Math.abs(tetGame.cityAnimDur('place', true) - 140) < 1e-9);
+  assert.ok(Math.abs(tetGame.cityAnimDur('down', true) - 1300 / 3) < 1e-9);
+
+  const low = tetGame.newGame({ level: 5, practice: true });
+  low.board = tetGame.emptyBoard();
+  low.piece = { t: 4, m: [[4, 4], [4, 4]], x: 0, y: 0 };
+  assert.strictEqual(tetGame.cityHighestSettled(low), 20);
+  assert.equal(tetGame.cityStackLow(low), true, 'an empty well is a low stack');
+  for (let r = 11; r < 20; r++) low.board[r][3] = 2;
+  assert.strictEqual(tetGame.cityHighestSettled(low), 11);
+  assert.equal(tetGame.cityStackLow(low), true, 'row 11 is still below halfway');
+  for (let w = 0; w < 20; w++) {
+    const ms = tetGame.cityBuildWait(low);
+    assert.ok(ms >= 2000 && ms <= 10000 / 3 + 1e-6, 'low-stack wait is [2, 3.33]s, got ' + ms);
+  }
+
+  const mid = tetGame.newGame({ level: 5, practice: true });
+  mid.board = tetGame.emptyBoard();
+  mid.piece = { t: 4, m: [[4, 4], [4, 4]], x: 0, y: 0 };
+  for (let r = 10; r < 20; r++) mid.board[r][3] = 2;
+  assert.strictEqual(tetGame.cityHighestSettled(mid), 10);
+  assert.equal(tetGame.cityStackLow(mid), false, 'row 10 is halfway, so speed reverts');
+  for (let w = 0; w < 20; w++) {
+    const ms = tetGame.cityBuildWait(mid);
+    assert.ok(ms >= 6000 && ms <= 10000, 'halfway wait is [6, 10]s, got ' + ms);
+  }
+  mid.board[9][3] = 2;
+  assert.equal(tetGame.cityStackLow(mid), false, 'above halfway stays at normal speed');
+
+  // Scheduling a job on a low stack uses the fast climb duration, locked for the job.
+  const g = tetGame.newGame({ level: 5, practice: true });
+  g.board = tetGame.emptyBoard();
+  g.piece = { t: 4, m: [[4, 4], [4, 4]], x: 0, y: 0 };
+  for (let r = 16; r < 20; r++) for (let c = 2; c < 10; c++) g.board[r][c] = 2;
+  const crew = tetGame.resetCityCrew(tetGame.newCityCrew(), 5, g);
+  assert.ok(crew.wait >= 2000 && crew.wait <= 10000 / 3 + 1e-6);
+  crew.wait = 0;
+  tetGame.stepCityCrew(crew, g, 30, { started: true });
+  assert.ok(crew.job && crew.job.fast === true);
+  assert.ok(Math.abs(crew.job.dur - 500) < 1e-9, 'fast climb is 1500/3');
+  // A brick appearing at halfway before the next schedule must not change this job.
+  for (let r = 10; r < 16; r++) g.board[r][2] = 2;
+  assert.equal(tetGame.cityStackLow(g), false);
+  tetGame.stepCityCrew(crew, g, 500, { started: true });
+  assert.ok(crew.job && crew.job.stage === 'place');
+  assert.ok(crew.job.fast === true && Math.abs(crew.job.dur - 140) < 1e-9, 'in-flight job keeps the fast place timing');
+  tetGame.stepCityCrew(crew, g, 140, { started: true });
+  assert.ok(crew.job && crew.job.stage === 'down');
+  assert.ok(Math.abs(crew.job.dur - 1300 / 3) < 1e-9);
+  tetGame.stepCityCrew(crew, g, 1300 / 3 + 1, { started: true });
+  assert.strictEqual(crew.job, null);
+  assert.ok(crew.wait >= 6000 && crew.wait <= 10000, 'next brick is re-checked and reverts to [6, 10]s');
+
+  // A job scheduled at halfway uses the normal 3.22s animation.
+  const crew2 = tetGame.resetCityCrew(tetGame.newCityCrew(), 5, g);
+  assert.ok(crew2.wait >= 6000 && crew2.wait <= 10000);
+  crew2.wait = 0;
+  tetGame.stepCityCrew(crew2, g, 30, { started: true });
+  assert.ok(crew2.job && crew2.job.fast === false);
+  assert.strictEqual(crew2.job.dur, 1500);
+}
+
 
