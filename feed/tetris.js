@@ -2160,6 +2160,8 @@
   function nzPalState() { return nzPal; }
   const EXTREME_KEY = 'tetris-extreme';
   const EXTREME_PEEK_MS = 4000;
+  const EXTREME_EXIT_MIN = 44;
+  const EXTREME_TOP_RESERVE = 52;
 
 
   function findFullRows(g) {
@@ -3455,7 +3457,7 @@
     c.fillRect(0, 0, w, h);
     c.restore();
   }
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_BUILD_EVERY_LOW, CITY_SAFE_TOP, CITY_CREW_N, CITY_ANIM_CLIMB, CITY_ANIM_PLACE, CITY_ANIM_DOWN, CITY_ANIM_FAST, cityHighestSettled, cityStackLow, cityBuildEvery, cityBuildWait, cityAnimDur, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, HIGH_SCORE_MS, HIGH_SCORE_FADE_MS, highScoreProg, maybeHighScore, startHighScore, tickHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, FARM_SUN, FARM_HZ, farmDayTarget, farmSunPos, ROOSTER_HASH, roosterSrc, stackColY, stackSkyline, stackPathAt, stackPathLen, newStackWash, stepStackWash, STACK_WASH_PERIOD, washCover, washSpill, washPool, stackWashInland, washCycle, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, fwSkyFlashAlpha, startFwSkyFlash, maybeFwSkyFlash, FW_SKY_FLASH_PEAK, FW_SKY_FLASH_FADE, FW_MAJOR_SCALE, FW_BIGGER_GROW, fwSkyFlashState: () => fw.skyFlash, fwProg: (p) => { if (p != null) fw.prog = p; return fw.prog; }, fwReset, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts, SNOW_THEME, snowProg, snowFallParams, newBoardSnow, stepBoardSnow, snowOnLineClear, snowReset, boardSnow: () => boardSnow, NZ_THEME, nzProg, nzBeatsPerRow, nzDropInterval, NZ_PAL, NZ_PAL_STEPS, NZ_PAL_FADE_MS, nzPalIndex, nzPaletteNow, mixHex, nzMixProgress, resetNzPal, setNzPal, tickNzPal, nzPalState, EXTREME_KEY, EXTREME_PEEK_MS, SEAGULL_HASH, seagullSrc, startNzFlash, nzFlashAlpha, newNzGulls, stepNzGulls, nzGulls: () => nzGulls, nzFlashState: () => nzFlash };
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_BUILD_EVERY_LOW, CITY_SAFE_TOP, CITY_CREW_N, CITY_ANIM_CLIMB, CITY_ANIM_PLACE, CITY_ANIM_DOWN, CITY_ANIM_FAST, cityHighestSettled, cityStackLow, cityBuildEvery, cityBuildWait, cityAnimDur, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, HIGH_SCORE_MS, HIGH_SCORE_FADE_MS, highScoreProg, maybeHighScore, startHighScore, tickHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, FARM_SUN, FARM_HZ, farmDayTarget, farmSunPos, ROOSTER_HASH, roosterSrc, stackColY, stackSkyline, stackPathAt, stackPathLen, newStackWash, stepStackWash, STACK_WASH_PERIOD, washCover, washSpill, washPool, stackWashInland, washCycle, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, fwSkyFlashAlpha, startFwSkyFlash, maybeFwSkyFlash, FW_SKY_FLASH_PEAK, FW_SKY_FLASH_FADE, FW_MAJOR_SCALE, FW_BIGGER_GROW, fwSkyFlashState: () => fw.skyFlash, fwProg: (p) => { if (p != null) fw.prog = p; return fw.prog; }, fwReset, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts, SNOW_THEME, snowProg, snowFallParams, newBoardSnow, stepBoardSnow, snowOnLineClear, snowReset, boardSnow: () => boardSnow, NZ_THEME, nzProg, nzBeatsPerRow, nzDropInterval, NZ_PAL, NZ_PAL_STEPS, NZ_PAL_FADE_MS, nzPalIndex, nzPaletteNow, mixHex, nzMixProgress, resetNzPal, setNzPal, tickNzPal, nzPalState, EXTREME_KEY, EXTREME_PEEK_MS, EXTREME_EXIT_MIN, EXTREME_TOP_RESERVE, SEAGULL_HASH, seagullSrc, startNzFlash, nzFlashAlpha, newNzGulls, stepNzGulls, nzGulls: () => nzGulls, nzFlashState: () => nzFlash };
 
   if (!root.document) return;
   const doc = root.document;
@@ -3714,6 +3716,11 @@
     const pick = doc.getElementById('levelpick');
     if (pick && !pick.hidden) { if (e.key === 'Escape') closePicker(); return; }
     if (root.IBScores && root.IBScores.isOpen()) { if (e.key === 'Escape') root.IBScores.close(); return; }
+    if (e.key === 'Escape' && typeof isExtreme === 'function' && isExtreme()) {
+      e.preventDefault();
+      setExtreme(false, 'escape');
+      return;
+    }
     const a = map[e.key];
     if (!a) return;
     e.preventDefault();
@@ -7172,7 +7179,7 @@
     const extreme = isExtreme();
     const vv = root.visualViewport;
     const r = extreme
-      ? { width: (vv && vv.width) || root.innerWidth || 390, height: (vv && vv.height) || root.innerHeight || 844 }
+      ? { width: (vv && vv.width) || root.innerWidth || 390, height: Math.max(48, ((vv && vv.height) || root.innerHeight || 844) - EXTREME_TOP_RESERVE) }
       : row.getBoundingClientRect();
     const sideW = (!extreme && side && !row.classList.contains('no-side')) ? side.getBoundingClientRect().width : 0;
     const gap = extreme ? 0 : 8;
@@ -7201,8 +7208,10 @@
     const btn = doc.getElementById('extremebtn');
     if (btn) {
       btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-      btn.textContent = on ? 'Extreme on' : 'Extreme';
+      btn.textContent = on ? 'Exit extreme' : 'Extreme';
     }
+    const xb = doc.getElementById('xexitbtn');
+    if (xb) xb.hidden = !on;
     const hud = doc.getElementById('xhud');
     if (hud) hud.hidden = !on;
     const tg = doc.getElementById('xtoggle');
@@ -7230,13 +7239,8 @@
   function setFull(on, from) {
     const html = doc.documentElement, body = doc.body;
     on = !!on;
-    if (!on && isExtreme() && from !== 'extreme-off') {
-      html.classList.add('fs', 'fs-overlay');
-      if (body) body.classList.add('fs');
-      layoutBoard();
-      if (root.requestAnimationFrame) root.requestAnimationFrame(layoutBoard);
-      return;
-    }
+    // 1.9.197: leaving browser fullscreen (or Android back) also exits Extreme and restores the normal UI.
+    if (!on && isExtreme()) setExtreme(false, from === 'event' || from === 'parent' ? 'fullscreenchange' : (from || 'full-off'));
     html.classList.toggle('fs', on);
     if (body) body.classList.toggle('fs', on);
     if (from === 'parent') {
@@ -7290,24 +7294,18 @@
   if (board) board.addEventListener('pointerdown', tryAutoFull, { capture: true });
   { const eb = doc.getElementById('extremebtn');
     if (eb) eb.addEventListener('click', () => setExtreme(!isExtreme(), 'button')); }
+  { const xb = doc.getElementById('xexitbtn');
+    if (xb) xb.addEventListener('click', ev => { ev.preventDefault(); ev.stopPropagation(); setExtreme(false, 'exit-btn'); }); }
   { const tg = doc.getElementById('xtoggle');
-    let holdT = 0;
     if (tg) {
-      tg.addEventListener('pointerdown', ev => {
-        ev.preventDefault(); ev.stopPropagation();
-        holdT = root.setTimeout(() => { holdT = 0; setExtreme(false, 'toggle-hold'); }, 500);
-      });
-      tg.addEventListener('pointerup', ev => {
-        ev.preventDefault(); ev.stopPropagation();
-        if (holdT) { root.clearTimeout(holdT); holdT = 0; peekExtreme(); }
-      });
-      tg.addEventListener('pointercancel', () => { if (holdT) { root.clearTimeout(holdT); holdT = 0; } });
-      tg.addEventListener('click', ev => { ev.preventDefault(); ev.stopPropagation(); });
+      const exit = ev => { ev.preventDefault(); ev.stopPropagation(); if (isExtreme()) setExtreme(false, 'exit-icon'); };
+      tg.addEventListener('pointerdown', ev => ev.stopPropagation());
+      tg.addEventListener('click', exit);
     }
   }
   function extremeEmptyTarget(el) {
     if (!el || !el.closest) return false;
-    if (el.closest('#board') || el.closest('#xtoggle') || el.closest('#extremebtn')) return false;
+    if (el.closest('#board') || el.closest('#xtoggle') || el.closest('#extremebtn') || el.closest('#xexitbtn')) return false;
     if (el.closest('[data-act]') || el.closest('#levelpick') || el.closest('button')) return false;
     return true;
   }

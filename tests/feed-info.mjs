@@ -2890,3 +2890,27 @@ if (live) {
   assert.ok(src.includes("opts.extreme") && src.includes('xscore') && src.includes('xlevel'));
 }
 
+// 1.9.197 Extreme full screen always has a reliable exit
+{
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  const html = fs.readFileSync('feed/tetris.html', 'utf8');
+  assert.strictEqual(tetGame.EXTREME_EXIT_MIN, 44);
+  assert.strictEqual(tetGame.EXTREME_TOP_RESERVE, 52);
+  assert.ok(html.includes('id="xtoggle"') && html.includes('aria-label="Exit extreme"'));
+  assert.ok(html.includes('id="xexitbtn"') && html.includes('Exit extreme'));
+  assert.ok(/width:\s*44px/.test(html) && /min-width:\s*44px/.test(html) && /min-height:\s*44px/.test(html));
+  assert.ok(html.includes('top: max(4px, env(safe-area-inset-top))') && html.includes('right: max(4px, env(safe-area-inset-right))'));
+  assert.ok(html.includes('top: 52px'), 'the board is laid out below the exit strip');
+  assert.ok(src.includes("setExtreme(false, 'exit-icon')"));
+  assert.ok(src.includes("setExtreme(false, 'exit-btn')"));
+  assert.ok(src.includes("setExtreme(false, 'escape')"));
+  assert.ok(src.includes("from === 'event' || from === 'parent'"));
+  assert.ok(src.includes("setExtreme(false, from === 'event' || from === 'parent' ? 'fullscreenchange'"));
+  assert.ok(src.includes("e.key === 'Escape'") && src.includes("setExtreme(false, 'escape')"));
+  assert.ok(src.includes("btn.textContent = on ? 'Exit extreme' : 'Extreme'"));
+  // The 1.9.172 Fullscreen API and 1.9.196 peek / empty-area long-press stay.
+  assert.ok(src.includes('function setFull') && src.includes('requestFullscreen'));
+  assert.ok(src.includes('function peekExtreme') && src.includes("setExtreme(false, 'empty-hold')"));
+  assert.ok(src.includes("localStorage.getItem(EXTREME_KEY) === '1'") && src.includes("setExtreme(true, 'boot')"));
+}
+
