@@ -173,7 +173,7 @@
     { colors: ['#ef4444', '#14b8a6', '#22c55e', '#facc15', '#38bdf8', '#e5e7eb', '#f97316'], bg: 'linear-gradient(180deg,#2563eb 0%,#22d3ee 45%,#15803d 100%)', board: 'rgba(5,30,30,0.5)' },
     { colors: ['#e0f2fe', '#93c5fd', '#f9a8d4', '#fde68a', '#5eead4', '#c4b5fd', '#fca5a5'], bg: 'linear-gradient(180deg,#f9a8d4 0%,#818cf8 45%,#1e3a8a 100%)', board: 'rgba(15,23,60,0.5)' },
     { colors: ['#4ade80', '#16a34a', '#f472b6', '#facc15', '#22d3ee', '#a3e635', '#fb923c'], bg: 'linear-gradient(180deg,#fb923c 0%,#f472b6 35%,#0e7490 70%,#14532d 100%)', board: 'rgba(5,30,20,0.5)' },
-    { colors: ['#fde6c8', '#facc15', '#eab308', '#fb7185', '#f97316', '#22c55e', '#ef4444'], bg: 'linear-gradient(180deg,#f5d0a0 0%,#c4b59a 40%,#6b4f3a 100%)', board: 'rgba(40,24,12,0.48)' }
+    { colors: ['#fde6c8', '#facc15', '#eab308', '#fb7185', '#f97316', '#9333ea', '#ef4444'], bg: 'linear-gradient(180deg,#f5d0a0 0%,#c4b59a 40%,#6b4f3a 100%)', board: 'rgba(40,24,12,0.48)' }
   ];
   // Colourful picture behind each theme (same order as THEMES), softened with a dark veil so the blocks stand out.
   const PICS = THEMES.map((_, i) => 'tetris-bg/' + i + '.webp');
@@ -194,7 +194,7 @@
   const FOOD_THEME = 12;
 
   // 1.9.199 Food (theme 12, level 12): pieces are painted food, fragments stay in each cell after lock.
-  const FOOD_KIND = ['', 'ice', 'banana', 'banana', 'melon', 'carrot', 'broccoli', 'chilli', 'cherry'];
+  const FOOD_KIND = ['', 'ice', 'banana', 'banana', 'melon', 'carrot', 'grape', 'chilli', 'cherry'];
   const CHERRY_T = 8;
   const CHERRY_ODDS = 13; // about 1 in 12–15 spawns
   const CHERRY_BONUS = 50;
@@ -207,6 +207,7 @@
     if (k === 'cherry') return 'boom';
     if (k === 'carrot' || k === 'chilli') return 'crunch';
     if (k === 'banana' || k === 'ice') return 'squish';
+    if (k === 'grape' || k === 'melon') return 'munch';
     return 'munch';
   }
   function emptyFood() { return Array.from({ length: ROWS }, () => Array(COLS).fill(null)); }
@@ -723,11 +724,11 @@
   // re-toned to Shane's game-over voice; Fantastic (Shane) and You got this stay as they were.
   const CALLOUT_VOICES = {
     amazing: 'f68cdbb0', brilliant: '791b3eb0', fantastic: '95c74d33',
-    awesome: 'c083a2f5', yougotthis: '7761c550', keepgoing: '66d1b6c8'
+    awesome: 'c083a2f5', yougotthis: '7761c550'
   };
   const CALLOUT_TEXT = {
     amazing: 'Amazing!', brilliant: 'Brilliant!', fantastic: 'Fantastic!',
-    awesome: 'Awesome!', yougotthis: 'You got this!', keepgoing: 'Keep going!'
+    awesome: 'Awesome!', yougotthis: 'You got this!'
   };
   const CALLOUT_DUR = 1400;
   const CALLOUT_GAP = 7000;
@@ -871,14 +872,13 @@
   function pickCallout(info) {
     const idsPraiseBig = ['amazing', 'brilliant'];
     const idsBigger = ['fantastic', 'awesome'];
-    const idsEncourage = ['yougotthis', 'keepgoing'];
     const pick = arr => arr[(Math.random() * arr.length) | 0];
     if (info.n >= 4 && info.b2b) return pick(idsBigger);
     if (info.n >= 4) return pick(idsPraiseBig);
     if (info.n === 3) return pick(idsPraiseBig);
     if (info.combo >= 3) return pick(idsBigger);
-    // You got this / Keep going are only for level 1 (Farmyard, the first level of a run).
-    if (info.n === 0 && (info.high || info.near) && info.level === 1) return pick(idsEncourage);
+    // 1.9.201: only You got this! remains as encouragement, and only on level 1.
+    if (info.n === 0 && (info.high || info.near) && info.level === 1) return 'yougotthis';
     return null;
   }
   function playCallout(g, id, delay) {
@@ -1047,7 +1047,7 @@
   // 1.9.199 Food landing / clear bites: synthesised, CC0-free originals. 300 Hz–3.5 kHz, mellow, louder than the music but gentle.
   const FOOD_HASH = { munch: '25db313e', crunch: '5b730569', squish: '6f68e879', chomp: 'f2449c85', boom: '70ec46f6' };
   const FOOD_VOL = { munch: 0.66, crunch: 0.68, squish: 0.64, chomp: 0.72, boom: 0.76 };
-  const FOOD_SPRITES = { src: 'tetris-bg/food-sprites-d7044f80.webp', cell: 96, bleed: 2, hash: 'd7044f80', layout: {"1:0":{"x":4,"y":4,"w":384,"h":384,"cols":4,"rows":4},"1:1":{"x":392,"y":4,"w":384,"h":384,"cols":4,"rows":4},"1:2":{"x":780,"y":4,"w":384,"h":384,"cols":4,"rows":4},"1:3":{"x":1168,"y":4,"w":384,"h":384,"cols":4,"rows":4},"2:0":{"x":4,"y":392,"w":288,"h":288,"cols":3,"rows":3},"2:1":{"x":296,"y":392,"w":288,"h":288,"cols":3,"rows":3},"2:2":{"x":588,"y":392,"w":288,"h":288,"cols":3,"rows":3},"2:3":{"x":880,"y":392,"w":288,"h":288,"cols":3,"rows":3},"3:0":{"x":4,"y":684,"w":288,"h":288,"cols":3,"rows":3},"3:1":{"x":296,"y":684,"w":288,"h":288,"cols":3,"rows":3},"3:2":{"x":588,"y":684,"w":288,"h":288,"cols":3,"rows":3},"3:3":{"x":880,"y":684,"w":288,"h":288,"cols":3,"rows":3},"4:0":{"x":4,"y":976,"w":192,"h":192,"cols":2,"rows":2},"4:1":{"x":200,"y":976,"w":192,"h":192,"cols":2,"rows":2},"4:2":{"x":396,"y":976,"w":192,"h":192,"cols":2,"rows":2},"4:3":{"x":592,"y":976,"w":192,"h":192,"cols":2,"rows":2},"5:0":{"x":4,"y":1172,"w":288,"h":288,"cols":3,"rows":3},"5:1":{"x":296,"y":1172,"w":288,"h":288,"cols":3,"rows":3},"5:2":{"x":588,"y":1172,"w":288,"h":288,"cols":3,"rows":3},"5:3":{"x":880,"y":1172,"w":288,"h":288,"cols":3,"rows":3},"6:0":{"x":4,"y":1464,"w":288,"h":288,"cols":3,"rows":3},"6:1":{"x":296,"y":1464,"w":288,"h":288,"cols":3,"rows":3},"6:2":{"x":588,"y":1464,"w":288,"h":288,"cols":3,"rows":3},"6:3":{"x":880,"y":1464,"w":288,"h":288,"cols":3,"rows":3},"7:0":{"x":4,"y":1756,"w":288,"h":288,"cols":3,"rows":3},"7:1":{"x":296,"y":1756,"w":288,"h":288,"cols":3,"rows":3},"7:2":{"x":588,"y":1756,"w":288,"h":288,"cols":3,"rows":3},"7:3":{"x":880,"y":1756,"w":288,"h":288,"cols":3,"rows":3},"8:0":{"x":4,"y":2048,"w":96,"h":96,"cols":1,"rows":1},"8:1":{"x":104,"y":2048,"w":96,"h":96,"cols":1,"rows":1},"8:2":{"x":204,"y":2048,"w":96,"h":96,"cols":1,"rows":1},"8:3":{"x":304,"y":2048,"w":96,"h":96,"cols":1,"rows":1}} };
+  const FOOD_SPRITES = { src: 'tetris-bg/food-sprites-e3977dde.webp', cell: 96, bleed: 2, hash: 'e3977dde', layout: {"1:0":{"x":4,"y":4,"w":384,"h":384,"cols":4,"rows":4},"1:1":{"x":392,"y":4,"w":384,"h":384,"cols":4,"rows":4},"1:2":{"x":780,"y":4,"w":384,"h":384,"cols":4,"rows":4},"1:3":{"x":1168,"y":4,"w":384,"h":384,"cols":4,"rows":4},"2:0":{"x":4,"y":392,"w":288,"h":288,"cols":3,"rows":3},"2:1":{"x":296,"y":392,"w":288,"h":288,"cols":3,"rows":3},"2:2":{"x":588,"y":392,"w":288,"h":288,"cols":3,"rows":3},"2:3":{"x":880,"y":392,"w":288,"h":288,"cols":3,"rows":3},"3:0":{"x":4,"y":684,"w":288,"h":288,"cols":3,"rows":3},"3:1":{"x":296,"y":684,"w":288,"h":288,"cols":3,"rows":3},"3:2":{"x":588,"y":684,"w":288,"h":288,"cols":3,"rows":3},"3:3":{"x":880,"y":684,"w":288,"h":288,"cols":3,"rows":3},"4:0":{"x":4,"y":976,"w":192,"h":192,"cols":2,"rows":2},"4:1":{"x":200,"y":976,"w":192,"h":192,"cols":2,"rows":2},"4:2":{"x":396,"y":976,"w":192,"h":192,"cols":2,"rows":2},"4:3":{"x":592,"y":976,"w":192,"h":192,"cols":2,"rows":2},"5:0":{"x":4,"y":1172,"w":288,"h":288,"cols":3,"rows":3},"5:1":{"x":296,"y":1172,"w":288,"h":288,"cols":3,"rows":3},"5:2":{"x":588,"y":1172,"w":288,"h":288,"cols":3,"rows":3},"5:3":{"x":880,"y":1172,"w":288,"h":288,"cols":3,"rows":3},"6:0":{"x":4,"y":1464,"w":288,"h":288,"cols":3,"rows":3},"6:1":{"x":296,"y":1464,"w":288,"h":288,"cols":3,"rows":3},"6:2":{"x":588,"y":1464,"w":288,"h":288,"cols":3,"rows":3},"6:3":{"x":880,"y":1464,"w":288,"h":288,"cols":3,"rows":3},"7:0":{"x":4,"y":1756,"w":288,"h":288,"cols":3,"rows":3},"7:1":{"x":296,"y":1756,"w":288,"h":288,"cols":3,"rows":3},"7:2":{"x":588,"y":1756,"w":288,"h":288,"cols":3,"rows":3},"7:3":{"x":880,"y":1756,"w":288,"h":288,"cols":3,"rows":3},"8:0":{"x":4,"y":2048,"w":96,"h":96,"cols":1,"rows":1},"8:1":{"x":104,"y":2048,"w":96,"h":96,"cols":1,"rows":1},"8:2":{"x":204,"y":2048,"w":96,"h":96,"cols":1,"rows":1},"8:3":{"x":304,"y":2048,"w":96,"h":96,"cols":1,"rows":1}} };
   let foodSpriteImg = null, foodSpriteReady = false;
   function loadFoodSprites() {
     const Img = (root && root.Image) || (typeof Image !== 'undefined' ? Image : null);
@@ -4295,7 +4295,7 @@
     const kind = foodKind(t);
     const col = color || blockColor(t, 0, 12);
     ctx.globalAlpha = alpha;
-    const width = size * (kind === 'ice' ? 0.62 : (kind === 'broccoli' ? 0.78 : 0.72));
+    const width = size * (kind === 'ice' ? 0.62 : (kind === 'grape' ? 0.78 : 0.72));
     function tube(pts, w0, w1) {
       if (pts.length === 1) {
         ctx.beginPath();
@@ -4366,43 +4366,20 @@
       ctx.globalAlpha = 1;
       return;
     }
-    if (kind === 'broccoli') {
-      // Stem toward the unique end, florets as clustered bumps on every cell.
-      const stem = path[0];
-      const sx = ox + (stem.c + 0.5) * size, sy = oy + (stem.r + 0.5) * size;
-      const mid = path[Math.min(1, path.length - 1)];
-      const mx = ox + (mid.c + 0.5) * size, my = oy + (mid.r + 0.5) * size;
-      const drawStem = function () {
-        ctx.beginPath();
-        ctx.moveTo(sx, sy);
-        ctx.lineTo(mx, my);
-      };
-      if (ghost) {
-        cells.forEach(p => {
-          ctx.beginPath();
-          ctx.arc(ox + (p.c + 0.5) * size, oy + (p.r + 0.5) * size, size * 0.42, 0, 6.283);
-          ctx.fillStyle = foodHex(col, 0.26);
-          ctx.fill();
-          foodStrokeAround(ctx, function () { ctx.beginPath(); ctx.arc(ox + (p.c + 0.5) * size, oy + (p.r + 0.5) * size, size * 0.42, 0, 6.283); }, col, size, true);
-        });
-        ctx.globalAlpha = 1;
-        return;
-      }
-      ctx.strokeStyle = '#6b4f2a';
-      ctx.lineWidth = size * 0.28;
-      ctx.lineCap = 'round';
-      drawStem(); ctx.stroke();
-      ctx.strokeStyle = '#8b6914';
-      ctx.lineWidth = size * 0.16;
-      drawStem(); ctx.stroke();
+    if (kind === 'grape') {
+      // Rounded berry clusters per cell; no stalk or column.
       cells.forEach((p, i) => {
         const cx = ox + (p.c + 0.5) * size, cy = oy + (p.r + 0.5) * size;
-        const bumps = 5;
-        for (let k = 0; k < bumps; k++) {
-          const a = i * 0.7 + k * 1.3;
-          const rr = size * (0.28 - k * 0.025);
-          const bx = cx + Math.cos(a) * size * 0.16;
-          const by = cy + Math.sin(a) * size * 0.14 - size * 0.04;
+        const berries = [[0, 0, 0.36], [-0.22, -0.12, 0.22], [0.2, -0.14, 0.2], [-0.12, 0.2, 0.2], [0.18, 0.16, 0.18], [0, -0.26, 0.16]];
+        berries.forEach((b, k) => {
+          const bx = cx + b[0] * size, by = cy + b[1] * size, rr = size * b[2];
+          if (ghost) {
+            ctx.beginPath();
+            ctx.arc(bx, by, rr, 0, 6.283);
+            ctx.fillStyle = foodHex(col, 0.26);
+            ctx.fill();
+            return;
+          }
           const grd = ctx.createRadialGradient(bx - rr * 0.3, by - rr * 0.35, rr * 0.1, bx, by, rr);
           grd.addColorStop(0, foodShade(col, 0.28));
           grd.addColorStop(0.55, col);
@@ -4411,11 +4388,13 @@
           ctx.arc(bx, by, rr, 0, 6.283);
           ctx.fillStyle = grd;
           ctx.fill();
-        }
+        });
+        if (ghost) foodStrokeAround(ctx, function () { ctx.beginPath(); ctx.arc(cx, cy, size * 0.42, 0, 6.283); }, col, size, true);
       });
       ctx.globalAlpha = 1;
       return;
     }
+    // Path foods: ice, banana, carrot, chilli
     // Path foods: ice, banana, carrot, chilli
     let wStart = width * 0.5, wEnd = width * 0.5;
     if (kind === 'carrot' || kind === 'chilli') { wStart = width * 0.58; wEnd = width * 0.22; }
