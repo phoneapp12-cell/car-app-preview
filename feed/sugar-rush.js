@@ -1394,15 +1394,24 @@
   // SPEAK_GAP ms, and the minor ones (a plain match that only chipped a goal) are skipped.
   const SPEAK_GAP = 2500, SPEAK_PITCH = 1.25, SPEAK_RATE = 1.05, SPEAK_VOL = 0.9;
   const SPEAK_LANGS = ['en-nz', 'en-au', 'en-gb', 'en-ie', 'en-za', 'en-us', 'en'];
-  function pickSpeechVoice(list) {
+  const SPEAK_FEMALE = /(female|woman|aria|natasha|karen|catherine|matilda|serena|samantha|libby|sonia|molly|zira|tessa|moira|fiona|victoria|allison|ava|susan|hazel|kate|jenny|clara|google uk english female)/i;
+  const SPEAK_MALE = /(\bmale\b|\bman\b|mitchell|william|lee|daniel|gordon|arthur|oliver|fred|ryan|guy|rishi|aaron|alex|tom|thomas|james|george|david|mark|ralph|google uk english male)/i;
+  function speechGender(v) {
+    const n = String(v && v.name || '');
+    if (/female|woman/i.test(n)) return 'f';
+    if (SPEAK_MALE.test(n)) return 'm';
+    if (SPEAK_FEMALE.test(n)) return 'f';
+    return null;
+  }
+  function pickSpeechVoice(list, gender) {
     list = Array.from(list || []);
-    const cheer = /(female|aria|natasha|karen|catherine|matilda|serena|samantha|libby|sonia|molly|zira|google uk english female)/i;
     let best = null, bestScore = -1;
     list.forEach(function (v) {
       const lang = String(v && v.lang || '').toLowerCase().replace('_', '-');
       let i = SPEAK_LANGS.findIndex(function (l) { return lang === l || lang.indexOf(l + '-') === 0 || (l === 'en' && lang.indexOf('en') === 0); });
       if (i < 0) return;
-      const score = (SPEAK_LANGS.length - i) * 10 + (cheer.test(v.name || '') ? 3 : 0) + (v.localService ? 1 : 0);
+      const g = speechGender(v);
+      const score = (gender ? (g === gender ? 100 : g ? -100 : 0) : (g === 'f' ? 3 : 0)) + (SPEAK_LANGS.length - i) * 10 + (v.localService ? 1 : 0);
       if (score > bestScore) { bestScore = score; best = v; }
     });
     return best;
@@ -1429,8 +1438,89 @@
     // 1.9.224 Shane's songs (made with Suno), -17 LUFS like the other tunes, AAC 96k with an mp3 twin.
     'sugar-rush-travel.m4a': 'd4c901aa', 'sugar-rush-travel.mp3': '662a7337',
     'sugar-rush-kiss.m4a': '24aced8c', 'sugar-rush-kiss.mp3': '8c1174e4',
-    'sugar-rush-song.m4a': 'fb999cd1', 'sugar-rush-song.mp3': '586f9ee6'
+    'sugar-rush-song.m4a': 'fb999cd1', 'sugar-rush-song.mp3': '586f9ee6',
+    // 1.9.225 Every saying pre-recorded in a female and a male NZ voice, one small sprite per voice.
+    'sugar-rush-say-f.m4a': '06eb3a31', 'sugar-rush-say-f.mp3': '8ccde7c4',
+    'sugar-rush-say-m.m4a': '78470b6c', 'sugar-rush-say-m.mp3': '9efd6ba2'
   };
+  // 1.9.225 Spoken sayings as recorded clips, a female voice (Microsoft neural "Molly", en-NZ) and a male one
+  // ("Mitchell", en-NZ), so the game mixes the two reliably instead of relying on the phone's voices.
+  // Each sprite is mono AAC 48 kbps; clips sit 0.3 s apart. SAY_CLIPS[text] = [fStart, fDur, mStart, mDur] in seconds.
+  const SAY_SPRITES = { f: 'sugar-rush-say-f.m4a', m: 'sugar-rush-say-m.m4a' };
+  const SAY_CLIPS = {
+    "Sweet as!": [0.3, 0.753, 0.3, 0.782],
+    "Sugar rush!": [1.353, 0.782, 1.382, 0.769],
+    "Choice!": [2.436, 0.487, 2.45, 0.583],
+    "Mean as!": [3.223, 0.704, 3.333, 0.705],
+    "Stripe-tastic!": [4.227, 0.887, 4.338, 0.945],
+    "Candy-licious!": [5.414, 0.832, 5.582, 0.852],
+    "Looking sharp!": [6.546, 0.703, 6.734, 0.657],
+    "Stripe me pink!": [7.548, 0.859, 7.692, 0.834],
+    "That's a wrap!": [8.708, 0.639, 8.826, 0.663],
+    "All wrapped up!": [9.647, 0.726, 9.789, 0.714],
+    "Parcel of yum!": [10.673, 0.883, 10.803, 0.814],
+    "Tied with a bow!": [11.856, 0.936, 11.917, 0.885],
+    "Sprinkle-tastic!": [13.093, 0.993, 13.102, 1.01],
+    "Hundreds and thousands!": [14.386, 1.279, 14.412, 1.095],
+    "Sprinkle party!": [15.964, 0.993, 15.806, 0.934],
+    "Lolly bomb!": [17.257, 0.74, 17.04, 0.757],
+    "Jelly good!": [18.297, 0.655, 18.097, 0.637],
+    "Wobble wobble!": [19.252, 0.782, 19.034, 0.808],
+    "Jelly well done!": [20.335, 1.004, 20.142, 0.848],
+    "Wobbly wonder!": [21.639, 0.861, 21.29, 0.835],
+    "Jar-mazing!": [22.8, 0.817, 22.425, 0.684],
+    "Lock-busted!": [23.917, 0.729, 23.41, 0.744],
+    "Jar-fully done!": [24.947, 0.972, 24.454, 0.86],
+    "Set those jars free!": [26.218, 1.365, 25.613, 1.127],
+    "Ice ice baby!": [27.884, 0.964, 27.04, 0.906],
+    "Icing on the cake!": [29.147, 0.859, 28.246, 0.893],
+    "Chip chip hooray!": [30.306, 0.976, 29.439, 0.975],
+    "Frost-busted!": [31.583, 0.797, 30.714, 0.849],
+    "Down the hatch!": [32.68, 0.924, 31.863, 0.741],
+    "Coming through!": [33.904, 0.762, 32.905, 0.616],
+    "And down she goes!": [34.965, 1.096, 33.821, 1.042],
+    "Nice drop!": [36.361, 0.637, 35.163, 0.697],
+    "Choc-blocked!": [37.298, 0.683, 36.159, 0.669],
+    "No more spreading!": [38.281, 0.993, 37.128, 0.885],
+    "Held the line!": [39.573, 0.81, 38.314, 0.756],
+    "Choc stop!": [40.683, 0.568, 39.369, 0.661],
+    "Gum-believable!": [41.55, 0.854, 40.33, 0.806],
+    "Cherry on top!": [42.705, 0.756, 41.436, 0.757],
+    "Pop those cherries!": [43.761, 1.062, 42.493, 1.028],
+    "Gumdrop gorgeous!": [45.122, 1.153, 43.822, 0.981],
+    "Zesty!": [46.575, 0.561, 45.103, 0.535],
+    "Lemon-sational!": [47.436, 0.933, 45.937, 0.927],
+    "Zing!": [48.669, 0.437, 47.164, 0.406],
+    "Squeeze the day!": [49.406, 0.889, 47.87, 0.842],
+    "Double delight!": [50.595, 0.858, 49.012, 0.742],
+    "Two for tea!": [51.753, 0.763, 50.054, 0.69],
+    "Special times two!": [52.817, 1.258, 51.044, 1.102],
+    "Pair of treats!": [54.374, 0.917, 52.447, 0.86],
+    "Still in it!": [55.591, 0.653, 53.607, 0.649],
+    "Not done yet!": [56.544, 0.844, 54.556, 0.74],
+    "Clutch play!": [57.688, 0.741, 55.596, 0.665],
+    "Comeback sweet!": [58.729, 0.883, 56.561, 0.754],
+    "Pop pop!": [59.911, 0.491, 57.615, 0.556],
+    "Fizz-tastic!": [60.702, 0.739, 58.471, 0.779],
+    "Bubble pop!": [61.741, 0.585, 59.55, 0.526],
+    "Popping candy!": [62.626, 0.855, 60.377, 0.763],
+    "Liquorice-free!": [63.781, 0.831, 61.44, 0.804],
+    "Unwrapped!": [64.912, 0.629, 62.544, 0.584],
+    "Untangled!": [65.841, 0.73, 63.428, 0.705],
+    "Black magic!": [66.871, 0.76, 64.433, 0.772],
+    "Goal achieved!": [67.931, 0.905, 65.506, 0.745],
+    "Sugar Crush!": [69.136, 0.83, 66.551, 0.802],
+    "Voice on!": [70.266, 0.682, 67.653, 0.675]
+  };
+  function sayClip(text, g) {
+    const c = SAY_CLIPS[text]; if (!c) return null;
+    return g === 'm' ? { start: c[2], dur: c[3] } : { start: c[0], dur: c[1] };
+  }
+  // Mostly alternate female and male, with the odd repeat so it doesn't feel mechanical.
+  function nextSayVoice(last, r) {
+    if (last !== 'f' && last !== 'm') return r < 0.5 ? 'f' : 'm';
+    return r < 0.75 ? (last === 'f' ? 'm' : 'f') : last;
+  }
   function mediaUrl(file) { return file.replace(/\.(mp3|m4a)$/, '-' + MEDIA_HASH[file] + '.$1'); }
   // 1.9.223 Shane's songs for the later levels, picked by mood: the most intense for the Hard and Super Hard levels,
   // the calmest for the Pacific islands, the upbeat one for the rest. Levels 1-7 keep our own tunes (Shane likes
@@ -2537,7 +2627,7 @@
 
   root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_STOPS, FUTURE_STOPS, LV_COUNT, lvId, levelIds, stopId, LEGACY_220_IDS, migrateProg, stopForLevel, icingPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, bubLeft, liqLeft, spreadLiq, LIQ_IDLE, goalCounts, cloneState, bestMove, hintMoveFor, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
     allowed: () => !!(root.IBScores && root.IBScores.isShane && root.IBScores.isShane()),
-    SPEAK_GAP, SPEAK_PITCH, SPEAK_RATE, SPEAK_VOL, pickSpeechVoice, speakWorthy, SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL, XF,
+    SPEAK_GAP, SPEAK_PITCH, SPEAK_RATE, SPEAK_VOL, pickSpeechVoice, speechGender, speakWorthy, SAY_SPRITES, SAY_CLIPS, sayClip, nextSayVoice, SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL, XF,
     VOICE_FILES, VOICE_RANK, MEDIA_HASH, mediaUrl, gameTrack, SONG_PLAN, SONG_FILES, SONG_FROM, songMood, attachSfxBus, playTone, playChime, playMovesWarnChime, playClip, voiceForStep,
     SAYINGS, SAYING_COLORS, SAYING_VOICE, sayingKind, pickSaying, sayingColor, MOVES_WARN_AT, MOVES_WARN_MS, HINT_IDLE_MS, HINT_REPEAT_MS,
     SPARKLE_MIN_MS, SPARKLE_MAX_MS, SPARKLE_MAX, SPARKLE_MAX_REDUCE, SHIMMER_MS, sparkleCap, sparkleEase, shimmerAt, drawStarGlint, drawCandyShine,
@@ -2630,7 +2720,7 @@
       .then(b => { bufs[kind] = b; return b; }).catch(() => { loading[kind] = null; return null; });
     return loading[kind];
   }
-  const TRACKS = { game: 'sugar-rush-music.mp3', game1: 'sugar-rush-l1.mp3', game2: 'sugar-rush-l2.mp3', menu: 'sugar-rush-menu.mp3', win: 'sugar-rush-win.mp3', yum: 'sugar-rush-yum.mp3', yay: VOICE_FILES.yay, great: VOICE_FILES.great, awesome: VOICE_FILES.awesome, sweetas: VOICE_FILES.sweetas, succulent: VOICE_FILES.succulent };
+  const TRACKS = { say_f: SAY_SPRITES.f, say_m: SAY_SPRITES.m, game: 'sugar-rush-music.mp3', game1: 'sugar-rush-l1.mp3', game2: 'sugar-rush-l2.mp3', menu: 'sugar-rush-menu.mp3', win: 'sugar-rush-win.mp3', yum: 'sugar-rush-yum.mp3', yay: VOICE_FILES.yay, great: VOICE_FILES.great, awesome: VOICE_FILES.awesome, sweetas: VOICE_FILES.sweetas, succulent: VOICE_FILES.succulent };
   function volFor(kind) { return kind === 'menu' ? MENU_VOL : BGM_VOL; }
   function gameKind(level) {
     const n = level == null ? lvNum : level;
@@ -2788,7 +2878,7 @@
     silentUnlock(ac);
     const p = (ac.state === 'suspended' || ac.state === 'interrupted') ? ac.resume() : Promise.resolve();
     p.then(() => { if (musicOn) playKind(wantKind()); }).catch(() => { });
-    if (soundOn && voiceOn) primeSpeech();
+    if (soundOn && voiceOn) { primeSpeech(); if (screen === 'game') loadSayClips(); }
   }
 
   function stopVoice() {
@@ -2835,14 +2925,36 @@
   function callout(step, i) {
     // 1.9.223 With speech available the saying itself is spoken (from showSaying); the clips are the fallback.
     const word = voiceForStep(step, step && (step.cascade || (i + 1)));
-    if (word && !canSpeak()) say(word);
+    if (word && !canSpeak() && !clipsReady()) say(word);
     else if (!word) chime();
   }
   // ---- 1.9.223 Spoken sayings (speechSynthesis) ----
   const synth = root.speechSynthesis || null;
-  let speakVoice = null, speakAt = -1e9, speakPrimed = false;
+  let speakVoice = null, speakVoices = { f: null, m: null }, speakAt = -1e9, speakPrimed = false, sayVoice = null, saySrc = null;
   function canSpeak() { return !!(synth && root.SpeechSynthesisUtterance); }
-  function loadSpeechVoice() { try { speakVoice = pickSpeechVoice(synth.getVoices()); } catch (e) { speakVoice = null; } }
+  function loadSpeechVoice() {
+    try { const l = synth.getVoices(); speakVoice = pickSpeechVoice(l); speakVoices = { f: pickSpeechVoice(l, 'f'), m: pickSpeechVoice(l, 'm') }; } catch (e) { speakVoice = null; }
+  }
+  // 1.9.225 Lazy-load the two saying sprites (about 400 KB each) once sound and voice are on and a level is in play.
+  function loadSayClips() { if (soundOn && voiceOn && audio()) { loadBuf('say_f'); loadBuf('say_m'); } }
+  function clipsReady() { return !!(bufs.say_f || bufs.say_m); }
+  function playSayClip(line, g, force) {
+    if (!ac || !clipOut) return false;
+    if (!bufs['say_' + g]) g = g === 'f' ? 'm' : 'f';
+    const buf = bufs['say_' + g], c = sayClip(line, g);
+    if (!buf || !c) return false;
+    if (force && saySrc) { try { saySrc.stop(); } catch (e) { } saySrc = null; }
+    runAudio(() => {
+      const at = ac.currentTime + 0.01, src = ac.createBufferSource(), gn = ac.createGain();
+      src.buffer = buf; gn.gain.setValueAtTime(VOICE_VOL * 1.6, at);
+      src.connect(gn); gn.connect(clipOut);
+      src.start(at, Math.max(0, c.start - 0.04), c.dur + 0.1);
+      src.onended = () => { if (saySrc === src) saySrc = null; };
+      saySrc = src;
+      duckMusicBrief(Math.min(2.4, c.dur + 0.15));
+    });
+    return true;
+  }
   if (canSpeak()) { loadSpeechVoice(); try { synth.addEventListener('voiceschanged', loadSpeechVoice); } catch (e) { } }
   function primeSpeech() {
     // iOS only lets speech start from a tap: speak a silent blank once on the first touch.
@@ -2852,17 +2964,24 @@
   }
   function speakLine(text, opt) {
     opt = opt || {};
-    if (!text || !soundOn || !voiceOn || !canSpeak() || (doc && doc.hidden)) return false;
+    if (!text || !soundOn || !voiceOn || (doc && doc.hidden)) return false;
     const t = now();
     if (!opt.force && t - speakAt < SPEAK_GAP) return false;
     const line = String(text).replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF\uFE0F]/gu, '').trim();
     if (!line) return false;
+    // Female and male take turns (mostly); the recorded clip first, the phone's voice of that gender if it is missing.
+    const g = nextSayVoice(sayVoice, Math.random());
+    if (playSayClip(line, g, opt.force)) { sayVoice = g; speakAt = t; return true; }
+    loadSayClips();
+    if (!canSpeak()) return false;
     try {
       if (opt.force) synth.cancel();
       else if (synth.speaking || synth.pending) return false;
       const u = new root.SpeechSynthesisUtterance(line);
       if (!speakVoice) loadSpeechVoice();
-      if (speakVoice) { u.voice = speakVoice; u.lang = speakVoice.lang; } else u.lang = 'en-NZ';
+      const gv = speakVoices[g] || speakVoice;
+      if (gv) { u.voice = gv; u.lang = gv.lang; } else u.lang = 'en-NZ';
+      sayVoice = g;
       u.pitch = SPEAK_PITCH; u.rate = SPEAK_RATE; u.volume = SPEAK_VOL;
       speakAt = t;
       duckMusicBrief(Math.min(2.4, 0.45 + line.length * 0.065));
@@ -2870,10 +2989,10 @@
       return true;
     } catch (e) { return false; }
   }
-  function stopSpeech() { try { if (synth) synth.cancel(); } catch (e) { } }
+  function stopSpeech() { try { if (synth) synth.cancel(); } catch (e) { } if (saySrc) { try { saySrc.stop(); } catch (e) { } saySrc = null; } }
   // Big moments: speak the banner words when speech works, otherwise the old clip.
-  function cheer(text, word, force) { if (!speakLine(text, { force: !!force }) && !(canSpeak() && voiceOn)) say(word); }
-  function setVoice(on) { voiceOn = !!on; ls.set('ib-sugar-voice', voiceOn); if (!voiceOn) stopSpeech(); paintButtons(); if (voiceOn) { primeSpeech(); speakLine('Voice on!', { force: true }); } }
+  function cheer(text, word, force) { if (!speakLine(text, { force: !!force }) && !((canSpeak() || clipsReady()) && voiceOn)) say(word); }
+  function setVoice(on) { voiceOn = !!on; ls.set('ib-sugar-voice', voiceOn); if (!voiceOn) stopSpeech(); paintButtons(); if (voiceOn) { primeSpeech(); loadSayClips(); speakLine('Voice on!', { force: true }); } }
 
   // ---------- Look ----------
   const COL = [['#ff6b88', '#ff1a4a', '#c40032'], ['#ffb347', '#ff6a00', '#c44e00'], ['#ffe566', '#ffc107', '#d99400'], ['#5dff7a', '#12d04a', '#0b8a2c'], ['#6ed0ff', '#1a8cff', '#0b5ad6'], ['#d894ff', '#c026f0', '#7a12b0']];
@@ -3790,6 +3909,7 @@
     if (!opt.tutorial) doc.body.classList.remove('sarah');
     const fresh = screen !== 'game' || lvNum !== n;
     screen = 'game';
+    loadSayClips();
     lvNum = n;
     const lv = LEVELS[n - 1];
     doc.body.classList.add('ingame');
@@ -5289,7 +5409,7 @@
     say, chime, callout, unlockAudio, audio, showSaying, hideSaying, showMovesWarn, hideMovesWarn, maybeWarn3, showHint, hideHintHand, noteActivity,
     clipsReady: () => Object.keys(VOICE_FILES).every(k => !!bufs[k]),
     setSound(on) { soundOn = !!on; ls.set('ib-sugar-sound', soundOn); paintButtons(); },
-    setVoice(on) { setVoice(on); }, voiceState: () => ({ voiceOn, canSpeak: canSpeak(), voice: speakVoice ? speakVoice.name + ' ' + speakVoice.lang : null }), speakLine: (t, o) => speakLine(t, o),
+    setVoice(on) { setVoice(on); }, voiceState: () => ({ voiceOn, sayVoice, clips: clipsReady(), canSpeak: canSpeak(), voice: speakVoice ? speakVoice.name + ' ' + speakVoice.lang : null }), speakLine: (t, o) => speakLine(t, o),
     setScore(n) { if (!st) return; st.score = n; st.moves = 0; st.over = true; st.won = goalsMet(st); st.stars = starsOf(st); hud(); },
     previewWin(opts) { opts = opts || {}; const n = opts.level || (st && st.lv && st.lv.n) || 2; if (!st || st.lv.n !== n) startLevel(n); st.score = opts.score || Math.max(st.lv.stars[2] || 0, 2400); st.moves = Math.max(st.moves, 1); st.won = true; st.over = true; st.stars = opts.stars || 3; if (opts.resetBadge) prog.badges[n - 1] = 0; winInfo = recordWin(st); hud(); showEnd(); },
     view: () => ({ score: st && st.score, moves: st && st.moves, busy, soundOn, musicOn, screen, level: st && st.lv && st.lv.n, acState: ac && ac.state, sparkles: sparkles.length, hold: sparkleHoldT != null, warned3, lastSaying, hintOn, hintMove: hintMove && hintMove.map(function (p) { return p.slice(); }), lastAct, streak: streakPts, streakTier: streakTier(streakPts), boosts: normBoosters(inv()), hammerMode, spinReady: spinReady(), overlay: ovp.length, scene: ($('scene') && $('scene').dataset.n) || '' }),

@@ -4624,10 +4624,10 @@ console.log('1.9.223 hourly lives ok');
   assert.strictEqual(SR.speakWorthy({ cascade: 1, popped: [1, 2, 3], jellyCleared: 1 }, 1), false, 'a plain match is minor');
   assert.strictEqual(SR.speakWorthy({ cascade: 3, popped: [1, 2, 3] }, 3), true);
   assert.ok(src.includes('if (speakWorthy(step, step && (step.cascade || (i + 1)))) speakLine(text);'), 'speaks the saying on screen');
-  assert.ok(src.includes("if (!text || !soundOn || !voiceOn || !canSpeak() || (doc && doc.hidden)) return false;"), 'respects Sound and Voice');
+  assert.ok(src.includes("if (!text || !soundOn || !voiceOn || (doc && doc.hidden)) return false;"), 'respects Sound and Voice');
   assert.ok(src.includes('if (!opt.force && t - speakAt < SPEAK_GAP) return false;') && src.includes('duckMusicBrief(Math.min(2.4,'));
   assert.ok(src.includes("ls.get('ib-sugar-voice', true)") && html.includes('id="voicebtn"'));
-  assert.ok(src.includes('if (word && !canSpeak()) say(word);'), 'clips only where speech is missing');
+  assert.ok(src.includes('if (word && !canSpeak() && !clipsReady()) say(word);'), 'old word clips only where speech and saying clips are missing');
   assert.ok(!/say\('(great|sweetas|awesome)'\)/.test(src));
   // Song slots: levels 1-7 keep our tunes; Shane's songs by mood from level 8; nothing changes until a file is listed.
   assert.strictEqual(SR.SONG_FROM, 8);
@@ -4659,6 +4659,37 @@ console.log('1.9.223 voice and song slots ok');
   assert.ok(sw.includes('/\\.m4a$/i.test(u.pathname)'), 'SW leaves m4a range requests to the browser too');
 }
 console.log('1.9.224 songs ok');
+
+// 1.9.225 Sayings pre-recorded in a female and a male NZ voice (two lazy sprites), mixed; phone speech by gender as fallback.
+{
+  const SR = load('feed/sugar-rush.js').SugarRush;
+  const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
+  const sha8 = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex').slice(0, 8);
+  const pool = new Set(); for (const k in SR.SAYINGS) SR.SAYINGS[k].forEach(x => pool.add(x));
+  assert.ok(pool.has('Sweet as!') && pool.has('Cherry on top!'));
+  for (const t of pool) { const c = SR.SAY_CLIPS[t]; assert.ok(c && c.length === 4 && c.every(x => x >= 0) && c[1] > 0.2 && c[1] < 2.4 && c[3] > 0.2 && c[3] < 2.4, 'clips for ' + t); }
+  for (const t of ['Goal achieved!', 'Sugar Crush!', 'Voice on!']) assert.ok(SR.SAY_CLIPS[t], t);
+  // Clips sit in order without overlapping, inside each sprite.
+  for (const [i, j] of [[0, 1], [2, 3]]) { const xs = Object.values(SR.SAY_CLIPS).map(c => [c[i], c[i] + c[j]]).sort((a, b) => a[0] - b[0]); for (let k = 1; k < xs.length; k++) assert.ok(xs[k][0] - xs[k - 1][1] >= 0.25, 'gap'); }
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(SR.sayClip('Cherry on top!', 'm'))), { start: SR.SAY_CLIPS['Cherry on top!'][2], dur: SR.SAY_CLIPS['Cherry on top!'][3] });
+  assert.strictEqual(SR.sayClip('Nope', 'f'), null);
+  assert.strictEqual(SR.nextSayVoice('f', 0.1), 'm'); assert.strictEqual(SR.nextSayVoice('m', 0.1), 'f'); assert.strictEqual(SR.nextSayVoice('f', 0.9), 'f');
+  let flips = 0, last = null; for (let k = 0; k < 400; k++) { const g = SR.nextSayVoice(last, (k * 0.6180339887) % 1); if (last && g !== last) flips++; last = g; }
+  assert.ok(flips > 200, 'mostly alternates');
+  for (const g of ['f', 'm']) for (const e of ['m4a', 'mp3']) {
+    const f = 'sugar-rush-say-' + g + '.' + e, url = SR.mediaUrl(f);
+    assert.strictEqual(SR.MEDIA_HASH[f], sha8('feed/' + url), f);
+    const size = fs.statSync('feed/' + url).size; assert.ok(size > 2e5 && size < 6e5, f + ' small');
+  }
+  const vs = [{ name: 'Karen', lang: 'en-AU' }, { name: 'Lee', lang: 'en-AU' }, { name: 'Daniel', lang: 'en-GB' }, { name: 'Google UK English Female', lang: 'en-GB' }];
+  assert.strictEqual(SR.pickSpeechVoice(vs, 'm').name, 'Lee'); assert.strictEqual(SR.pickSpeechVoice(vs, 'f').name, 'Karen');
+  assert.strictEqual(SR.speechGender({ name: 'Microsoft Mitchell Online (Natural) - English (New Zealand)' }), 'm');
+  assert.strictEqual(SR.speechGender({ name: 'Microsoft Molly Online (Natural) - English (New Zealand)' }), 'f');
+  assert.ok(src.includes('if (playSayClip(line, g, opt.force)) { sayVoice = g; speakAt = t; return true; }') && src.includes('const gv = speakVoices[g] || speakVoice;'));
+  assert.ok(src.includes("function loadSayClips() { if (soundOn && voiceOn && audio()) { loadBuf('say_f'); loadBuf('say_m'); } }"), 'lazy, only with sound and voice on');
+}
+console.log('1.9.225 male and female sayings ok');
+
 
 
 
