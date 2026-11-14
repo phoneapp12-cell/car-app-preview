@@ -1,4 +1,4 @@
-/* Info Book 1.9.166 – Sugar Rush, levels 1–10. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.166 – Sugar Rush, levels 1–15. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -21,6 +21,9 @@
   const HEART = ['..XXXX..', '.XXXXXX.', 'XXXXXXXX', 'XXXXXXXX', 'XXXXXXXX', '.XXXXXX.', '..XXXX..', '...XX...'];
   const FUNNEL = ['.XXXXXX.', '.XXXXXX.', '..XXXX..', '..XXXX..', '..XXXX..', '..XXXX..', '.XXXXXX.', '.XXXXXX.'];
   const FRAME = ['XXXXXXXX', 'X......X', 'X......X', 'XX....XX', 'XX....XX', 'X......X', 'X......X', 'XXXXXXXX'];
+  // 1.9.219 South Island trays: a glacier valley (Franz Josef) and a factory floor (Dunedin).
+  const GLACIER = ['XXXXXXXX', 'XXXXXXXX', '.XXXXXX.', '.XXXXXX.', '..XXXX..', '..XXXX..', '.XXXXXX.', 'XXXXXXXX'];
+  const FACTORY = ['XXXXXXXX', 'XXXXXXXX', 'XXXXXXXX', 'XXX..XXX', 'XXX..XXX', 'XXXXXXXX', 'XXXXXXXX', 'XXXXXXXX'];
 
   const LEVELS = [
     { n: 1, name: 'The Sweet Shop', target: 0, moves: 20, stars: [3000, 6000, 9000], kinds: 6,
@@ -70,7 +73,34 @@
       ice: ['00000000', '00000000', '00100100', '00000000', '00000000', '00000000', '00000000', '00000000'],
       locks: ['00000000', '00000000', '00000000', '00100100', '00000000', '00000000', '00000000', '00000000'],
       help: 'A little of everything: jelly, two ingredients, a bit of icing and a couple of locked jars. Finish it all in 32 moves.',
-      badge: { id: 'night', name: 'Night Light', icon: '🌟' } }
+      badge: { id: 'night', name: 'Night Light', icon: '🌟' } },
+    // 1.9.219 Levels 11–15 continue south. Goals are always objectives; score only sets stars.
+    { n: 11, name: 'Whale Watch', target: 0, moves: 22, stars: [0, 2300, 4600], kinds: 6,
+      bub: ['10000001', '01000010', '00100100', '00011000', '00011000', '00100100', '01000010', '10000001'],
+      help: 'Sugar bubbles hold a sweet in place. Make a match next to a bubble, or hit it with a special sweet, to pop it, and the bubbles touching it pop too. Pop every bubble in 22 moves.',
+      badge: { id: 'whale', name: 'Whale Tail', icon: '🐋' } },
+    { n: 12, name: 'Garden City', target: 0, moves: 24, stars: [0, 4000, 8000], kinds: 6,
+      jelly: ['00000000', '02200220', '02000020', '00011000', '00011000', '02000020', '02200220', '00000000'],
+      locks: ['00000000', '00000000', '00000000', '00011000', '00011000', '00000000', '00000000', '00000000'],
+      bub: ['00011000', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '00011000'],
+      help: 'Double jelly in the garden beds, locked jars in the middle and a few sugar bubbles. Clear the jelly, free the jars and pop the bubbles in 24 moves.',
+      badge: { id: 'tram', name: 'Tram Ticket', icon: '🚋' } },
+    { n: 13, name: 'Glacier Run', target: 0, moves: 38, stars: [0, 3500, 7000], kinds: 6, mask: GLACIER,
+      ings: [[0, 2], [0, 5]],
+      ice: ['00000000', '00000000', '01000010', '00000000', '00200200', '00000000', '00000000', '00000000'],
+      help: 'Bring both ingredients down the glacier. Some of the icing is packed twice as thick. Bring both down and clear all the icing in 38 moves.',
+      badge: { id: 'glacier', name: 'Glacier Gem', icon: '💎' } },
+    { n: 14, name: 'Liquorice Gondola', target: 0, moves: 28, stars: [0, 2600, 5200], kinds: 6,
+      liq: ['11000011', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000'],
+      help: 'Liquorice wraps a sweet so it cannot be swapped. Include it in a match, or hit it with a special, to free it. If two moves in a row free none, the liquorice creeps onto a sweet next to it. Free all the liquorice in 28 moves.',
+      badge: { id: 'gondola', name: 'Gondola Pass', icon: '🚡' } },
+    { n: 15, name: 'The Chocolate Factory', target: 0, moves: 28, stars: [0, 2200, 4400], kinds: 6, mask: FACTORY,
+      choco: ['00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '11000011'],
+      jelly: ['00000000', '00111100', '01000010', '01000010', '01000010', '01000010', '00111100', '00000000'],
+      bub: ['10000001', '10000001', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000'],
+      liq: ['00011000', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000'],
+      help: 'The big finish: keep the chocolate in check, clear the jelly, pop the sugar bubbles and free the liquorice in 28 moves.',
+      badge: { id: 'ticket', name: 'Golden Ticket', icon: '🎫' } }
   ];
 
 
@@ -85,7 +115,12 @@
     { icon: '🎁', goal: 'Bring the ingredients down to the bottom', detail: 'Guide both ingredients down to the bottom in 34 moves.', tip: 'A little icing sits in the way. Match under an ingredient to drop it down.', mechanic: 'ings' },
     { icon: '🍫', goal: 'Clear all the jelly', detail: 'Keep the chocolate in check and clear every jelly in 24 moves.', tip: 'Chocolate spreads to a neighbouring tile at the end of a move if you did not hit it.', mechanic: 'choco' },
     { icon: '🍋', goal: 'Clear the jelly and collect 6 lemon drops', detail: 'Clear the jelly and collect 6 lemon drops in 28 moves.', tip: 'The path runs around the edge of the tray. Stay on it.', mechanic: 'path' },
-    { icon: '🌟', goal: 'Finish every objective', detail: 'Clear the jelly, bring both ingredients down, break the icing and free the locked jars — all in 32 moves.', tip: 'A little of everything. Take it one match at a time.', mechanic: 'mix' }
+    { icon: '🌟', goal: 'Finish every objective', detail: 'Clear the jelly, bring both ingredients down, break the icing and free the locked jars — all in 32 moves.', tip: 'A little of everything. Take it one match at a time.', mechanic: 'mix' },
+    { icon: '🫧', goal: 'Pop all the sugar bubbles', detail: 'Pop every sugar bubble in 22 moves.', tip: 'A bubble holds a sweet in place. Match next to it, or hit it with a special, to pop it — and the bubbles touching it pop too.', mechanic: 'bub' },
+    { icon: '🚋', goal: 'Clear the jelly, free the jars and pop the bubbles', detail: 'Clear every double jelly, free the 4 locked jars and pop the 4 sugar bubbles in 24 moves.', tip: 'The garden beds have two layers of jelly. Work the corners while the middle jars wait.', mechanic: 'garden' },
+    { icon: '🎁', goal: 'Bring both ingredients down and clear the icing', detail: 'Guide both ingredients down the glacier and clear all the icing in 38 moves.', tip: 'Thick icing needs two hits. Clear a path under each ingredient.', mechanic: 'glacier' },
+    { icon: '➿', goal: 'Free all the liquorice', detail: 'Free every liquorice-wrapped sweet in 28 moves.', tip: 'Include a wrapped sweet in a match to free it. If two moves in a row free none, the liquorice creeps onto a sweet next to it.', mechanic: 'liq' },
+    { icon: '🎫', goal: 'Finish every objective', detail: 'Clear the jelly, pop the sugar bubbles and free the liquorice, with chocolate on the loose — all in 28 moves.', tip: 'The big finish. Hit the chocolate when you can, and never leave the liquorice alone for long.', mechanic: 'factory' }
   ];
   function levelIntro(n, p) {
     const lv = LEVELS[(n | 0) - 1]; if (!lv) return null;
@@ -304,6 +339,84 @@
           { icon: '🔒', text: 'Free the locked jars' }
         ]
       }
+    ],
+    // 1.9.219 Sugar bubbles (level 11) and liquorice (level 14) each get a short hand tutorial.
+    11: [
+      {
+        id: 'bub-show', kind: 'show',
+        board: ['02402402','235f3523','240c4024','35115335','40241240','52354352','02402402','23553523'],
+        hl: [[1, 3], [2, 3]],
+        bubble: 'These are sugar bubbles. A bubble holds a sweet in place, so it cannot be swapped.'
+      },
+      {
+        id: 'bub-pop', kind: 'move',
+        board: ['02402402','235f3523','240c4024','35115335','40241240','52354352','02402402','23553523'],
+        move: [[3, 4], [4, 4]],
+        hl: [[1, 3], [2, 3], [3, 2], [3, 3], [3, 4], [4, 4]],
+        bubble: 'Match next to a bubble to pop it. The bubbles touching it pop too!'
+      },
+      { id: 'ready11', kind: 'ready', bubble: "Pop every bubble to finish. A special sweet pops them too. You're ready!" }
+    ],
+    12: [
+      {
+        id: 'recap12', kind: 'recap',
+        title: 'The Garden City',
+        bubble: 'Three things to finish on this level. Take it one match at a time.',
+        items: [
+          { icon: '🍨', text: 'Clear the double jelly in the garden beds' },
+          { icon: '🔒', text: 'Free the 4 locked jars in the middle' },
+          { icon: '🫧', text: 'Pop the 4 sugar bubbles' }
+        ]
+      }
+    ],
+    13: [
+      {
+        id: 'recap13', kind: 'recap',
+        title: 'Down the glacier',
+        bubble: 'Bring both ingredients to the bottom and clear the icing.',
+        items: [
+          { icon: '🎁', text: 'Match under an ingredient to drop it down' },
+          { icon: '🧁', text: 'Thick icing needs two hits' }
+        ]
+      }
+    ],
+    14: [
+      {
+        id: 'liq-show', kind: 'show',
+        board: ['03405403','13513513','34004034','35225135','40142440','51351351','03405403','13513513'],
+        liq: ['00000000','00000000','00000000','00110000','00000000','00000000','00000000','00000000'],
+        hl: [[3, 2], [3, 3]],
+        bubble: 'This is liquorice. It wraps a sweet, so the sweet cannot be swapped.'
+      },
+      {
+        id: 'liq-free', kind: 'move',
+        board: ['03405403','13513513','34004034','35225135','40142440','51351351','03405403','13513513'],
+        liq: ['00000000','00000000','00000000','00110000','00000000','00000000','00000000','00000000'],
+        move: [[3, 4], [4, 4]],
+        hl: [[3, 2], [3, 3], [3, 4], [4, 4]],
+        bubble: 'Include it in a match to free it.'
+      },
+      {
+        id: 'liq-creep', kind: 'show',
+        board: ['03405403','13513513','34004034','35225135','40142440','51351351','03405403','13513513'],
+        liq: ['00000000','00000000','00000000','00100000','00000000','00000000','00000000','00000000'],
+        hl: [[3, 2], [3, 3], [2, 2], [4, 2], [3, 1]],
+        bubble: 'Careful: if two moves in a row free none, the liquorice creeps onto a sweet next to it.'
+      },
+      { id: 'ready14', kind: 'ready', bubble: "Free all the liquorice to finish. You're ready!" }
+    ],
+    15: [
+      {
+        id: 'recap15', kind: 'recap',
+        title: 'The Chocolate Factory',
+        bubble: 'The big finish. You have seen all of these before.',
+        items: [
+          { icon: '🍫', text: 'Keep the chocolate in check' },
+          { icon: '💜', text: 'Clear the jelly' },
+          { icon: '🫧', text: 'Pop the sugar bubbles' },
+          { icon: '➿', text: 'Free the liquorice before it creeps' }
+        ]
+      }
     ]
   };
   function tutorialFor(n) { return TUTORIALS[n] || null; }
@@ -322,13 +435,18 @@
     { n: 7, x: 200, y: 424, place: 'Taupō Station', kind: 'station', label: 'left' },
     { n: 8, x: 300, y: 500, place: 'Napier', kind: 'town', label: 'left' },
     { n: 9, x: 246, y: 530, place: 'Wellington', kind: 'town', label: 'right' },
-    { n: 10, x: 148, y: 640, place: 'Nelson', kind: 'town', label: 'left' }
+    { n: 10, x: 148, y: 640, place: 'Nelson', kind: 'town', label: 'left' },
+    // 1.9.219 South Island: east coast to Christchurch, over Arthur's Pass to the West Coast, then south.
+    { n: 11, x: 236, y: 728, place: 'Kaikōura', kind: 'town', label: 'left' },
+    { n: 12, x: 270, y: 852, place: 'Christchurch', kind: 'town', label: 'right' },
+    { n: 13, x: 112, y: 800, place: 'Franz Josef', kind: 'town', label: 'right' },
+    { n: 14, x: 138, y: 948, place: 'Queenstown', kind: 'town', label: 'right' },
+    { n: 15, x: 238, y: 984, place: 'Dunedin', kind: 'town', label: 'right' }
   ];
   const FUTURE_STOPS = [
-    { place: 'Christchurch', x: 270, y: 852, label: 'right' },
-    { place: 'Queenstown', x: 138, y: 948, label: 'right' },
-    { place: 'Dunedin', x: 252, y: 1010, label: 'left' }
+    { place: 'Bluff', x: 176, y: 1026, label: 'left' }
   ];
+  const LV_COUNT = 15;
   function stopForLevel(n) { return MAP_STOPS[(n | 0) - 1] || null; }
   function icingPath(pts) {
     if (!pts || pts.length < 2) return '';
@@ -416,11 +534,13 @@
   const adj = (a, z) => Math.abs(a[0] - z[0]) + Math.abs(a[1] - z[1]) === 1;
   const randKind = (rand, kinds) => Math.floor(rand() * (kinds || KINDS));
   const isHole = t => t === HOLE || !!(t && t.hole);
-  const isBlock = t => !!(t && (t.ice > 0 || t.choco > 0));
+  // 1.9.219 Sugar bubbles (t.bub) hold a sweet in place like a block until a match next to them, or a special, pops them.
+  // Liquorice (t.liq) wraps a sweet like a lock, and creeps to a neighbour when a move frees none.
+  const isBlock = t => !!(t && (t.ice > 0 || t.choco > 0 || t.bub > 0));
   const isIng = t => !!(t && t.ing);
   const isBomb = t => !!(t && t.s === 'b' && t.c < 0 && !t.ing && !t.ice && !t.choco);
-  const isCandy = t => !!(t && t.c >= 0 && !t.ice && !t.choco && !t.ing);
-  const canSwap = t => !!(t && !isHole(t) && (isCandy(t) || isBomb(t)) && !t.lock);
+  const isCandy = t => !!(t && t.c >= 0 && !t.ice && !t.choco && !t.ing && !t.bub);
+  const canSwap = t => !!(t && !isHole(t) && (isCandy(t) || isBomb(t)) && !t.lock && !t.liq);
   function isOpen(mask, r, c) {
     if (r < 0 || r >= N || c < 0 || c >= N) return false;
     if (!mask) return true;
@@ -438,7 +558,8 @@
     return LEVELS[0];
   }
 
-  // Tests: '0'-'5' plain sweets, '*' a sprinkle bomb, '.' empty, '#' a hole, 'I' icing, 'C' chocolate, 'G' an ingredient.
+  // Tests: '0'-'5' plain sweets, '*' a sprinkle bomb, '.' empty, '#' a hole, 'I' icing, 'C' chocolate, 'G' an ingredient,
+  // 'a'-'f' a sweet of colour 0-5 inside a sugar bubble.
   function fromRows(rows) {
     return rows.map(row => row.split('').map(ch => {
       if (ch === '.') return null;
@@ -447,6 +568,7 @@
       if (ch === 'I') return Object.assign(mk(-4), { ice: 1 });
       if (ch === 'C') return Object.assign(mk(-5), { choco: 1 });
       if (ch === 'G') return Object.assign(mk(-3), { ing: 1 });
+      if (ch >= 'a' && ch <= 'f') return Object.assign(mk(ch.charCodeAt(0) - 97), { bub: 1 });
       return mk(+ch);
     }));
   }
@@ -456,6 +578,7 @@
     if (t.ice > 0) return 'I';
     if (t.choco) return 'C';
     if (t.ing) return 'G';
+    if (t.bub > 0) return String.fromCharCode(97 + t.c);
     if (t.c < 0) return '*';
     return String(t.c);
   }).join(''));
@@ -560,7 +683,7 @@
     } else {
       const other = isBomb(A) ? Z : A, bomb = isBomb(A) ? A : Z;
       bomb.armed = true;
-      for (let k = 0; k < N * N; k++) { const [r, c] = rc(k), t = b[r][c]; if (t === bomb || (t && t.c === other.c)) clear.add(k); }
+      for (let k = 0; k < N * N; k++) { const [r, c] = rc(k), t = b[r][c]; if (t === bomb || (t && t.c === other.c)) { if (t !== bomb && isBlock(t)) hit.add(k); else clear.add(k); } }
       const bk = [...clear].find(k => b[rc(k)[0]][rc(k)[1]] === bomb);
       fired.push({ r: rc(bk)[0], c: rc(bk)[1], s: 'b', color: other.c });
       expand(b, clear, fired, hit, mask);
@@ -618,11 +741,14 @@
     step.delivered = step.delivered || [];
     step.jellyCleared = 0;
     step.brokeLock = false;
+    step.liqFreed = 0;
+    step.bubPopped = 0;
     step.clear.forEach(k => {
       const [r, c] = rc(k), t = b[r][c];
       if (t && !isHole(t) && !isBlock(t)) {
-        step.popped.push({ id: t.id, r, c, color: t.c, s: t.s, lock: t.lock });
+        step.popped.push({ id: t.id, r, c, color: t.c, s: t.s, lock: t.lock, liq: t.liq });
         if (t.lock) step.brokeLock = true;
+        if (t.liq) step.liqFreed++;
         if (st && t.c >= 0) st.collected[t.c] = (st.collected[t.c] || 0) + 1;
         b[r][c] = null;
         if (st && st.jelly) {
@@ -645,6 +771,11 @@
         step.chocoHit = true;
         b[r][c] = null;
         if (st && st.jelly) { const before = st.jelly[r][c] || 0; st.jelly[r][c] = Math.max(0, before - 1); if (before > 0) step.jellyCleared++; }
+      } else if (t.bub > 0) {
+        // Pop the bubble (the sweet inside stays), and the bubbles right next to it pop too.
+        const popBub = (i, j, chain) => { const o = b[i][j]; o.bub = 0; step.bubPopped++; step.blocked.push({ r: i, c: j, kind: 'bub', left: 0, chain: !!chain }); };
+        popBub(r, c, false);
+        [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]].forEach(([i, j]) => { if (isOpen(mask, i, j) && b[i][j] && b[i][j].bub > 0) popBub(i, j, true); });
       }
     });
     step.madeTiles = (step.made || []).map(m => { const [r, c] = rc(m.k), t = mk(m.color, m.s); b[r][c] = t; return { t, r, c }; });
@@ -680,7 +811,7 @@
     const cells = [], tiles = [];
     for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
       const t = b[r][c];
-      if (isCandy(t) && !t.lock) { cells.push([r, c]); tiles.push(t); }
+      if (isCandy(t) && !t.lock && !t.liq) { cells.push([r, c]); tiles.push(t); }
     }
     for (let tries = 0; tries < 300; tries++) {
       for (let i = tiles.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); const x = tiles[i]; tiles[i] = tiles[j]; tiles[j] = x; }
@@ -689,7 +820,7 @@
     }
     const fresh = newBoard(rand, kinds, mask);
     for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
-      if (isHole(b[r][c]) || isBlock(b[r][c]) || isIng(b[r][c]) || (b[r][c] && b[r][c].lock)) continue;
+      if (isHole(b[r][c]) || isBlock(b[r][c]) || isIng(b[r][c]) || (b[r][c] && (b[r][c].lock || b[r][c].liq))) continue;
       if (isOpen(mask, r, c)) b[r][c] = fresh[r][c];
     }
     return true;
@@ -725,6 +856,8 @@
       }
     };
     grid(lv.locks, (r, c) => { if (isCandy(board[r][c])) board[r][c].lock = 1; });
+    grid(lv.liq, (r, c) => { if (isCandy(board[r][c]) && !board[r][c].lock) board[r][c].liq = 1; });
+    grid(lv.bub, (r, c) => { if (isCandy(board[r][c]) && !board[r][c].lock && !board[r][c].liq) board[r][c].bub = 1; });
     grid(lv.ice, (r, c, n) => { board[r][c] = Object.assign(mk(-4), { ice: n }); });
     grid(lv.choco, (r, c) => { board[r][c] = Object.assign(mk(-5), { choco: 1 }); });
     (lv.ings || []).forEach(([r, c]) => { if (isOpen(mask, r, c)) board[r][c] = Object.assign(mk(-3), { ing: 1 }); });
@@ -739,6 +872,8 @@
   }
   function iceLeft(b) { let n = 0; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (b[r][c] && b[r][c].ice > 0) n += b[r][c].ice; return n; }
   function chocoLeft(b) { let n = 0; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (b[r][c] && b[r][c].choco) n++; return n; }
+  function bubLeft(b) { if (!b) return 0; let n = 0; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (b[r][c] && b[r][c].bub > 0) n++; return n; }
+  function liqLeft(b) { if (!b) return 0; let n = 0; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (b[r][c] && b[r][c].liq) n++; return n; }
   function locksLeft(b) {
     if (!b) return 0;
     let n = 0; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (b[r][c] && b[r][c].lock) n++;
@@ -752,7 +887,27 @@
     if (lv.collect && (st.collected[lv.collect.color] || 0) < lv.collect.n) return false;
     if ((lv.ings && lv.ings.length) && (st.ingsLeft || 0) > 0) return false;
     if (lv.locks && locksLeft(st.board) > 0) return false;
+    if (lv.bub && bubLeft(st.board) > 0) return false;
+    if (lv.liq && liqLeft(st.board) > 0) return false;
     return true;
+  }
+  // Liquorice creeps: one plain sweet next to it gets wrapped, after LIQ_IDLE moves in a row that freed none.
+  const LIQ_IDLE = 2;
+  function spreadLiq(st) {
+    const b = st.board, mask = st.mask, neigh = [], seen = new Set();
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+      if (!(b[r][c] && b[r][c].liq)) continue;
+      [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]].forEach(([i, j]) => {
+        if (!isOpen(mask, i, j) || seen.has(key(i, j))) return;
+        const t = b[i][j];
+        if (!isCandy(t) || t.s || t.lock || t.liq) return;
+        seen.add(key(i, j)); neigh.push([i, j]);
+      });
+    }
+    if (!neigh.length) return null;
+    const [i, j] = neigh[Math.floor(st.rand() * neigh.length)];
+    b[i][j].liq = 1;
+    return { r: i, c: j };
   }
   function spreadChoco(st) {
     const b = st.board, mask = st.mask, spots = [], neigh = [];
@@ -795,7 +950,7 @@
   function isScoreOnly(lv) {
     lv = lv || {};
     // Kept for older tests; no live level is score-only any more.
-    return !lv.jelly && !lv.ice && !lv.collect && !(lv.ings && lv.ings.length) && !lv.locks;
+    return !lv.jelly && !lv.ice && !lv.collect && !(lv.ings && lv.ings.length) && !lv.locks && !lv.bub && !lv.liq;
   }
   function goalCounts(lv, stt) {
     lv = lv || {};
@@ -824,6 +979,14 @@
     if (lv.locks) {
       const left = stt && stt.board ? locksLeft(stt.board) : 0;
       out.push({ kind: 'locks', icon: '🔒', left: left, have: 0, n: left, lab: left + ' left', text: '🔒 ' + left + ' left' });
+    }
+    if (lv.bub) {
+      const left = stt && stt.board ? bubLeft(stt.board) : 0;
+      out.push({ kind: 'bub', icon: '🫧', left: left, have: 0, n: left, lab: 'Bubbles ' + left + ' left', text: '🫧 Bubbles ' + left + ' left' });
+    }
+    if (lv.liq) {
+      const left = stt && stt.board ? liqLeft(stt.board) : 0;
+      out.push({ kind: 'liq', icon: '➿', left: left, have: 0, n: left, lab: 'Liquorice ' + left + ' left', text: '➿ Liquorice ' + left + ' left' });
     }
     return out;
   }
@@ -857,8 +1020,18 @@
     if (!st.tutorial && !hasMove(b, mask)) { shuffle(b, st.rand, st.kinds, mask); shuffled = true; }
     const chocoHit = steps.some(s => s.chocoHit);
     const spread = (!chocoHit && chocoLeft(b)) ? spreadChoco(st) : null;
+    // Liquorice creeps after two moves in a row that free none of it (LIQ_IDLE).
+    const liqHit = steps.some(s => s.liqFreed > 0);
+    let liqSpread = null;
+    if (liqHit || !liqLeft(b)) st.liqIdle = 0;
+    else if (!st.tutorial) {
+      st.liqIdle = (st.liqIdle || 0) + 1;
+      if (st.liqIdle >= LIQ_IDLE) { liqSpread = spreadLiq(st); st.liqIdle = 0; }
+    }
+    // 1.9.219 A spread can take the last swap away; shuffle so the board never gets stuck.
+    if (!st.tutorial && !shuffled && (spread || liqSpread) && !hasMove(b, mask)) { shuffle(b, st.rand, st.kinds, mask); shuffled = true; }
     if (!st.tutorial) finishIfDone(st);
-    return { valid: true, steps, shuffled, swapped: [A, Z], spread };
+    return { valid: true, steps, shuffled, swapped: [A, Z], spread, liqSpread };
   }
 
 
@@ -866,7 +1039,7 @@
     const cells = [];
     for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
       const t = st.board[r][c];
-      if (isCandy(t) && !t.s && !t.lock) cells.push([r, c]);
+      if (isCandy(t) && !t.s && !t.lock && !t.liq) cells.push([r, c]);
     }
     return cells;
   }
@@ -949,7 +1122,7 @@
       lv: st.lv,
       jelly: st.jelly ? st.jelly.map(r => r.slice()) : null,
       collected: st.collected.slice(),
-      ingsLeft: st.ingsLeft,
+      ingsLeft: st.ingsLeft, liqIdle: st.liqIdle || 0,
       score: st.score, moves: st.moves, target: st.target, over: st.over, won: st.won, stars: st.stars
     };
   }
@@ -968,6 +1141,8 @@
     if (before.jelly) h += (jellyLeft(before) - jellyLeft(after)) * 250;
     if (before.lv && before.lv.ice) h += (iceLeft(before.board) - iceLeft(after.board)) * 300;
     if (before.lv && before.lv.locks) h += (locksLeft(before.board) - locksLeft(after.board)) * 350;
+    if (before.lv && before.lv.bub) h += (bubLeft(before.board) - bubLeft(after.board)) * 320;
+    if (before.lv && before.lv.liq) h += (liqLeft(before.board) - liqLeft(after.board)) * 420;
     h += ((before.ingsLeft || 0) - (after.ingsLeft || 0)) * 800;
     if (res && res.steps) h += res.steps.reduce((n, s) => n + (s.madeTiles ? s.madeTiles.length * 80 : 0), 0);
     return h;
@@ -1147,19 +1322,21 @@
     gumdrop: ['Gum-believable!', 'Cherry on top!', 'Pop those cherries!', 'Gumdrop gorgeous!'],
     lemon: ['Zesty!', 'Lemon-sational!', 'Zing!', 'Squeeze the day!'],
     combo: ['Double delight!', 'Two for tea!', 'Special times two!', 'Pair of treats!'],
-    comeback: ['Still in it!', 'Not done yet!', 'Clutch play!', 'Comeback sweet!']
+    comeback: ['Still in it!', 'Not done yet!', 'Clutch play!', 'Comeback sweet!'],
+    bub: ['Pop pop!', 'Fizz-tastic!', 'Bubble pop!', 'Popping candy!'],
+    liq: ['Liquorice-free!', 'Unwrapped!', 'Untangled!', 'Black magic!']
   };
   const SAYING_COLORS = {
     cascade: '#ff3d8a', stripe: '#1aa7ff', wrap: '#ffb400', bomb: '#c84dff',
     jelly: '#e649cf', locks: '#ff8c2a', ice: '#3bc9ff', ings: '#ff6b2c',
     choco: '#c26a2d', gumdrop: '#ff2d55', lemon: '#ffd43b', combo: '#ff5ad5',
-    comeback: '#ff7a1a'
+    comeback: '#ff7a1a', bub: '#29b6f6', liq: '#6a3d9a'
   };
   const SAYING_VOICE = {
     cascade: 'great', stripe: 'great', wrap: 'sweetas', bomb: 'succulent',
     jelly: 'great', locks: 'great', ice: 'great', ings: 'sweetas',
     choco: 'great', gumdrop: 'great', lemon: 'great', combo: 'awesome',
-    comeback: 'awesome'
+    comeback: 'awesome', bub: 'great', liq: 'great'
   };
   function sayingKind(s, cascade, st) {
     if (!s) return null;
@@ -1179,6 +1356,8 @@
     else if (s.delivered && s.delivered.length) kind = 'ings';
     else if (s.chocoHit) kind = 'choco';
     else if (s.brokeLock) kind = 'locks';
+    else if (s.liqFreed) kind = 'liq';
+    else if (s.bubPopped) kind = 'bub';
     else if (s.jellyCleared) kind = 'jelly';
     else if ((s.blocked || []).some(b => b.kind === 'ice')) kind = 'ice';
     else {
@@ -1303,7 +1482,7 @@
   function raceIcon(id) { return RACE_ICONS.find(function (x) { return x.id === id; }) || null; }
   function isRaceIcon(id) { return !!raceIcon(id); }
   function raceStars(p) { return (p && p.stars || []).reduce(function (a, n) { return a + (n || 0); }, 0); }
-  function raceStop(p) { return Math.max(1, Math.min(10, (p && p.open) || 1)); }
+  function raceStop(p) { return Math.max(1, Math.min(LV_COUNT, (p && p.open) || 1)); }
   function hashStr(s) {
     let h = 2166136261;
     s = String(s || '');
@@ -1588,6 +1767,124 @@
         { x: 10, y: 34, w: 3, cls: 'sc-twinkle', d: 2.6, dl: -1.4, svg: 'glint' },
         { x: 62, y: 44, w: 3.5, cls: 'sc-twinkle', d: 2, dl: -0.3, svg: 'glint' },
         { x: 30, y: 4, w: 16, cls: 'sc-shoot', d: 7, svg: 'shoot' }
+      ] },
+    // 1.9.219 South Island scenes for levels 11-15.
+    { n: 11, id: 'kaikoura', place: 'Kaikōura', title: 'Whales off Kaikōura', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#6cc6ff'], [0.6, '#bfe8ff'], [1, '#f2fbff']]) + scGrad('se', [[0, '#2fa4dc'], [1, '#14699e']]) + scGrad('mt', [[0, '#8b9cc8'], [1, '#6a7cae']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(300, 90, 1, 0.85) + scCloud(70, 160, 0.7, 0.75) +
+          '<path d="M0 560 L40 470 L80 520 L130 420 L178 500 L220 440 L262 506 L310 430 L356 500 L390 470 L390 600 L0 600 Z" fill="url(#mt)"/>' +
+          '<path d="M112 450 L130 420 L150 452 L138 446 L130 456 L120 446 Z M292 460 L310 430 L330 462 L318 456 L310 466 L300 456 Z M206 462 L220 440 L236 464 L226 460 L220 468 Z" fill="#fff"/>' +
+          '<path d="M0 590 C80 566 160 580 240 572 C300 566 350 572 390 578 L390 620 L0 620 Z" fill="#5c9f6c"/>' +
+          '<rect y="612" width="390" height="232" fill="url(#se)"/>' +
+          '<path d="M20 650 q16 -6 32 0 M150 680 q16 -6 32 0 M290 660 q16 -6 32 0 M70 730 q16 -6 32 0 M240 760 q16 -6 32 0 M30 800 q16 -6 32 0" stroke="#fff" stroke-width="2.5" fill="none" opacity=".55"/>' +
+          '<path d="M300 844 C304 800 320 778 350 772 C374 768 390 776 390 790 L390 844 Z" fill="#6b6b78"/><path d="M318 790 C330 778 352 776 370 782" stroke="#8a8a96" stroke-width="4" fill="none"/>' +
+          '<ellipse cx="352" cy="772" rx="18" ry="8" fill="#5a4a40"/><circle cx="366" cy="766" r="6" fill="#5a4a40"/><circle cx="369" cy="764" r="1.4" fill="#111"/>';
+      },
+      sprites: [
+        { x: 30, y: 74, w: 22, cls: 'sc-bob', d: 2.8, svg: 'whale' },
+        { x: 34, y: 70, w: 12, cls: 'sc-rise', d: 3.6, puff: 1 },
+        { x: 37, y: 71, w: 9, cls: 'sc-rise', d: 4.2, dl: -1.8, puff: 1 },
+        { x: 70, y: 80, w: 10, cls: 'sc-bob', d: 3.4, dl: -1, svg: 'boat' },
+        { x: 50, y: 14, w: 8, cls: 'sc-drift', d: 9, svg: 'gull' },
+        { x: 8, y: 6, w: 26, cls: 'sc-drift', d: 22, svg: 'cloud' }
+      ] },
+    { n: 12, id: 'christchurch', place: 'Christchurch', title: 'The Garden City', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#8fd6ff'], [0.6, '#dff4ff'], [1, '#fff4e6']]) + scGrad('rv', [[0, '#6cc4e8'], [1, '#3b9ccc']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(90, 90, 1) + scCloud(290, 140, 0.8, 0.85) +
+          '<rect x="210" y="470" width="150" height="150" fill="#cfc4ae"/><path d="M200 474 L285 420 L370 474 Z" fill="#7d8a9a"/>' +
+          '<rect x="262" y="380" width="46" height="100" fill="#d8ccb4"/><path d="M256 384 L285 330 L314 384 Z" fill="#7d8a9a"/>' +
+          [228, 254, 316, 342].map(function (x) { return '<path d="M' + x + ' 560 V520 a8 8 0 0 1 16 0 V560 Z" fill="#7ec8ef" opacity=".8"/>'; }).join('') +
+          '<path d="M276 420 a9 9 0 0 1 18 0 V440 H276 Z" fill="#7ec8ef"/><circle cx="285" cy="406" r="7" fill="#fff6c8"/>' +
+          '<path d="M0 600 C80 580 160 594 240 586 C300 580 350 584 390 590 L390 844 L0 844 Z" fill="#8fd27a"/>' +
+          '<rect y="606" width="390" height="10" fill="#9a8a7a"/><path d="M0 610 H390" stroke="#6b5a4a" stroke-width="2"/>' +
+          '<path d="M-10 700 C70 680 140 720 220 702 C300 684 340 716 400 704 L400 750 C340 762 300 730 220 748 C140 766 70 726 -10 746 Z" fill="url(#rv)"/>' +
+          '<path d="M40 720 q12 -4 24 0 M200 718 q12 -4 24 0 M320 714 q12 -4 24 0" stroke="#fff" stroke-width="2" fill="none" opacity=".6"/>' +
+          '<path d="M0 770 C100 756 200 780 300 766 C340 760 370 762 390 764 L390 844 L0 844 Z" fill="#6cbf5e"/>' +
+          [[30, 640], [120, 650], [350, 646]].map(function (p) { return '<rect x="' + (p[0] - 3) + '" y="' + p[1] + '" width="6" height="40" fill="#7a4a2a"/><circle cx="' + p[0] + '" cy="' + (p[1] - 6) + '" r="22" fill="#ffb3d3"/><circle cx="' + (p[0] - 12) + '" cy="' + (p[1] + 4) + '" r="14" fill="#ff9ac6"/><circle cx="' + (p[0] + 12) + '" cy="' + (p[1] + 2) + '" r="15" fill="#ffc8e0"/>'; }).join('') +
+          [0, 1].map(function (row) { return [24, 52, 80, 108, 280, 308, 336, 364].map(function (x, i) { const cols = ['#ff6fa8', '#ffd43b', '#c77dff', '#ff8c2a']; return '<circle cx="' + x + '" cy="' + (800 + row * 20) + '" r="6" fill="' + cols[(i + row) % 4] + '"/><circle cx="' + x + '" cy="' + (800 + row * 20) + '" r="2" fill="#fff6c8"/>'; }).join(''); }).join('');
+      },
+      sprites: [
+        { x: 30, y: 67, w: 30, cls: 'sc-roll', d: 9, svg: 'tram' },
+        { x: 40, y: 82, w: 14, cls: 'sc-bob', d: 3, svg: 'punt' },
+        { x: 10, y: 30, w: 6, cls: 'sc-float', d: 7, emoji: '🌸' },
+        { x: 70, y: 40, w: 5, cls: 'sc-float', d: 8.5, dl: -3, emoji: '🌸' },
+        { x: 45, y: 12, w: 24, cls: 'sc-drift', d: 22, svg: 'cloud' }
+      ] },
+    { n: 13, id: 'franzjosef', place: 'Franz Josef', title: 'Franz Josef Glacier', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#7cc8f6'], [1, '#e8f7ff']]) + scGrad('gl', [[0, '#ffffff'], [0.6, '#cdeeff'], [1, '#9fd8f4']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(320, 80, 0.9, 0.85) + scCloud(60, 120, 0.8, 0.8) +
+          '<path d="M0 520 L60 340 L120 450 L170 300 L200 360 L230 290 L290 440 L340 330 L390 420 L390 700 L0 700 Z" fill="#5d6a86"/>' +
+          '<path d="M44 386 L60 340 L78 380 L66 372 L58 384 Z M150 344 L170 300 L190 340 L178 334 L170 346 Z M212 330 L230 290 L250 336 L238 328 L230 340 Z M324 370 L340 330 L358 366 L346 360 L338 372 Z" fill="#fff"/>' +
+          '<path d="M160 360 C176 420 150 480 170 540 C186 600 160 660 150 720 L250 720 C236 660 220 600 232 540 C246 470 230 410 240 352 C220 340 180 344 160 360 Z" fill="url(#gl)"/>' +
+          '<path d="M178 420 l14 6 M200 470 l18 4 M184 530 l16 6 M206 600 l14 4 M176 660 l18 6" stroke="#8fcbea" stroke-width="3" stroke-linecap="round"/>' +
+          '<path d="M0 640 C40 610 80 630 120 650 L130 844 L0 844 Z M390 640 C350 610 300 628 270 650 L260 844 L390 844 Z" fill="#2f6e46"/>' +
+          '<path d="M120 720 C160 740 230 740 270 720 L280 844 L110 844 Z" fill="#a7a49a"/><path d="M150 760 C180 770 210 770 240 760" stroke="#7ec8ef" stroke-width="8" fill="none" stroke-linecap="round"/>' +
+          [[34, 760], [86, 790], [312, 770], [360, 800]].map(function (p) { const x = p[0], y = p[1]; return '<rect x="' + (x - 3) + '" y="' + y + '" width="6" height="' + (844 - y) + '" fill="#4a3424"/>' +
+            [-80, -45, -10, 25, 60, 95].map(function (a) { const r = a * Math.PI / 180; return '<path d="M' + x + ' ' + y + ' Q' + (x + Math.sin(r) * 26) + ' ' + (y - 30) + ' ' + (x + Math.sin(r) * 50) + ' ' + (y - Math.cos(r) * 22) + '" stroke="#3f9a5a" stroke-width="6" fill="none" stroke-linecap="round"/>'; }).join(''); }).join('');
+      },
+      sprites: [
+        { x: 60, y: 22, w: 16, cls: 'sc-drift', d: 10, svg: 'heli' },
+        { x: 46, y: 50, w: 4, cls: 'sc-twinkle', d: 1.8, svg: 'glint' },
+        { x: 54, y: 62, w: 3.5, cls: 'sc-twinkle', d: 2.3, dl: -0.8, svg: 'glint' },
+        { x: 42, y: 74, w: 3, cls: 'sc-twinkle', d: 2, dl: -1.3, svg: 'glint' },
+        { x: 12, y: 80, w: 7, cls: 'sc-bob', d: 2.4, emoji: '🦜' },
+        { x: 6, y: 10, w: 24, cls: 'sc-drift', d: 24, svg: 'cloud' }
+      ] },
+    { n: 14, id: 'queenstown', place: 'Queenstown', title: 'Lake Wakatipu and the Remarkables', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#7a7ef0'], [0.5, '#ff9fc6'], [1, '#ffd6a6']]) + scGrad('lk', [[0, '#4c9fd6'], [1, '#2a6fa8']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(80, 110, 0.9, 0.6) +
+          '<circle cx="300" cy="200" r="34" fill="#fff1b8" opacity=".85"/>' +
+          '<path d="M0 600 L40 520 L70 552 L110 470 L150 540 L190 480 L230 556 L270 486 L310 540 L350 470 L390 530 L390 620 L0 620 Z" fill="#7d6aa8"/>' +
+          '<path d="M96 496 L110 470 L124 498 L114 494 L110 502 Z M176 506 L190 480 L204 508 L194 504 L190 512 Z M256 512 L270 486 L284 514 L274 508 L270 516 Z M336 496 L350 470 L364 498 L354 494 L350 502 Z" fill="#fff"/>' +
+          '<rect y="612" width="390" height="120" fill="url(#lk)"/>' +
+          '<path d="M30 640 q14 -5 28 0 M200 660 q14 -5 28 0 M310 646 q14 -5 28 0 M110 700 q14 -5 28 0" stroke="#fff" stroke-width="2.5" fill="none" opacity=".6"/>' +
+          '<path d="M0 520 C40 520 60 600 90 640 L90 844 L0 844 Z" fill="#3f7a52"/>' +
+          '<path d="M20 600 L380 470" stroke="#4a3a4a" stroke-width="2.5"/><path d="M20 610 L380 480" stroke="#4a3a4a" stroke-width="1.5" opacity=".7"/>' +
+          '<rect x="0" y="726" width="390" height="118" fill="#8fc86f"/>' +
+          scHouses([120, 150, 186, 222, 260, 296, 334], 760, ['#fff', '#ffe066', '#ffb3d3', '#7ec8ef', '#c8f0e0']) +
+          '<path d="M0 790 C100 778 200 798 300 784 C340 778 370 780 390 782 L390 844 L0 844 Z" fill="#6cb85a"/>' +
+          scPine(30, 760, 80) + scPine(60, 790, 70) + scPine(366, 800, 74);
+      },
+      sprites: [
+        { x: 30, y: 66, w: 9, cls: 'sc-glide', d: 7, svg: 'gondola' },
+        { x: 58, y: 80, w: 22, cls: 'sc-bob', d: 3.4, svg: 'steamer' },
+        { x: 66, y: 74, w: 10, cls: 'sc-rise', d: 3.8, puff: 1 },
+        { x: 68, y: 75, w: 8, cls: 'sc-rise', d: 4.4, dl: -2, puff: 1 },
+        { x: 40, y: 10, w: 24, cls: 'sc-drift', d: 24, svg: 'cloud' }
+      ] },
+    { n: 15, id: 'dunedin', place: 'Dunedin', title: 'The Chocolate Factory, Dunedin', night: true,
+      art: function () {
+        let stars = '';
+        for (let i = 0; i < 36; i++) { const x = (i * 97) % 390, y = (i * 131) % 460, r = (i % 4 === 0) ? 1.7 : 1; stars += '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="#fff" opacity="' + (0.45 + (i % 3) * 0.2) + '"/>'; }
+        return '<defs>' + scGrad('sk', [[0, '#1d1650'], [0.55, '#5a3a8a'], [1, '#e08aa8']]) + scGrad('ch', [[0, '#8a4a2a'], [1, '#4a2414']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + stars +
+          '<circle cx="80" cy="120" r="28" fill="#fff4c2"/><circle cx="92" cy="112" r="24" fill="#2a1f5e"/>' +
+          '<path d="M0 600 C70 570 150 576 210 590 C270 566 340 568 390 580 L390 700 L0 700 Z" fill="#3a2a5a"/>' +
+          '<rect x="210" y="520" width="150" height="180" fill="#8a5a3a"/><rect x="230" y="440" width="22" height="90" fill="#6b3a1f"/><rect x="300" y="460" width="20" height="70" fill="#6b3a1f"/>' +
+          '<rect x="226" y="436" width="30" height="10" fill="#4a2414"/><rect x="296" y="456" width="28" height="10" fill="#4a2414"/>' +
+          [0, 1, 2].map(function (row) { return [224, 256, 288, 320].map(function (x) { return '<rect x="' + x + '" y="' + (546 + row * 44) + '" width="20" height="24" rx="3" fill="#ffd27a" opacity=".9"/>'; }).join(''); }).join('') +
+          '<rect x="232" y="500" width="106" height="20" rx="6" fill="#ffd43b"/><text x="285" y="514" text-anchor="middle" font-size="10" font-weight="900" fill="#6b3a1f" font-family="ui-rounded,system-ui,sans-serif">CHOCOLATE</text>' +
+          '<rect x="20" y="560" width="150" height="140" fill="#f2e6d0"/><rect x="20" y="560" width="150" height="10" fill="#7a3a3a"/>' +
+          '<rect x="80" y="480" width="30" height="90" fill="#f2e6d0"/><path d="M74 484 L95 444 L116 484 Z" fill="#7a3a3a"/><circle cx="95" cy="506" r="9" fill="#fff8d6" stroke="#7a3a3a" stroke-width="2"/>' +
+          [34, 62, 120, 148].map(function (x) { return '<path d="M' + x + ' 640 V600 a8 8 0 0 1 16 0 V640 Z" fill="#ffd27a" opacity=".9"/>'; }).join('') +
+          '<path d="M0 700 C80 690 160 712 250 698 C310 690 360 694 390 696 L390 760 L0 760 Z" fill="url(#ch)"/>' +
+          '<path d="M30 720 q16 -6 32 0 M170 728 q16 -6 32 0 M300 716 q16 -6 32 0" stroke="#c0825a" stroke-width="3" fill="none" opacity=".7"/>' +
+          '<rect y="760" width="390" height="10" fill="#7a6a5a"/><path d="M0 782 H390 M0 798 H390" stroke="#4a3a2a" stroke-width="3"/>' +
+          [0, 26, 52, 78, 104, 130, 156, 182, 208, 234, 260, 286, 312, 338, 364].map(function (x) { return '<rect x="' + (x + 6) + '" y="776" width="8" height="28" fill="#6a4a3a"/>'; }).join('') +
+          '<rect y="804" width="390" height="40" fill="#2a2240"/>';
+      },
+      sprites: [
+        { x: 57, y: 47, w: 12, cls: 'sc-rise', d: 4, puff: 1 },
+        { x: 75, y: 50, w: 10, cls: 'sc-rise', d: 4.6, dl: -1.8, puff: 1 },
+        { x: 4, y: 88, w: 26, cls: 'sc-roll', d: 8, svg: 'train' },
+        { x: 30, y: 60, w: 6, cls: 'sc-float', d: 6, emoji: '🎫' },
+        { x: 20, y: 8, w: 4, cls: 'sc-twinkle', d: 1.8, svg: 'glint' },
+        { x: 66, y: 22, w: 3.5, cls: 'sc-twinkle', d: 2.2, dl: -0.7, svg: 'glint' },
+        { x: 46, y: 4, w: 16, cls: 'sc-shoot', d: 8, svg: 'shoot' }
       ] }
   ];
   const SCENE_SPRITE_SVG = {
@@ -1600,7 +1897,13 @@
     train: '<svg viewBox="0 0 100 40"><rect x="40" y="10" width="34" height="20" rx="3" fill="#e0333a"/><rect x="62" y="2" width="14" height="28" rx="2" fill="#3d3d6b"/><rect x="65" y="6" width="8" height="8" fill="#fff6c8"/><rect x="44" y="4" width="8" height="8" fill="#3d3d6b"/><rect x="2" y="14" width="34" height="16" rx="3" fill="#3d8bfd"/><rect x="6" y="17" width="8" height="6" fill="#fff6c8"/><rect x="18" y="17" width="8" height="6" fill="#fff6c8"/><circle cx="10" cy="33" r="5" fill="#333"/><circle cx="28" cy="33" r="5" fill="#333"/><circle cx="50" cy="33" r="5" fill="#333"/><circle cx="66" cy="33" r="5" fill="#333"/><path d="M74 26 L84 32 H74 Z" fill="#ffd43b"/></svg>',
     sunburst: '<svg viewBox="-50 -50 100 100">' + [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(function (i) { return '<path d="M0 0 L' + (Math.cos(i * Math.PI / 6 - 0.13) * 50).toFixed(1) + ' ' + (Math.sin(i * Math.PI / 6 - 0.13) * 50).toFixed(1) + ' L' + (Math.cos(i * Math.PI / 6 + 0.13) * 50).toFixed(1) + ' ' + (Math.sin(i * Math.PI / 6 + 0.13) * 50).toFixed(1) + ' Z" fill="#fff6c2" opacity=".35"/>'; }).join('') + '</svg>',
     blades: '<svg viewBox="-30 -30 60 60"><path d="M0 0 L-3 -28 L3 -28 Z M0 0 L25.7 12.4 L22.7 17.6 Z M0 0 L-22.7 17.6 L-25.7 12.4 Z" fill="#fff"/><circle r="3.5" fill="#ddd"/></svg>',
-    shoot: '<svg viewBox="0 0 80 20"><path d="M2 2 L70 16" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".7"/><circle cx="72" cy="16" r="3" fill="#fff"/></svg>'
+    shoot: '<svg viewBox="0 0 80 20"><path d="M2 2 L70 16" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".7"/><circle cx="72" cy="16" r="3" fill="#fff"/></svg>',
+    whale: '<svg viewBox="0 0 100 40"><path d="M6 30 C20 20 50 18 74 24 C82 26 88 30 92 34 L6 34 Z" fill="#3a4a66"/><path d="M60 22 C62 10 66 4 72 2 C70 10 74 14 80 12 C76 18 70 22 64 24 Z" fill="#2c3a52"/><circle cx="20" cy="28" r="1.6" fill="#fff"/><path d="M0 36 q10 -4 20 0 t20 0 t20 0 t20 0 t20 0" stroke="#fff" stroke-width="2.5" fill="none" opacity=".75"/></svg>',
+    tram: '<svg viewBox="0 0 100 44"><path d="M40 2 L46 8 M60 2 L54 8" stroke="#333" stroke-width="1.6"/><rect x="6" y="8" width="88" height="28" rx="5" fill="#2f7a3e"/><rect x="6" y="8" width="88" height="7" rx="3" fill="#ffd43b"/><rect x="12" y="17" width="12" height="10" rx="2" fill="#fff6c8"/><rect x="28" y="17" width="12" height="10" rx="2" fill="#fff6c8"/><rect x="44" y="17" width="12" height="10" rx="2" fill="#fff6c8"/><rect x="60" y="17" width="12" height="10" rx="2" fill="#fff6c8"/><rect x="76" y="17" width="12" height="10" rx="2" fill="#fff6c8"/><circle cx="24" cy="38" r="5" fill="#333"/><circle cx="76" cy="38" r="5" fill="#333"/></svg>',
+    punt: '<svg viewBox="0 0 60 40"><path d="M2 30 H58 L54 36 H6 Z" fill="#9a5b3a"/><rect x="20" y="20" width="10" height="10" rx="3" fill="#ff8ab8"/><circle cx="25" cy="16" r="4" fill="#f2c79a"/><path d="M44 30 L50 2" stroke="#7a4a2a" stroke-width="2"/><rect x="38" y="20" width="8" height="10" rx="2" fill="#fff"/><rect x="38" y="13" width="8" height="3" fill="#333"/><circle cx="42" cy="17" r="3" fill="#f2c79a"/></svg>',
+    heli: '<svg viewBox="0 0 80 40"><path d="M10 6 H70" stroke="#333" stroke-width="2.5" stroke-linecap="round"/><rect x="38" y="6" width="3" height="6" fill="#333"/><ellipse cx="38" cy="20" rx="16" ry="9" fill="#e0333a"/><path d="M24 20 H4 L2 14" stroke="#e0333a" stroke-width="4" fill="none"/><path d="M46 16 a8 7 0 0 1 6 8 H44 Z" fill="#bfe9ff"/><path d="M28 32 H52 M32 29 V32 M48 29 V32" stroke="#333" stroke-width="2"/></svg>',
+    gondola: '<svg viewBox="0 0 40 50"><path d="M20 0 V10" stroke="#4a3a4a" stroke-width="2"/><rect x="6" y="10" width="28" height="30" rx="6" fill="#e0333a"/><rect x="10" y="15" width="20" height="12" rx="3" fill="#bfe9ff"/><rect x="6" y="34" width="28" height="6" rx="3" fill="#b0262c"/></svg>',
+    steamer: '<svg viewBox="0 0 100 40"><path d="M2 24 H98 L90 36 H10 Z" fill="#fff"/><path d="M2 30 H96" stroke="#e0333a" stroke-width="3"/><rect x="20" y="14" width="56" height="10" fill="#fff"/><rect x="24" y="17" width="48" height="3" fill="#3d3d6b"/><rect x="44" y="2" width="10" height="13" fill="#e0333a"/><rect x="44" y="2" width="10" height="3" fill="#222"/></svg>'
   };
   function sceneFor(n) { return SCENES[(n | 0) - 1] || SCENES[0]; }
   function sceneSvg(n) {
@@ -1750,7 +2053,7 @@
     return true;
   }
 
-  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_STOPS, FUTURE_STOPS, stopForLevel, icingPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, goalCounts, cloneState, bestMove, hintMoveFor, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
+  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_STOPS, FUTURE_STOPS, LV_COUNT, stopForLevel, icingPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, bubLeft, liqLeft, spreadLiq, LIQ_IDLE, goalCounts, cloneState, bestMove, hintMoveFor, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
     allowed: () => !!(root.IBScores && root.IBScores.isShane && root.IBScores.isShane()),
     SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL, XF,
     VOICE_FILES, VOICE_RANK, MEDIA_HASH, mediaUrl, gameTrack, attachSfxBus, playTone, playChime, playMovesWarnChime, playClip, voiceForStep,
@@ -1781,13 +2084,16 @@
 
   function loadProg() {
     const p = ls.get('ib-sugar-progress', null) || {};
-    const stars = Array.isArray(p.stars) ? p.stars.slice(0, 10) : [];
-    const best = Array.isArray(p.best) ? p.best.slice(0, 10) : [];
-    const badges = Array.isArray(p.badges) ? p.badges.slice(0, 10) : [];
-    while (stars.length < 10) stars.push(0);
-    while (best.length < 10) best.push(0);
-    while (badges.length < 10) badges.push(0);
-    return { open: Math.max(1, Math.min(10, p.open || 1)), stars, best, badges };
+    const stars = Array.isArray(p.stars) ? p.stars.slice(0, LV_COUNT) : [];
+    const best = Array.isArray(p.best) ? p.best.slice(0, LV_COUNT) : [];
+    const badges = Array.isArray(p.badges) ? p.badges.slice(0, LV_COUNT) : [];
+    while (stars.length < LV_COUNT) stars.push(0);
+    while (best.length < LV_COUNT) best.push(0);
+    while (badges.length < LV_COUNT) badges.push(0);
+    // 1.9.219 Anyone who already finished level 10 (stars on it) can go on to level 11.
+    let open = Math.max(1, Math.min(LV_COUNT, p.open || 1));
+    if (open === 10 && (stars[9] || 0) > 0) open = 11;
+    return { open: open, stars, best, badges };
   }
   function saveProg() { ls.set('ib-sugar-progress', prog); }
   const prog = loadProg();
@@ -2060,6 +2366,7 @@
   // 1.9.218 Glossier, rounder sweets: a soft contact shadow, a darker rim, bounce light
   // from below and a crisp specular. No shadowBlur, so it stays cheap on a phone.
   function drawSweet(t, x, y, R, sc, al, wob) {
+    if (t.bub > 0) { drawBubbled(t, x, y, R, sc, al, wob); return; }
     ctx.save(); ctx.translate(x, y); if (wob) ctx.rotate(wob); ctx.scale(sc, sc); ctx.globalAlpha = al;
     ctx.fillStyle = 'rgba(70,10,40,.16)'; ctx.beginPath(); ctx.ellipse(0, R * .88, R * .72, R * .18, 0, 0, Math.PI * 2); ctx.fill();
     if (t.ing) {
@@ -2144,6 +2451,40 @@
       ctx.fillStyle = 'rgba(70,40,20,.8)'; rr(-R * .28, -R * .05, R * .56, R * .45, R * .08); ctx.fill();
       ctx.strokeStyle = 'rgba(70,40,20,.8)'; ctx.lineWidth = R * .1; ctx.beginPath(); ctx.arc(0, -R * .08, R * .2, Math.PI, 0); ctx.stroke();
     }
+    if (t.liq) drawLiqWrap(R);
+    ctx.restore();
+  }
+  // 1.9.219 Liquorice: two twisted black ropes crossed over the sweet, with a glossy edge.
+  function drawLiqWrap(R) {
+    ctx.save();
+    ctx.lineCap = 'round';
+    const ropes = [[-R * .78, -R * .62, R * .78, R * .62], [-R * .78, R * .62, R * .78, -R * .62], [-R * .86, 0, R * .86, 0]];
+    ropes.forEach(function (q, i) {
+      ctx.strokeStyle = i === 2 ? '#3a1f33' : '#1c0f18'; ctx.lineWidth = R * (i === 2 ? .2 : .26);
+      ctx.beginPath(); ctx.moveTo(q[0], q[1]); ctx.lineTo(q[2], q[3]); ctx.stroke();
+      ctx.strokeStyle = 'rgba(190,120,200,.55)'; ctx.lineWidth = R * .05;
+      ctx.setLineDash([R * .12, R * .14]);
+      ctx.beginPath(); ctx.moveTo(q[0], q[1] - R * .05); ctx.lineTo(q[2], q[3] - R * .05); ctx.stroke();
+      ctx.setLineDash([]);
+    });
+    ctx.fillStyle = '#ff7ab6'; ctx.beginPath(); ctx.arc(0, 0, R * .13, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#1c0f18'; ctx.beginPath(); ctx.arc(0, 0, R * .06, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  // 1.9.219 Sugar bubble: the sweet sits a little smaller inside a shimmering glass sphere.
+  function drawBubbled(t, x, y, R, sc, al, wob) {
+    const inner = Object.assign({}, t, { bub: 0 });
+    drawSweet(inner, x, y, R * .74, sc, al, wob);
+    const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : 0;
+    const sh = reduce ? 0 : Math.sin(now / 520 + (t.id || 0)) * .03;
+    ctx.save(); ctx.translate(x, y); ctx.scale(sc * (1 + sh), sc * (1 - sh)); ctx.globalAlpha = al;
+    const g = ctx.createRadialGradient(-R * .2, -R * .25, R * .1, 0, 0, R * .96);
+    g.addColorStop(0, 'rgba(255,255,255,.06)'); g.addColorStop(.7, 'rgba(150,215,255,.22)'); g.addColorStop(1, 'rgba(90,170,240,.5)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R * .94, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = R * .07; ctx.beginPath(); ctx.arc(0, 0, R * .92, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = 'rgba(41,182,246,.55)'; ctx.lineWidth = R * .04; ctx.beginPath(); ctx.arc(0, 0, R * .84, Math.PI * .15, Math.PI * .85); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.beginPath(); ctx.ellipse(-R * .38, -R * .44, R * .22, R * .11, -0.6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.95)'; ctx.beginPath(); ctx.arc(R * .42, R * .3, R * .06, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
   // Specials glow and pulse behind the sweet; the sprinkle bomb gets a turning rainbow ring.
@@ -2479,6 +2820,11 @@
     if (kind === 'collect' || kind === 'path') return '<span class="hearts">' + (kind === 'collect' ? '💖' : '🍋') + '</span>';
     if (kind === 'jelly' || kind === 'double') return kind === 'double' ? '<span class="dbl"><i></i><i></i></span>' : '<span class="jelly"></span>';
     if (kind === 'locks') return '<span class="lock">🔒</span>';
+    if (kind === 'bub') return '<span class="bubp"></span><span class="bubp sm"></span><span class="bubp"></span>';
+    if (kind === 'liq') return '<span class="liqp"></span>';
+    if (kind === 'garden') return '<span class="dbl"><i></i><i></i></span><span class="lock">🔒</span><span class="bubp sm"></span>';
+    if (kind === 'glacier') return '<span class="ing">🎁</span><span class="ice thick"></span>';
+    if (kind === 'factory') return '<span class="choco"></span><span class="bubp sm"></span><span class="liqp sm"></span>';
     if (kind === 'ice') return '<span class="ice"></span>';
     if (kind === 'ings') return '<span class="ing">🍒</span><span class="ing">🍋</span>';
     if (kind === 'choco') return '<span class="choco"></span>';
@@ -2684,7 +3030,7 @@
     hideRecap();
     const n = tut.n;
     const needBoot = (step.board && !step.keepBoard) || !st || (st.lv && st.lv.n !== n);
-    if (needBoot) bootLevel(n, { board: step.board, jelly: step.jelly, locks: step.locks, tutorial: true });
+    if (needBoot) bootLevel(n, { board: step.board, jelly: step.jelly, locks: step.locks, liq: step.liq, tutorial: true });
     if (step.kind === 'hud' || step.kind === 'ready' || step.kind === 'show') {
       if (!st) bootLevel(n, { board: (steps[0] && steps[0].board) || null, tutorial: true });
       if (st) { st.over = false; hud(); }
@@ -2747,6 +3093,11 @@
         if (+(opt.locks[r] && opt.locks[r][c]) && st.board[r][c] && st.board[r][c].c >= 0) st.board[r][c].lock = 1;
       }
     }
+    if (opt.liq) {
+      for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+        if (+(opt.liq[r] && opt.liq[r][c]) && st.board[r][c] && st.board[r][c].c >= 0) st.board[r][c].liq = 1;
+      }
+    }
     if (opt.jelly) st.jelly = parseDigits(opt.jelly);
     if (opt.tutorial) st.tutorial = true;
     sel = null; busy = false; lastAct = now();
@@ -2779,6 +3130,8 @@
     if (lv.ice) bits.push('Icing ' + iceLeft(g.board) + ' left');
     if (lv.ings && lv.ings.length) bits.push('Ingredients ' + ((lv.ings.length - (g.ingsLeft || 0))) + ' / ' + lv.ings.length);
     if (lv.locks) bits.push('Locks ' + locksLeft(g.board) + ' left');
+    if (lv.bub) bits.push('Bubbles ' + bubLeft(g.board) + ' left');
+    if (lv.liq) bits.push('Liquorice ' + liqLeft(g.board) + ' left');
     return bits.join(' · ');
   }
   function hud() {
@@ -2882,7 +3235,7 @@
     const list = race.racers && race.racers.length ? race.racers : (race.mine ? [race.mine] : []);
     const byStop = new Map();
     list.forEach(function (r) {
-      const n = Math.max(1, Math.min(10, r.stop || 1));
+      const n = Math.max(1, Math.min(LV_COUNT, r.stop || 1));
       if (!byStop.has(n)) byStop.set(n, []);
       byStop.get(n).push(r);
     });
@@ -3059,7 +3412,7 @@
     if (dash) dash.setAttribute('d', live);
     if (fut) fut.setAttribute('d', future);
     path.innerHTML = '';
-    const here = Math.min(10, Math.max(1, prog.open));
+    const here = Math.min(LV_COUNT, Math.max(1, prog.open));
     LEVELS.forEach((lv, i) => {
       const n = i + 1, open = n <= prog.open, stars = prog.stars[i] || 0, stop = MAP_STOPS[i];
       const b = doc.createElement('button');
@@ -3117,8 +3470,9 @@
     if (target === 'start' || target === 'north') {
       useEl = false; top = 0; left = Math.max(0, view.scrollWidth / 2 - view.clientWidth / 2);
     } else if (target === 'south') {
-      const n9 = view.querySelector('.lv[data-n="9"]');
-      const chch = view.querySelector('.future-stop[data-place="Christchurch"]');
+      // 1.9.219 'south' frames the South Island stops, Kaikōura down to Dunedin.
+      const n9 = view.querySelector('.lv[data-n="11"]') || view.querySelector('.lv[data-n="9"]');
+      const chch = view.querySelector('.lv[data-n="15"]') || view.querySelector('.future-stop[data-place="Bluff"]');
       if (n9 && chch) {
         const r1 = n9.getBoundingClientRect(), r2 = chch.getBoundingClientRect(), v = view.getBoundingClientRect();
         const mid = ((r1.top + r2.bottom) / 2) - v.top + view.scrollTop;
@@ -3129,7 +3483,7 @@
         el = chch || view.querySelector('.lv[data-n="10"]');
       }
     } else {
-      const n = target == null ? Math.min(10, Math.max(1, prog.open)) : target;
+      const n = target == null ? Math.min(LV_COUNT, Math.max(1, prog.open)) : target;
       el = view.querySelector('.lv[data-n="' + n + '"]');
     }
     if (useEl && el) {
@@ -3156,7 +3510,7 @@
     if (fromGame && !(opts && opts.keepSong)) enterScreen($('map'));
     renderMap(); paintButtons(); paintSpinBtn();
     syncRace(true);
-    const scrollTo = opts && opts.scroll != null ? opts.scroll : Math.min(10, Math.max(1, prog.open));
+    const scrollTo = opts && opts.scroll != null ? opts.scroll : Math.min(LV_COUNT, Math.max(1, prog.open));
     const behavior = (opts && opts.behavior) || (reduce ? 'auto' : 'smooth');
     const go = function () { scrollMapTo(scrollTo, { behavior: behavior }); };
     if (root.requestAnimationFrame) root.requestAnimationFrame(function () { root.requestAnimationFrame(go); });
@@ -3200,6 +3554,19 @@
     for (let i = 0; i < res.steps.length; i++) await showStep(res.steps[i], i, { streak: !plain });
     if (plain) addStreak(-1);
     if (res.spread) { const t = st.board[res.spread.r][res.spread.c]; if (t) { const s = sprite(t, res.spread.r, res.spread.c); s.grow = now(); } }
+    // 1.9.219 Liquorice creeps after two moves in a row that free none; the move before, it gives a warning.
+    if (res.liqSpread) {
+      const lr = res.liqSpread.r, lc = res.liqSpread.c, t = st.board[lr] && st.board[lr][lc];
+      if (t) {
+        const s = sprites.get(t.id) || sprite(t, lr, lc); s.t = t; s.grow = now();
+        const [x, y] = cellXY(lr, lc);
+        fx.push({ type: 'ring', x, y, t0: now(), dur: 520, col: '#4a2a44', big: 1.3 });
+        addText('Liquorice creeps!', x, y, 20, '#f3d1ff');
+        await wait(360);
+      }
+    } else if (!st.tutorial && st.lv && st.lv.liq && st.liqIdle === LIQ_IDLE - 1 && liqLeft(st.board)) {
+      addText('Free the liquorice!', W / 2, W * .12, 18, '#f3d1ff');
+    }
     if (res.shuffled) {
       addText('Shuffle!', W / 2, W / 2, 30, '#fff'); await wait(450);
       for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
@@ -3235,6 +3602,16 @@
         for (let k = 0; k < per; k++) { const a = Math.random() * Math.PI * 2, v = .5 + Math.random() * .7; pushFx({ type: 'shard', x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - .45, rot: Math.random() * 6, vr: (Math.random() - .5) * 10, sz: .07 + Math.random() * .06, col: COL[p.color][(k % 2) ? 0 : 1], t0: t, dur: 520 + Math.random() * 180 }); }
         pushFx({ type: 'glint', x, y, dx: (Math.random() - .5) * .3, dy: -.25, sz: .16 + Math.random() * .08, rot: Math.random() * 3, t0: t + Math.random() * 60, dur: 420 });
       }
+      // 1.9.219 Freed liquorice snaps into dark twisty bits.
+      if (p.liq && !reduce) for (let k = 0; k < 6; k++) { const a = k * 1.05 + Math.random() * .4, v = .6 + Math.random() * .5; pushFx({ type: 'shard', x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - .4, rot: a, vr: (Math.random() - .5) * 12, sz: .09, col: k % 2 ? '#1c0f18' : '#4a2a44', t0: t, dur: 620 }); }
+    }
+    // 1.9.219 Popped sugar bubbles burst in a blue ring with a twinkle; chained pops follow a beat later.
+    for (const b of s.blocked || []) {
+      if (b.kind !== 'bub') continue;
+      const [x, y] = cellXY(b.r, b.c), t1 = t + (b.chain ? 90 : 0);
+      fx.push({ type: 'ring', x, y, t0: t1, dur: 440, col: '#7fd3ff', big: 1.2 });
+      if (!reduce) for (let k = 0; k < 3; k++) pushFx({ type: 'glint', x: x + (Math.random() - .5) * .4, y: y + (Math.random() - .5) * .4, dx: 0, dy: -.2, sz: .12 + Math.random() * .08, rot: 0, t0: t1 + k * 50, dur: 380 });
+      const sp = st.board[b.r] && st.board[b.r][b.c] && sprites.get(st.board[b.r][b.c].id); if (sp) sp.grow = t1;
     }
     for (const f of s.fired || []) {
       const [fx0, fy0] = cellXY(f.r, f.c);
@@ -3533,7 +3910,7 @@
     if (stars > prog.stars[i]) prog.stars[i] = stars;
     if (g.score > (prog.best[i] || 0)) prog.best[i] = g.score;
     if (newBadge) prog.badges[i] = 1;
-    if (g.lv.n >= prog.open && g.lv.n < 10) prog.open = g.lv.n + 1;
+    if (g.lv.n >= prog.open && g.lv.n < LV_COUNT) prog.open = g.lv.n + 1;
     saveProg();
     syncRace(true);
     const firstThree = stars === 3 && prevStars < 3;
@@ -3736,7 +4113,7 @@
     animatePathSegment(fromN, toN);
     await hopRacer(fromN, toN);
     const ov = $('goalnext');
-    if (ov && toN && toN <= 10 && fromN < 10) {
+    if (ov && toN && toN <= LV_COUNT && fromN < LV_COUNT) {
       $('goalnexttitle').textContent = 'On to ' + (stopForLevel(toN) && stopForLevel(toN).place || ('level ' + toN));
       $('goalnextmsg').textContent = 'Level ' + toN + ' is open.';
       $('goalnextbtn').hidden = false;
@@ -3791,7 +4168,7 @@
     }
     if (won) {
       const extra = n === 3 ? 'Three stars!' : n === 2 ? 'Two stars.' : 'One star.';
-      const next = lv.n < 10 ? ' Level ' + (lv.n + 1) + ' is open.' : ' You have finished every level in the shop.';
+      const next = lv.n < LV_COUNT ? ' Level ' + (lv.n + 1) + ' is open.' : ' You have finished every level in the shop.';
       $('endmsg').textContent = extra + next;
     } else {
       const bits = [];
@@ -3803,7 +4180,7 @@
       $('endmsg').textContent = bits.length ? ('Not quite — ' + bits.join(', ') + '. Have another go!') : 'Have another go!';
     }
     $('againbtn').textContent = won ? 'Play again' : 'Try again';
-    $('nextbtn').hidden = !(won && lv.n < 10);
+    $('nextbtn').hidden = !(won && lv.n < LV_COUNT);
     if (won && opts.animateStars) {
       $('nextbtn').hidden = true;
       if ($('endmap')) $('endmap').hidden = true;
@@ -3831,7 +4208,7 @@
       endTap = false;
       $('end').hidden = true;
       if ($('endmap')) $('endmap').hidden = false;
-      await celebrateOnMap(lv.n, lv.n < 10 ? lv.n + 1 : lv.n);
+      await celebrateOnMap(lv.n, lv.n < LV_COUNT ? lv.n + 1 : lv.n);
     }
   }
   function leaveEnd() { stopEnd(); $('end').hidden = true; }
@@ -3843,7 +4220,7 @@
   function goNext() {
     leaveEnd();
     if ($('goalnext')) $('goalnext').hidden = true;
-    if (lvNum < 10) openLevel(lvNum + 1);
+    if (lvNum < LV_COUNT) openLevel(lvNum + 1);
     else showMap();
     if (musicOn && !endPlaying) playKind(wantKind());
   }

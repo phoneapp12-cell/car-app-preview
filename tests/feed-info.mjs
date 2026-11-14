@@ -967,7 +967,7 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   assert.strictEqual(SR.voiceForStep({ popped: [{}, {}, {}], made: [], fired: [], cascade: 5 }, 5), 'succulent');
   assert.ok(srJs.includes("if (won) say('yay')") && srJs.includes('function chime') && srJs.includes('function say'));
   assert.ok(srJs.includes('duckMusicBrief') && srJs.includes('linearRampToValueAtTime(1, t0 + dur + 0.22)'));
-  assert.ok(SR.LEVELS.length === 10 && SR.LEVELS[1].name === "Sarah's Sweet Spot");
+  assert.ok(SR.LEVELS.length === 15 && SR.LEVELS[1].name === "Sarah's Sweet Spot");
   assert.ok(SR.LEVELS[1].theme === 'sarah' && SR.LEVELS[1].badge && SR.LEVELS[1].badge.special);
   assert.ok(SR.LEVELS[1].intro && /Sarah, Shane's partner/.test(SR.LEVELS[1].intro.body));
   assert.ok(SR.LEVELS.every(lv => lv.badge && lv.badge.icon && lv.badge.name));
@@ -3857,15 +3857,15 @@ if (live) {
   const SR = load('feed/sugar-rush.js').SugarRush;
   const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
   const html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
-  assert.strictEqual(SR.LEVELS.length, 10);
+  assert.strictEqual(SR.LEVELS.length, 15);
   assert.strictEqual(SR.LEVELS[1].name, "Sarah's Sweet Spot");
   assert.strictEqual(SR.LEVELS[1].badge.icon, '💖');
   assert.strictEqual(SR.LEVELS[1].badge.name, "Sarah's Heart");
-  assert.strictEqual(SR.MAP_STOPS.length, 10);
+  assert.strictEqual(SR.MAP_STOPS.length, 15);
   assert.strictEqual(SR.MAP_W, 400);
   assert.ok(SR.MAP_H > 1000, 'the map is tall enough to scroll south');
   const places = SR.MAP_STOPS.map(s => s.place);
-  assert.deepStrictEqual(Array.from(places), ['Onerahi', "Sarah's House", 'Whangārei', 'Auckland Post Office', 'Hamilton', 'Rotorua', 'Taupō Station', 'Napier', 'Wellington', 'Nelson']);
+  assert.deepStrictEqual(Array.from(places), ['Onerahi', "Sarah's House", 'Whangārei', 'Auckland Post Office', 'Hamilton', 'Rotorua', 'Taupō Station', 'Napier', 'Wellington', 'Nelson', 'Kaikōura', 'Christchurch', 'Franz Josef', 'Queenstown', 'Dunedin']);
   assert.strictEqual(SR.stopForLevel(2).kind, 'house');
   assert.strictEqual(SR.stopForLevel(2).place, "Sarah's House");
   assert.strictEqual(SR.stopForLevel(4).kind, 'post');
@@ -3873,9 +3873,9 @@ if (live) {
   assert.strictEqual(SR.stopForLevel(7).kind, 'station');
   assert.ok(SR.stopForLevel(7).place.toLowerCase().includes('station') || SR.stopForLevel(7).place.includes('Taupō'));
   const future = SR.FUTURE_STOPS.map(s => s.place);
-  assert.ok(future.includes('Christchurch') && future.includes('Queenstown') && future.includes('Dunedin'));
+  assert.ok(future.includes('Bluff') && places.includes('Christchurch') && places.includes('Queenstown') && places.includes('Dunedin'));
   assert.ok(SR.MAP_STOPS.every((a, i) => i === 0 || SR.MAP_STOPS[i].y >= SR.MAP_STOPS[0].y - 40), 'the journey starts up north');
-  assert.ok(SR.stopForLevel(10).y < SR.FUTURE_STOPS[0].y, 'future stops lie further south');
+  assert.ok(SR.stopForLevel(15).y < SR.FUTURE_STOPS[0].y, 'future stops lie further south');
   const path = SR.icingPath(SR.MAP_STOPS);
   assert.ok(path.startsWith('M ') && path.includes('C '), 'candy path is a smooth SVG line through the stops');
   const svg = SR.nzMapSvg();
@@ -3944,7 +3944,7 @@ if (live) {
   const play = fs.readFileSync('feed/play.js', 'utf8');
   const idx = fs.readFileSync('feed/index.html', 'utf8');
   const SR = load('feed/sugar-rush.js').SugarRush;
-  assert.strictEqual(SR.LEVELS.length, 10);
+  assert.strictEqual(SR.LEVELS.length, 15);
   assert.strictEqual(SR.LEVELS[1].name, "Sarah's Sweet Spot");
   assert.ok(html.includes('id="mapbar"') && html.includes('id="mapexit"') && html.includes('Exit'));
   assert.ok(html.includes('id="racechip"') && html.includes('id="pickicon"') && html.includes('Pick your icon'));
@@ -3967,9 +3967,9 @@ if (live) {
   const SR = load('feed/sugar-rush.js').SugarRush;
   const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
   const html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
-  assert.strictEqual(SR.LEVELS.length, 10);
+  assert.strictEqual(SR.LEVELS.length, 15);
   assert.ok(SR.LEVELS[1].intro && /Sarah, Shane's partner/.test(SR.LEVELS[1].intro.body));
-  assert.strictEqual(SR.LEVEL_INTROS.length, 10);
+  assert.strictEqual(SR.LEVEL_INTROS.length, 15);
   assert.strictEqual(SR.LEVELS[0].target, 0);
   assert.strictEqual(SR.LEVELS[0].moves, 20);
   const lines = {
@@ -4064,7 +4064,7 @@ if (live) {
   const SR = load('feed/sugar-rush.js').SugarRush;
   const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
   const html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
-  assert.strictEqual(SR.LEVELS.length, 10);
+  assert.strictEqual(SR.LEVELS.length, 15);
   assert.ok(SR.LEVELS[1].intro && /Sarah, Shane's partner/.test(SR.LEVELS[1].intro.body));
   assert.ok(SR.TUTORIALS[1] && SR.TUTORIALS[1] === SR.TUTORIAL_STEPS);
   assert.strictEqual(SR.tutorialFor(1), SR.TUTORIAL_STEPS);
@@ -4349,7 +4349,7 @@ if (live) {
   assert.strictEqual(SR.shuffleBooster(Object.assign(SR.cloneState(hs), { tutorial: true })), false);
   const shu = SR.cloneState(hs);
   assert.ok(SR.shuffleBooster(shu) && SR.hasMove(shu.board, shu.mask));
-  assert.ok(SR.LEVELS.every(l => !l.target && (l.collect || l.jelly || l.locks || l.ice || l.ings || l.choco)), 'goals stay objective-based, never a score');
+  assert.ok(SR.LEVELS.every(l => !l.target && (l.collect || l.jelly || l.locks || l.ice || l.ings || l.choco || l.bub || l.liq)), 'goals stay objective-based, never a score');
   // F. Sugar Crush finale fits Goal achieved and the play-out.
   assert.ok(src.includes('function sugarCrushFinale') && src.includes('showCrushBan') && src.includes('fireworks('));
   assert.ok(src.includes('goalban') && src.includes('moveswarn') && src.includes('hintMoveFor'), 'goal card, 3 MOVES LEFT and the hint stay');
@@ -4369,3 +4369,89 @@ if (live) {
   assert.ok(!/new Audio\([^)]*(bgm|music|loop)/i.test(src.slice(src.indexOf('1.9.218'))), 'no new background music');
   assert.ok(!/candy crush/i.test(src + html), 'no Candy Crush names in the game');
 }
+
+// 1.9.219 Sugar Rush levels 11-15 down the South Island: sugar bubbles, spreading liquorice, map and race to 15.
+{
+  const SR = load('feed/sugar-rush.js').SugarRush;
+  const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
+  const html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
+  assert.strictEqual(SR.LEVELS.length, 15);
+  assert.strictEqual(SR.LV_COUNT, 15);
+  const names = SR.LEVELS.slice(10).map(l => l.name);
+  assert.deepStrictEqual(Array.from(names), ['Whale Watch', 'Garden City', 'Glacier Run', 'Liquorice Gondola', 'The Chocolate Factory']);
+  // Every goal is an objective; score only sets stars.
+  for (const lv of SR.LEVELS.slice(10)) {
+    assert.ok(!lv.target, 'level ' + lv.n + ' has no score target');
+    assert.ok(lv.bub || lv.liq || lv.jelly || lv.ice || lv.ings || lv.locks, 'level ' + lv.n + ' has an objective');
+    assert.ok(lv.stars && lv.stars.length === 3 && lv.stars[1] < lv.stars[2]);
+    assert.ok(lv.badge && lv.badge.icon && lv.badge.name);
+    assert.ok(SR.goalCounts(lv).length >= 1, 'level ' + lv.n + ' shows a goal card');
+    const intro = SR.LEVEL_INTROS[lv.n - 1];
+    assert.ok(intro && intro.goal && intro.detail.includes(lv.moves + ' moves'), 'intro ' + lv.n + ' names its moves');
+    assert.ok(!/score|points/i.test(intro.goal), 'intro goal ' + lv.n + ' is not a score');
+    assert.ok(SR.tryBeat(lv, 16) >= 3, 'level ' + lv.n + ' is winnable');
+  }
+  assert.ok(SR.LEVELS[10].bub && !SR.LEVELS[10].jelly, 'level 11 is the bubble level');
+  assert.ok(SR.LEVELS[13].liq, 'level 14 is the liquorice level');
+  assert.ok(SR.LEVELS[14].choco && SR.LEVELS[14].jelly && SR.LEVELS[14].bub && SR.LEVELS[14].liq, 'level 15 mixes everything');
+  assert.deepStrictEqual(Array.from(SR.goalCounts(SR.LEVELS[10]).map(g => g.kind)), ['bub']);
+  assert.deepStrictEqual(Array.from(SR.goalCounts(SR.LEVELS[13]).map(g => g.kind)), ['liq']);
+  // Sugar bubbles: 'a'-'f' is a bubbled sweet; it cannot be swapped; a match next to it pops it, and its neighbours pop too.
+  const bb = SR.fromRows(['02402402','235f3523','240c4024','35115335','40241240','52354352','02402402','23553523']);
+  assert.ok(bb[1][3].bub === 1 && bb[1][3].c === 5 && SR.isBlock(bb[1][3]) && !SR.isCandy(bb[1][3]));
+  assert.strictEqual(SR.toRows(bb)[1], '235f3523');
+  assert.strictEqual(SR.validSwap(bb, [2, 3], [2, 4]), false, 'a bubbled sweet cannot be swapped');
+  const bst = SR.newGame({ level: SR.LEVELS[10], seed: 3 });
+  bst.board = bb; bst.tutorial = true;
+  const bres = SR.play(bst, [3, 4], [4, 4]);
+  assert.ok(bres.valid && SR.bubLeft(bst.board) === 0, 'the match pops the bubble next to it and the one touching that');
+  assert.ok(bres.steps[0].bubPopped === 2 && bres.steps[0].blocked.some(b => b.kind === 'bub' && b.chain));
+  // Liquorice: wrapped sweets cannot swap, a match frees them, and it creeps after two idle moves (never in a tutorial).
+  const lst = SR.newGame({ level: SR.LEVELS[13], seed: 5 });
+  assert.strictEqual(SR.liqLeft(lst.board), 4);
+  assert.strictEqual(SR.LIQ_IDLE, 2);
+  let lr = null; for (let r = 0; r < 8 && !lr; r++) for (let c = 0; c < 8 && !lr; c++) if (lst.board[r][c] && lst.board[r][c].liq) lr = [r, c];
+  assert.ok(!SR.validSwap(lst.board, lr, [lr[0] + 1, lr[1]]), 'liquorice holds its sweet');
+  const before = SR.liqLeft(lst.board);
+  const sp = SR.spreadLiq(lst);
+  assert.ok(sp && lst.board[sp.r][sp.c].liq && SR.liqLeft(lst.board) === before + 1, 'liquorice creeps onto a neighbour');
+  let creep = null;
+  for (let s = 1; s <= 40 && !creep; s++) {
+    const g = SR.newGame({ level: SR.LEVELS[13], seed: s });
+    for (let k = 0; k < 6 && !creep && !g.over; k++) {
+      const m = SR.findMove(g.board, g.mask); if (!m) break;
+      const res = SR.play(g, m[0], m[1]);
+      if (res.liqSpread) creep = res;
+    }
+  }
+  assert.ok(creep, 'liquorice creeps in real play when left alone');
+  const tutLiq = SR.newGame({ level: SR.LEVELS[13], seed: 2 }); tutLiq.tutorial = true; tutLiq.liqIdle = 5;
+  const tm = SR.findMove(tutLiq.board, tutLiq.mask); const tres = SR.play(tutLiq, tm[0], tm[1]);
+  assert.ok(!tres.liqSpread, 'no creeping during a tutorial');
+  assert.ok('liqIdle' in SR.cloneState(lst));
+  // Hand tutorials for the two new mechanics, and recaps on the mixed levels; Replay tutorial uses tutorialFor.
+  for (const n of [11, 14]) {
+    const steps = SR.tutorialFor(n);
+    assert.ok(steps && steps.some(s => s.kind === 'move') && steps.some(s => s.kind === 'show') && steps[steps.length - 1].kind === 'ready', 'tutorial ' + n);
+  }
+  for (const n of [12, 13, 15]) assert.ok(SR.tutorialFor(n) && SR.tutorialFor(n)[0].kind === 'recap', 'recap ' + n);
+  assert.ok(src.includes('liq: step.liq') && src.includes('if (opt.liq)'), 'tutorial boards can wrap liquorice');
+  assert.ok(src.includes('function drawBubbled') && src.includes('function drawLiqWrap'));
+  assert.ok(src.includes("'Liquorice creeps!'") && src.includes("'Free the liquorice!'"));
+  // Map: five new South Island stops, Bluff still to come, race and progress cap at 15.
+  const south = SR.MAP_STOPS.slice(10).map(s => s.place);
+  assert.deepStrictEqual(Array.from(south), ['Kaikōura', 'Christchurch', 'Franz Josef', 'Queenstown', 'Dunedin']);
+  assert.ok(SR.MAP_STOPS.every(s => s.x > 20 && s.x < SR.MAP_W - 20 && s.y < SR.MAP_H));
+  assert.deepStrictEqual(Array.from(SR.FUTURE_STOPS.map(s => s.place)), ['Bluff']);
+  assert.strictEqual(SR.raceStop({ open: 15 }), 15);
+  assert.strictEqual(SR.raceStop({ open: 99 }), 15);
+  assert.ok(!/Math\.min\(10,/.test(src) && !/< 10\)/.test(src.slice(src.indexOf('function recordWin'))), 'no level count hardcoded to 10');
+  assert.ok(src.includes('if (open === 10 && (stars[9] || 0) > 0) open = 11;'), 'players who finished Nelson can go on');
+  // Scenes, previews and styles.
+  for (const n of [11, 12, 13, 14, 15]) assert.ok(SR.sceneSprites(n).includes('class="scs '));
+  assert.deepStrictEqual(Array.from(SR.SCENES.slice(10).map(s => s.id)), ['kaikoura', 'christchurch', 'franzjosef', 'queenstown', 'dunedin']);
+  for (const k of ['bub', 'liq', 'garden', 'glacier', 'factory']) assert.ok(src.includes("kind === '" + k + "'"), 'intro preview ' + k);
+  assert.ok(html.includes('.introprev .bubp') && html.includes('.introprev .liqp') && html.includes('@keyframes scrollx') && html.includes('@keyframes scglide'));
+  assert.ok(!/candy crush/i.test(src + html), 'no Candy Crush names in the game');
+}
+console.log('1.9.219 sugar levels ok');
