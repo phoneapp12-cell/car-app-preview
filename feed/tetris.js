@@ -1851,7 +1851,7 @@
     cells.push([x - 1, y + 1], [x + 1, y + 1]);
     return cells;
   }
-  function dropColumns(board, food, hits, cols) {
+  function dropColumns(board, food, hits, cols, slime) {
     (cols || []).forEach(c => {
       if (c < 0 || c >= COLS) return;
       const stack = [];
@@ -1859,7 +1859,8 @@
         if (board[r] && board[r][c]) stack.push({
           t: board[r][c],
           food: food && food[r] ? food[r][c] : null,
-          hits: hits && hits[r] ? hits[r][c] : 0
+          hits: hits && hits[r] ? hits[r][c] : 0,
+          slime: slime && slime[r] ? slime[r][c] : 0
         });
       }
       let i = stack.length - 1;
@@ -1868,11 +1869,13 @@
           board[r][c] = stack[i].t;
           if (food && food[r]) food[r][c] = stack[i].food;
           if (hits && hits[r]) hits[r][c] = stack[i].hits || 0;
+          if (slime && slime[r]) slime[r][c] = stack[i].slime || 0;
           i--;
         } else {
           if (board[r]) board[r][c] = 0;
           if (food && food[r]) food[r][c] = null;
           if (hits && hits[r]) hits[r][c] = 0;
+          if (slime && slime[r]) slime[r][c] = 0;
         }
       }
     });
@@ -1894,7 +1897,7 @@
     });
     const cols = [];
     cherryBlastCells(x, y).forEach(([c]) => { if (c >= 0 && c < COLS && cols.indexOf(c) < 0) cols.push(c); });
-    dropColumns(g.board, food, hits, cols);
+    dropColumns(g.board, food, hits, cols, g.slime);
     const bonus = CHERRY_BONUS + CHERRY_PER_CELL * removed.length;
     g.score += bonus;
     playFoodBoom();
@@ -1966,7 +1969,7 @@
       if (hits && hits[r]) hits[r][c] = 0;
       if (cols.indexOf(c) < 0) cols.push(c);
     });
-    dropColumns(g.board, food, hits, cols);
+    dropColumns(g.board, food, hits, cols, g.slime);
     const bonus = BANANA_BONUS + BANANA_PER_CELL * group.length;
     g.score += bonus;
     playFoodBoom();
@@ -2961,6 +2964,7 @@
     }
     if (g.over || g.paused) return g;
     if (g.clearFx || g.levelUp || g.highScore) return g;
+    if (g.heldByAbseil) return g;
     const p = g.piece;
     if (a === 'left' || a === 'right') {
       const dx = a === 'left' ? -1 : 1;
@@ -3894,10 +3898,12 @@
     ctx.restore();
   }
   // 1.9.207 Snowy mountains: two cartoon climbers abseil down on ropes every
-  // 30–60 s, one picks up a decorative Tetris piece (stage colours, not a live
-  // game piece), they carry it a little, drop it, and climb back up. Visual
-  // only, on the scene canvas behind or around the well, no gameplay effect.
-  // Skipped when the phone asks for reduced motion.
+  // 30–60 s. 1.9.209: when a live falling piece is in a safe place, they grab
+  // it, carry it a few columns sideways (only to a position where it fits),
+  // and let it go so it keeps falling from there. They never drop it into an
+  // overlap, and they will not grab a piece in the last couple of rows above
+  // the stack. If a live grab is not possible, they still run the decorative
+  // prop from 1.9.207. Reduced motion keeps the same rules with gentler motion.
   const ABSEIL_GAP = [30, 60];
   const ABSEIL_FIRST = [5, 12];
   const ABSEIL_DOWN = 2.8;
@@ -3905,18 +3911,96 @@
   const ABSEIL_CARRY = 2.8;
   const ABSEIL_UP = 4.4;
   const ABSEIL_CELL = 11;
+  const ABSEIL_SAFE_ROWS = 2;
   function abseilWait(first) {
     const r = first ? ABSEIL_FIRST : ABSEIL_GAP;
     return r[0] + Math.random() * (r[1] - r[0]);
   }
   function newAbseil() {
-    return { phase: 'wait', t: 0, wait: abseilWait(true), w: 0, h: 0, people: [], piece: null, seed: 0, ready: false };
+    return { phase: 'wait', t: 0, wait: abseilWait(true), w: 0, h: 0, people: [], piece: null, seed: 0, ready: false, mode: 'prop', hold: false, targetX: 0, fromX: 0, token: 0 };
   }
   let abseil = newAbseil();
   function abseilReset() { abseil = newAbseil(); }
   function abseilState() { return abseil; }
   function abseilShape(t) {
     try { return rotShape(t, 0); } catch (e) { return (SHAPES[t] || [[t]]).map(function (r) { return r.slice(); }); }
+  }
+  function abseilWellRect(w, h, well) {
+    if (well && well.width > 8) return well;
+    const bw = COLS * CELL, bh = ROWS * CELL;
+    return { left: (w - bw) / 2, top: Math.max(48, (h - bh) / 2 - 20), width: bw, height: bh };
+  }
+  function abseilCellToScreen(c, r, w, h, well) {
+    const rec = abseilWellRect(w, h, well);
+    return { x: rec.left + (c + 0.5) * rec.width / COLS, y: rec.top + (r + 0.5) * rec.height / ROWS };
+  }
+  function abseilPieceCenter(g, w, h, well) {
+    const p = g && g.piece;
+    if (!p || !p.m) return abseilCellToScreen(4.5, 4, w, h, well);
+    let sx = 0, sy = 0, n = 0;
+    for (let r = 0; r < p.m.length; r++) for (let c = 0; c < p.m[r].length; c++) {
+      if (!p.m[r][c]) continue;
+      sx += p.x + c; sy += p.y + r; n++;
+    }
+    if (!n) return abseilCellToScreen(p.x, p.y, w, h, well);
+    return abseilCellToScreen(sx / n, sy / n, w, h, well);
+  }
+  function pieceFallLeft(g) {
+    const p = g && g.piece;
+    if (!p || !p.m) return 0;
+    let gy = p.y;
+    while (!collides(g.board, p.m, p.x, gy + 1)) gy++;
+    return gy - p.y;
+  }
+  function abseilPieceSafe(g, flags) {
+    if (!g || !g.piece) return false;
+    if (themeFor(g.level) !== SNOW_THEME) return false;
+    if (!(flags && flags.pose)) {
+      if (g.over || g.paused || g.clearFx || g.levelUp || g.highScore) return false;
+    }
+    return pieceFallLeft(g) >= ABSEIL_SAFE_ROWS;
+  }
+  function abseilShiftOk(g, x) {
+    const p = g && g.piece;
+    if (!p || !p.m) return false;
+    if (collides(g.board, p.m, x, p.y)) return false;
+    const step = x > p.x ? 1 : -1;
+    for (let nx = p.x + step; nx !== x + step; nx += step) {
+      if (collides(g.board, p.m, nx, p.y)) return false;
+    }
+    return true;
+  }
+  function abseilShiftTargets(g) {
+    const p = g && g.piece;
+    if (!p) return [];
+    const opts = [];
+    const dists = [3, 2, 4, 1];
+    for (let i = 0; i < dists.length; i++) {
+      const dist = dists[i];
+      const signs = Math.random() < 0.5 ? [-1, 1] : [1, -1];
+      for (let s = 0; s < signs.length; s++) {
+        const x = p.x + signs[s] * dist;
+        if (abseilShiftOk(g, x)) opts.push(x);
+      }
+      if (opts.length) break;
+    }
+    return opts;
+  }
+  function abseilHoldsPiece(st, g) {
+    st = st || abseil;
+    if (!st || st.mode !== 'live') return false;
+    if (g && !g.heldByAbseil) return false;
+    return st.phase === 'grab' || st.phase === 'carry';
+  }
+  function abseilRelease(st, g) {
+    if (g) g.heldByAbseil = false;
+    if (st) st.token = (st.token || 0) + 1;
+  }
+  function abseilPeople(x0, x1) {
+    return [
+      { x: x0, y: -24, ropeX: x0, side: -1, hue: 0, has: false, reach: 0 },
+      { x: x1, y: -36, ropeX: x1, side: 1, hue: 1, has: false, reach: 0 }
+    ];
   }
   function abseilStart(st, w, h, opt) {
     const x0 = Math.max(28, w * 0.16);
@@ -3929,64 +4013,122 @@
     st.w = w; st.h = h;
     st.seed = Math.random();
     st.pickupY = pickupY;
-    st.people = [
-      { x: x0, y: -24, ropeX: x0, side: -1, hue: 0, has: false, reach: 0 },
-      { x: x1, y: -36, ropeX: x1, side: 1, hue: 1, has: false, reach: 0 }
-    ];
+    st.people = abseilPeople(x0, x1);
     st.carrier = 1;
+    st.mode = 'prop';
     st.piece = { t: typ, color: pal[(typ - 1) % pal.length], x: (x0 + x1) / 2, y: pickupY - 8, rot: 0, held: false, falling: false, vx: 0, vy: 0, a: 1 };
+    st.targetX = 0; st.fromX = 0;
+    st.ready = true;
+  }
+  function abseilStartLive(st, w, h, g, flags) {
+    const well = flags && flags.well;
+    const mid = abseilPieceCenter(g, w, h, well);
+    const rec = abseilWellRect(w, h, well);
+    const cellW = rec.width / COLS;
+    const x0 = mid.x - cellW * 1.6;
+    const x1 = mid.x + cellW * 1.6;
+    const targets = abseilShiftTargets(g);
+    st.phase = 'down';
+    st.t = 0;
+    st.w = w; st.h = h;
+    st.seed = Math.random();
+    st.pickupY = mid.y;
+    st.people = abseilPeople(x0, x1);
+    st.carrier = 1;
+    st.mode = 'live';
+    st.piece = null;
+    st.fromX = g.piece.x;
+    st.targetX = targets.length ? targets[(Math.random() * targets.length) | 0] : g.piece.x;
+    st.liveY = g.piece.y;
+    st.token = (st.token || 0) + 1;
+    st.pieceId = (g.piece.t || 0) + ':' + st.token;
     st.ready = true;
   }
   function stepAbseil(st, dt, w, h, flags) {
     st = st || abseil;
     w = w || st.w || 390; h = h || st.h || 844;
     st.w = w; st.h = h;
-    const reduce = !!(flags && flags.reduce) && !(flags && flags.pose);
+    flags = flags || {};
+    const reduce = !!flags.reduce;
+    const pose = !!flags.pose;
+    if (st.hold && !pose) return st;
     const sec = Math.max(0, dt || 0) / 1000;
-    if (reduce) {
-      st.phase = 'wait';
-      st.t = 0;
-      st.wait = ABSEIL_GAP[1];
-      st.people = [];
-      st.piece = null;
-      st.ready = true;
-      return st;
-    }
+    const swingMul = reduce ? 0.25 : 1;
+    const speed = reduce ? 1.35 : 1;
+    const game = flags.game;
     if (st.phase === 'wait' || !st.phase) {
+      if (game) game.heldByAbseil = false;
       st.wait = (st.wait == null ? abseilWait(true) : st.wait) - sec;
       st.t += sec;
       st.people = [];
       st.piece = null;
+      st.mode = 'prop';
       st.ready = true;
-      if (st.wait <= 0) abseilStart(st, w, h, flags && flags.start);
+      if (st.wait <= 0) {
+        const canLive = !pose && game && flags.running && abseilPieceSafe(game, flags) && abseilShiftTargets(game).length;
+        if (canLive) abseilStartLive(st, w, h, game, flags);
+        else abseilStart(st, w, h, flags.start);
+      }
       return st;
     }
-    st.t += sec;
+    st.t += sec * speed;
     const down = ABSEIL_DOWN, grab = ABSEIL_GRAB, carry = ABSEIL_CARRY, up = ABSEIL_UP;
     const t = st.t;
     const ease = function (x) { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
-    const pickupY = st.pickupY || h * 0.4;
+    if (st.mode === 'live' && game) {
+      // Abort if the live piece is no longer safe, before we have hold of it.
+      if ((st.phase === 'down' || st.phase === 'grab') && !abseilPieceSafe(game, flags) && !game.heldByAbseil) {
+        st.mode = 'prop';
+        st.phase = 'up';
+        st.t = down + grab + carry + 0.2;
+        st.piece = null;
+        if (game) game.heldByAbseil = false;
+      }
+    }
     let p0 = st.people[0], p1 = st.people[1];
-    if (!p0 || !p1) { abseilStart(st, w, h, flags && flags.start); p0 = st.people[0]; p1 = st.people[1]; }
+    if (!p0 || !p1) {
+      if (st.mode === 'live' && game) abseilStartLive(st, w, h, game, flags);
+      else abseilStart(st, w, h, flags.start);
+      p0 = st.people[0]; p1 = st.people[1];
+    }
     const startY = -24;
+    // Live climbers track the falling piece on the way down, then hold its y.
+    if (st.mode === 'live' && game && game.piece && (st.phase === 'down' || t < down)) {
+      const mid = abseilPieceCenter(game, w, h, flags.well);
+      const rec = abseilWellRect(w, h, flags.well);
+      const cellW = rec.width / COLS;
+      st.pickupY = mid.y;
+      p0.ropeX = mid.x - cellW * 1.6;
+      p1.ropeX = mid.x + cellW * 1.6;
+    }
+    const pickupY = st.pickupY || h * 0.4;
     if (t < down) {
       st.phase = 'down';
       const u = ease(t / down);
       p0.y = startY + (pickupY - startY) * u;
       p1.y = startY - 12 + (pickupY - (startY - 12)) * u;
-      p0.x = p0.ropeX + Math.sin(t * 2.1) * 3.5 * u;
-      p1.x = p1.ropeX + Math.sin(t * 1.8 + 1) * 3.5 * u;
+      p0.x = p0.ropeX + Math.sin(t * 2.1) * 3.5 * u * swingMul;
+      p1.x = p1.ropeX + Math.sin(t * 1.8 + 1) * 3.5 * u * swingMul;
       p0.has = p1.has = false; p0.reach = p1.reach = 0;
       if (st.piece) { st.piece.held = false; st.piece.falling = false; st.piece.a = 1; }
+      if (game) game.heldByAbseil = false;
     } else if (t < down + grab) {
       st.phase = 'grab';
-      p0.y = pickupY + Math.sin(t * 6) * 1.2;
-      p1.y = pickupY + Math.sin(t * 6 + 0.4) * 1.2;
+      p0.y = pickupY + Math.sin(t * 6) * 1.2 * swingMul;
+      p1.y = pickupY + Math.sin(t * 6 + 0.4) * 1.2 * swingMul;
       p0.x = p0.ropeX; p1.x = p1.ropeX;
       const gu = ease((t - down) / grab);
       const car = st.people[st.carrier];
       car.reach = gu;
-      if (st.piece) {
+      if (st.mode === 'live' && game && game.piece) {
+        if (gu > 0.55 && abseilPieceSafe(game, flags)) {
+          game.heldByAbseil = true;
+          game.acc = 0;
+          st.liveY = game.piece.y;
+          st.fromX = st.fromX != null ? st.fromX : game.piece.x;
+          car.has = true;
+        }
+      } else if (st.piece) {
         const tx = car.x + car.side * -10;
         const ty = car.y + 14;
         st.piece.x += (tx - st.piece.x) * Math.min(1, gu * 1.4);
@@ -3997,22 +4139,53 @@
     } else if (t < down + grab + carry) {
       st.phase = 'carry';
       const u = ease((t - down - grab) / carry);
-      const swing = Math.sin(t * 3.2) * 2;
-      const mid = (p0.ropeX + p1.ropeX) / 2;
-      p0.x = p0.ropeX + (mid - 28 - p0.ropeX) * u * 0.35 + swing;
-      p1.x = p1.ropeX + (mid + 28 - p1.ropeX) * u * 0.35 - swing;
-      p0.y = pickupY + Math.sin(t * 5) * 2;
-      p1.y = pickupY + Math.sin(t * 5 + 0.5) * 2;
-      const car = st.people[st.carrier];
-      car.has = true; car.reach = 1;
-      if (st.piece) {
-        st.piece.held = true;
-        st.piece.x = car.x + car.side * -12;
-        st.piece.y = car.y + 16;
-        st.piece.rot = Math.sin(t * 2) * 0.12;
+      const swing = Math.sin(t * 3.2) * 2 * swingMul;
+      if (st.mode === 'live' && game && game.piece) {
+        game.heldByAbseil = true;
+        game.acc = 0;
+        game.piece.y = st.liveY != null ? st.liveY : game.piece.y;
+        const dest = st.targetX;
+        const want = st.fromX + (dest - st.fromX) * u;
+        const next = (dest > st.fromX) ? Math.floor(want + 1e-6) : Math.ceil(want - 1e-6);
+        if (next !== game.piece.x && abseilShiftOk(game, next)) game.piece.x = next;
+        if (u >= 1 && abseilShiftOk(game, dest)) game.piece.x = dest;
+        // Re-aim ropes at the carried piece.
+        const mid = abseilPieceCenter(game, w, h, flags.well);
+        st.pickupY = mid.y;
+        const rec = abseilWellRect(w, h, flags.well);
+        const cellW = rec.width / COLS;
+        p0.ropeX = mid.x - cellW * 1.6;
+        p1.ropeX = mid.x + cellW * 1.6;
+        p0.x = p0.ropeX + swing;
+        p1.x = p1.ropeX - swing;
+        p0.y = mid.y + Math.sin(t * 5) * 2 * swingMul;
+        p1.y = mid.y + Math.sin(t * 5 + 0.5) * 2 * swingMul;
+        const car = st.people[st.carrier];
+        car.has = true; car.reach = 1;
+      } else {
+        const mid = (p0.ropeX + p1.ropeX) / 2;
+        p0.x = p0.ropeX + (mid - 28 - p0.ropeX) * u * 0.35 + swing;
+        p1.x = p1.ropeX + (mid + 28 - p1.ropeX) * u * 0.35 - swing;
+        p0.y = pickupY + Math.sin(t * 5) * 2 * swingMul;
+        p1.y = pickupY + Math.sin(t * 5 + 0.5) * 2 * swingMul;
+        const car = st.people[st.carrier];
+        car.has = true; car.reach = 1;
+        if (st.piece) {
+          st.piece.held = true;
+          st.piece.x = car.x + car.side * -12;
+          st.piece.y = car.y + 16;
+          st.piece.rot = Math.sin(t * 2) * 0.12 * swingMul;
+        }
       }
     } else {
       const u = t - (down + grab + carry);
+      if (st.mode === 'live' && game) {
+        if (game.piece && st.targetX != null && abseilShiftOk(game, st.targetX)) {
+          game.piece.x = st.targetX;
+          if (st.liveY != null) game.piece.y = st.liveY;
+        }
+        abseilRelease(st, game);
+      }
       if (!st.piece || !st.piece.falling) {
         if (st.piece) {
           st.piece.held = false;
@@ -4026,8 +4199,8 @@
       const climb = ease(Math.min(1, Math.max(0, (u - 0.15) / up)));
       p0.y = pickupY + (startY - 40 - pickupY) * climb;
       p1.y = pickupY + (startY - 50 - pickupY) * climb;
-      p0.x = p0.ropeX + Math.sin(t * 2.4) * 3 * (1 - climb);
-      p1.x = p1.ropeX + Math.sin(t * 2.1 + 1) * 3 * (1 - climb);
+      p0.x = p0.ropeX + Math.sin(t * 2.4) * 3 * (1 - climb) * swingMul;
+      p1.x = p1.ropeX + Math.sin(t * 2.1 + 1) * 3 * (1 - climb) * swingMul;
       if (st.piece && st.piece.falling) {
         st.piece.vy += 420 * sec;
         st.piece.x += st.piece.vx * sec;
@@ -4036,28 +4209,38 @@
         if (st.piece.y > h + 40) st.piece.a = Math.max(0, st.piece.a - 2 * sec);
         else if (st.piece.y > h * 0.92) st.piece.a = Math.max(0.15, 1 - (st.piece.y - h * 0.92) / (h * 0.12));
       }
-      if (climb >= 1 && (!st.piece || st.piece.y > h + 20 || st.piece.a <= 0)) {
+      if (climb >= 1 && (st.mode === 'live' || !st.piece || st.piece.y > h + 20 || st.piece.a <= 0)) {
         st.phase = 'wait';
         st.t = 0;
         st.wait = abseilWait(false);
         st.people = [];
         st.piece = null;
+        st.mode = 'prop';
       }
     }
     st.ready = true;
     return st;
   }
-  function poseAbseil(opts, w, h) {
+  function poseAbseil(opts, w, h, game) {
     const st = abseil;
     w = w || st.w || 390; h = h || st.h || 844;
     const times = { down: 1.45, grab: ABSEIL_DOWN + 0.45, carry: ABSEIL_DOWN + ABSEIL_GRAB + 1.3, drop: ABSEIL_DOWN + ABSEIL_GRAB + ABSEIL_CARRY + 0.2, up: ABSEIL_DOWN + ABSEIL_GRAB + ABSEIL_CARRY + 1.6 };
     const phase = (opts && opts.phase) || 'down';
     const typ = (opts && opts.t) || 6;
-    abseilStart(st, w, h, { t: typ });
     const dur = (opts && opts.tTime != null) ? opts.tTime : (opts && opts.at != null ? opts.at : (times[phase] != null ? times[phase] : 1.45));
-    st.phase = 'down';
-    st.t = 0;
-    stepAbseil(st, dur * 1000, w, h, { reduce: false, pose: true });
+    if (opts && opts.live && game && game.piece) {
+      abseilStartLive(st, w, h, game, { well: opts.well, running: true });
+      if (opts.targetX != null) st.targetX = opts.targetX;
+      st.phase = 'down';
+      st.t = 0;
+      stepAbseil(st, dur * 1000, w, h, { reduce: false, pose: true, game: game, running: true, well: opts.well });
+    } else {
+      abseilStart(st, w, h, { t: typ });
+      st.phase = 'down';
+      st.t = 0;
+      stepAbseil(st, dur * 1000, w, h, { reduce: false, pose: true, start: { t: typ } });
+    }
+    st.hold = true;
     return st;
   }
   function drawAbseilPiece(ctx, piece) {
@@ -4265,7 +4448,9 @@
       '<h3>Food stage</h3>' +
       '<p>Cherry bombs are a one-block cherry that shows up now and then. When one locks it explodes itself and the blocks under it. Banana bursts happen when two banana pieces (J or L) lock touching each other — the touching bananas explode.</p>' +
       '<h3>Sewers stage</h3>' +
-      '<p>Now and then a piece spawns as green slime. When it locks, it slides one square sideways if that space is free, or stays put if it is not, with a little squelch.</p>' +
+      '<p>Now and then a piece spawns as green slime. When it locks, it slides one square sideways if that space is free, or stays put if it is not, with a little squelch. Every so often a rat scurries onto a locked block on the surface of the stack and nibbles it away, one cell at a time. That cell disappears, and the blocks above it settle down the column, which can complete a line.</p>' +
+      '<h3>Snowy mountains</h3>' +
+      '<p>Every so often two climbers abseil down, grab the falling piece, carry it a few columns sideways to a place where it still fits, and let it go so it keeps falling from there. They will not grab a piece that is already in the last couple of rows above the stack.</p>' +
       '<h3>Cheers and scores</h3>' +
       '<p>A voice may cheer you on, and a high score is saved on this phone. The family scoreboard keeps everyone’s best too.</p>' +
       '<h3>Extreme</h3>' +
@@ -4388,6 +4573,253 @@
       o.start(t0); o.stop(t0 + 0.14);
     } catch (e) { }
   }
+  function playMunch() {
+    if (!soundOn || !ac) return;
+    try {
+      const t0 = ac.currentTime;
+      function bite(at, freq) {
+        const o = ac.createOscillator();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(freq, at);
+        o.frequency.exponentialRampToValueAtTime(freq * 0.55, at + 0.09);
+        const g = ac.createGain();
+        g.gain.setValueAtTime(0.0001, at);
+        g.gain.exponentialRampToValueAtTime(0.055, at + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0001, at + 0.11);
+        o.connect(g); g.connect(sfxGain || ac.destination);
+        o.start(at); o.stop(at + 0.13);
+      }
+      bite(t0, 240);
+      bite(t0 + 0.08, 200);
+    } catch (e) { }
+  }
+
+  // 1.9.209 Sewers water: starts at 15% of the screen and rises to 20% as
+  // lines are cleared on this level, with a gentle slosh. Behind the well.
+  const SEWER_WATER_MIN = 0.15;
+  const SEWER_WATER_MAX = 0.20;
+  function sewerLevelProg(lines, level) {
+    const lv = Math.max(1, level || 1);
+    const base = (lv - 1) * 10;
+    return Math.max(0, Math.min(1, ((lines || 0) - base) / 10));
+  }
+  function sewerWaterFrac(lines, level) {
+    return SEWER_WATER_MIN + (SEWER_WATER_MAX - SEWER_WATER_MIN) * sewerLevelProg(lines, level);
+  }
+  function sewerWaterY(h, lines, level) {
+    return (h || 0) * (1 - sewerWaterFrac(lines, level));
+  }
+
+  // 1.9.209 Sewers rats chew one surface cell at a time, then column gravity
+  // (the same dropColumns used by cherry bombs). Never touches the falling piece.
+  const RAT_CHEW_GAP = [20, 40];
+  const RAT_CHEW_FIRST = [8, 16];
+  const RAT_CHEW_APPROACH = 1.15;
+  const RAT_CHEW_NIBBLE = 1.2;
+  const RAT_CHEW_FLEE = 0.7;
+  function ratChewWait(first) {
+    const r = first ? RAT_CHEW_FIRST : RAT_CHEW_GAP;
+    return r[0] + Math.random() * (r[1] - r[0]);
+  }
+  function newRatChew() {
+    return { phase: 'wait', t: 0, wait: ratChewWait(true), rat: null, crumbs: [], col: -1, row: -1, munched: false, startX: 0, startY: 0 };
+  }
+  function sewerChewTargets(g) {
+    if (!g || !g.board) return [];
+    const out = [];
+    for (let c = 0; c < COLS; c++) {
+      for (let r = 0; r < ROWS; r++) {
+        if (!g.board[r][c]) continue;
+        if (pieceCovers(g, c, r)) continue;
+        const up = r === 0 || !g.board[r - 1][c];
+        const left = c === 0 || !g.board[r][c - 1];
+        const right = c === COLS - 1 || !g.board[r][c + 1];
+        if (up || left || right) out.push({ c: c, r: r, fromTop: !!up });
+      }
+    }
+    return out;
+  }
+  function applyRatChew(g, c, r) {
+    if (!g || !g.board || r < 0 || r >= ROWS || c < 0 || c >= COLS) return null;
+    if (!g.board[r][c]) return null;
+    if (pieceCovers(g, c, r)) return null;
+    const food = ensureFood(g);
+    const hits = g.hits;
+    const slime = ensureSlime(g);
+    g.board[r][c] = 0;
+    if (food[r]) food[r][c] = null;
+    if (hits && hits[r]) hits[r][c] = 0;
+    if (slime[r]) slime[r][c] = 0;
+    dropColumns(g.board, food, hits, [c], slime);
+    const n = applyClear(g, findFullRows(g));
+    try { maybeHighScore(g); } catch (e) { }
+    return { c: c, r: r, cleared: n };
+  }
+  function stepRatChew(st, g, dt, flags) {
+    flags = flags || {};
+    st = st || newRatChew();
+    if (!g || themeFor(g.level) !== SEWER_THEME) return newRatChew();
+    if (st.hold && !flags.pose) return st;
+    let left = Math.max(0, (dt || 0) / 1000);
+    const reduce = !!flags.reduce;
+    const running = !!flags.running;
+    const approach = (reduce ? RAT_CHEW_APPROACH * 0.65 : RAT_CHEW_APPROACH);
+    const nibble = (reduce ? RAT_CHEW_NIBBLE * 0.7 : RAT_CHEW_NIBBLE);
+    const flee = (reduce ? RAT_CHEW_FLEE * 0.7 : RAT_CHEW_FLEE);
+    function stepCrumbs(sec) {
+      const bits = st.crumbs || [];
+      for (let i = bits.length - 1; i >= 0; i--) {
+        const b = bits[i];
+        b.x += (b.vx || 0) * sec;
+        b.y += (b.vy || 0) * sec;
+        b.vy = (b.vy || 0) + 4.5 * sec;
+        b.life -= sec;
+        if (b.life <= 0) bits.splice(i, 1);
+      }
+      st.crumbs = bits;
+    }
+    let guard = 0;
+    while (guard++ < 10) {
+      if (st.phase === 'wait' || !st.phase) {
+        if (!running) return st;
+        st.wait = (st.wait == null ? ratChewWait(true) : st.wait) - left;
+        st.rat = null;
+        st.crumbs = [];
+        left = 0;
+        if (st.wait <= 0) {
+          left = -st.wait;
+          st.wait = 0;
+          const opts = sewerChewTargets(g);
+          if (!opts.length) { st.wait = 2 + Math.random() * 2; return st; }
+          const pick = opts[(Math.random() * opts.length) | 0];
+          st.phase = 'approach';
+          st.t = 0;
+          st.col = pick.c; st.row = pick.r;
+          st.fromTop = pick.fromTop;
+          st.munched = false;
+          st.crumbs = [];
+          const startX = pick.fromTop ? pick.c : (pick.c < COLS / 2 ? -1.5 : COLS + 0.5);
+          const startY = pick.fromTop ? Math.max(-1.4, pick.r - 6) : pick.r;
+          st.startX = startX; st.startY = startY;
+          st.rat = { x: startX, y: startY, dir: startX <= pick.c ? 1 : -1, sniff: 0, phase: 'walk', t: 0 };
+          if (left <= 0) return st;
+          continue;
+        }
+        return st;
+      }
+      if ((st.phase === 'approach' || st.phase === 'chew') && !st.munched) {
+        const gone = !g.board[st.row] || !g.board[st.row][st.col];
+        const hitPiece = pieceCovers(g, st.col, st.row);
+        if (gone || hitPiece || g.clearFx || g.over) {
+          st.phase = 'flee';
+          st.t = 0;
+          if (st.rat) st.rat.phase = 'walk';
+        }
+      }
+      if (st.phase === 'approach') {
+        const need = Math.max(0, approach - st.t);
+        const use = Math.min(left, need);
+        st.t += use; left -= use;
+        const u = Math.min(1, st.t / approach);
+        const e = u * u * (3 - 2 * u);
+        if (st.rat) {
+          st.rat.x = st.startX + (st.col - st.startX) * e;
+          st.rat.y = st.startY + (st.row - st.startY) * e;
+          st.rat.dir = (st.col >= st.startX) ? 1 : -1;
+          st.rat.phase = 'walk';
+          st.rat.t = st.t;
+          st.rat.sniff = 0;
+        }
+        if (u >= 1) {
+          st.phase = 'chew';
+          st.t = 0;
+          if (st.rat) { st.rat.x = st.col; st.rat.y = st.row; st.rat.phase = 'chew'; st.rat.sniff = 1; }
+          try { if (!flags.silent) playMunch(); } catch (e) { }
+          if (left > 0) continue;
+        }
+        return st;
+      }
+      if (st.phase === 'chew') {
+        const need = Math.max(0, nibble - st.t);
+        const use = Math.min(left, need);
+        st.t += use; left -= use;
+        if (st.rat) {
+          st.rat.x = st.col;
+          st.rat.y = st.row;
+          st.rat.phase = 'chew';
+          st.rat.sniff = 1;
+          st.rat.t = st.t;
+        }
+        if (!reduce && use > 0 && Math.random() < use * 16) {
+          (st.crumbs = st.crumbs || []).push({
+            x: st.col + 0.5 + (Math.random() - 0.5) * 0.55,
+            y: st.row + 0.35,
+            vx: (Math.random() - 0.5) * 1.8,
+            vy: -1.1 - Math.random() * 0.8,
+            life: 0.35 + Math.random() * 0.3
+          });
+        }
+        stepCrumbs(use);
+        if (st.t >= nibble && !st.munched) {
+          st.munched = true;
+          try { applyRatChew(g, st.col, st.row); } catch (e) { }
+          st.phase = 'flee';
+          st.t = 0;
+          if (st.rat) st.rat.phase = 'walk';
+          if (left > 0) continue;
+        }
+        return st;
+      }
+      if (st.phase === 'flee') {
+        const need = Math.max(0, flee - st.t);
+        const use = Math.min(left, need);
+        st.t += use; left -= use;
+        stepCrumbs(use);
+        const side = (st.col < COLS / 2) ? -1 : 1;
+        const destX = side < 0 ? -2 : COLS + 1;
+        const u = Math.min(1, st.t / flee);
+        if (st.rat) {
+          st.rat.x = st.col + (destX - st.col) * u;
+          st.rat.y = st.row - u * 0.6;
+          st.rat.dir = side;
+          st.rat.phase = 'walk';
+          st.rat.t = st.t;
+          st.rat.sniff = 0;
+        }
+        if (u >= 1) {
+          st.phase = 'wait';
+          st.t = 0;
+          st.wait = ratChewWait(false);
+          st.rat = null;
+          st.crumbs = [];
+          st.munched = false;
+          return st;
+        }
+        return st;
+      }
+      stepCrumbs(left);
+      return st;
+    }
+    return st;
+  }
+
+  function drawRatChew(ctx, st) {
+    if (!ctx || !st || !st.rat) return;
+    const rat = st.rat;
+    const px = (rat.x + 0.5) * CELL;
+    const py = (rat.y + 0.85) * CELL;
+    (st.crumbs || []).forEach(function (b) {
+      ctx.globalAlpha = Math.max(0, Math.min(1, b.life * 3));
+      ctx.fillStyle = '#c4a574';
+      ctx.fillRect(b.x * CELL - 1.4, b.y * CELL - 1.4, 2.8, 2.8);
+      ctx.globalAlpha = 1;
+    });
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.scale(1.45, 1.45);
+    drawSewerRat(ctx, { x: 0, y: 0, dir: rat.dir, sniff: rat.sniff, phase: rat.phase, t: rat.t });
+    ctx.restore();
+  }
 
   const SEWER_HOLE_GAP = [14, 22];
   const SEWER_HOLE_FIRST = [5, 10];
@@ -4400,7 +4832,8 @@
       ready: false, t: 0, w: 0, h: 0, hold: false,
       lamps: [], drips: [], bubbles: [], rats: [],
       manhole: { open: 0, phase: 'shut', t: 0, wait: sewerWait(true) },
-      water: 0, sniff: null, landAt: 0
+      water: 0, sniff: null, landAt: 0,
+      lines: 0, level: 10, chew: newRatChew()
     };
   }
   let sewerFx = newSewerFx();
@@ -4444,6 +4877,8 @@
     const reduce = !!opts.reduce;
     if (st.hold) return st;
     st.t = (st.t || 0) + sec;
+    if (opts.lines != null) st.lines = opts.lines;
+    if (opts.level != null) st.level = opts.level;
     st.water = (st.water || 0) + sec * (reduce ? 0.15 : 0.55);
     // lamps flicker as a slow brightness wander
     (st.lamps || []).forEach(function (L) {
@@ -4481,7 +4916,7 @@
       const xs = [0.18, 0.45, 0.68, 0.82];
       st.drips.push({ x: xs[(Math.random() * xs.length) | 0] * w, y: 0.08 * h + Math.random() * 0.04 * h, v: 80 + Math.random() * 50, r: 1.6 + Math.random() * 1.1 });
     }
-    const waterY = h * 0.82;
+    const waterY = sewerWaterY(h, st.lines, st.level);
     for (let i = st.drips.length - 1; i >= 0; i--) {
       const d = st.drips[i];
       if (!reduce) d.y += d.v * sec;
@@ -4492,7 +4927,7 @@
     if (!reduce && st.bubbles.length < 8 && Math.random() < sec * 1.8) {
       st.bubbles.push({
         x: w * (0.08 + Math.random() * 0.84),
-        y: h * (0.88 + Math.random() * 0.1),
+        y: waterY + 10 + Math.random() * Math.max(12, h - waterY - 16),
         r: 2.2 + Math.random() * 3.4,
         v: 18 + Math.random() * 22,
         ph: Math.random() * 6.28,
@@ -4513,8 +4948,8 @@
       }
       if (b.y < waterY - 28 || (b.pop && b.y < popAt - 6)) st.bubbles.splice(i, 1);
     }
-    // rats on the ledge
-    const ledgeY = h * 0.78;
+    // rats on the ledge, just above the (rising) water
+    const ledgeY = waterY - 16;
     (st.rats || []).forEach(function (rat, i) {
       rat.y = ledgeY;
       if (reduce) { rat.phase = 'idle'; rat.sniff = 0; return; }
@@ -4558,6 +4993,8 @@
     sewerFx.hold = true;
     sewerFx.t = opt.t != null ? opt.t : 8;
     sewerFx.water = opt.water != null ? opt.water : sewerFx.t * 0.55;
+    sewerFx.lines = opt.lines != null ? opt.lines : 0;
+    sewerFx.level = opt.level != null ? opt.level : 10;
     const open = opt.manhole != null ? opt.manhole : 1;
     sewerFx.manhole = { open: open, phase: open >= 1 ? 'open' : (open > 0 ? 'opening' : 'shut'), t: 1, wait: 0 };
     (sewerFx.lamps || []).forEach(function (L, i) { L.bri = opt.bri != null ? opt.bri : 0.8 + 0.1 * (i % 2); });
@@ -4572,10 +5009,29 @@
       { x: (w || 390) * 0.36, y: (h || 844) * 0.83, r: 5, v: 0, ph: 0.5, pop: true }
     ];
     const sniff = opt.sniff !== false;
+    const ledgeY = sewerWaterY(h || 844, sewerFx.lines, sewerFx.level) - 16;
     sewerFx.rats = [
-      { x: (w || 390) * (sniff ? 0.42 : 0.22), dir: 1, phase: sniff ? 'sniff' : 'walk', t: 0.4, wait: 0, sniff: sniff ? 1 : 0, y: (h || 844) * 0.78 },
-      { x: (w || 390) * 0.78, dir: -1, phase: 'walk', t: 0.8, wait: 0, sniff: 0, y: (h || 844) * 0.78 }
+      { x: (w || 390) * (sniff ? 0.42 : 0.22), dir: 1, phase: sniff ? 'sniff' : 'walk', t: 0.4, wait: 0, sniff: sniff ? 1 : 0, y: ledgeY },
+      { x: (w || 390) * 0.78, dir: -1, phase: 'walk', t: 0.8, wait: 0, sniff: 0, y: ledgeY }
     ];
+    if (opt.chew) {
+      const col = opt.chew.c != null ? opt.chew.c : 4;
+      const row = opt.chew.r != null ? opt.chew.r : 14;
+      sewerFx.chew = {
+        phase: 'chew', t: opt.chew.t != null ? opt.chew.t : 0.6, wait: 0,
+        col: col, row: row, munched: false, hold: true,
+        startX: col, startY: row,
+        crumbs: [
+          { x: col + 0.3, y: row + 0.2, vx: 0, vy: 0, life: 0.4 },
+          { x: col + 0.7, y: row + 0.15, vx: 0, vy: 0, life: 0.35 },
+          { x: col + 0.45, y: row + 0.45, vx: 0, vy: 0, life: 0.3 }
+        ],
+        rat: { x: col, y: row, dir: 1, phase: 'chew', t: 0.6, sniff: 1 }
+      };
+    } else {
+      sewerFx.chew = newRatChew();
+      sewerFx.chew.hold = true;
+    }
     return sewerFx;
   }
   function drawSewerRat(ctx, rat) {
@@ -4692,31 +5148,33 @@
       ctx.stroke();
     }
     ctx.restore();
-    // flowing green water along the bottom
-    const waterY = h * 0.82;
+    // flowing green water along the bottom (15–20% of the screen, rising with lines)
+    const waterY = sewerWaterY(h, st.lines, st.level);
     const flow = st.water || 0;
     const still = !!reduce;
+    const slosh = still ? 1.0 : 4.2;
+    const slosh2 = still ? 0.35 : 1.8;
     ctx.beginPath();
     ctx.moveTo(0, h);
     ctx.lineTo(0, waterY);
     for (let x = 0; x <= w; x += 8) {
-      const y = waterY + Math.sin(x / 28 + flow * (still ? 0.2 : 1.4)) * (still ? 1.2 : 3.4)
-        + Math.sin(x / 11 + flow * 0.7) * (still ? 0.4 : 1.4);
+      const y = waterY + Math.sin(x / 28 + flow * (still ? 0.2 : 1.15)) * slosh
+        + Math.sin(x / 11 + flow * 0.7) * slosh2;
       ctx.lineTo(x, y);
     }
     ctx.lineTo(w, h);
     ctx.closePath();
     const wg = ctx.createLinearGradient(0, waterY, 0, h);
-    wg.addColorStop(0, 'rgba(70, 150, 100, 0.55)');
-    wg.addColorStop(0.35, 'rgba(24, 80, 58, 0.7)');
-    wg.addColorStop(1, 'rgba(8, 28, 22, 0.85)');
+    wg.addColorStop(0, 'rgba(80, 170, 110, 0.42)');
+    wg.addColorStop(0.28, 'rgba(28, 96, 66, 0.58)');
+    wg.addColorStop(1, 'rgba(8, 28, 22, 0.82)');
     ctx.fillStyle = wg;
     ctx.fill();
-    ctx.strokeStyle = 'rgba(150, 220, 170, 0.45)';
-    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = 'rgba(150, 220, 170, 0.5)';
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
     for (let x = 0; x <= w; x += 8) {
-      const y = waterY + Math.sin(x / 28 + flow * (still ? 0.2 : 1.4)) * (still ? 1.2 : 3.4);
+      const y = waterY + Math.sin(x / 28 + flow * (still ? 0.2 : 1.15)) * slosh;
       if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
     ctx.stroke();
@@ -4746,7 +5204,7 @@
     ctx.restore();
   }
 
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_BUILD_EVERY_LOW, CITY_SAFE_TOP, CITY_CREW_N, CITY_ANIM_CLIMB, CITY_ANIM_PLACE, CITY_ANIM_DOWN, CITY_ANIM_FAST, cityHighestSettled, cityStackLow, cityBuildEvery, cityBuildWait, cityAnimDur, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, DROP_SLOW, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, HIGH_SCORE_MS, HIGH_SCORE_FADE_MS, highScoreProg, maybeHighScore, startHighScore, tickHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, FARM_SUN, FARM_HZ, FARM_SUNRISE_PROG, FARM_SUNRISE_SEC, farmDayTarget, farmSunPos, ROOSTER_HASH, roosterSrc, farmThemeActive, playRoosterSfx, stopRoosterSfx, stackColY, stackSkyline, stackPathAt, stackPathLen, newStackWash, stepStackWash, STACK_WASH_PERIOD, washCover, washSpill, washPool, stackWashInland, washCycle, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, fwSkyFlashAlpha, startFwSkyFlash, maybeFwSkyFlash, FW_SKY_FLASH_PEAK, FW_SKY_FLASH_FADE, FW_MAJOR_SCALE, FW_BIGGER_GROW, fwSkyFlashState: () => fw.skyFlash, fwProg: (p) => { if (p != null) fw.prog = p; return fw.prog; }, fwReset, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts, SNOW_THEME, snowProg, snowFallParams, newBoardSnow, stepBoardSnow, snowOnLineClear, snowReset, boardSnow: () => boardSnow, newAbseil, stepAbseil, drawAbseil, poseAbseil, abseilState, abseilReset, ABSEIL_GAP, ABSEIL_FIRST, NZ_THEME, nzProg, nzBeatsPerRow, nzDropInterval, NZ_PAL, NZ_PAL_STEPS, NZ_PAL_FADE_MS, nzPalIndex, nzPaletteNow, mixHex, nzMixProgress, resetNzPal, setNzPal, tickNzPal, nzPalState, EXTREME_KEY, EXTREME_PEEK_MS, EXTREME_EXIT_MIN, EXTREME_TOP_RESERVE, SEAGULL_HASH, seagullSrc, startNzFlash, nzFlashAlpha, newNzGulls, stepNzGulls, nzGulls: () => nzGulls, nzFlashState: () => nzFlash, FOOD_THEME, FOOD_KIND, FOOD_HASH, FOOD_VOL, foodKind, foodSoundFor, foodSrc, emptyFood, ensureFood, cloneFood, dropFood, stampFood, foodMetaAt, rotShape, shapeCells, shapePath, playFoodSfx, playFoodLand, playFoodChomp, playFoodBoom, CHERRY_T, CHERRY_ODDS, CHERRY_BONUS, CHERRY_PER_CELL, isCherry, takeNext, cherryBlastCells, dropColumns, applyCherryBomb, isBanana, BANANA_BONUS, BANANA_PER_CELL, bananaTouchesLocked, connectedBananaCells, applyBananaBurst, spawnBananaBurst, FOOD_SPRITES, loadFoodSprites, PAUSE_CLOSE_MS, CLOSE_MSG, TETRIS_SCORES_CLEAR_207, clearTetrisScoresOnce207, nowMs, setNowMs, nextPausedAt, shouldCloseAfterPause, howToPlayLevels, howToPlayHtml, SEWER_THEME, SLIME_ODDS, SLIME_COLOR, maybeSlime, trySlimeSlide, isSlime, stampSlime, emptySlime, ensureSlime, cloneSlime, dropSlime, newSewerFx, stepSewerFx, drawSewerScene, poseSewer, sewerState, sewerReset, sewerOnLand, playSquelch, playBlorp, pieceColor, cellIsSlime, SEWER_HOLE_GAP, SEWER_HOLE_FIRST };
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_BUILD_EVERY_LOW, CITY_SAFE_TOP, CITY_CREW_N, CITY_ANIM_CLIMB, CITY_ANIM_PLACE, CITY_ANIM_DOWN, CITY_ANIM_FAST, cityHighestSettled, cityStackLow, cityBuildEvery, cityBuildWait, cityAnimDur, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, DROP_SLOW, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, HIGH_SCORE_MS, HIGH_SCORE_FADE_MS, highScoreProg, maybeHighScore, startHighScore, tickHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, FARM_SUN, FARM_HZ, FARM_SUNRISE_PROG, FARM_SUNRISE_SEC, farmDayTarget, farmSunPos, ROOSTER_HASH, roosterSrc, farmThemeActive, playRoosterSfx, stopRoosterSfx, stackColY, stackSkyline, stackPathAt, stackPathLen, newStackWash, stepStackWash, STACK_WASH_PERIOD, washCover, washSpill, washPool, stackWashInland, washCycle, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, fwSkyFlashAlpha, startFwSkyFlash, maybeFwSkyFlash, FW_SKY_FLASH_PEAK, FW_SKY_FLASH_FADE, FW_MAJOR_SCALE, FW_BIGGER_GROW, fwSkyFlashState: () => fw.skyFlash, fwProg: (p) => { if (p != null) fw.prog = p; return fw.prog; }, fwReset, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts, SNOW_THEME, snowProg, snowFallParams, newBoardSnow, stepBoardSnow, snowOnLineClear, snowReset, boardSnow: () => boardSnow, newAbseil, stepAbseil, drawAbseil, poseAbseil, abseilState, abseilReset, ABSEIL_GAP, ABSEIL_FIRST, NZ_THEME, nzProg, nzBeatsPerRow, nzDropInterval, NZ_PAL, NZ_PAL_STEPS, NZ_PAL_FADE_MS, nzPalIndex, nzPaletteNow, mixHex, nzMixProgress, resetNzPal, setNzPal, tickNzPal, nzPalState, EXTREME_KEY, EXTREME_PEEK_MS, EXTREME_EXIT_MIN, EXTREME_TOP_RESERVE, SEAGULL_HASH, seagullSrc, startNzFlash, nzFlashAlpha, newNzGulls, stepNzGulls, nzGulls: () => nzGulls, nzFlashState: () => nzFlash, FOOD_THEME, FOOD_KIND, FOOD_HASH, FOOD_VOL, foodKind, foodSoundFor, foodSrc, emptyFood, ensureFood, cloneFood, dropFood, stampFood, foodMetaAt, rotShape, shapeCells, shapePath, playFoodSfx, playFoodLand, playFoodChomp, playFoodBoom, CHERRY_T, CHERRY_ODDS, CHERRY_BONUS, CHERRY_PER_CELL, isCherry, takeNext, cherryBlastCells, dropColumns, applyCherryBomb, isBanana, BANANA_BONUS, BANANA_PER_CELL, bananaTouchesLocked, connectedBananaCells, applyBananaBurst, spawnBananaBurst, FOOD_SPRITES, loadFoodSprites, PAUSE_CLOSE_MS, CLOSE_MSG, TETRIS_SCORES_CLEAR_207, clearTetrisScoresOnce207, nowMs, setNowMs, nextPausedAt, shouldCloseAfterPause, howToPlayLevels, howToPlayHtml, SEWER_THEME, SLIME_ODDS, SLIME_COLOR, maybeSlime, trySlimeSlide, isSlime, stampSlime, emptySlime, ensureSlime, cloneSlime, dropSlime, newSewerFx, stepSewerFx, drawSewerScene, poseSewer, sewerState, sewerReset, sewerOnLand, playSquelch, playBlorp, playMunch, pieceColor, cellIsSlime, SEWER_HOLE_GAP, SEWER_HOLE_FIRST, SEWER_WATER_MIN, SEWER_WATER_MAX, sewerLevelProg, sewerWaterFrac, sewerWaterY, RAT_CHEW_GAP, RAT_CHEW_FIRST, newRatChew, sewerChewTargets, applyRatChew, stepRatChew, drawRatChew, abseilPieceSafe, abseilShiftTargets, abseilShiftOk, abseilHoldsPiece, pieceFallLeft, ABSEIL_SAFE_ROWS, abseilStartLive };
 
   if (!root.document) return;
   const doc = root.document;
@@ -5079,10 +5537,10 @@
     citySeed(opts);
     if (themeFor(g.level) === SEWER_THEME) {
       const sw = (root.innerWidth || 390), sh = (root.innerHeight || 844);
-      if (opts.sewer) poseSewer(opts.sewer, sw, sh);
+      if (opts.sewer) poseSewer(Object.assign({ lines: g.lines, level: g.level }, opts.sewer), sw, sh);
       else {
         sewerReset();
-        stepSewerFx(sewerFx, opts.sewerTime != null ? opts.sewerTime : 0, sw, sh, { reduce: reduceMotion(), silent: true });
+        stepSewerFx(sewerFx, opts.sewerTime != null ? opts.sewerTime : 0, sw, sh, { reduce: reduceMotion(), silent: true, lines: g.lines, level: g.level });
       }
     } else sewerReset();
     snowReset();
@@ -5107,11 +5565,11 @@
     if (themeFor(g.level) === SNOW_THEME && g.board) {
       stepBoardSnow(boardSnow, g.board, opts.snowTime != null ? opts.snowTime : 0, snowProg(g.lines, g.level), { reduce: reduceMotion() });
       const aw = (root.innerWidth || 390), ah = (root.innerHeight || 844);
-      if (opts.abseil) poseAbseil(opts.abseil, aw, ah);
+      if (opts.abseil) poseAbseil(opts.abseil, aw, ah, (opts.abseil.live) ? g : null);
       else if (opts.abseilTime != null) {
         abseilReset();
         abseil.wait = 0;
-        stepAbseil(abseil, opts.abseilTime, aw, ah, { reduce: false, pose: true, start: opts.abseilStart });
+        stepAbseil(abseil, opts.abseilTime, aw, ah, { reduce: false, pose: true, start: opts.abseilStart, game: opts.abseilLive ? g : null, running: !!opts.abseilLive, well: wellRect() });
       } else abseilReset();
     } else abseilReset();
   };
@@ -6009,7 +6467,7 @@
     fx.ctx.setTransform(d, 0, 0, d, 0, 0);
   }
   function fxInit() {
-    if (fx.cv || fx.off || !doc.body || !doc.createElement) return;
+    if (fx.cv || !doc.body || !doc.createElement) return;
     const cv = doc.createElement('canvas'); if (!cv.getContext) return;
     cv.className = 'fx'; cv.setAttribute('aria-hidden', 'true');
     cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:0';
@@ -6049,9 +6507,12 @@
   }
   function fxDraw(now) {
     if (isEffect(lookIdx < 0 ? themeIdx : lookIdx)) {
-      try { if (effectStageDraw(now)) return; } catch (e) { }
+      try { if (effectStageDraw(now)) { try { drawLiveAbseilOverlay(); } catch (e2) { } return; } } catch (e) { }
     }
-    if (fx.off) return;
+    const lookNow = lookIdx < 0 ? themeIdx : lookIdx;
+    const snowOnEarly = lookNow === SNOW_THEME || (g && themeFor(g.clearFx ? g.clearFx.level : g.level) === SNOW_THEME);
+    const sewerOnEarly = lookNow === SEWER_THEME || (g && themeFor(g.clearFx ? g.clearFx.level : g.level) === SEWER_THEME);
+    if (fx.off && !snowOnEarly && !sewerOnEarly) return;
     fxInit(); if (!fx.ctx) return;
     if (fx.theme !== lookIdx) fxTheme(lookIdx < 0 ? 0 : lookIdx);
     if ((lookIdx < 0 ? themeIdx : lookIdx) === SNOW_THEME && g) {
@@ -6059,7 +6520,7 @@
     }
     const t = now / 1000, dt = Math.min(0.05, fx.last ? t - fx.last : 0); fx.last = t;
     const c = fx.ctx; c.clearRect(0, 0, fx.w, fx.h);
-    for (let i = 0; i < fx.list.length; i++) {
+    for (let i = 0; !fx.off && i < fx.list.length; i++) {
       let o = fx.list[i]; const k = o.k, m = k.m;
       let a = k.a, rot = 0, flip = o.dir > 0;
       if (k.vy) o.y0 += k.vy * dt;
@@ -6117,17 +6578,20 @@
     const snowOn = (lookIdx < 0 ? themeIdx : lookIdx) === SNOW_THEME || (g && themeFor(g.clearFx ? g.clearFx.level : g.level) === SNOW_THEME);
     if (snowOn) {
       try {
-        stepAbseil(abseil, dt * 1000, fx.w, fx.h, { reduce: fx.off || reduceMotion() });
-        drawAbseil(c, abseil);
+        // Gameplay is stepped in the main loop; here we only draw.
+        if (abseil && abseil.mode !== 'live') drawAbseil(c, abseil);
       } catch (e) { }
-    } else if (abseil && abseil.ready && abseil.phase !== 'wait') abseilReset();
+    } else if (abseil && abseil.ready && abseil.phase !== 'wait' && !abseil.hold) abseilReset();
     const sewerOn = (lookIdx < 0 ? themeIdx : lookIdx) === SEWER_THEME || (g && themeFor(g.clearFx ? g.clearFx.level : g.level) === SEWER_THEME);
     if (sewerOn) {
       try {
-        stepSewerFx(sewerFx, dt * 1000, fx.w, fx.h, { reduce: fx.off || reduceMotion() });
+        const lv = g ? (g.clearFx ? g.clearFx.level : g.level) : 10;
+        const ln = g ? (g.clearFx ? g.clearFx.lines : g.lines) : 0;
+        stepSewerFx(sewerFx, dt * 1000, fx.w, fx.h, { reduce: fx.off || reduceMotion(), lines: ln, level: lv, silent: true });
         drawSewerScene(c, sewerFx, fx.w, fx.h, fx.off || reduceMotion());
       } catch (e) { }
     } else if (sewerFx && sewerFx.ready) sewerReset();
+    try { drawLiveAbseilOverlay(); } catch (e) { }
   }
   // Pixel invaders on the Space travel board. They drift; bombs fall slowly down a column.
   const INV_SPRITES = [
@@ -6144,6 +6608,56 @@
   function cityReset() { resetCityCrew(city, g.level, g); }
   function citySeed(opts) { seedCityCrew(city, g, (opts && opts.city) || {}); }
   function cityStep(dt) { stepCityCrew(city, g, dt, { started: started, onTock: () => sfx('tock') }); }
+  function wellRect() {
+    try {
+      const el = board || doc.getElementById('board');
+      if (el && el.getBoundingClientRect) {
+        const r = el.getBoundingClientRect();
+        if (r.width > 8) return r;
+      }
+    } catch (e) { }
+    return null;
+  }
+  function abseilPlayStep(dt, running) {
+    const on = g && themeFor(g.clearFx ? g.clearFx.level : g.level) === SNOW_THEME;
+    if (!on) {
+      if (g) g.heldByAbseil = false;
+      if (abseil && abseil.ready && abseil.phase !== 'wait' && !abseil.hold) abseilReset();
+      return;
+    }
+    const w = (fx && fx.w) || root.innerWidth || 390;
+    const h = (fx && fx.h) || root.innerHeight || 844;
+    const frozen = !g || g.paused || g.over || (g.demo && abseil && abseil.hold);
+    stepAbseil(abseil, frozen ? 0 : dt, w, h, {
+      reduce: reduceMotion(),
+      game: g,
+      running: !!running,
+      well: wellRect()
+    });
+  }
+  function sewerPlayStep(dt, running) {
+    const on = g && themeFor(g.clearFx ? g.clearFx.level : g.level) === SEWER_THEME;
+    if (!on) {
+      if (sewerFx && sewerFx.chew && sewerFx.chew.phase !== 'wait' && !sewerFx.chew.hold) sewerFx.chew = newRatChew();
+      return;
+    }
+    if (!sewerFx.chew) sewerFx.chew = newRatChew();
+    stepRatChew(sewerFx.chew, g, dt, {
+      running: !!running,
+      reduce: reduceMotion(),
+      silent: false
+    });
+  }
+  function drawLiveAbseilOverlay() {
+    if (!abseil || abseil.mode !== 'live' || !abseil.people || !abseil.people.length) return;
+    lifeInit();
+    if (!life.ctx) return;
+    if (life.w !== (root.innerWidth || life.w) || life.h !== (root.innerHeight || life.h)) lifeSize();
+    // Snow has no other life drawing, so we can paint the climbers in front of the well.
+    const c = life.ctx;
+    c.clearRect(0, 0, life.w, life.h);
+    drawAbseil(c, abseil);
+  }
   function invSprite(ctx, rows, x, y, color) {
     const px = INV_PX;
     ctx.fillStyle = color;
@@ -8967,16 +9481,22 @@
         }
       } else {
         g.nzDropAt = null;
-        g.acc += dt;
-        if (g.acc >= dropInterval(g.level)) {
+        if (abseilHoldsPiece(abseil, g)) {
           g.acc = 0;
-          if (!collides(g.board, g.piece.m, g.piece.x, g.piece.y + 1)) g.piece.y++;
-          else { lockPiece(g); syncHud(); }
+        } else {
+          g.acc += dt;
+          if (g.acc >= dropInterval(g.level)) {
+            g.acc = 0;
+            if (!collides(g.board, g.piece.m, g.piece.x, g.piece.y + 1)) g.piece.y++;
+            else { lockPiece(g); syncHud(); }
+          }
         }
       }
     }
     try { if (!clearing) invStep(dt); } catch (e) { }
     try { if (!clearing) cityStep(dt); } catch (e) { }
+    try { abseilPlayStep(dt, running); } catch (e) { }
+    try { sewerPlayStep(dt, running); } catch (e) { }
     try {
       if (g && isEffect(cellThemeIdx()) === 'beach') stepStackWash(stackWash, g.board, dt, { reduce: reduceMotion() });
       else if (stackWash.ready) stackWashReset();
@@ -9033,6 +9553,7 @@
       try { if (!sparkHold) tickBlockSpark(now, drawBoard, (!g.over && !fx) ? g.piece : null, reduceMotion()); } catch (e) { }
       try { invDraw(ctx); } catch (e) { }
       try { drawCityCrew(ctx); } catch (e) { }
+      try { if (sewerFx && sewerFx.chew) drawRatChew(ctx, sewerFx.chew); } catch (e) { }
       try { drawStackWash(ctx); } catch (e) { }
       try { drawSnowCaps(ctx); drawBoardSnow(ctx); } catch (e) { }
       try { drawEffectTrails(ctx); drawEffectRipples(ctx); } catch (e) { }
