@@ -3,7 +3,7 @@
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
    Open to every family member since 1.9.228 (Shane-only before; the coming-soon screen is no longer used).
-   Scores are not sent to the family scoreboard yet. Good moves are spoken in a bright, punchy callout voice (matched to Shane's "Great!" clip)
+   Scores are not sent to the family scoreboard yet. 1.9.229: only major moments are spoken; minor sayings play candy sounds. Good moves were spoken in a bright, punchy callout voice (matched to Shane's "Great!" clip)
    (Yay, Great, Awesome, Sweet as, Succulent). A plain 3-match plays a short, soft chime (about 200 ms, sine
    with a gentle bell harmonic, 400–800 Hz, 2.5 kHz lowpass). There are no pack pops, smashes or synth select
    or swap sounds. Voices sit clearly above the music, through a compressor, with a brief music duck that
@@ -1413,8 +1413,91 @@
   // appears once the last one has been said (SAY_SHOW_MS at least), and voice lines queue rather than cut each other.
   // 1.9.227 At least SAY_REST_MS of quiet after a spoken saying finishes before the next one shows. Minor sayings that
   // land in that rest are simply not shown; big ones (specials, streak level-ups) wait, at most one in the queue.
+  // 1.9.229 Only the major moments are spoken: special sweets made or set off (stripe, wrap, sprinkle bomb), combos,
+  // streak level-ups, the Hard level start, Goal achieved and Sugar Crush. Every other saying still pops up on screen
+  // but plays a short candy sound instead (candySfxPlan), at normal pace. SAY_REST_MS applies to spoken lines only.
   const SAY_REST_MS = 3000, SAY_BIG = ['combo', 'bomb', 'wrap', 'stripe'];
   function sayBig(kind) { return SAY_BIG.indexOf(kind) >= 0; }
+  const HARD_LINES = { 1: 'Hard level!', 2: 'Super Hard level!' };
+  function hardLine(h) { return HARD_LINES[h] || ''; }
+  // 1.9.229 Candy sounds for the minor sayings: procedural sine/triangle notes on the soft pentatonic scale
+  // (fundamentals 400-800 Hz, through the same 2.5 kHz-lowpassed bus as the chime). Each kind has a few styles; a
+  // style never repeats twice running, the key and timing are jittered, and arpeggios grow with the chain.
+  // Returns a list of notes { t, f, dur, vol, type, glide, vib } that playCandySfx renders.
+  const CANDY_STYLES = {
+    cascade: ['arp', 'arp', 'sparkle'], jelly: ['wobble', 'plink'], locks: ['unlock', 'plink'], ice: ['glass', 'sparkle'],
+    ings: ['drop', 'plink'], choco: ['thud', 'pop'], gumdrop: ['pop', 'pops'], lemon: ['zing', 'plink'],
+    comeback: ['arp', 'unlock'], bub: ['pops', 'pop'], liq: ['sparkle', 'glass'], win: ['arp'],
+    stripe: ['sparkle', 'arp'], wrap: ['pops', 'arp'], bomb: ['sparkle', 'arp'], combo: ['arp', 'sparkle']
+  };
+  function candySfxPlan(kind, chain, rand, last) {
+    rand = typeof rand === 'function' ? rand : Math.random;
+    chain = Math.max(1, chain | 0);
+    const styles = CANDY_STYLES[kind] || ['plink', 'sparkle'];
+    let opts = styles.filter(x => x !== last); if (!opts.length) opts = styles;
+    const style = opts[(rand() * opts.length) | 0];
+    const root = (rand() * SCALE.length) | 0, v = SFX_NOTE * 0.9, notes = [];
+    const det = () => 1 + (rand() - 0.5) * 0.03;
+    const sc = k => SCALE[((k % SCALE.length) + SCALE.length) % SCALE.length]; // wraps within the 440-784 Hz scale
+    const push = (t, f, dur, vol, type, extra) => notes.push(Object.assign({ t: +t.toFixed(3), f: Math.round(Math.max(400, Math.min(SFX_MAX_HZ, f * det()))), dur, vol, type: type || 'sine' }, extra || {}));
+    if (style === 'arp') {
+      // Rising arpeggio: 3 notes for a small chain, up to 8 for a big one, quicker as it grows.
+      const n = Math.min(8, 2 + chain), step = Math.max(0.045, 0.085 - chain * 0.006);
+      // Runs up the scale; a long chain climbs again with more shimmer (the scale tops out at SFX_MAX_HZ).
+      const lo = root % 3;
+      for (let k = 0; k < n; k++) push(k * step, SCALE[(lo + k) % SCALE.length], k === n - 1 ? 0.26 : 0.12, v * (0.75 + 0.25 * k / n), k % 2 ? 'triangle' : 'sine', { spark: k === n - 1 || lo + k >= SCALE.length });
+    } else if (style === 'sparkle') {
+      const n = 3 + Math.min(4, chain) + ((rand() * 2) | 0);
+      for (let k = 0; k < n; k++) push(k * (0.035 + rand() * 0.025), sc((rand() * SCALE.length) | 0), 0.09, v * 0.7, 'sine', { spark: true });
+    } else if (style === 'pop') {
+      push(0, 760 - rand() * 80, 0.09, v * 1.1, 'sine', { glide: 430 + rand() * 40 });
+      push(0.07, sc(root), 0.12, v * 0.6, 'triangle');
+    } else if (style === 'pops') {
+      const n = 2 + Math.min(3, chain - 1) + ((rand() * 2) | 0);
+      for (let k = 0; k < n; k++) push(k * (0.06 + rand() * 0.03), 720 + rand() * 70, 0.07, v * 0.9, 'sine', { glide: 420 + rand() * 60 });
+    } else if (style === 'plink') {
+      push(0, sc(root), 0.14, v, 'triangle'); push(0.09 + rand() * 0.03, sc(root + 2), 0.2, v * 0.85, 'triangle', { spark: true });
+    } else if (style === 'wobble') {
+      push(0, sc(root), 0.32, v, 'sine', { vib: 7 + rand() * 3 }); push(0.12, sc(root + 1), 0.22, v * 0.5, 'sine', { vib: 9 });
+    } else if (style === 'unlock') {
+      push(0, sc(root), 0.08, v, 'triangle'); push(0.07, sc(root + 1), 0.08, v, 'triangle'); push(0.15, sc(root + 3), 0.24, v, 'sine', { spark: true });
+    } else if (style === 'glass') {
+      for (let k = 0; k < 3; k++) push(k * 0.05, sc(root + 4 - k), 0.18, v * 0.75, 'sine', { spark: true });
+    } else if (style === 'drop') {
+      for (let k = 0; k < 4; k++) push(k * 0.06, sc(root + 4 - k), 0.1, v * 0.85, k === 3 ? 'triangle' : 'sine');
+    } else if (style === 'thud') {
+      push(0, 520, 0.14, v * 1.1, 'triangle', { glide: 400 }); push(0.08, sc(root), 0.12, v * 0.5, 'sine');
+    } else { // zing
+      push(0, 600, 0.12, v, 'sine', { glide: 800 }); push(0.1, sc(root + 3), 0.16, v * 0.7, 'triangle', { spark: true });
+    }
+    return { style, notes };
+  }
+  function playCandySfx(ctx, dest, at, plan) {
+    if (!ctx || !dest || !plan) return;
+    for (const nt of plan.notes) {
+      const t0 = at + nt.t, end = t0 + Math.max(0.05, nt.dur), att = 0.008;
+      const parts = [[nt.f, nt.vol, nt.type]];
+      parts.push([nt.f * 2, nt.vol * (nt.spark ? 0.3 : 0.16), 'sine']); // sparkle: a brighter octave shimmer
+      if (nt.spark) parts.push([nt.f * 3, nt.vol * 0.08, 'sine']);
+      for (const [hz, peak, typ] of parts) {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = typ === 'triangle' ? 'triangle' : 'sine';
+        const ratio = hz / nt.f;
+        o.frequency.setValueAtTime(hz, t0);
+        if (nt.glide) o.frequency.exponentialRampToValueAtTime(Math.max(400, Math.min(SFX_MAX_HZ, nt.glide)) * ratio, end);
+        if (nt.vib && ctx.createOscillator) {
+          const l = ctx.createOscillator(), lg = ctx.createGain();
+          l.type = 'sine'; l.frequency.setValueAtTime(nt.vib, t0); lg.gain.setValueAtTime(hz * 0.025, t0);
+          l.connect(lg); lg.connect(o.frequency); l.start(t0); l.stop(end + 0.03);
+        }
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.linearRampToValueAtTime(Math.max(0.0001, peak), t0 + att);
+        g.gain.exponentialRampToValueAtTime(0.0001, end);
+        o.connect(g); g.connect(dest);
+        o.start(t0); o.stop(end + 0.03);
+      }
+    }
+  }
   const SAY_SHOW_MS = 1100, SAY_AFTER_MS = 350, SPEAK_GAP = SAY_SHOW_MS, SPEAK_PITCH = 1.25, SPEAK_RATE = 1.05, SPEAK_VOL = 0.9;
   const SPEAK_LANGS = ['en-nz', 'en-au', 'en-gb', 'en-ie', 'en-za', 'en-us', 'en'];
   const SPEAK_FEMALE = /(female|woman|aria|natasha|karen|catherine|matilda|serena|samantha|libby|sonia|molly|zira|tessa|moira|fiona|victoria|allison|ava|susan|hazel|kate|jenny|clara|google uk english female)/i;
@@ -1466,8 +1549,8 @@
     'sugar-rush-song.m4a': 'fb999cd1', 'sugar-rush-song.mp3': '586f9ee6',
     // 1.9.225 Every saying pre-recorded in a female and a male NZ voice, one small sprite per voice.
     // 1.9.227 More room: reverb RT60 ~1.4 s and echoes at 120/260/420 ms, about 34% wet, ~0.9 s tail inside each clip.
-    'sugar-rush-say-f.m4a': '26b115df', 'sugar-rush-say-f.mp3': 'b07be725',
-    'sugar-rush-say-m.m4a': '3a94c931', 'sugar-rush-say-m.mp3': 'e4007425'
+    'sugar-rush-say-f.m4a': 'a4d17597', 'sugar-rush-say-f.mp3': 'd67a2872',
+    'sugar-rush-say-m.m4a': '33cd967e', 'sugar-rush-say-m.mp3': 'f1cbab26'
   };
   // 1.9.225 Spoken sayings as recorded clips, a female voice (Microsoft neural "Molly", en-NZ) and a male one
   // ("Mitchell", en-NZ), so the game mixes the two reliably instead of relying on the phone's voices.
@@ -1475,73 +1558,31 @@
   // SAY_CLIPS[text] = [fStart, fDur, mStart, mDur] in seconds. 1.9.226 adds the streak lines, which show on screen too.
   const SAY_SPRITES = { f: 'sugar-rush-say-f.m4a', m: 'sugar-rush-say-m.m4a' };
   const SAY_CLIPS = {
-    "Sweet as!": [0.25, 1.405, 0.25, 1.372],
-    "Sugar rush!": [1.905, 1.389, 1.872, 1.391],
-    "Choice!": [3.544, 1.185, 3.513, 1.199],
-    "Mean as!": [4.98, 1.275, 4.962, 1.305],
-    "Stripe-tastic!": [6.505, 1.543, 6.517, 1.55],
-    "Candy-licious!": [8.298, 1.418, 8.318, 1.414],
-    "Looking sharp!": [9.966, 1.437, 9.982, 1.405],
-    "Stripe me pink!": [11.653, 1.503, 11.637, 1.456],
-    "That's a wrap!": [13.405, 1.399, 13.343, 1.328],
-    "All wrapped up!": [15.054, 1.423, 14.921, 1.299],
-    "Parcel of yum!": [16.727, 1.46, 16.47, 1.494],
-    "Tied with a bow!": [18.438, 1.68, 18.214, 1.619],
-    "Sprinkle-tastic!": [20.367, 1.673, 20.083, 1.628],
-    "Hundreds and thousands!": [22.29, 1.803, 21.961, 1.714],
-    "Sprinkle party!": [24.344, 1.672, 23.925, 1.676],
-    "Lolly bomb!": [26.266, 1.369, 25.851, 1.416],
-    "Jelly good!": [27.886, 1.402, 27.517, 1.433],
-    "Wobble wobble!": [29.538, 1.443, 29.2, 1.587],
-    "Jelly well done!": [31.23, 1.589, 31.037, 1.502],
-    "Wobbly wonder!": [33.069, 1.553, 32.79, 1.505],
-    "Jar-mazing!": [34.872, 1.43, 34.545, 1.334],
-    "Lock-busted!": [36.552, 1.404, 36.129, 1.41],
-    "Jar-fully done!": [38.206, 1.6, 37.789, 1.556],
-    "Set those jars free!": [40.056, 2.059, 39.595, 1.835],
-    "Ice ice baby!": [42.365, 1.563, 41.68, 1.568],
-    "Icing on the cake!": [44.178, 1.539, 43.497, 1.486],
-    "Chip chip hooray!": [45.966, 1.713, 45.234, 1.682],
-    "Frost-busted!": [47.93, 1.5, 47.166, 1.475],
-    "Down the hatch!": [49.68, 1.484, 48.891, 1.299],
-    "Coming through!": [51.414, 1.506, 50.44, 1.404],
-    "And down she goes!": [53.17, 1.717, 52.094, 1.673],
-    "Nice drop!": [55.136, 1.444, 54.017, 1.39],
-    "Choc-blocked!": [56.83, 1.319, 55.658, 1.301],
-    "No more spreading!": [58.399, 1.645, 57.208, 1.559],
-    "Held the line!": [60.294, 1.425, 59.017, 1.436],
-    "Choc stop!": [61.969, 1.383, 60.704, 1.368],
-    "Gum-believable!": [63.602, 1.556, 62.322, 1.58],
-    "Cherry on top!": [65.407, 1.493, 64.151, 1.422],
-    "Pop those cherries!": [67.151, 1.689, 65.823, 1.711],
-    "Gumdrop gorgeous!": [69.09, 1.721, 67.785, 1.541],
-    "Zesty!": [71.061, 1.244, 69.576, 1.318],
-    "Lemon-sational!": [72.555, 1.516, 71.143, 1.585],
-    "Zing!": [74.321, 1.206, 72.979, 1.205],
-    "Squeeze the day!": [75.777, 1.623, 74.433, 1.581],
-    "Double delight!": [77.65, 1.477, 76.264, 1.414],
-    "Two for tea!": [79.377, 1.501, 77.928, 1.462],
-    "Special times two!": [81.128, 1.984, 79.64, 1.904],
-    "Pair of treats!": [83.362, 1.444, 81.794, 1.448],
-    "Still in it!": [85.057, 1.327, 83.493, 1.359],
-    "Not done yet!": [86.634, 1.478, 85.102, 1.392],
-    "Clutch play!": [88.362, 1.429, 86.744, 1.401],
-    "Comeback sweet!": [90.04, 1.494, 88.394, 1.4],
-    "Pop pop!": [91.784, 1.258, 90.045, 1.283],
-    "Fizz-tastic!": [93.292, 1.434, 91.578, 1.397],
-    "Bubble pop!": [94.975, 1.319, 93.225, 1.217],
-    "Popping candy!": [96.544, 1.589, 94.692, 1.483],
-    "Liquorice-free!": [98.383, 1.548, 96.424, 1.525],
-    "Unwrapped!": [100.181, 1.176, 98.2, 1.176],
-    "Untangled!": [101.607, 1.441, 99.626, 1.426],
-    "Black magic!": [103.297, 1.499, 101.302, 1.343],
-    "Goal achieved!": [105.046, 1.515, 102.895, 1.396],
-    "Sugar Crush!": [106.811, 1.463, 104.541, 1.386],
-    "Voice on!": [108.524, 1.403, 106.177, 1.406],
-    "Sweet streak!": [110.177, 1.54, 107.834, 1.546],
-    "Sweeter streak!": [111.967, 1.521, 109.63, 1.549],
-    "Sugar-high streak!": [113.738, 1.685, 111.429, 1.624],
-    "Ultimate sweet streak!": [115.674, 1.869, 113.302, 1.763]
+    "Stripe-tastic!": [0.25, 1.543, 0.25, 1.55],
+    "Candy-licious!": [2.043, 1.418, 2.05, 1.414],
+    "Looking sharp!": [3.711, 1.437, 3.714, 1.405],
+    "Stripe me pink!": [5.398, 1.503, 5.37, 1.456],
+    "That's a wrap!": [7.15, 1.399, 7.075, 1.328],
+    "All wrapped up!": [8.799, 1.423, 8.654, 1.299],
+    "Parcel of yum!": [10.472, 1.46, 10.202, 1.494],
+    "Tied with a bow!": [12.183, 1.68, 11.947, 1.619],
+    "Sprinkle-tastic!": [14.112, 1.673, 13.816, 1.628],
+    "Hundreds and thousands!": [16.035, 1.803, 15.694, 1.714],
+    "Sprinkle party!": [18.089, 1.672, 17.657, 1.676],
+    "Lolly bomb!": [20.011, 1.369, 19.584, 1.416],
+    "Double delight!": [21.631, 1.477, 21.25, 1.414],
+    "Two for tea!": [23.358, 1.501, 22.914, 1.462],
+    "Special times two!": [25.109, 1.984, 24.626, 1.904],
+    "Pair of treats!": [27.343, 1.444, 26.78, 1.448],
+    "Goal achieved!": [29.037, 1.515, 28.479, 1.396],
+    "Sugar Crush!": [30.802, 1.463, 30.124, 1.386],
+    "Voice on!": [32.515, 1.403, 31.761, 1.406],
+    "Sweet streak!": [34.168, 1.54, 33.417, 1.546],
+    "Sweeter streak!": [35.958, 1.521, 35.214, 1.549],
+    "Sugar-high streak!": [37.729, 1.685, 37.012, 1.624],
+    "Ultimate sweet streak!": [39.665, 1.869, 38.886, 1.763],
+    "Hard level!": [41.784, 1.34, 40.899, 1.515],
+    "Super Hard level!": [43.374, 1.728, 42.664, 1.853]
   };
   function sayClip(text, g) {
     const c = SAY_CLIPS[text]; if (!c) return null;
@@ -1712,6 +1753,8 @@
     else if (hasBomb) kind = 'bomb';
     else if (madeWrap) kind = 'wrap';
     else if (madeStripe) kind = 'stripe';
+    else if (fired.some(f => f.s === 'w')) kind = 'wrap'; // 1.9.229 setting one off is a major moment too
+    else if (fired.some(f => f.s === 'row' || f.s === 'col')) kind = 'stripe';
     else if (s.delivered && s.delivered.length) kind = 'ings';
     else if (s.chocoHit) kind = 'choco';
     else if (s.brokeLock) kind = 'locks';
@@ -2658,7 +2701,7 @@
 
   root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_STOPS, FUTURE_STOPS, NZ_PROJ, nzXY, WHANGAREI_INSET, insetXY, pacXY, ausXY, LV_COUNT, lvId, levelIds, stopId, LEGACY_220_IDS, migrateProg, stopForLevel, icingPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, bubLeft, liqLeft, spreadLiq, LIQ_IDLE, goalCounts, cloneState, bestMove, hintMoveFor, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
     allowed: () => true, // 1.9.228 open to every family member
-    SAY_REST_MS, SAY_BIG, sayBig, SAY_SHOW_MS, SAY_AFTER_MS, sayShowGap, SPEAK_GAP, SPEAK_PITCH, SPEAK_RATE, SPEAK_VOL, pickSpeechVoice, speechGender, speakWorthy, SAY_SPRITES, SAY_CLIPS, sayClip, nextSayVoice, SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL, XF,
+    SAY_REST_MS, SAY_BIG, sayBig, HARD_LINES, hardLine, CANDY_STYLES, candySfxPlan, playCandySfx, SAY_SHOW_MS, SAY_AFTER_MS, sayShowGap, SPEAK_GAP, SPEAK_PITCH, SPEAK_RATE, SPEAK_VOL, pickSpeechVoice, speechGender, speakWorthy, SAY_SPRITES, SAY_CLIPS, sayClip, nextSayVoice, SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL, XF,
     VOICE_FILES, VOICE_RANK, MEDIA_HASH, mediaUrl, gameTrack, SONG_PLAN, SONG_FILES, SONG_FROM, songMood, attachSfxBus, playTone, playChime, playMovesWarnChime, playClip, voiceForStep,
     SAYINGS, SAYING_COLORS, SAYING_VOICE, sayingKind, pickSaying, sayingColor, MOVES_WARN_AT, MOVES_WARN_MS, HINT_IDLE_MS, HINT_REPEAT_MS,
     SPARKLE_MIN_MS, SPARKLE_MAX_MS, SPARKLE_MAX, SPARKLE_MAX_REDUCE, SHIMMER_MS, sparkleCap, sparkleEase, shimmerAt, drawStarGlint, drawCandyShine,
@@ -2923,6 +2966,18 @@
       ac.resume().then(go).catch(() => { });
     } else go();
   }
+  let candyLast = '', candyAt = 0;
+  function candySfx(kind, chain) {
+    const t = now();
+    if (t - candyAt < 90) return; // a cascade can fire several steps at once: keep it to one sound per beat
+    candyAt = t;
+    runAudio(() => {
+      if (!out) return;
+      const plan = candySfxPlan(kind, chain, Math.random, candyLast);
+      candyLast = plan.style;
+      playCandySfx(ac, out, ac.currentTime + 0.01, plan);
+    });
+  }
   function chime() {
     runAudio(() => {
       if (!out) return;
@@ -2955,9 +3010,10 @@
   }
   function callout(step, i) {
     // 1.9.223 With speech available the saying itself is spoken (from showSaying); the clips are the fallback.
-    const word = voiceForStep(step, step && (step.cascade || (i + 1)));
-    if (word && !canSpeak() && !clipsReady()) say(word);
-    else if (!word) chime();
+    // 1.9.229 Minor sayings play a candy sound (from showSaying); only major ones may fall back to the old word clips.
+    const cas = step && (step.cascade || (i + 1)), word = voiceForStep(step, cas), kind = sayingKind(step, cas, st);
+    if (kind && sayBig(kind) && word && voiceOn && !canSpeak() && !clipsReady()) say(word);
+    else if (!kind) chime();
   }
   // ---- 1.9.223 Spoken sayings (speechSynthesis) ----
   const synth = root.speechSynthesis || null;
@@ -3774,6 +3830,8 @@
     el.hidden = false;
     el.onclick = hideHardBan;
     playHardSting(h);
+    // 1.9.229 The Hard level start is a major moment: said (with reverb) just after the sting.
+    setTimeout(function () { if (st && st.lv && st.lv.hard === h && !st.over && screen === 'game' && voiceLive()) cheer(hardLine(h)); }, h === 2 ? 900 : 750);
     clearTimeout(hardTimer);
     hardTimer = setTimeout(hideHardBan, reduce ? 1500 : 2200);
   }
@@ -4077,18 +4135,28 @@
   }
   function clearSayQueue() { if (sayPendTimer) clearTimeout(sayPendTimer); sayPendTimer = 0; sayPending = null; sayFreeAt = 0; }
   function showSaying(step, i) {
-    const kind = sayingKind(step, step && (step.cascade || (i + 1)), st);
+    const chain = step && (step.cascade || (i + 1));
+    const kind = sayingKind(step, chain, st);
     if (!kind) return null;
     const t = now(), big = sayBig(kind), live = voiceLive();
-    if (!live && t < sayUntil) return null;
-    if (live && !sayFree() && (!big || sayPending)) return null; // a minor line in the rest: not shown, so never silent
+    // 1.9.229 Minor sayings: a candy sound every time, the line on screen at normal pace (no spoken rest).
+    // Major ones with Voice off do the same. Major ones with Voice on are spoken, with the SAY_REST_MS rest.
+    if (!big || !live) {
+      candySfx(kind, chain);
+      if (t < sayUntil || sayPending) return null;
+      const text = pickSaying(kind, lastSaying);
+      if (!text) return null;
+      paintSaying(text, kind);
+      return text;
+    }
+    if (!sayFree() && sayPending) return null;
     const text = pickSaying(kind, lastSaying);
     if (!text) return null;
-    if (!live) sayUntil = t + sayShowGap(0, reduce);
     return sayGate(text, big, () => paintSaying(text, kind)) ? text : null;
   }
   function paintSaying(text, kind) {
     lastSaying = text;
+    sayUntil = now() + sayShowGap(0, reduce);
     const el = $('saypop');
     if (el) {
       el.textContent = text;
@@ -5212,7 +5280,7 @@
     const won = st.won;
     if (st.score > (prog.best[st.lv.n - 1] || 0)) { prog.best[st.lv.n - 1] = st.score; saveProg(); }
     winInfo = won ? recordWin(st) : { newBadge: false, yum: false, stars: 0 };
-    if (won) cheer(pickSaying('cascade', lastSaying) || 'Sweet as!', 'yay');
+    if (won) candySfx('win', 6); // 1.9.229 a sparkly arpeggio (Goal achieved and Sugar Crush were already said)
     if (won && musicOn) setTimeout(() => { if (musicOn) playEndSong(winInfo.yum ? 'yum' : 'win'); }, 480);
     setTimeout(() => showEnd(), 500 * SP);
   }
