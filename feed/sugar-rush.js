@@ -23,8 +23,9 @@
   const FRAME = ['XXXXXXXX', 'X......X', 'X......X', 'XX....XX', 'XX....XX', 'X......X', 'X......X', 'XXXXXXXX'];
 
   const LEVELS = [
-    { n: 1, name: 'The Sweet Shop', target: 3000, moves: 20, stars: [3000, 6000, 9000], kinds: 6,
-      help: 'Swipe a sweet into its neighbour, or tap one then the other, to line up 3 or more of the same. Reach 3,000 points in 20 moves.',
+    { n: 1, name: 'The Sweet Shop', target: 0, moves: 20, stars: [3000, 6000, 9000], kinds: 6,
+      collect: { color: 0, n: 20 },
+      help: 'Swipe a sweet into its neighbour, or tap one then the other, to line up 3 or more of the same. Collect 20 cherry gumdrops in 20 moves.',
       badge: { id: 'shop', name: 'Sweet Shop Star', icon: '⭐' } },
     { n: 2, name: "Sarah's Sweet Spot", theme: 'sarah', target: 0, moves: 25, stars: [0, 1200, 2400], kinds: 5, mask: HEART,
       collect: { color: 0, n: 10 },
@@ -36,9 +37,9 @@
       jelly: ['00000000', '00000000', '00111100', '00111100', '00111100', '00111100', '00000000', '00000000'],
       help: 'Some tiles have a layer of jelly under the sweet. Make a match on a jelly tile to clear it. Clear every jelly in 22 moves.',
       badge: { id: 'jelly', name: 'Jelly Ribbon', icon: '🎀' } },
-    { n: 4, name: 'Locked Jars', target: 2500, moves: 22, stars: [2500, 5000, 8000], kinds: 6,
+    { n: 4, name: 'Locked Jars', target: 0, moves: 22, stars: [2500, 5000, 8000], kinds: 6,
       locks: ['00000000', '00011000', '00111100', '01100110', '01100110', '00111100', '00011000', '00000000'],
-      help: 'A few sweets are locked. They cannot be swapped, but a match that includes them still counts and frees them. Reach 2,500 points in 22 moves.',
+      help: 'A few sweets are locked. They cannot be swapped, but a match that includes them still counts and frees them. Free all the locked jars in 22 moves.',
       badge: { id: 'lock', name: 'Unlocked Key', icon: '🔑' } },
     { n: 5, name: 'Icing on the Cake', target: 0, moves: 24, stars: [0, 1600, 3200], kinds: 6,
       ice: ['00000000', '00011000', '00111100', '01100110', '01100110', '00111100', '00011000', '00000000'],
@@ -75,10 +76,10 @@
 
   // 1.9.212 Level intro copy and the level-1 tutorial. Gameplay rules are unchanged.
   const LEVEL_INTROS = [
-    { icon: '🎯', goal: 'Score 3,000 points', detail: 'Reach 3,000 points in 20 moves.', tip: 'Swap two neighbours to make a line of three. Longer lines and special sweets score more.', mechanic: 'match' },
+    { icon: '🍒', goal: 'Collect 20 cherry gumdrops', detail: 'Collect 20 cherry gumdrops in 20 moves.', tip: 'Swap two neighbours to make a line of three. Cherry gumdrops are the red ones. Longer lines and special sweets score more, and more stars.', mechanic: 'match' },
     { icon: '🍒', goal: 'Collect 10 cherry gumdrops', detail: 'Collect 10 cherry gumdrops in 25 moves.', tip: "This heart-shaped tray is Sarah's corner of the shop. Take your time and gather the cherry gumdrops.", mechanic: 'collect' },
     { icon: '💜', goal: 'Clear all the jelly', detail: 'Clear every jelly in 22 moves.', tip: 'Make a match on a jelly tile to clear it.', mechanic: 'jelly' },
-    { icon: '🔒', goal: 'Score 2,500 points', detail: 'Reach 2,500 points in 22 moves. Break the locked jars along the way.', tip: 'Locked jars cannot be swapped, but a match that includes them still counts and frees them.', mechanic: 'locks' },
+    { icon: '🔒', goal: 'Free all the locked jars', detail: 'Free all the locked jars in 22 moves.', tip: 'Locked jars cannot be swapped, but a match that includes them still counts and frees them.', mechanic: 'locks' },
     { icon: '🧁', goal: 'Clear all the icing', detail: 'Clear all the icing in 24 moves.', tip: 'A match next to a block of icing, or a special sweet that hits it, chips it away.', mechanic: 'ice' },
     { icon: '🍨', goal: 'Clear all the double jelly', detail: 'Clear every jelly in 24 moves.', tip: 'These jellies have two layers, so some tiles need two clears.', mechanic: 'double' },
     { icon: '🎁', goal: 'Bring the ingredients down to the bottom', detail: 'Guide both ingredients down to the bottom in 34 moves.', tip: 'A little icing sits in the way. Match under an ingredient to drop it down.', mechanic: 'ings' },
@@ -135,7 +136,7 @@
     },
     {
       id: 'goal', kind: 'hud', hlHud: ['goalstrip', 'score', 'moves'],
-      bubble: 'Your goal is up the top. On this level, reach 3,000 points in 20 moves.'
+      bubble: 'Your goal is up the top. On this level, collect 20 cherry gumdrops in 20 moves.'
     },
     {
       id: 'stars', kind: 'hud', hlHud: ['starbars'],
@@ -199,7 +200,7 @@
         hl: [[3, 2], [3, 3], [3, 4], [4, 4]],
         bubble: 'Include them in a match to free them.'
       },
-      { id: 'ready4', kind: 'ready', bubble: "Reach 2,500 points to finish. You're ready!" }
+      { id: 'ready4', kind: 'ready', bubble: "Free every locked jar to finish. You're ready!" }
     ],
     5: [
       {
@@ -738,13 +739,19 @@
   }
   function iceLeft(b) { let n = 0; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (b[r][c] && b[r][c].ice > 0) n += b[r][c].ice; return n; }
   function chocoLeft(b) { let n = 0; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (b[r][c] && b[r][c].choco) n++; return n; }
+  function locksLeft(b) {
+    if (!b) return 0;
+    let n = 0; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (b[r][c] && b[r][c].lock) n++;
+    return n;
+  }
   function goalsMet(st) {
     const lv = st.lv || LEVEL;
-    if (lv.target && st.score < lv.target) return false;
+    // Score is never the win condition — only objectives are.
     if (lv.jelly && jellyLeft(st) > 0) return false;
     if (lv.ice && iceLeft(st.board) > 0) return false;
     if (lv.collect && (st.collected[lv.collect.color] || 0) < lv.collect.n) return false;
     if ((lv.ings && lv.ings.length) && (st.ingsLeft || 0) > 0) return false;
+    if (lv.locks && locksLeft(st.board) > 0) return false;
     return true;
   }
   function spreadChoco(st) {
@@ -787,7 +794,8 @@
   }
   function isScoreOnly(lv) {
     lv = lv || {};
-    return !lv.jelly && !lv.ice && !lv.collect && !(lv.ings && lv.ings.length);
+    // Kept for older tests; no live level is score-only any more.
+    return !lv.jelly && !lv.ice && !lv.collect && !(lv.ings && lv.ings.length) && !lv.locks;
   }
   function finishIfDone(st) {
     const reached = goalsMet(st);
@@ -929,6 +937,7 @@
     if (before.lv && before.lv.collect) h += ((after.collected[before.lv.collect.color] || 0) - (before.collected[before.lv.collect.color] || 0)) * 400;
     if (before.jelly) h += (jellyLeft(before) - jellyLeft(after)) * 250;
     if (before.lv && before.lv.ice) h += (iceLeft(before.board) - iceLeft(after.board)) * 300;
+    if (before.lv && before.lv.locks) h += (locksLeft(before.board) - locksLeft(after.board)) * 350;
     h += ((before.ingsLeft || 0) - (after.ingsLeft || 0)) * 800;
     if (res && res.steps) h += res.steps.reduce((n, s) => n + (s.madeTiles ? s.madeTiles.length * 80 : 0), 0);
     return h;
@@ -1196,7 +1205,7 @@
   }
   function racerFirst(name) { return String(name || 'Player').trim().split(/\s+/)[0] || 'Player'; }
 
-  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_STOPS, FUTURE_STOPS, stopForLevel, icingPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, cloneState, bestMove, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
+  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_STOPS, FUTURE_STOPS, stopForLevel, icingPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, cloneState, bestMove, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
     allowed: () => !!(root.IBScores && root.IBScores.isShane && root.IBScores.isShane()),
     SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL, XF,
     VOICE_FILES, VOICE_RANK, MEDIA_HASH, mediaUrl, gameTrack, attachSfxBus, playTone, playChime, playClip, voiceForStep,
@@ -1723,10 +1732,11 @@
     if ($('help')) {
       let t = info.goal;
       if (stt) {
-        if (stt.lv && stt.lv.collect) t += ' · ' + (stt.collected[stt.lv.collect.color] || 0) + ' / ' + stt.lv.collect.n;
+        if (stt.lv && stt.lv.collect) t += ' · ' + (stt.collected[stt.lv.collect.color] || 0) + '/' + stt.lv.collect.n;
         if (stt.lv && stt.lv.ings && stt.lv.ings.length) t += ' · ' + ((stt.lv.ings.length - (stt.ingsLeft || 0))) + '/' + stt.lv.ings.length;
         else if (stt.lv && stt.lv.jelly) t += ' · ' + jellyLeft(stt) + ' left';
         else if (stt.lv && stt.lv.ice) t += ' · ' + iceLeft(stt.board) + ' left';
+        else if (stt.lv && stt.lv.locks) t += ' · ' + locksLeft(stt.board) + ' left';
         t += ' · ' + stt.moves + ' moves left';
       } else t = info.strip;
       $('help').textContent = t;
@@ -1894,11 +1904,11 @@
   function objText(g) {
     if (!g || !g.lv) return '';
     const lv = g.lv, bits = [];
-    if (lv.target) bits.push('Score ' + g.score.toLocaleString('en-NZ') + ' / ' + lv.target.toLocaleString('en-NZ'));
     if (lv.collect) bits.push((NAMES[lv.collect.color] || 'Sweets') + ' ' + (g.collected[lv.collect.color] || 0) + ' / ' + lv.collect.n);
     if (lv.jelly) bits.push('Jelly ' + jellyLeft(g) + ' left');
     if (lv.ice) bits.push('Icing ' + iceLeft(g.board) + ' left');
     if (lv.ings && lv.ings.length) bits.push('Ingredients ' + ((lv.ings.length - (g.ingsLeft || 0))) + ' / ' + lv.ings.length);
+    if (lv.locks) bits.push('Locks ' + locksLeft(g.board) + ' left');
     return bits.join(' · ');
   }
   function hud() {
@@ -2523,11 +2533,11 @@
       $('endmsg').textContent = extra + next;
     } else {
       const bits = [];
-      if (lv.target) bits.push('you needed ' + lv.target.toLocaleString('en-NZ') + ' points');
       if (lv.collect) bits.push('you needed ' + lv.collect.n + ' ' + (NAMES[lv.collect.color] || 'sweets').toLowerCase());
       if (lv.jelly) bits.push('some jelly is still on the tray');
       if (lv.ice) bits.push('some icing is still in the way');
       if (lv.ings && lv.ings.length) bits.push('an ingredient did not make it down');
+      if (lv.locks) bits.push('some jars are still locked');
       $('endmsg').textContent = bits.length ? ('Not quite — ' + bits.join(', ') + '. Have another go!') : 'Have another go!';
     }
     $('againbtn').textContent = won ? 'Play again' : 'Try again';
@@ -2662,7 +2672,7 @@
     say, chime, callout, unlockAudio, audio,
     clipsReady: () => Object.keys(VOICE_FILES).every(k => !!bufs[k]),
     setSound(on) { soundOn = !!on; ls.set('ib-sugar-sound', soundOn); paintButtons(); },
-    setScore(n) { if (!st) return; st.score = n; st.moves = 0; st.over = true; st.won = goalsMet(st) || n >= (st.target || 0); st.stars = starsOf(st); hud(); },
+    setScore(n) { if (!st) return; st.score = n; st.moves = 0; st.over = true; st.won = goalsMet(st); st.stars = starsOf(st); hud(); },
     previewWin(opts) { opts = opts || {}; const n = opts.level || (st && st.lv && st.lv.n) || 2; if (!st || st.lv.n !== n) startLevel(n); st.score = opts.score || Math.max(st.lv.stars[2] || 0, 2400); st.moves = Math.max(st.moves, 1); st.won = true; st.over = true; st.stars = opts.stars || 3; if (opts.resetBadge) prog.badges[n - 1] = 0; winInfo = recordWin(st); hud(); showEnd(); },
     view: () => ({ score: st && st.score, moves: st && st.moves, busy, soundOn, musicOn, screen, level: st && st.lv && st.lv.n, acState: ac && ac.state, sparkles: sparkles.length, hold: sparkleHoldT != null }),
     musicState, playKind, wantKind, playEndSong, stopAllMusic, stopEnd, gameKind, setMusic,
