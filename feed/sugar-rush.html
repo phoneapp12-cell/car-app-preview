@@ -271,6 +271,67 @@
     .goalsparks i, .racer.hopping { animation: none !important; transition: none !important; }
   }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+  /* 1.9.213 Sayings, brighter twinkles, goal countdown, and 3-moves banner */
+  .goalstrip { display: flex; align-items: stretch; gap: 8px; margin: 0 0 8px; padding: 6px 8px; border-radius: 16px; background: rgba(255,255,255,.88); border: 2px solid #ffc2dc; }
+  .goalstrip #help { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .cd-items { display: flex; align-items: stretch; gap: 6px; flex: 1; min-width: 0; overflow: hidden; }
+  .cd-item { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 3px 10px 3px 6px; border-radius: 14px; background: linear-gradient(180deg, #fff, #ffe9f2); border: 2px solid #ff9cc6; box-shadow: 0 2px 0 #f4a0c4; }
+  .cd-item .cd-icon { font-size: 30px; line-height: 1; }
+  .cd-item .cd-num { font-size: 28px; font-weight: 900; font-variant-numeric: tabular-nums; color: #d6246e; line-height: 1; letter-spacing: -.02em; }
+  .cd-item .cd-lab { font-size: 11px; font-weight: 800; color: #8a3a62; text-transform: uppercase; letter-spacing: .04em; line-height: 1.1; max-width: 4.6em; }
+  .cd-item.tick { animation: cdbounce .45s ease-out; }
+  @keyframes cdbounce { 0% { transform: scale(1); } 30% { transform: scale(1.16); } 100% { transform: scale(1); } }
+  .movecount { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 0 0 auto; min-width: 74px; padding: 3px 10px; border-radius: 14px; background: rgba(255,255,255,.95); border: 2px solid #ffc2dc; }
+  .movecount span { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: #b3487c; }
+  .movecount strong { font-size: 26px; font-weight: 900; font-variant-numeric: tabular-nums; color: #5a1238; line-height: 1.05; }
+  .movecount.low { border-color: #ff7a1a; background: #fff4e0; animation: movepulse 1s ease-in-out infinite; }
+  @keyframes movepulse { 0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,122,26,.35); } 50% { transform: scale(1.07); box-shadow: 0 0 0 6px rgba(255,122,26,0); } }
+  .stats.two { grid-template-columns: 1fr 1fr; }
+  .saypop { position: fixed; left: 50%; top: 46%; z-index: 19; transform: translate(-50%, -50%); pointer-events: none; font: 900 40px/1.05 ui-rounded, "SF Pro Rounded", system-ui, sans-serif; letter-spacing: .01em; text-align: center; white-space: nowrap; -webkit-text-stroke: 7px #fff; paint-order: stroke fill; text-shadow: 0 4px 0 rgba(90,18,56,.28), 0 8px 18px rgba(90,18,56,.2); max-width: 94vw; }
+  .saypop[hidden] { display: none !important; }
+  .saypop.pop { animation: saypopin .45s ease-out; }
+  @keyframes saypopin { 0% { transform: translate(-50%, -50%) scale(.55); opacity: 0; } 55% { transform: translate(-50%, -50%) scale(1.14); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
+  #moveswarn { position: fixed; inset: 0; z-index: 21; pointer-events: none; overflow: hidden; display: flex; align-items: center; }
+  #moveswarn[hidden] { display: none !important; }
+  .mw-inner { position: relative; display: inline-flex; align-items: center; will-change: transform; }
+  .mw-text { position: relative; font: 900 58px/1 ui-rounded, "SF Pro Rounded", system-ui, sans-serif; letter-spacing: .04em; white-space: nowrap; text-transform: uppercase;
+    background-image: linear-gradient(90deg, #ff2d55, #ff8c00, #ffd400, #3ce07a, #1aa7ff, #c026f0, #ff2d55);
+    background-size: 220% 100%;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    -webkit-text-stroke: 8px #fff; paint-order: stroke fill;
+    filter: drop-shadow(0 5px 0 rgba(90,18,56,.35)) drop-shadow(0 10px 16px rgba(90,18,56,.22));
+  }
+  .mw-shimmer { position: absolute; inset: -10% -8%; pointer-events: none; background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,.65) 50%, transparent 70%); background-size: 220% 100%; mix-blend-mode: screen; }
+  .mw-sparks { position: absolute; inset: -18px -24px; pointer-events: none; }
+  .mw-sparks i { position: absolute; font-size: 18px; color: #fff8a0; text-shadow: 0 0 8px #fff, 0 0 2px #ffd400; animation: mwglint 0.7s ease-in-out infinite; }
+  .mw-sparks i:nth-child(1) { left: 4%; top: 8%; animation-delay: 0s; }
+  .mw-sparks i:nth-child(2) { left: 22%; bottom: 0; animation-delay: .12s; }
+  .mw-sparks i:nth-child(3) { left: 48%; top: -6%; animation-delay: .24s; }
+  .mw-sparks i:nth-child(4) { left: 70%; bottom: 4%; animation-delay: .36s; }
+  .mw-sparks i:nth-child(5) { left: 90%; top: 10%; animation-delay: .48s; }
+  .mw-sparks i:nth-child(6) { left: 12%; top: 55%; font-size: 12px; animation-delay: .2s; }
+  .mw-sparks i:nth-child(7) { left: 60%; top: 60%; font-size: 14px; animation-delay: .4s; }
+  @keyframes mwglint { 0%, 100% { opacity: .35; transform: scale(.7) rotate(0deg); } 50% { opacity: 1; transform: scale(1.25) rotate(18deg); } }
+  @keyframes mwscroll { 0% { transform: translateX(100vw); } 100% { transform: translateX(calc(-100% - 8vw)); } }
+  @keyframes mwshimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+  @keyframes mwfade { 0% { opacity: 0; transform: translateX(-50%) scale(.92); } 18%, 78% { opacity: 1; transform: translateX(-50%) scale(1); } 100% { opacity: 0; transform: translateX(-50%) scale(1); } }
+  #moveswarn.run .mw-inner { animation: mwscroll 2.3s linear forwards; }
+  #moveswarn.run .mw-text { animation: mwshimmer 2.3s linear forwards; }
+  #moveswarn.run .mw-shimmer { animation: mwshimmer 1.15s linear infinite; }
+  #moveswarn.mid.run .mw-inner { animation-delay: -1.15s; animation-play-state: paused; }
+  #moveswarn.mid.run .mw-text { animation-delay: -1.15s; animation-play-state: paused; }
+  #moveswarn.reduce.run .mw-inner { left: 50%; animation: mwfade 2s ease-in-out forwards; }
+  #moveswarn.reduce.run .mw-text, #moveswarn.reduce.run .mw-shimmer { animation: none; }
+  #moveswarn.reduce .mw-sparks { display: none; }
+  @media (max-width: 400px) { .mw-text { font-size: 46px; -webkit-text-stroke-width: 6px; } .saypop { font-size: 32px; -webkit-text-stroke-width: 6px; } .cd-item .cd-num { font-size: 24px; } .cd-item .cd-icon { font-size: 26px; } }
+  @media (prefers-reduced-motion: reduce) {
+    .cd-item.tick, .movecount.low, .saypop.pop { animation: none !important; }
+    #moveswarn.run .mw-inner { left: 50%; animation: mwfade 2s ease-in-out forwards !important; }
+    #moveswarn.run .mw-text, #moveswarn.run .mw-shimmer, .mw-sparks i { animation: none !important; }
+    #moveswarn .mw-sparks { display: none; }
+  }
+
 </style>
 </head>
 <body>
@@ -324,10 +385,13 @@
 
     <div id="game" hidden>
       <h1>Sugar Rush <small id="lvname">Level 1</small></h1>
-      <div class="goalstrip" id="goalstrip"><span class="gicon" id="gicon">🍒</span><p class="help" id="help">Collect 20 cherry gumdrops · 20 moves</p></div>
-      <div class="stats">
+      <div class="goalstrip" id="goalstrip">
+        <div class="cd-items" id="cditems"><div class="cd-item" data-kind="collect"><span class="cd-icon" id="gicon">🍒</span><span class="cd-num">20</span><span class="cd-lab">left</span></div></div>
+        <div class="movecount" id="movecount"><span>Moves left</span><strong id="moves">20</strong></div>
+        <p class="help" id="help">Collect 20 cherry gumdrops · 20 moves</p>
+      </div>
+      <div class="stats two">
         <div class="stat"><span>Score</span><strong id="score">0</strong></div>
-        <div class="stat"><span>Moves</span><strong id="moves">20</strong></div>
         <div class="stat"><span>Best</span><strong id="best">0</strong></div>
       </div>
       <div class="obj" id="obj"></div>
@@ -378,6 +442,14 @@
     </div>
   </div>
 
+  <div id="saypop" class="saypop" hidden aria-hidden="true"></div>
+  <div id="moveswarn" hidden aria-hidden="true">
+    <div class="mw-inner">
+      <span class="mw-shimmer" aria-hidden="true"></span>
+      <span class="mw-text">3 MOVES LEFT!</span>
+      <span class="mw-sparks" aria-hidden="true"><i>✦</i><i>✧</i><i>✦</i><i>✧</i><i>✦</i><i>✦</i><i>✧</i></span>
+    </div>
+  </div>
   <div id="goalban" hidden>
     <div class="goalban-inner">Goal achieved!<em>Sugar crush!</em>
       <span class="goalsparks" aria-hidden="true"><i>✦</i><i>✦</i><i>✦</i><i>✦</i></span>

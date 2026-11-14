@@ -1477,11 +1477,11 @@ if (live) {
 // 1.9.169 Sugar Rush candies sparkle: gloss, staggered star glints, a soft shimmer sweep
 {
   const SR = load('feed/sugar-rush.js').SugarRush;
-  assert.strictEqual(SR.SPARKLE_MIN_MS, 600);
-  assert.strictEqual(SR.SPARKLE_MAX_MS, 1000);
-  assert.strictEqual(SR.SPARKLE_MAX, 4);
+  assert.strictEqual(SR.SPARKLE_MIN_MS, 480);
+  assert.strictEqual(SR.SPARKLE_MAX_MS, 900);
+  assert.strictEqual(SR.SPARKLE_MAX, 7);
   assert.strictEqual(SR.SPARKLE_MAX_REDUCE, 1);
-  assert.strictEqual(SR.sparkleCap(false), 4);
+  assert.strictEqual(SR.sparkleCap(false), 7);
   assert.strictEqual(SR.sparkleCap(true), 1, 'prefers-reduced-motion tones the glints down');
   assert.strictEqual(SR.sparkleEase(0), 0);
   assert.strictEqual(SR.sparkleEase(1), 0);
@@ -1494,10 +1494,10 @@ if (live) {
   const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
   assert.ok(src.includes('function drawCandyShine') && src.includes('function drawStarGlint') && src.includes('function drawShimmerSweep'));
   assert.ok(src.includes('drawCandyShine(ctx, R, 1)'));
-  assert.ok(src.includes('drawCandyShine(ctx, R * 0.85, 0.75)'), 'ingredients get a gloss');
-  assert.ok(src.includes('drawCandyShine(ctx, R * 0.9, 0.7)'), 'icing gets a gloss');
-  assert.ok(src.includes('drawCandyShine(ctx, R * 0.85, 0.55)'), 'chocolate gets a gloss');
-  assert.ok(src.includes('drawCandyShine(ctx, R, 0.8)'), 'sprinkle bombs get a gloss');
+  assert.ok(src.includes('drawCandyShine(ctx, R * 0.85, 1)'), 'ingredients get a gloss');
+  assert.ok(src.includes('drawCandyShine(ctx, R * 0.9, 0.95)'), 'icing gets a gloss');
+  assert.ok(src.includes('drawCandyShine(ctx, R * 0.85, 0.8)'), 'chocolate gets a gloss');
+  assert.ok(src.includes('drawCandyShine(ctx, R, 1)'), 'sprinkle bombs get a gloss');
   assert.ok(src.includes('tickSparkles') && src.includes('sparkleCap(reduce)'));
   assert.ok(src.includes('if (reduce && sparkleHoldT == null) return'), 'the moving sweep is skipped when motion is reduced');
   assert.ok(!/function drawShimmerSweep[\s\S]{0,400}new Audio|function tickSparkles[\s\S]{0,500}playKind|say\(|chime\(/.test(src) || true);
@@ -4138,5 +4138,76 @@ if (live) {
   const nLocks = SR.locksLeft(lockSt.board);
   const cleared = Object.assign({}, lockSt, { board: lockSt.board.map(row => row.map(t => t && t.lock ? Object.assign({}, t, { lock: 0 }) : t)) });
   assert.ok(!SR.goalsMet(lockSt) && SR.goalsMet(cleared) && nLocks > 0);
+}
+
+// 1.9.213 Sayings, brighter twinkles, goal countdown, and the 3-moves banner
+{
+  const SR = load('feed/sugar-rush.js').SugarRush;
+  const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
+  const html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
+  const kinds = Object.keys(SR.SAYINGS);
+  assert.ok(kinds.length >= 12, 'a large pool of sayings');
+  for (const k of kinds) {
+    assert.ok(SR.SAYINGS[k].length >= 3, k + ' has at least three variants');
+    let last = null;
+    for (let i = 0; i < 12; i++) {
+      const s = SR.pickSaying(k, last, () => 0);
+      assert.ok(s && SR.SAYINGS[k].includes(s));
+      assert.notStrictEqual(s, last, k + ' does not repeat in a row');
+      last = s;
+    }
+  }
+  assert.ok(SR.SAYINGS.cascade.includes('Sweet as!') && SR.SAYINGS.cascade.includes('Sugar rush!'));
+  assert.ok(SR.SAYINGS.stripe.includes('Stripe-tastic!') && SR.SAYINGS.stripe.includes('Candy-licious!'));
+  assert.ok(SR.SAYINGS.wrap.includes("That's a wrap!"));
+  assert.ok(SR.SAYINGS.bomb.includes('Sprinkle-tastic!') && SR.SAYINGS.bomb.includes('Hundreds and thousands!'));
+  assert.ok(SR.SAYINGS.jelly.includes('Jelly good!') && SR.SAYINGS.jelly.includes('Wobble wobble!'));
+  assert.ok(SR.SAYINGS.locks.includes('Jar-mazing!'));
+  assert.ok(SR.SAYINGS.ice.includes('Ice ice baby!'));
+  assert.ok(SR.SAYINGS.ings.includes('Down the hatch!'));
+  assert.ok(SR.SAYINGS.choco.includes('Choc-blocked!'));
+  assert.ok(SR.SAYINGS.gumdrop.includes('Gum-believable!'));
+  assert.ok(SR.SAYINGS.lemon.includes('Zesty!'));
+  assert.ok(SR.SAYINGS.combo.includes('Double delight!'));
+  assert.ok(SR.SAYINGS.comeback.length >= 3);
+  assert.strictEqual(SR.sayingKind({ popped: [{}, {}, {}], made: [], fired: [], cascade: 1 }, 1), null, 'a plain 3-match is silent');
+  assert.strictEqual(SR.sayingKind({ popped: [{}, {}, {}], made: [], fired: [], cascade: 2 }, 2), 'cascade');
+  assert.strictEqual(SR.sayingKind({ popped: [], made: [{ s: 'row' }], fired: [], cascade: 1 }, 1), 'stripe');
+  assert.strictEqual(SR.sayingKind({ popped: [], made: [{ s: 'w' }], fired: [], cascade: 1 }, 1), 'wrap');
+  assert.strictEqual(SR.sayingKind({ popped: [], made: [{ s: 'b' }], fired: [], cascade: 1 }, 1), 'bomb');
+  assert.strictEqual(SR.sayingKind({ popped: [], made: [], fired: [{ s: 'row' }, { s: 'w' }], cascade: 1 }, 1), 'combo');
+  assert.strictEqual(SR.sayingKind({ popped: [], made: [], fired: [], jellyCleared: 1, cascade: 1 }, 1), 'jelly');
+  assert.strictEqual(SR.sayingKind({ popped: [], made: [], fired: [], brokeLock: true, cascade: 1 }, 1), 'locks');
+  assert.strictEqual(SR.sayingKind({ popped: [], made: [], fired: [], blocked: [{ kind: 'ice' }], cascade: 1 }, 1), 'ice');
+  assert.strictEqual(SR.sayingKind({ popped: [], made: [], fired: [], delivered: [{}], cascade: 1 }, 1), 'ings');
+  assert.strictEqual(SR.sayingKind({ popped: [], made: [], fired: [], chocoHit: true, cascade: 1 }, 1), 'choco');
+  const gumSt = { lv: SR.LEVELS[0], moves: 12, collected: [] };
+  assert.strictEqual(SR.sayingKind({ popped: [{ color: 0 }, { color: 0 }, { color: 0 }], made: [], fired: [], cascade: 1 }, 1, gumSt), 'gumdrop');
+  const lemonSt = { lv: SR.LEVELS[8], moves: 12, collected: [] };
+  assert.strictEqual(SR.sayingKind({ popped: [{ color: 2 }, { color: 2 }, { color: 2 }], made: [], fired: [], cascade: 1 }, 1, lemonSt), 'lemon');
+  assert.strictEqual(SR.sayingKind({ popped: [{ color: 0 }, { color: 0 }, { color: 0 }], made: [], fired: [], cascade: 1 }, 1, { lv: SR.LEVELS[0], moves: 4 }), 'comeback');
+  assert.strictEqual(SR.sayingKind({ popped: [], made: [{ s: 'row' }], fired: [], cascade: 1 }, 1, { moves: 3 }), 'stripe', 'specials beat the comeback line');
+  // Spoken clips stay on the existing words so older tests and audio files still match.
+  assert.strictEqual(SR.voiceForStep({ popped: [{}, {}, {}, {}], made: [{ s: 'row' }], fired: [], cascade: 1 }, 1), 'great');
+  assert.ok(src.includes('showSaying') && src.includes('sayUntil') && html.includes('id="saypop"') && html.includes('saypopin'));
+
+  const l1 = SR.goalCounts(SR.LEVELS[0], { collected: [17, 0, 0, 0, 0, 0], board: SR.newGame({ level: SR.LEVELS[0], seed: 1 }).board });
+  assert.ok(l1.some(c => c.kind === 'collect' && c.icon === '🍒' && c.left === 3 && /3 left/.test(c.text)));
+  const l3 = SR.goalCounts(SR.LEVELS[2], SR.newGame({ level: SR.LEVELS[2], seed: 1 }));
+  assert.ok(l3.some(c => c.kind === 'jelly' && c.icon === '🟩' && /Jelly/.test(c.text) && c.left > 0));
+  const l4 = SR.goalCounts(SR.LEVELS[3], SR.newGame({ level: SR.LEVELS[3], seed: 1 }));
+  assert.ok(l4.some(c => c.kind === 'locks' && c.icon === '🔒' && c.left > 0));
+  const l7 = SR.goalCounts(SR.LEVELS[6], SR.newGame({ level: SR.LEVELS[6], seed: 1 }));
+  assert.ok(l7.some(c => c.kind === 'ings' && /\d\/\d/.test(c.lab)));
+  assert.ok(html.includes('id="cditems"') && html.includes('id="movecount"') && html.includes('cdbounce') && html.includes('movepulse'));
+  assert.ok(html.includes('prefers-reduced-motion') && src.includes('cd-item') && src.includes("classList.toggle('low'"));
+
+  assert.strictEqual(SR.MOVES_WARN_AT, 3);
+  assert.ok(SR.MOVES_WARN_MS >= 2000 && SR.MOVES_WARN_MS <= 2500);
+  assert.ok(html.includes('3 MOVES LEFT!') && html.includes('id="moveswarn"') && html.includes('mwscroll') && html.includes('mwfade'));
+  assert.ok(src.includes('function playMovesWarnChime') && src.includes('maybeWarn3') && src.includes('warned3'));
+  assert.ok(src.includes('if (st.moves !== MOVES_WARN_AT || goalsMet(st)) return'));
+  assert.ok(src.includes('pointer-events: none') || html.includes('#moveswarn') && html.includes('pointer-events: none'));
+  assert.ok(html.includes('#moveswarn.reduce') || html.includes('prefers-reduced-motion'));
 }
 
