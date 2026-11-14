@@ -3961,3 +3961,100 @@ if (live) {
   assert.ok(html.includes('id="shelf"') && html.includes('Badge shelf'));
   assert.ok(src.includes("playKind(wantKind())") && src.includes("'menu'"));
 }
+
+// 1.9.212 Sugar Rush level intros and the level-1 tutorial
+{
+  const SR = load('feed/sugar-rush.js').SugarRush;
+  const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
+  const html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
+  assert.strictEqual(SR.LEVELS.length, 10);
+  assert.ok(SR.LEVELS[1].intro && /Sarah, Shane's partner/.test(SR.LEVELS[1].intro.body));
+  assert.strictEqual(SR.LEVEL_INTROS.length, 10);
+  assert.strictEqual(SR.LEVELS[0].target, 3000);
+  assert.strictEqual(SR.LEVELS[0].moves, 20);
+  const lines = {
+    1: 'Level 1 · Onerahi',
+    2: "Level 2 · Sarah's House",
+    3: 'Level 3 · Whangārei',
+    4: 'Level 4 · Auckland Post Office',
+    5: 'Level 5 · Hamilton',
+    6: 'Level 6 · Rotorua',
+    7: 'Level 7 · Taupō Station',
+    8: 'Level 8 · Napier',
+    9: 'Level 9 · Wellington',
+    10: 'Level 10 · Nelson'
+  };
+  const goals = {
+    1: 'Score 3,000 points',
+    2: 'Collect 10 cherry gumdrops',
+    3: 'Clear all the jelly',
+    4: 'Score 2,500 points',
+    5: 'Clear all the icing',
+    6: 'Clear all the double jelly',
+    7: 'Bring the ingredients down to the bottom',
+    8: 'Clear all the jelly',
+    9: 'Clear the jelly and collect 6 lemon drops',
+    10: 'Finish every objective'
+  };
+  for (let n = 1; n <= 10; n++) {
+    const info = SR.levelIntro(n, { stars: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] });
+    assert.strictEqual(info.n, n);
+    assert.strictEqual(info.name, SR.LEVELS[n - 1].name);
+    assert.strictEqual(info.stopLine, lines[n]);
+    assert.strictEqual(info.goal, goals[n]);
+    assert.ok(info.detail && info.tip && info.icon && info.mechanic);
+    assert.strictEqual(info.moves, SR.LEVELS[n - 1].moves);
+    assert.ok(info.strip.startsWith(info.goal));
+    assert.ok(info.strip.includes(String(info.moves)));
+  }
+  const sarah = SR.levelIntro(2, { stars: [0, 3, 0, 0, 0, 0, 0, 0, 0, 0] });
+  assert.strictEqual(sarah.stars, 3);
+  assert.strictEqual(sarah.theme, 'sarah');
+  assert.ok(sarah.badge && sarah.badge.name === "Sarah's Heart");
+  const taupo = SR.levelIntro(7);
+  assert.strictEqual(taupo.mechanic, 'ings');
+  assert.ok(/ingredients/i.test(taupo.detail));
+
+  const ids = SR.TUTORIAL_STEPS.map(s => s.id);
+  assert.deepStrictEqual(Array.from(ids), ['match3', 'striped', 'wrapped', 'bomb', 'goal', 'stars', 'ready']);
+  assert.ok(SR.TUTORIAL_STEPS.every(s => s.bubble && s.bubble.length < 140));
+  assert.strictEqual(SR.TUTORIAL_STEPS[0].bubble, 'Swap two neighbouring sweets to make a line of three.');
+  assert.ok(/striped sweet/.test(SR.TUTORIAL_STEPS[1].bubble));
+  assert.ok(/wrapped sweet/.test(SR.TUTORIAL_STEPS[2].bubble));
+  assert.ok(/sprinkle bomb/.test(SR.TUTORIAL_STEPS[3].bubble));
+  assert.ok(/3,000 points in 20 moves/.test(SR.TUTORIAL_STEPS[4].bubble));
+  assert.ok(/Stars fill/.test(SR.TUTORIAL_STEPS[5].bubble));
+  assert.strictEqual(SR.TUTORIAL_STEPS[6].bubble, "You're ready!");
+  for (const step of SR.TUTORIAL_STEPS.filter(s => s.kind === 'move')) {
+    const st = SR.newGame({ board: SR.fromRows(step.board), level: SR.LEVELS[0] });
+    assert.strictEqual(SR.findRuns(st.board).length, 0, step.id + ' starts with no runs');
+    const res = SR.play(st, step.move[0], step.move[1]);
+    assert.strictEqual(res.valid, true, step.id + ' move is valid');
+    const made = (res.steps[0].made || []).map(m => m.s);
+    if (step.special) {
+      assert.ok(made.includes(step.special), step.id + ' makes ' + step.special + ' got ' + made);
+    } else {
+      assert.ok(!made.length, step.id + ' is a plain match of three');
+    }
+  }
+  const mv = SR.TUTORIAL_STEPS[0].move;
+  assert.ok(SR.sameTutMove(mv[0], mv[1], mv) && SR.sameTutMove(mv[1], mv[0], mv));
+  assert.ok(!SR.sameTutMove([0, 0], [0, 1], mv));
+  assert.strictEqual(SR.TUTORIAL_KEY, 'ib-sugar-tutorial-done');
+
+  assert.ok(html.includes('id="intro"') && html.includes('id="introtitle"') && html.includes('id="introbody"') && html.includes('id="introbtn"'));
+  assert.ok(html.includes('id="introx"') && html.includes('id="introstop"') && html.includes('id="introhow"'));
+  assert.ok(html.includes("Let's go!") && html.includes('How to play') && html.includes('Skip tutorial'));
+  assert.ok(html.includes('id="howtobtn"') && html.includes('id="tut"') && html.includes('id="tuthand"') && html.includes('id="tutskip"'));
+  assert.ok(html.includes('id="goalstrip"') && html.includes('id="starbars"'));
+  assert.ok(html.includes('prefers-reduced-motion') && html.includes('orientation: landscape'));
+  assert.ok(html.includes('.tuthand') && html.includes('tuthswipe'));
+  assert.ok(src.includes('showIntro') && src.includes('startTutorial') && src.includes('skipTutorial'));
+  assert.ok(src.includes('beginLevel') && src.includes('st.tutorial'));
+  assert.ok(src.includes("Let's go!") && src.includes('Replay tutorial'));
+  // Gameplay, badges and race hooks stay as they were
+  assert.strictEqual(SR.LEVELS[0].name, 'The Sweet Shop');
+  assert.strictEqual(SR.LEVELS[6].name, 'Bring it Down');
+  assert.strictEqual(SR.LEVELS[1].badge.name, "Sarah's Heart");
+  assert.ok(src.includes('seedRace') && src.includes('never POST to the family backend'));
+}
