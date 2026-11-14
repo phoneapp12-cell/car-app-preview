@@ -862,7 +862,7 @@
     while (q.length) {
       const k = q.pop(); if (done.has(k)) continue; done.add(k);
       const [r, c] = rc(k), t = b[r][c];
-      if (!t || !t.s || isBlock(t) || isIng(t)) continue;
+      if (!t || !t.s || t.used || isBlock(t) || isIng(t)) continue; // used: spent in a special + special combo
       if (t.s === 'row') { fired.push({ r, c, s: 'row' }); for (let j = 0; j < N; j++) add(key(r, j)); }
       else if (t.s === 'col') { fired.push({ r, c, s: 'col' }); for (let i = 0; i < N; i++) add(key(i, c)); }
       else if (t.s === 'w') { fired.push({ r, c, s: 'w' }); for (let i = r - 1; i <= r + 1; i++) for (let j = c - 1; j <= c + 1; j++) if (i >= 0 && i < N && j >= 0 && j < N) add(key(i, j)); }
@@ -904,6 +904,91 @@
       neighbourHits(b, clear, hit, mask);
     }
     return { kind: 'clear', clear, made: [], fired, hit, groups: 1, bomb: true };
+  }
+  // 1.9.230 Two super powers together: swapping two special sweets always works (even with no normal match) and
+  // makes a combo, centred where the dragged sweet lands:
+  //   stripe + stripe   'crisscross'  the whole row and the whole column
+  //   stripe + wrapped  'bigcross'    a giant cross: 3 full rows and 3 full columns
+  //   wrapped + wrapped 'bigblast'    a 5x5 double blast
+  //   bomb + stripe     'stripestorm' every free sweet of the stripe's colour turns striped, then they all fire
+  //   bomb + wrapped    'wrapstorm'   every free sweet of that colour turns wrapped, then they all explode
+  //   bomb + bomb       'sugarstorm'  clears the whole board
+  // (The sprinkle bomb is the game's colour bomb; stripes and wrapped sweets are the only other specials.)
+  // Everything goes through the normal clear/hit sets, so jelly, jars, icing, bubbles, liquorice, chocolate and
+  // ingredients all behave exactly as for any other clear.
+  const COMBO_KINDS = ['crisscross', 'bigcross', 'bigblast', 'stripestorm', 'wrapstorm', 'sugarstorm'];
+  const COMBO_BONUS = { crisscross: 400, bigcross: 600, bigblast: 600, stripestorm: 900, wrapstorm: 900, sugarstorm: 1500 };
+  const isSpecialTile = t => !!(t && t.s && (isCandy(t) || isBomb(t)));
+  function comboKind(A, Z) {
+    if (!isSpecialTile(A) || !isSpecialTile(Z)) return '';
+    const k = [A, Z].map(t => isBomb(t) ? 'b' : t.s === 'w' ? 'w' : 's').sort().join('');
+    return { bb: 'sugarstorm', bs: 'stripestorm', bw: 'wrapstorm', ss: 'crisscross', sw: 'bigcross', ww: 'bigblast' }[k] || '';
+  }
+  function comboSwap(b, A, Z, a, z, mask, rand, kind) {
+    kind = kind || comboKind(A, Z);
+    if (kind === 'sugarstorm') { const s = bombSwap(b, A, Z, key(z[0], z[1]), mask); s.combo = kind; s.comboAt = { r: z[0], c: z[1] }; s.comboBonus = COMBO_BONUS[kind]; return s; }
+    rand = typeof rand === 'function' ? rand : Math.random;
+    const clear = new Set(), fired = [], hit = new Set(), converted = [];
+    const [r0, c0] = z;
+    const add = (r, c) => {
+      if (r < 0 || r >= N || c < 0 || c >= N || !isOpen(mask, r, c)) return;
+      const t = b[r][c], k = key(r, c);
+      if (!t || isHole(t) || isIng(t)) return;
+      if (isBlock(t)) { hit.add(k); return; }
+      clear.add(k);
+    };
+    let bomb = false;
+    if (kind === 'stripestorm' || kind === 'wrapstorm') {
+      const bt = isBomb(A) ? A : Z, other = bt === A ? Z : A, col = other.c;
+      bt.armed = true; bomb = true;
+      add(z[0], z[1]); add(a[0], a[1]);
+      let n = 0;
+      for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+        const t = b[r][c];
+        if (!t || t === bt || t.c !== col || !isOpen(mask, r, c)) continue;
+        if (isBlock(t)) { hit.add(key(r, c)); continue; }
+        if (!isCandy(t)) continue;
+        if (t !== other && !t.s && !t.lock && !t.liq) {
+          const sp = kind === 'wrapstorm' ? 'w' : (n++ % 2 ? 'col' : 'row');
+          converted.push({ t, r, c, s: sp }); t.s = sp;
+        }
+        add(r, c);
+      }
+      const bk = bt === A ? z : a;
+      fired.push({ r: bk[0], c: bk[1], s: 'b', color: col });
+      expand(b, clear, fired, hit, mask);
+      for (const cv of converted) cv.t.s = ''; // shown turning special by the UI, just before they fire
+    } else {
+      A.used = true; Z.used = true;
+      add(z[0], z[1]); add(a[0], a[1]);
+      if (kind === 'crisscross') {
+        for (let j = 0; j < N; j++) add(r0, j);
+        for (let i = 0; i < N; i++) add(i, c0);
+        fired.push({ r: r0, c: c0, s: 'row' }, { r: r0, c: c0, s: 'col' });
+      } else if (kind === 'bigcross') {
+        for (let d = -1; d <= 1; d++) {
+          if (r0 + d >= 0 && r0 + d < N) { for (let j = 0; j < N; j++) add(r0 + d, j); fired.push({ r: r0 + d, c: c0, s: 'row' }); }
+          if (c0 + d >= 0 && c0 + d < N) { for (let i = 0; i < N; i++) add(i, c0 + d); fired.push({ r: r0, c: c0 + d, s: 'col' }); }
+        }
+      } else { // bigblast
+        for (let i = r0 - 2; i <= r0 + 2; i++) for (let j = c0 - 2; j <= c0 + 2; j++) add(i, j);
+        fired.push({ r: r0, c: c0, s: 'w', big: 2 }, { r: a[0], c: a[1], s: 'w', big: 2 });
+      }
+      expand(b, clear, fired, hit, mask); // other specials caught in the blast go off too
+    }
+    neighbourHits(b, clear, hit, mask);
+    return { kind: 'clear', clear, made: [], fired, hit, groups: 1, bomb, combo: kind, comboAt: { r: r0, c: c0 }, converted, comboBonus: COMBO_BONUS[kind] };
+  }
+  // 1.9.230 Two specials side by side (the first time, a quick combo tip points at them).
+  function adjacentSpecials(b, mask) {
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+      const t = b[r][c]; if (!canSwap(t) || !isSpecialTile(t)) continue;
+      for (const [i, j] of [[r, c + 1], [r + 1, c]]) {
+        if (i >= N || j >= N || (mask && !isOpen(mask, i, j))) continue;
+        const o = b[i][j]; if (canSwap(o) && isSpecialTile(o)) return [[r, c], [i, j]];
+      }
+    }
+    return null;
   }
   function collapse(b, rand, kinds, mask) {
     const falls = [];
@@ -994,7 +1079,7 @@
     });
     step.madeTiles = (step.made || []).map(m => { const [r, c] = rc(m.k), t = mk(m.color, m.s); b[r][c] = t; return { t, r, c }; });
     step.cascade = cascade;
-    step.points = step.popped.length * PTS * cascade + (step.made || []).reduce((n, m) => n + (BONUS[m.s] || 0), 0);
+    step.points = step.popped.length * PTS * cascade + (step.made || []).reduce((n, m) => n + (BONUS[m.s] || 0), 0) + (step.comboBonus || 0);
     step.falls = [];
     for (let guard = 0; guard < 8; guard++) {
       const f = collapse(b, rand, kinds, mask);
@@ -1010,6 +1095,7 @@
     const A = b[a[0]] && b[a[0]][a[1]], Z = b[z[0]] && b[z[0]][z[1]];
     if (!canSwap(A) || !canSwap(Z)) return false;
     if (isBomb(A) || isBomb(Z)) return true;
+    if (comboKind(A, Z)) return true; // 1.9.230 two specials always combine
     swapAt(b, a, z); const ok = findRuns(b).length > 0; swapAt(b, a, z);
     return ok;
   }
@@ -1223,7 +1309,9 @@
     st.moves--;
     const steps = [];
     let cascade = 1;
-    if (isBomb(A) || isBomb(Z)) { const s = applyStep(b, bombSwap(b, A, Z, key(z[0], z[1]), mask), st.rand, st.kinds, cascade++, st); steps.push(s); st.score += s.points; }
+    const ck = comboKind(A, Z);
+    if (ck) { const s = applyStep(b, comboSwap(b, A, Z, a, z, mask, st.rand, ck), st.rand, st.kinds, cascade++, st); steps.push(s); st.score += s.points; }
+    else if (isBomb(A) || isBomb(Z)) { const s = applyStep(b, bombSwap(b, A, Z, key(z[0], z[1]), mask), st.rand, st.kinds, cascade++, st); steps.push(s); st.score += s.points; }
     let pref = steps.length ? null : [z, a];
     for (let guard = 0; guard < 60; guard++) {
       const s = resolve(b, pref, mask); if (!s) break;
@@ -1360,6 +1448,7 @@
     if (before.lv && before.lv.liq) h += (liqLeft(before.board) - liqLeft(after.board)) * 420;
     h += ((before.ingsLeft || 0) - (after.ingsLeft || 0)) * 800;
     if (res && res.steps) h += res.steps.reduce((n, s) => n + (s.madeTiles ? s.madeTiles.length * 80 : 0), 0);
+    if (res && res.steps && res.steps[0] && res.steps[0].combo) h += 2500; // 1.9.230 hints prefer a super power combo
     return h;
   }
   function bestMove(st) {
@@ -1416,7 +1505,7 @@
   // 1.9.229 Only the major moments are spoken: special sweets made or set off (stripe, wrap, sprinkle bomb), combos,
   // streak level-ups, the Hard level start, Goal achieved and Sugar Crush. Every other saying still pops up on screen
   // but plays a short candy sound instead (candySfxPlan), at normal pace. SAY_REST_MS applies to spoken lines only.
-  const SAY_REST_MS = 3000, SAY_BIG = ['combo', 'bomb', 'wrap', 'stripe'];
+  const SAY_REST_MS = 3000, SAY_BIG = ['combo', 'bomb', 'wrap', 'stripe', 'crisscross', 'bigcross', 'bigblast', 'stripestorm', 'wrapstorm', 'sugarstorm'];
   function sayBig(kind) { return SAY_BIG.indexOf(kind) >= 0; }
   const HARD_LINES = { 1: 'Hard level!', 2: 'Super Hard level!' };
   function hardLine(h) { return HARD_LINES[h] || ''; }
@@ -1428,7 +1517,8 @@
     cascade: ['arp', 'arp', 'sparkle'], jelly: ['wobble', 'plink'], locks: ['unlock', 'plink'], ice: ['glass', 'sparkle'],
     ings: ['drop', 'plink'], choco: ['thud', 'pop'], gumdrop: ['pop', 'pops'], lemon: ['zing', 'plink'],
     comeback: ['arp', 'unlock'], bub: ['pops', 'pop'], liq: ['sparkle', 'glass'], win: ['arp'],
-    stripe: ['sparkle', 'arp'], wrap: ['pops', 'arp'], bomb: ['sparkle', 'arp'], combo: ['arp', 'sparkle']
+    stripe: ['sparkle', 'arp'], wrap: ['pops', 'arp'], bomb: ['sparkle', 'arp'], combo: ['arp', 'sparkle'],
+    crisscross: ['arp', 'sparkle'], bigcross: ['arp', 'sparkle'], bigblast: ['pops', 'arp'], stripestorm: ['sparkle', 'arp'], wrapstorm: ['pops', 'sparkle'], sugarstorm: ['arp', 'sparkle']
   };
   function candySfxPlan(kind, chain, rand, last) {
     rand = typeof rand === 'function' ? rand : Math.random;
@@ -1549,8 +1639,8 @@
     'sugar-rush-song.m4a': 'fb999cd1', 'sugar-rush-song.mp3': '586f9ee6',
     // 1.9.225 Every saying pre-recorded in a female and a male NZ voice, one small sprite per voice.
     // 1.9.227 More room: reverb RT60 ~1.4 s and echoes at 120/260/420 ms, about 34% wet, ~0.9 s tail inside each clip.
-    'sugar-rush-say-f.m4a': 'a4d17597', 'sugar-rush-say-f.mp3': 'd67a2872',
-    'sugar-rush-say-m.m4a': '33cd967e', 'sugar-rush-say-m.mp3': 'f1cbab26'
+    'sugar-rush-say-f.m4a': 'c16ab81b', 'sugar-rush-say-f.mp3': '25067d1f',
+    'sugar-rush-say-m.m4a': '9e645d94', 'sugar-rush-say-m.mp3': '8e05c831'
   };
   // 1.9.225 Spoken sayings as recorded clips, a female voice (Microsoft neural "Molly", en-NZ) and a male one
   // ("Mitchell", en-NZ), so the game mixes the two reliably instead of relying on the phone's voices.
@@ -1582,7 +1672,25 @@
     "Sugar-high streak!": [37.729, 1.685, 37.012, 1.624],
     "Ultimate sweet streak!": [39.665, 1.869, 38.886, 1.763],
     "Hard level!": [41.784, 1.34, 40.899, 1.515],
-    "Super Hard level!": [43.374, 1.728, 42.664, 1.853]
+    "Super Hard level!": [43.374, 1.728, 42.664, 1.853],
+    "Criss-cross crunch!": [45.352, 1.678, 44.767, 1.552],
+    "Stripes times two!": [47.28, 2.013, 46.569, 1.91],
+    "Giant candy cross!": [49.543, 1.889, 48.729, 1.701],
+    "Cross my heart!": [51.683, 1.492, 50.681, 1.417],
+    "Double wrap blast!": [53.425, 1.713, 52.347, 1.619],
+    "Kaboom of yum!": [55.388, 1.598, 54.216, 1.448],
+    "Stripes everywhere!": [57.236, 1.818, 55.914, 1.692],
+    "Rainbow stripes!": [59.304, 1.595, 57.856, 1.501],
+    "Wrapped rainbow!": [61.15, 1.64, 59.607, 1.623],
+    "Parcel party!": [63.04, 1.579, 61.48, 1.547],
+    "Sugar storm!": [64.869, 1.482, 63.277, 1.558],
+    "Clean sweep!": [66.6, 1.433, 65.085, 1.435],
+    "X marks the sweet!": [68.284, 1.725, 66.771, 1.663],
+    "Mega cross!": [70.259, 1.418, 68.684, 1.38],
+    "Double parcel pop!": [71.927, 1.675, 70.314, 1.663],
+    "Stripe storm!": [73.852, 1.59, 72.227, 1.635],
+    "Gift wrap frenzy!": [75.692, 1.842, 74.112, 1.773],
+    "Sugar tornado!": [77.784, 1.758, 76.135, 1.673]
   };
   function sayClip(text, g) {
     const c = SAY_CLIPS[text]; if (!c) return null;
@@ -1722,6 +1830,10 @@
     gumdrop: ['Gum-believable!', 'Cherry on top!', 'Pop those cherries!', 'Gumdrop gorgeous!'],
     lemon: ['Zesty!', 'Lemon-sational!', 'Zing!', 'Squeeze the day!'],
     combo: ['Double delight!', 'Two for tea!', 'Special times two!', 'Pair of treats!'],
+    // 1.9.230 Super power combos (two specials swapped together): each has its own spoken lines.
+    crisscross: ['Criss-cross crunch!', 'Stripes times two!', 'X marks the sweet!'], bigcross: ['Giant candy cross!', 'Cross my heart!', 'Mega cross!'],
+    bigblast: ['Double wrap blast!', 'Kaboom of yum!', 'Double parcel pop!'], stripestorm: ['Stripes everywhere!', 'Rainbow stripes!', 'Stripe storm!'],
+    wrapstorm: ['Wrapped rainbow!', 'Parcel party!', 'Gift wrap frenzy!'], sugarstorm: ['Sugar storm!', 'Clean sweep!', 'Sugar tornado!'],
     comeback: ['Still in it!', 'Not done yet!', 'Clutch play!', 'Comeback sweet!'],
     bub: ['Pop pop!', 'Fizz-tastic!', 'Bubble pop!', 'Popping candy!'],
     liq: ['Liquorice-free!', 'Unwrapped!', 'Untangled!', 'Black magic!']
@@ -1730,12 +1842,14 @@
     cascade: '#ff3d8a', stripe: '#1aa7ff', wrap: '#ffb400', bomb: '#c84dff',
     jelly: '#e649cf', locks: '#ff8c2a', ice: '#3bc9ff', ings: '#ff6b2c',
     choco: '#c26a2d', gumdrop: '#ff2d55', lemon: '#ffd43b', combo: '#ff5ad5',
+    crisscross: '#1aa7ff', bigcross: '#00b4d8', bigblast: '#ff8c00', stripestorm: '#c84dff', wrapstorm: '#ff3d8a', sugarstorm: '#7b2cbf',
     comeback: '#ff7a1a', bub: '#29b6f6', liq: '#6a3d9a'
   };
   const SAYING_VOICE = {
     cascade: 'great', stripe: 'great', wrap: 'sweetas', bomb: 'succulent',
     jelly: 'great', locks: 'great', ice: 'great', ings: 'sweetas',
     choco: 'great', gumdrop: 'great', lemon: 'great', combo: 'awesome',
+    crisscross: 'awesome', bigcross: 'awesome', bigblast: 'awesome', stripestorm: 'succulent', wrapstorm: 'succulent', sugarstorm: 'succulent',
     comeback: 'awesome', bub: 'great', liq: 'great'
   };
   function sayingKind(s, cascade, st) {
@@ -1749,7 +1863,8 @@
     const madeStripe = made.some(m => { const k = madeKind(m); return k === 'row' || k === 'col'; });
     const low = !!(st && st.moves <= 5 && st.moves > 0);
     let kind = null;
-    if (nFire >= 2) kind = 'combo';
+    if (s.combo && SAYINGS[s.combo]) kind = s.combo;
+    else if (nFire >= 2) kind = 'combo';
     else if (hasBomb) kind = 'bomb';
     else if (madeWrap) kind = 'wrap';
     else if (madeStripe) kind = 'stripe';
@@ -1773,7 +1888,7 @@
       else if (nGum >= 3) kind = 'gumdrop';
       else if (i >= 2) kind = 'cascade';
     }
-    if (low && kind && kind !== 'combo' && kind !== 'bomb' && kind !== 'wrap' && kind !== 'stripe') kind = 'comeback';
+    if (low && kind && !sayBig(kind)) kind = 'comeback';
     return kind;
   }
   function pickSaying(kind, last, rand) {
@@ -2701,7 +2816,7 @@
 
   root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_STOPS, FUTURE_STOPS, NZ_PROJ, nzXY, WHANGAREI_INSET, insetXY, pacXY, ausXY, LV_COUNT, lvId, levelIds, stopId, LEGACY_220_IDS, migrateProg, stopForLevel, icingPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, bubLeft, liqLeft, spreadLiq, LIQ_IDLE, goalCounts, cloneState, bestMove, hintMoveFor, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
     allowed: () => true, // 1.9.228 open to every family member
-    SAY_REST_MS, SAY_BIG, sayBig, HARD_LINES, hardLine, CANDY_STYLES, candySfxPlan, playCandySfx, SAY_SHOW_MS, SAY_AFTER_MS, sayShowGap, SPEAK_GAP, SPEAK_PITCH, SPEAK_RATE, SPEAK_VOL, pickSpeechVoice, speechGender, speakWorthy, SAY_SPRITES, SAY_CLIPS, sayClip, nextSayVoice, SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL, XF,
+    SAY_REST_MS, SAY_BIG, sayBig, COMBO_KINDS, COMBO_BONUS, comboKind, comboSwap, adjacentSpecials, isSpecialTile, HARD_LINES, hardLine, CANDY_STYLES, candySfxPlan, playCandySfx, SAY_SHOW_MS, SAY_AFTER_MS, sayShowGap, SPEAK_GAP, SPEAK_PITCH, SPEAK_RATE, SPEAK_VOL, pickSpeechVoice, speechGender, speakWorthy, SAY_SPRITES, SAY_CLIPS, sayClip, nextSayVoice, SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL, XF,
     VOICE_FILES, VOICE_RANK, MEDIA_HASH, mediaUrl, gameTrack, SONG_PLAN, SONG_FILES, SONG_FROM, songMood, attachSfxBus, playTone, playChime, playMovesWarnChime, playClip, voiceForStep,
     SAYINGS, SAYING_COLORS, SAYING_VOICE, sayingKind, pickSaying, sayingColor, MOVES_WARN_AT, MOVES_WARN_MS, HINT_IDLE_MS, HINT_REPEAT_MS,
     SPARKLE_MIN_MS, SPARKLE_MAX_MS, SPARKLE_MAX, SPARKLE_MAX_REDUCE, SHIMMER_MS, sparkleCap, sparkleEase, shimmerAt, drawStarGlint, drawCandyShine,
@@ -3364,6 +3479,7 @@
         if (s.pop) { const p = Math.min(1, (t - s.pop) / (220 * SP)); s.sc = 1 + .3 * p; s.al = 1 - p; }
         if (s.grow) { const p = Math.min(1, (t - s.grow) / (260 * SP)); s.sc = .3 + .7 * easeOut(p) + (p < 1 ? .25 * Math.sin(p * Math.PI) : 0); if (p >= 1) { s.grow = 0; s.sc = 1; } }
         if (s.y < -0.5) continue;
+        if (s.t.c === -4 && !(s.t.ice > 0)) continue; // 1.9.230 icing already broken by this move: never drawn as a sweet
         let wob = 0;
         if (hint && !reduce && hint.some(h => h[0] === s.r && h[1] === s.c)) wob = Math.sin(t / 180) * .12;
         // Gentle idle bob (off with reduced motion) and a little squash when a sweet lands.
@@ -3860,6 +3976,7 @@
   }
   let hintOn = false, hintHold = false;
   function noteActivity() {
+    hideComboTip();
     lastAct = now();
     hideHintHand();
     hintOn = false;
@@ -3874,6 +3991,26 @@
     const recap = $('tutrecap'); if (recap && !recap.hidden) return false;
     for (const s of sprites.values()) if (s.tw || s.pop || s.grow) return false;
     return true;
+  }
+  // 1.9.230 Quick combo tutorial: the first time two specials sit side by side, point at them with a short tip.
+  const COMBO_TIP_KEY = 'ib-sugar-combo-tip';
+  let comboTipTimer = 0;
+  function comboTipSeen() { return !!ls.get(COMBO_TIP_KEY + memberTag(), false); }
+  function hideComboTip() { clearTimeout(comboTipTimer); const el = $('combotip'); if (el) el.hidden = true; }
+  function maybeComboTip(force) {
+    if (!st || st.over || st.tutorial || (tut && tut.active)) return false;
+    if (!force && comboTipSeen()) return false;
+    const pair = adjacentSpecials(st.board, st.mask);
+    if (!pair) return false;
+    ls.set(COMBO_TIP_KEY + memberTag(), true);
+    const el = $('combotip');
+    if (el) {
+      el.innerHTML = '<b>⚡ Super power combo!</b><span>Swap two special sweets together for a mega blast: stripes, wrapped sweets and sprinkle bombs all combine.</span>';
+      el.hidden = false; el.onclick = hideComboTip;
+      clearTimeout(comboTipTimer); comboTipTimer = setTimeout(hideComboTip, 6500);
+    }
+    hintMove = pair; hintOn = false; lastAct = now() - HINT_IDLE_MS - 50;
+    return pair;
   }
   function hideHintHand() {
     const el = $('hinthand');
@@ -4678,6 +4815,7 @@
     } else if (!st.tutorial && st.lv && st.lv.liq && st.liqIdle === LIQ_IDLE - 1 && liqLeft(st.board)) {
       addText('Free the liquorice!', W / 2, W * .12, 18, '#f3d1ff');
     }
+    maybeComboTip();
     if (res.shuffled) {
       addText('Shuffle!', W / 2, W / 2, 30, '#fff'); await wait(450);
       for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
@@ -4748,6 +4886,36 @@
     // Let the zap land before the sweets clear.
     await wait((crush && crush.fast ? 50 : bombs.length ? 240 : 110) * SP);
   }
+  // 1.9.230 Each super power combo gets its own big moment before the clear.
+  async function comboIntro(s) {
+    if (crush && crush.skip) return;
+    const t = now(), k = s.combo, at = s.comboAt || { r: (N / 2) | 0, c: (N / 2) | 0 };
+    const [x0, y0] = cellXY(at.r, at.c), colr = SAYING_COLORS[k] || '#ffffff';
+    shake(2);
+    fx.push({ type: 'flash', x: x0, y: y0, col: colr, t0: t, dur: 520 });
+    fx.push({ type: 'ring', x: x0, y: y0, t0: t, dur: 620 * SP, col: '#ffffff', big: k === 'sugarstorm' ? 7 : k === 'bigblast' ? 3.6 : 2.6 });
+    fx.push({ type: 'ring', x: x0, y: y0, t0: t + 90, dur: 640 * SP, col: colr, big: k === 'sugarstorm' ? 6 : 3 });
+    const edge = (r, c) => cellXY(Math.max(0, Math.min(N - 1, r)), Math.max(0, Math.min(N - 1, c)));
+    const bolts = [];
+    if (k === 'crisscross' || k === 'bigcross') {
+      const ds = k === 'bigcross' ? [-1, 0, 1] : [0];
+      for (const d of ds) { bolts.push(edge(at.r + d, 0), edge(at.r + d, N - 1), edge(0, at.c + d), edge(N - 1, at.c + d)); }
+    } else if (k === 'bigblast') {
+      for (let a = 0; a < 8; a++) bolts.push([x0 + Math.cos(a * Math.PI / 4) * CS * 2.4, y0 + Math.sin(a * Math.PI / 4) * CS * 2.4]);
+    } else if (k === 'stripestorm' || k === 'wrapstorm') {
+      // The colour bomb's lightning turns every sweet of that colour striped / wrapped, then they all go off.
+      for (const cv of s.converted || []) {
+        cv.t.s = cv.s;
+        const sp = sprites.get(cv.t.id); if (sp) sp.grow = t + 60;
+        bolts.push(cellXY(cv.r, cv.c));
+      }
+    } else if (k === 'sugarstorm') {
+      for (let n = 0; n < 24; n++) bolts.push(cellXY((n * 5 + 3) % N, (n * 3 + 1) % N));
+    }
+    if (!reduce) bolts.slice(0, 40).forEach((p, n) => fx.push({ type: 'bolt', x0, y0, x1: p[0], y1: p[1], col: n % 2 ? '#ffffff' : colr, w: k === 'bigblast' ? .9 : .75, seed: n * 13 + 5, t0: t + n * 8, dur: 560 }));
+    playZap(true);
+    await wait((s.converted && s.converted.length ? 520 : 300) * (crush && crush.fast ? 0.3 : 1));
+  }
   function boltPath(f, bucket) {
     const R = rng(f.seed * 131 + bucket * 17 + 1);
     const dx = f.x1 - f.x0, dy = f.y1 - f.y0, len = Math.hypot(dx, dy) || 1;
@@ -4775,6 +4943,7 @@
   }
   async function showStep(s, i, opt) {
     opt = opt || {};
+    if (s.combo) await comboIntro(s);
     await lightning(s);
     const t = now();
     let cx = 0, cy = 0, n = 0;
@@ -4807,7 +4976,7 @@
         fx.push({ type: 'beam', s: f.s, r: f.r, c: f.c, t0: t, dur: 420 * SP });
         if (!reduce) fx.push({ type: 'beam2', s: f.s, r: f.r, c: f.c, col, t0: t, dur: 480 });
       } else if (f.s === 'w') {
-        fx.push({ type: 'ring', x: fx0, y: fy0, t0: t, dur: 480 * SP, col, big: 1.6 });
+        fx.push({ type: 'ring', x: fx0, y: fy0, t0: t, dur: 480 * SP, col, big: f.big ? 2.6 : 1.6 });
         if (!reduce) { fx.push({ type: 'ring', x: fx0, y: fy0, t0: t, dur: 620, col: '#ffffff', big: 2.4 }); fx.push({ type: 'flash', x: fx0, y: fy0, col, t0: t, dur: 380 }); }
       } else {
         fx.push({ type: 'ring', x: fx0, y: fy0, t0: t, dur: 480 * SP });
@@ -4823,10 +4992,11 @@
         }
       }
     }
+    if (s.combo) showSaying(s, i); // 1.9.230 a super power combo's line goes first (ahead of a streak line)
     if (opt.streak !== false) addStreak(streakStepGain(s, i));
     callout(s, i);
     if (n) addText('+' + s.points, cx / n, cy / n, 22, '#fff');
-    showSaying(s, i);
+    if (!s.combo) showSaying(s, i);
     if (opt.shake !== false) shake(shakeLevel([s]) >= 2 ? 2 : (i >= 2 ? 1 : shakeLevel([s])));
     for (const m of s.madeTiles || []) { const sp = sprite(m.t, m.r, m.c); sp.grow = t; if (!reduce) { const [x, y] = cellXY(m.r, m.c); pushFx({ type: 'glint', x, y, dx: 0, dy: 0, sz: .45, rot: 0, t0: t, dur: 520 }); } }
     if (s.delivered) for (const d of s.delivered) { const sp = sprites.get(d.t.id); if (sp) sp.pop = t; }
@@ -5550,7 +5720,7 @@
   root.requestAnimationFrame(frame);
 
   root.SugarRush.ui = {
-    state: () => st, attempt, hud, paintGoalStrip, showEnd, showMap, scrollMapTo, openLevel, startLevel, showIntro, startTutorial, skipTutorial, finishTutorial, showTutStep, beginLevel, beginGoalFinish, showGoalBanner, celebrateOnMap, progress: () => prog, tutorial: () => tut, crush: () => crush,
+    state: () => st, attempt, comboTip: maybeComboTip, hud, paintGoalStrip, showEnd, showMap, scrollMapTo, openLevel, startLevel, showIntro, startTutorial, skipTutorial, finishTutorial, showTutStep, beginLevel, beginGoalFinish, showGoalBanner, celebrateOnMap, progress: () => prog, tutorial: () => tut, crush: () => crush,
     seedLives, showLives, openLivesPanel, lives: () => lives(), settleLife, nextLife: () => nextLife(),
     seedRace, seedRaceEvent, showRaceOn, showRaceResult, racePrize, syncRace, openIconPicker, setRaceOpen, requestCloseSugar, race: () => race,
     say, chime, callout, unlockAudio, audio, showSaying, hideSaying, showMovesWarn, hideMovesWarn, maybeWarn3, showHint, hideHintHand, noteActivity,
