@@ -36,6 +36,7 @@ export function scoresInit(sql) {
     CREATE INDEX IF NOT EXISTS s_mid ON scores(mid, game, at);`);
   clearShaneTetrisOnce(sql);
   clearShaneTetrisOnce20261113(sql);
+  clearAllTetrisOnce20261114(sql);
 }
 
 /* One-off, 12 Nov 2026: Shane asked to be cleared from the Tetris high-score table only.
@@ -90,6 +91,36 @@ export function clearShaneTetrisOnce20261113(sql) {
     const rec = { at: Date.now(), matched: shane.length, deleted, newLeader: leader ? { name: leader.name, score: leader.score } : null };
     sql.exec(`INSERT OR REPLACE INTO meta (k,v) VALUES (?,?)`, CLEAR_SHANE_TETRIS_KEY2, JSON.stringify(rec));
     try { console.log('clear_shane_tetris_20261113', JSON.stringify({ matched: rec.matched, deleted: rec.deleted.map(d => ({ name: d.name, n: d.n, top: d.top })), newLeader: rec.newLeader })); } catch (e) { }
+    return rec;
+  } catch (e) {
+    return { err: 'pending' };
+  }
+}
+
+
+/* One-off, 14 Nov 2026: Shane asked to reset everyone's Tetris high scores
+   (family scoreboard and each phone). Scrabble is left alone. Guarded by a
+   meta flag so it runs exactly once. After it has run, new Tetris scores are kept. */
+export const CLEAR_ALL_TETRIS_KEY = 'clear_all_tetris_20261114';
+export function clearAllTetrisOnce20261114(sql) {
+  try {
+    sql.exec(`CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT)`);
+    const prev = rows(sql, `SELECT v FROM meta WHERE k=?`, CLEAR_ALL_TETRIS_KEY)[0];
+    if (prev) {
+      try { return { already: true, ...JSON.parse(prev.v) }; } catch (e) { return { already: true }; }
+    }
+    const existing = rows(sql, `SELECT s.id, s.mid, m.name, s.score, s.lines, s.level, s.at FROM scores s LEFT JOIN members m ON m.id=s.mid WHERE s.game='tetris' ORDER BY s.score DESC, s.at ASC`);
+    sql.exec(`DELETE FROM scores WHERE game='tetris'`);
+    const by = {};
+    for (const r of existing) {
+      const n = r.name || r.mid || '?';
+      if (!by[n]) by[n] = { name: n, mid: r.mid, n: 0, top: 0 };
+      by[n].n++;
+      if ((r.score || 0) > by[n].top) by[n].top = r.score || 0;
+    }
+    const rec = { at: Date.now(), n: existing.length, members: Object.values(by), scores: existing };
+    sql.exec(`INSERT OR REPLACE INTO meta (k,v) VALUES (?,?)`, CLEAR_ALL_TETRIS_KEY, JSON.stringify(rec));
+    try { console.log('clear_all_tetris_20261114', JSON.stringify({ n: rec.n, members: rec.members })); } catch (e) { }
     return rec;
   } catch (e) {
     return { err: 'pending' };

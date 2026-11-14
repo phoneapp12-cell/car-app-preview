@@ -87,8 +87,9 @@ function loadTetris() {
   return ctx.Tetris;
 }
 const tetGame = loadTetris();
-assert.strictEqual(tetGame.dropInterval(1), 800);
-assert.ok(tetGame.dropInterval(30) >= 60);
+assert.strictEqual(tetGame.DROP_SLOW, 1.38);
+assert.ok(Math.abs(tetGame.dropInterval(1) - 800 * 1.38) < 1e-9);
+assert.ok(tetGame.dropInterval(30) >= 60 * 1.38);
 const spun = tetGame.rotateCW(tetGame.rotateCW(tetGame.rotateCW(tetGame.rotateCW(tetGame.SHAPES[1]))));
 assert.deepStrictEqual(spun, tetGame.SHAPES[1]);
 const gMove = tetGame.newGame();
@@ -3325,7 +3326,7 @@ if (live) {
   assert.ok(guide.includes('Single is 100') && guide.includes('Double 300') && guide.includes('Triple 500') && guide.includes('800'));
   assert.ok(guide.includes('Cherry bombs') && guide.includes('Banana bursts') && guide.includes('J or L'));
   assert.ok(guide.includes('cheer') && guide.includes('high score'));
-  assert.ok(guide.includes('Extreme') && guide.includes('X in the top right') && guide.includes('Exit extreme') && guide.includes('full screen') && guide.includes('Close at the top'));
+  assert.ok(guide.includes('Extreme') && guide.includes('X in the top right') && guide.includes('Exit extreme') && guide.includes('full screen') && guide.includes('Exit Tetris'));
 
   // Fake clock: 5 continuous minutes paused closes; resume resets; start screen does not.
   const t0 = 1_700_000_000_000;
@@ -3503,3 +3504,111 @@ if (live) {
   assert.strictEqual(same.level, 8);
   assert.strictEqual(same.over, false);
 }
+
+// 1.9.207 Beach water looks like sea water, not snow
+{
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  const draw = src.slice(src.indexOf('function drawStackWash'), src.indexOf('// 1.9.192 Snowy mountains'));
+  assert.ok(draw.includes('1.9.207'));
+  assert.ok(draw.includes("rgba(56, 170, 175") && draw.includes("rgba(22, 120, 140") && draw.includes("rgba(10, 70, 105"), 'sheet is blue-green sea water');
+  assert.ok(!draw.includes("rgba(160, 220, 235") && !draw.includes("rgba(255, 255, 255, 0.9)") && !draw.includes("fillStyle = '#fff'"), 'milky white cap and white flake fills are gone');
+  assert.ok(draw.includes("Drips stay in the simulation but are no longer drawn as falling white dots"));
+  assert.ok(draw.includes('quadraticCurveTo(mid, y - 1.4') && draw.includes("rgba(220, 235, 230"), 'foam is a line at the wave edge');
+  assert.ok(!draw.includes('ctx.ellipse(mid, y - 1.2, 9 + 4 * wet') && !draw.includes('Splash foam where it lands'), 'opaque white foam blobs are gone');
+  assert.ok(draw.includes('Soft light shimmer') && draw.includes('fillRect(gx, y0 + 1.6, gw, 1.15)'));
+  assert.ok(draw.includes('const reduce = reduceMotion()') && draw.includes('const wave = reduce ? 0'), 'reduced motion stills the wash waves');
+  const beach = src.slice(src.indexOf('function drawBeachScene'), src.indexOf('function fwLoad'));
+  assert.ok(beach.includes('1.9.207 Sea surface') && beach.includes("fillStyle = '#2a8a96'") && beach.includes("globalCompositeOperation = 'multiply'"));
+  assert.ok(beach.includes('Soft sparkle highlights along the sun path') && beach.includes('falling dots'));
+  assert.ok(beach.includes('torn mid-sea shards') && beach.includes('const band = 0.46') && beach.includes('c.clip()'));
+  assert.ok(beach.includes('if (reduce)') && beach.includes('drawImage(beach.img.water'), 'reduced motion still shows the water painting');
+  assert.ok(src.includes("isEffect((g.clearFx ? themeFor(g.clearFx.level) : themeFor(g.level))) !== 'beach'"), 'wash stays on Beach only');
+  assert.strictEqual(tetGame.themeFor(2), 0);
+  assert.strictEqual(tetGame.isEffect(0), 'beach');
+  // Gameplay and the wash cycle are unchanged
+  assert.strictEqual(tetGame.STACK_WASH_PERIOD, 8);
+  assert.ok(tetGame.washCover(0) === 0 && tetGame.washCover(0.42) === 1);
+}
+
+// 1.9.207 Exit Tetris is always reachable; local Tetris scores reset once
+{
+  const html = fs.readFileSync('feed/tetris.html', 'utf8');
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  const scoresSrc = fs.readFileSync('feed/scores.js', 'utf8');
+  assert.ok(html.includes('id="exittetris-play"') && html.includes('id="exittetris-x"') && html.includes('id="exittetris-start"') && html.includes('id="exittetris-over"') && html.includes('id="exittetris-pause"') && html.includes('id="exittetris-howto"'));
+  assert.ok((html.match(/Exit Tetris/g) || []).length >= 6);
+  assert.ok(html.includes('html.fs-x #exittetris-x') && html.includes('display: block !important'));
+  assert.ok(src.includes("querySelectorAll('.exittetris')") && src.includes('requestCloseTetris()'));
+  const closeFn = src.slice(src.indexOf('function requestCloseTetris'), src.indexOf('function checkPauseClose'));
+  assert.ok(closeFn.includes('stopAudio') && closeFn.includes('CLOSE_MSG') && closeFn.includes('Do not touch tetris-best'));
+  assert.ok(src.includes("Use Exit Tetris to go back to Info Book"));
+  assert.strictEqual(tetGame.TETRIS_SCORES_CLEAR_207, 'ib-tetris-scores-cleared-1.9.207');
+  const mem = new Map();
+  const ls = { getItem: k => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: k => mem.delete(k) };
+  mem.set('tetris-best', '12400');
+  mem.set('ib-scores-tetris', JSON.stringify([{ score: 12400 }]));
+  mem.set('ib-scores-scrabble', JSON.stringify([{ score: 412 }]));
+  assert.strictEqual(tetGame.clearTetrisScoresOnce207(ls), true);
+  assert.strictEqual(ls.getItem('tetris-best'), null);
+  assert.strictEqual(ls.getItem('ib-scores-tetris'), null);
+  assert.strictEqual(ls.getItem('ib-scores-scrabble'), JSON.stringify([{ score: 412 }]), 'Scrabble local history is left alone');
+  assert.strictEqual(ls.getItem('ib-tetris-scores-cleared-1.9.207'), '1');
+  ls.setItem('tetris-best', '500');
+  assert.strictEqual(tetGame.clearTetrisScoresOnce207(ls), false, 'the reset never repeats');
+  assert.strictEqual(ls.getItem('tetris-best'), '500');
+  assert.ok(scoresSrc.includes("TETRIS_SCORES_CLEAR_207 = 'ib-tetris-scores-cleared-1.9.207'") && scoresSrc.includes("removeItem('ib-scores-tetris')"));
+}
+
+// 1.9.207 drop speed is 38% slower on every level; controls are unchanged
+{
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  const old = (lv) => Math.max(60, 800 * Math.pow(0.85, lv - 1));
+  for (const lv of [1, 2, 3, 5, 8, 9, 12, 13, 20, 30]) {
+    assert.ok(Math.abs(tetGame.dropInterval(lv) - old(lv) * 1.38) < 1e-9, 'level ' + lv + ' is 38% slower');
+  }
+  assert.ok(tetGame.dropInterval(1) > tetGame.dropInterval(2));
+  assert.ok(tetGame.dropInterval(8) > tetGame.dropInterval(9));
+  assert.ok(src.includes("a === 'down'") && src.includes("data-act=\"drop\"") || src.includes("a === 'drop'"));
+  // Soft / hard drop still exist and are not tied to DROP_SLOW
+  const act = src.slice(src.indexOf("} else if (a === 'down')"), src.indexOf("} else if (a === 'drop')") + 200);
+  assert.ok(act.includes("p.y++") && !act.includes('DROP_SLOW'), 'soft drop is unchanged');
+}
+
+// 1.9.207 Snowy mountains abseilers
+{
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.strictEqual(tetGame.themeFor(10), 10);
+  assert.strictEqual(tetGame.THEMES[10].name, 'Snowy mountains');
+  assert.deepStrictEqual(Array.from(tetGame.ABSEIL_GAP), [30, 60]);
+  assert.deepStrictEqual(Array.from(tetGame.ABSEIL_FIRST), [5, 12]);
+  const st0 = tetGame.newAbseil();
+  st0.wait = 0;
+  tetGame.stepAbseil(st0, 0, 390, 844, { pose: true, start: { t: 6 } });
+  // kick off a run
+  const st = tetGame.newAbseil();
+  st.wait = 0;
+  tetGame.stepAbseil(st, 10, 390, 844, { pose: true, start: { t: 6 } });
+  assert.ok(st.phase === 'down' || st.people.length === 2, 'a run starts after the wait');
+  const mid = tetGame.poseAbseil({ phase: 'carry', t: 6 }, 390, 844);
+  assert.strictEqual(mid.people.length, 2);
+  assert.ok(mid.people[0].y > 40 && mid.people[1].y > 40, 'both climbers are mid-abseil');
+  assert.ok(mid.piece && mid.piece.t === 6, 'decorative T piece uses the posed type');
+  assert.ok(mid.piece.held || mid.phase === 'grab' || mid.phase === 'carry', 'one of them has or is grabbing the piece');
+  const pal = tetGame.LOOKS[10].colors;
+  assert.ok(pal.includes(mid.piece.color), 'the prop uses Snowy mountains colours');
+  const reduced = tetGame.newAbseil();
+  reduced.phase = 'down';
+  reduced.people = [{ x: 10, y: 10 }];
+  tetGame.stepAbseil(reduced, 100, 390, 844, { reduce: true });
+  assert.strictEqual(reduced.phase, 'wait');
+  assert.strictEqual(reduced.people.length, 0, 'reduced motion skips the animation');
+  assert.ok(src.includes('function drawAbseilClimber') && src.includes('helmet') || src.includes("helmet"));
+  assert.ok(src.includes('stepAbseil(abseil') && src.includes('drawAbseil(c, abseil)'));
+  assert.ok(!src.includes('lockPiece') || src.indexOf('function poseAbseil') > 0);
+  const poseFn = src.slice(src.indexOf('function poseAbseil'), src.indexOf('function drawAbseilPiece'));
+  assert.ok(!poseFn.includes('lockPiece') && !poseFn.includes('spawn('), 'the prop is not a live game piece');
+  // Other stages do not start a run
+  assert.strictEqual(tetGame.themeFor(2), 0);
+  assert.strictEqual(tetGame.themeFor(8), 3);
+}
+

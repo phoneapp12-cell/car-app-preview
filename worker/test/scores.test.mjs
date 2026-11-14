@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
-import { checkScore, tetrisMax, scoresInit, scoresRoute, addScore, board, RATE, clearShaneTetrisOnce, CLEAR_SHANE_TETRIS_KEY, clearShaneTetrisOnce20261113, CLEAR_SHANE_TETRIS_KEY2 } from '../src/scores.js';
+import { checkScore, tetrisMax, scoresInit, scoresRoute, addScore, board, RATE, clearShaneTetrisOnce, CLEAR_SHANE_TETRIS_KEY, clearShaneTetrisOnce20261113, CLEAR_SHANE_TETRIS_KEY2, clearAllTetrisOnce20261114, CLEAR_ALL_TETRIS_KEY } from '../src/scores.js';
 
 function stubSql() {
   const db = new DatabaseSync(':memory:');
@@ -154,6 +154,36 @@ assert.equal(rec13b.already, true);
 assert.equal(rec13b.deleted[0].n, 2);
 assert.deepEqual(board(sql4, shane, 'tetris').body.top.map(x => [x.name, x.score]), [['Sarah', 8000], ['Shane', 3000], ['Shane Jenkins', 500]]);
 assert.ok(fam.includes('clearShaneTetrisOnce20261113(this.sql)'));
+
+// 14 Nov 2026 one-off: clear everyone's Tetris scores; leave Scrabble
+const sql5 = stubSql();
+sql5.db.exec(`CREATE TABLE members (id TEXT PRIMARY KEY, name TEXT, role TEXT, removed INTEGER DEFAULT 0)`);
+for (const [id, name, role] of [['m1', 'Shane Jenkins', 'admin'], ['m2', 'Sarah', 'member'], ['m4', 'Shane', 'member'], ['m5', 'Alex', 'admin']])
+  sql5.db.prepare(`INSERT INTO members VALUES (?,?,?,0)`).run(id, name, role);
+scoresInit(sql5);
+sql5.db.prepare('DELETE FROM meta WHERE k=?').run(CLEAR_ALL_TETRIS_KEY);
+const ins5 = sql5.db.prepare(`INSERT INTO scores (game,mid,score,lines,level,won,opp,at) VALUES (?,?,?,?,?,?,?,?)`);
+ins5.run('tetris', 'm1', 9900, 50, 6, null, null, 200);
+ins5.run('tetris', 'm2', 8000, 50, 6, null, null, 180);
+ins5.run('tetris', 'm4', 3000, 20, 3, null, null, 170);
+ins5.run('tetris', 'm5', 1200, 10, 2, null, null, 160);
+ins5.run('scrabble', 'm1', 412, null, null, 1, 'computer', 150);
+ins5.run('scrabble', 'm2', 380, null, null, 1, 'family', 140);
+const recAll = clearAllTetrisOnce20261114(sql5);
+assert.equal(recAll.already, undefined);
+assert.equal(recAll.n, 4);
+assert.equal(recAll.members.length, 4);
+assert.equal(board(sql5, shane, 'tetris').body.top.length, 0, 'every Tetris score is gone');
+assert.equal(board(sql5, shane, 'tetris').body.best.length, 0);
+assert.deepEqual(board(sql5, shane, 'scrabble').body.top.map(x => [x.name, x.score]), [['Shane Jenkins', 412], ['Sarah', 380]], 'Scrabble is untouched');
+assert.ok(recAll.scores.some(s => s.score === 9900 && s.name === 'Shane Jenkins'), 'backup rows are stored in the meta record');
+assert.equal(addScore(sql5, shane, { game: 'tetris', score: 500, lines: 4, level: 1 }, 3e12).status, 200);
+assert.deepEqual(board(sql5, shane, 'tetris').body.top.map(x => [x.name, x.score]), [['Shane Jenkins', 500]], 'a new Tetris score still saves and shows');
+const recAll2 = clearAllTetrisOnce20261114(sql5);
+assert.equal(recAll2.already, true);
+assert.equal(recAll2.n, 4);
+assert.deepEqual(board(sql5, shane, 'tetris').body.top.map(x => [x.name, x.score]), [['Shane Jenkins', 500]], 'the second clear is a no-op');
+assert.ok(fam.includes('clearAllTetrisOnce20261114(this.sql)'));
 
 console.log('scores tests ok');
 
