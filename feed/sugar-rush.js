@@ -797,6 +797,36 @@
     // Kept for older tests; no live level is score-only any more.
     return !lv.jelly && !lv.ice && !lv.collect && !(lv.ings && lv.ings.length) && !lv.locks;
   }
+  function goalCounts(lv, stt) {
+    lv = lv || {};
+    const out = [];
+    if (lv.collect) {
+      const have = stt ? (stt.collected[lv.collect.color] || 0) : 0;
+      const n = lv.collect.n;
+      const left = Math.max(0, n - have);
+      const icon = lv.collect.color === 0 ? '🍒' : lv.collect.color === 2 ? '🍋' : '🍬';
+      out.push({ kind: 'collect', icon: icon, left: left, have: have, n: n, lab: 'left', text: icon + ' ' + left + ' left' });
+    }
+    if (lv.ings && lv.ings.length) {
+      const n = lv.ings.length;
+      const have = stt ? (n - (stt.ingsLeft || 0)) : 0;
+      const left = stt ? (stt.ingsLeft || 0) : n;
+      out.push({ kind: 'ings', icon: '🎁', left: left, have: have, n: n, lab: have + '/' + n, text: '🎁 ' + have + '/' + n });
+    }
+    if (lv.jelly) {
+      const left = stt ? jellyLeft(stt) : 0;
+      out.push({ kind: 'jelly', icon: '🟩', left: left, have: 0, n: left, lab: 'Jelly ' + left + ' left', text: '🟩 Jelly ' + left + ' left' });
+    }
+    if (lv.ice) {
+      const left = stt && stt.board ? iceLeft(stt.board) : 0;
+      out.push({ kind: 'ice', icon: '🧁', left: left, have: 0, n: left, lab: 'Icing ' + left + ' left', text: '🧁 ' + left + ' left' });
+    }
+    if (lv.locks) {
+      const left = stt && stt.board ? locksLeft(stt.board) : 0;
+      out.push({ kind: 'locks', icon: '🔒', left: left, have: 0, n: left, lab: left + ' left', text: '🔒 ' + left + ' left' });
+    }
+    return out;
+  }
   function finishIfDone(st) {
     const reached = goalsMet(st);
     // Score-only levels (including level 1) play out every move, then award the win.
@@ -1092,10 +1122,95 @@
     return null;
   }
 
+  // Inventive, candy-themed sayings in NZ flavour. Matched to the achievement,
+  // never the generic "Great". At least three variants of each; pickSaying
+  // skips the line that just appeared so the same one does not land twice in a row.
+  const SAYINGS = {
+    cascade: ['Sweet as!', 'Sugar rush!', 'Choice!', 'Mean as!'],
+    stripe: ['Stripe-tastic!', 'Candy-licious!', 'Looking sharp!', 'Stripe me pink!'],
+    wrap: ["That's a wrap!", 'All wrapped up!', 'Parcel of yum!', 'Tied with a bow!'],
+    bomb: ['Sprinkle-tastic!', 'Hundreds and thousands!', 'Sprinkle party!', 'Lolly bomb!'],
+    jelly: ['Jelly good!', 'Wobble wobble!', 'Jelly well done!', 'Wobbly wonder!'],
+    locks: ['Jar-mazing!', 'Lock-busted!', 'Jar-fully done!', 'Set those jars free!'],
+    ice: ['Ice ice baby!', 'Icing on the cake!', 'Chip chip hooray!', 'Frost-busted!'],
+    ings: ['Down the hatch!', 'Coming through!', 'And down she goes!', 'Nice drop!'],
+    choco: ['Choc-blocked!', 'No more spreading!', 'Held the line!', 'Choc stop!'],
+    gumdrop: ['Gum-believable!', 'Cherry on top!', 'Pop those cherries!', 'Gumdrop gorgeous!'],
+    lemon: ['Zesty!', 'Lemon-sational!', 'Zing!', 'Squeeze the day!'],
+    combo: ['Double delight!', 'Two for tea!', 'Special times two!', 'Pair of treats!'],
+    comeback: ['Still in it!', 'Not done yet!', 'Clutch play!', 'Comeback sweet!']
+  };
+  const SAYING_COLORS = {
+    cascade: '#ff3d8a', stripe: '#1aa7ff', wrap: '#ffb400', bomb: '#c84dff',
+    jelly: '#e649cf', locks: '#ff8c2a', ice: '#3bc9ff', ings: '#ff6b2c',
+    choco: '#c26a2d', gumdrop: '#ff2d55', lemon: '#ffd43b', combo: '#ff5ad5',
+    comeback: '#ff7a1a'
+  };
+  const SAYING_VOICE = {
+    cascade: 'great', stripe: 'great', wrap: 'sweetas', bomb: 'succulent',
+    jelly: 'great', locks: 'great', ice: 'great', ings: 'sweetas',
+    choco: 'great', gumdrop: 'great', lemon: 'great', combo: 'awesome',
+    comeback: 'awesome'
+  };
+  function sayingKind(s, cascade, st) {
+    if (!s) return null;
+    const i = cascade != null ? cascade : (s.cascade || 1);
+    const fired = s.fired || [];
+    const made = s.madeTiles || s.made || [];
+    const nFire = fired.filter(f => f.s === 'row' || f.s === 'col' || f.s === 'w' || f.s === 'b').length;
+    const hasBomb = !!(s.bomb || fired.some(f => f.s === 'b') || made.some(m => madeKind(m) === 'b'));
+    const madeWrap = made.some(m => madeKind(m) === 'w');
+    const madeStripe = made.some(m => { const k = madeKind(m); return k === 'row' || k === 'col'; });
+    const low = !!(st && st.moves <= 5 && st.moves > 0);
+    let kind = null;
+    if (nFire >= 2) kind = 'combo';
+    else if (hasBomb) kind = 'bomb';
+    else if (madeWrap) kind = 'wrap';
+    else if (madeStripe) kind = 'stripe';
+    else if (s.delivered && s.delivered.length) kind = 'ings';
+    else if (s.chocoHit) kind = 'choco';
+    else if (s.brokeLock) kind = 'locks';
+    else if (s.jellyCleared) kind = 'jelly';
+    else if ((s.blocked || []).some(b => b.kind === 'ice')) kind = 'ice';
+    else {
+      const popped = s.popped || [];
+      const nLemon = popped.filter(p => p.color === 2).length;
+      const nGum = popped.filter(p => p.color === 0).length;
+      const want = st && st.lv && st.lv.collect;
+      if (want && want.color === 2 && nLemon) kind = 'lemon';
+      else if (want && want.color === 0 && nGum) kind = 'gumdrop';
+      else if (nLemon >= 3) kind = 'lemon';
+      else if (nGum >= 3) kind = 'gumdrop';
+      else if (i >= 2) kind = 'cascade';
+    }
+    if (low && kind && kind !== 'combo' && kind !== 'bomb' && kind !== 'wrap' && kind !== 'stripe') kind = 'comeback';
+    return kind;
+  }
+  function pickSaying(kind, last, rand) {
+    const pool = SAYINGS[kind];
+    if (!pool || !pool.length) return null;
+    const opts = pool.filter(t => t !== last);
+    const list = opts.length ? opts : pool;
+    const r = typeof rand === 'function' ? rand() : Math.random();
+    return list[(r * list.length) | 0];
+  }
+  function sayingColor(kind) { return SAYING_COLORS[kind] || '#ff4f9a'; }
+
+  function playMovesWarnChime(ctx, dest, at) {
+    if (!ctx || !dest) return;
+    if (at == null) at = (ctx.currentTime || 0) + 0.01;
+    const notes = [SCALE[0], SCALE[2], SCALE[SCALE.length - 1]];
+    const v = CHIME_VOL * 1.55;
+    notes.forEach(function (f, i) {
+      playTone(ctx, dest, f, at + i * 0.13, 0.28, v);
+    });
+  }
+  const MOVES_WARN_AT = 3, MOVES_WARN_MS = 2300;
+
   // 1.9.169 Tasteful candy sparkle: a glossy highlight on each sweet, a few
   // staggered star glints (~0.6–1s), and a soft shimmer sweep. Cheap on a
   // phone; prefers-reduced-motion keeps the gloss and tones the motion down.
-  const SPARKLE_MIN_MS = 600, SPARKLE_MAX_MS = 1000, SPARKLE_MAX = 4, SPARKLE_MAX_REDUCE = 1, SHIMMER_MS = 5200;
+  const SPARKLE_MIN_MS = 480, SPARKLE_MAX_MS = 900, SPARKLE_MAX = 7, SPARKLE_MAX_REDUCE = 1, SHIMMER_MS = 4200;
   function sparkleCap(reduceMotion) { return reduceMotion ? SPARKLE_MAX_REDUCE : SPARKLE_MAX; }
   function sparkleEase(p) {
     if (p <= 0 || p >= 1) return 0;
@@ -1113,7 +1228,7 @@
     ctx.translate(x, y);
     ctx.rotate(rot || 0);
     ctx.globalAlpha = Math.max(0, Math.min(1, a));
-    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.fillStyle = 'rgba(255,255,255,1)';
     function cross(len, thick) {
       ctx.beginPath();
       ctx.moveTo(0, -len);
@@ -1129,7 +1244,7 @@
     }
     cross(r, r * 0.16);
     ctx.rotate(Math.PI / 4);
-    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.fillStyle = 'rgba(255,252,180,0.95)';
     cross(r * 0.52, r * 0.1);
     ctx.restore();
   }
@@ -1137,13 +1252,17 @@
   function drawCandyShine(ctx, R, amt) {
     if (!ctx || !(R > 0)) return;
     const a = amt == null ? 1 : amt;
-    ctx.fillStyle = 'rgba(255,255,255,' + (0.42 * a) + ')';
+    ctx.fillStyle = 'rgba(255,255,255,' + (0.62 * a) + ')';
     ctx.beginPath();
-    ctx.ellipse(-R * .32, -R * .44, R * .34, R * .16, -.5, 0, Math.PI * 2);
+    ctx.ellipse(-R * .32, -R * .44, R * .38, R * .18, -.5, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,' + (0.7 * a) + ')';
+    ctx.fillStyle = 'rgba(255,255,255,' + (0.95 * a) + ')';
     ctx.beginPath();
-    ctx.ellipse(-R * .16, -R * .54, R * .09, R * .055, -.4, 0, Math.PI * 2);
+    ctx.ellipse(-R * .16, -R * .54, R * .11, R * .065, -.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,' + (0.55 * a) + ')';
+    ctx.beginPath();
+    ctx.ellipse(R * .22, -R * .18, R * .07, R * .04, .5, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -1205,10 +1324,11 @@
   }
   function racerFirst(name) { return String(name || 'Player').trim().split(/\s+/)[0] || 'Player'; }
 
-  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_STOPS, FUTURE_STOPS, stopForLevel, icingPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, cloneState, bestMove, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
+  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_STOPS, FUTURE_STOPS, stopForLevel, icingPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, goalCounts, cloneState, bestMove, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
     allowed: () => !!(root.IBScores && root.IBScores.isShane && root.IBScores.isShane()),
     SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL, XF,
-    VOICE_FILES, VOICE_RANK, MEDIA_HASH, mediaUrl, gameTrack, attachSfxBus, playTone, playChime, playClip, voiceForStep,
+    VOICE_FILES, VOICE_RANK, MEDIA_HASH, mediaUrl, gameTrack, attachSfxBus, playTone, playChime, playMovesWarnChime, playClip, voiceForStep,
+    SAYINGS, SAYING_COLORS, SAYING_VOICE, sayingKind, pickSaying, sayingColor, MOVES_WARN_AT, MOVES_WARN_MS,
     SPARKLE_MIN_MS, SPARKLE_MAX_MS, SPARKLE_MAX, SPARKLE_MAX_REDUCE, SHIMMER_MS, sparkleCap, sparkleEase, shimmerAt, drawStarGlint, drawCandyShine };
 
   if (!root.document) return;
@@ -1482,7 +1602,7 @@
   }
 
   // ---------- Look ----------
-  const COL = [['#ff8a9a', '#e0284a', '#9e1030'], ['#ffc078', '#f76707', '#b34700'], ['#fff3a0', '#fcc419', '#c98e00'], ['#9ff0a8', '#37b24d', '#1d7a30'], ['#a5dcff', '#228be6', '#124f99'], ['#e2b6ff', '#9c36b5', '#5f1a75']];
+  const COL = [['#ff6b88', '#ff1a4a', '#c40032'], ['#ffb347', '#ff6a00', '#c44e00'], ['#ffe566', '#ffc107', '#d99400'], ['#5dff7a', '#12d04a', '#0b8a2c'], ['#6ed0ff', '#1a8cff', '#0b5ad6'], ['#d894ff', '#c026f0', '#7a12b0']];
   const cv = $('board'), ctx = cv.getContext('2d');
   let W = 0, CS = 0, DPR = 1;
   function rr(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
@@ -1508,7 +1628,7 @@
       ctx.fillStyle = '#c45c2e'; rr(-R * .7, -R * .55, R * 1.4, R * 1.2, R * .18); ctx.fill();
       ctx.fillStyle = '#e8b04a'; rr(-R * .7, -R * .55, R * 1.4, R * .4, R * .16); ctx.fill();
       ctx.fillStyle = '#fff6c8'; ctx.fillRect(-R * .08, -R * .7, R * .16, R * 1.35);
-      drawCandyShine(ctx, R * 0.85, 0.75);
+      drawCandyShine(ctx, R * 0.85, 1);
       ctx.restore(); return;
     }
     if (t.ice > 0) {
@@ -1517,13 +1637,13 @@
       g.addColorStop(1, 'rgba(160,210,240,.8)');
       ctx.fillStyle = g; rr(-R * .85, -R * .85, R * 1.7, R * 1.7, R * .28); ctx.fill();
       ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = R * .08; rr(-R * .85, -R * .85, R * 1.7, R * 1.7, R * .28); ctx.stroke();
-      drawCandyShine(ctx, R * 0.9, 0.7);
+      drawCandyShine(ctx, R * 0.9, 0.95);
       ctx.restore(); return;
     }
     if (t.choco) {
       ctx.fillStyle = '#6b3a1f'; rr(-R * .85, -R * .85, R * 1.7, R * 1.7, R * .2); ctx.fill();
       ctx.fillStyle = '#4a2414'; rr(-R * .6, -R * .6, R * 1.2, R * 1.2, R * .12); ctx.fill();
-      drawCandyShine(ctx, R * 0.85, 0.55);
+      drawCandyShine(ctx, R * 0.85, 0.8);
       ctx.restore(); return;
     }
     if (t.c < 0) {
@@ -1531,7 +1651,7 @@
       g.addColorStop(0, '#9a6a4f'); g.addColorStop(.6, '#5b3423'); g.addColorStop(1, '#3a1f14');
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R * .95, 0, Math.PI * 2); ctx.fill();
       for (let i = 0; i < 14; i++) { const a = i * 2.39996, d = R * (.25 + .55 * ((i * 37) % 10) / 10); ctx.save(); ctx.translate(Math.cos(a) * d, Math.sin(a) * d); ctx.rotate(a * 1.7); ctx.fillStyle = COL[i % 6][1]; rr(-R * .13, -R * .05, R * .26, R * .1, R * .05); ctx.fill(); ctx.restore(); }
-      drawCandyShine(ctx, R, 0.8);
+      drawCandyShine(ctx, R, 1);
       ctx.restore(); return;
     }
     const c = COL[t.c];
@@ -1543,6 +1663,12 @@
     const g = ctx.createRadialGradient(-R * .35, -R * .4, R * .1, 0, 0, R * 1.1);
     g.addColorStop(0, c[0]); g.addColorStop(.55, c[1]); g.addColorStop(1, c[2]);
     shapePath(t.c, R * (t.s === 'w' ? .8 : 1)); ctx.fillStyle = g; ctx.fill();
+    if (!reduce) {
+      const breathe = 0.5 + 0.5 * Math.sin((performance.now() / 1100) + (t.c || 0) * 0.85);
+      ctx.fillStyle = 'rgba(255,255,255,' + (0.07 + 0.08 * breathe) + ')';
+      shapePath(t.c, R * (t.s === 'w' ? .8 : 1) * 0.72);
+      ctx.fill();
+    }
     if (t.s === 'row' || t.s === 'col') {
       ctx.save(); shapePath(t.c, R); ctx.clip(); ctx.fillStyle = 'rgba(255,255,255,.78)';
       for (let i = -2; i <= 2; i++) { if (t.s === 'row') ctx.fillRect(-R * 1.2, i * R * .42 - R * .08, R * 2.4, R * .16); else ctx.fillRect(i * R * .42 - R * .08, -R * 1.2, R * .16, R * 2.4); }
@@ -1587,14 +1713,14 @@
       dur,
       rot: Math.random() * Math.PI
     });
-    sparkleNext = t + (reduce ? 900 : (160 + Math.random() * 260));
+    sparkleNext = t + (reduce ? 900 : (90 + Math.random() * 180));
   }
   function drawShimmerSweep(t) {
     if (reduce && sparkleHoldT == null) return;
     const p = shimmerAt(t);
     const x = (p * 1.7 - 0.35) * W;
     const g = ctx.createLinearGradient(x - CS * 1.4, -CS * 0.2, x + CS * 1.4, CS * 0.5);
-    const peak = reduce ? 0.04 : 0.11;
+    const peak = reduce ? 0.05 : 0.18;
     g.addColorStop(0, 'rgba(255,255,255,0)');
     g.addColorStop(0.5, 'rgba(255,252,245,' + peak + ')');
     g.addColorStop(1, 'rgba(255,255,255,0)');
@@ -1650,7 +1776,7 @@
         if (life <= 0) continue;
         const x = s.x * CS + CS / 2 + sp.ox * R * s.sc;
         const y = s.y * CS + CS / 2 + sp.oy * R * s.sc;
-        drawStarGlint(ctx, x, y, R * (0.16 + 0.14 * life) * s.sc, 0.85 * life * s.al, sp.rot);
+        drawStarGlint(ctx, x, y, R * (0.24 + 0.22 * life) * s.sc, 1 * life * s.al, sp.rot);
       }
       if (tut && tut.active && tut.step && tut.step.hl && (tut.step.kind === 'move' || tut.step.kind === 'show')) {
         ctx.fillStyle = 'rgba(40, 8, 28, 0.55)';
@@ -1728,21 +1854,41 @@
   }
   function paintGoalStrip(lv, stt) {
     const info = levelIntro(lv && lv.n || 1, prog);
-    if ($('gicon')) $('gicon').textContent = info.icon;
+    const counts = goalCounts(lv, stt);
+    const hold = $('cditems');
+    if (hold) {
+      const prev = (hold.dataset.sig || '').split(',');
+      hold.innerHTML = counts.map(function (c, i) {
+        const lab = c.kind === 'ings' ? c.lab : (c.kind === 'jelly' ? 'Jelly left' : 'left');
+        const num = c.kind === 'ings' ? c.lab : String(c.left);
+        const iconId = i === 0 ? ' id="gicon"' : '';
+        return '<div class="cd-item" data-kind="' + c.kind + '" data-left="' + c.left + '"><span class="cd-icon"' + iconId + '>' + c.icon + '</span><span class="cd-num">' + num + '</span><span class="cd-lab">' + lab + '</span></div>';
+      }).join('');
+      const sig = counts.map(function (c) { return c.kind + ':' + c.left; }).join(',');
+      if (stt && prev && prev[0] && prev.join(',') !== sig) {
+        const items = hold.querySelectorAll('.cd-item');
+        counts.forEach(function (c, i) {
+          const was = prev[i] && +String(prev[i]).split(':')[1];
+          if (items[i] && was != null && c.left < was) {
+            items[i].classList.remove('tick');
+            void items[i].offsetWidth;
+            items[i].classList.add('tick');
+          }
+        });
+      }
+      hold.dataset.sig = sig;
+    } else if ($('gicon')) $('gicon').textContent = (counts[0] && counts[0].icon) || info.icon;
     if ($('help')) {
-      let t = info.goal;
-      if (stt) {
-        if (stt.lv && stt.lv.collect) t += ' · ' + (stt.collected[stt.lv.collect.color] || 0) + '/' + stt.lv.collect.n;
-        if (stt.lv && stt.lv.ings && stt.lv.ings.length) t += ' · ' + ((stt.lv.ings.length - (stt.ingsLeft || 0))) + '/' + stt.lv.ings.length;
-        else if (stt.lv && stt.lv.jelly) t += ' · ' + jellyLeft(stt) + ' left';
-        else if (stt.lv && stt.lv.ice) t += ' · ' + iceLeft(stt.board) + ' left';
-        else if (stt.lv && stt.lv.locks) t += ' · ' + locksLeft(stt.board) + ' left';
-        t += ' · ' + stt.moves + ' moves left';
-      } else t = info.strip;
-      $('help').textContent = t;
+      const bits = counts.map(function (c) { return c.text; });
+      if (stt) bits.push(stt.moves + ' moves left');
+      $('help').textContent = bits.length ? bits.join(' · ') : (stt ? info.goal : info.strip);
     }
     const strip = $('goalstrip');
     if (strip) strip.dataset.n = String(info.n);
+    const mc = $('movecount');
+    if (mc && stt) {
+      mc.classList.toggle('low', stt.moves <= 5 && stt.moves > 0 && !goalsMet(stt));
+    } else if (mc) mc.classList.remove('low');
   }
   function showIntro(n) {
     const info = levelIntro(n, prog); if (!info) return;
@@ -1881,7 +2027,7 @@
     if (opt.jelly) st.jelly = parseDigits(opt.jelly);
     if (opt.tutorial) st.tutorial = true;
     sel = null; busy = false; lastAct = now();
-    crush = null;
+    crush = null; warned3 = false; hideMovesWarn(); lastSaying = ''; sayUntil = 0; hideSaying();
     fitCanvas(); syncAll(); hud();
     paintGoalStrip(lv, st);
     hintMove = opt.tutorial ? null : findMove(st.board, st.mask);
@@ -1923,9 +2069,73 @@
     stars.forEach((s, i) => { const el = $('st' + i); el.style.left = (s / max * 100) + '%'; el.classList.toggle('got', st.score >= s && (s > 0 || st.won)); });
   }
   function praise(step, i) {
-    const sarah = st && st.lv && st.lv.theme === 'sarah';
-    const words = sarah ? ['', '', 'Lovely!', 'Sweet!', 'For Sarah!', 'Sugar rush!'] : ['', '', 'Yum!', 'Sweet!', 'Super sweet!', 'Sugar rush!'];
-    return words[Math.min(words.length - 1, i + 1)];
+    // Kept as a thin wrapper for older call sites; the on-board line now comes from pickSaying.
+    const kind = sayingKind(step, step && (step.cascade || (i + 1)), st);
+    return kind ? pickSaying(kind, lastSaying) : '';
+  }
+
+  let lastSaying = '', sayUntil = 0, sayTimer = 0, warned3 = false, warnTimer = 0;
+  function hideSaying() {
+    const el = $('saypop');
+    if (el) { el.hidden = true; el.textContent = ''; el.className = 'saypop'; }
+    if (sayTimer) { clearTimeout(sayTimer); sayTimer = 0; }
+  }
+  function showSaying(step, i) {
+    const kind = sayingKind(step, step && (step.cascade || (i + 1)), st);
+    if (!kind) return null;
+    const t = now();
+    if (t < sayUntil) return null;
+    const text = pickSaying(kind, lastSaying);
+    if (!text) return null;
+    lastSaying = text;
+    sayUntil = t + (reduce ? 1400 : 1100);
+    const el = $('saypop');
+    if (el) {
+      el.textContent = text;
+      el.style.color = sayingColor(kind);
+      el.hidden = false;
+      el.className = 'saypop kind-' + kind;
+      el.classList.remove('pop');
+      void el.offsetWidth;
+      el.classList.add('pop');
+      if (sayTimer) clearTimeout(sayTimer);
+      sayTimer = setTimeout(hideSaying, reduce ? 900 : 1100);
+    }
+    return text;
+  }
+  function hideMovesWarn() {
+    const el = $('moveswarn');
+    if (el) { el.hidden = true; el.classList.remove('run', 'mid', 'reduce'); }
+    if (warnTimer) { clearTimeout(warnTimer); warnTimer = 0; }
+  }
+  function showMovesWarn(opt) {
+    opt = opt || {};
+    const el = $('moveswarn');
+    if (!el) return;
+    el.hidden = false;
+    el.classList.toggle('reduce', !!reduce);
+    el.classList.toggle('mid', !!opt.mid);
+    el.classList.remove('run');
+    void el.offsetWidth;
+    el.classList.add('run');
+    if (!opt.silent) {
+      runAudio(() => {
+        if (!out) return;
+        playMovesWarnChime(ac, out, ac.currentTime + 0.01);
+      });
+    }
+    if (warnTimer) { clearTimeout(warnTimer); warnTimer = 0; }
+    if (!opt.hold) {
+      const dur = reduce ? 2000 : MOVES_WARN_MS;
+      warnTimer = setTimeout(hideMovesWarn, dur + 40);
+    }
+    return el;
+  }
+  function maybeWarn3() {
+    if (!st || warned3 || st.tutorial || (tut && tut.active) || (crush && crush.active) || st.over) return;
+    if (st.moves !== MOVES_WARN_AT || goalsMet(st)) return;
+    warned3 = true;
+    showMovesWarn();
   }
 
 
@@ -2275,6 +2485,7 @@
       return;
     }
     if (goalsMet(st) && !st.tutorial) { await beginGoalFinish(); return; }
+    maybeWarn3();
     if (st.over) finish();
   }
   function addText(str, x, y, size, col) { fx.push({ type: 'text', str, x, y, size, col, t0: now(), dur: 900 * SP }); }
@@ -2292,10 +2503,9 @@
     }
     callout(s, i);
     if (n) addText('+' + s.points, cx / n, cy / n, 22, '#fff');
-    const word = (s.fired && s.fired.length) ? (i >= 1 ? praise(s, i + 1) : 'Pow!') : praise(s, i);
-    if (word) addText(word, W / 2, W * .42, 34, '#ffe066');
+    showSaying(s, i);
     for (const m of s.madeTiles || []) { const sp = sprite(m.t, m.r, m.c); sp.grow = t; }
-    if (s.delivered) for (const d of s.delivered) { const sp = sprites.get(d.t.id); if (sp) sp.pop = t; addText('Got it!', cellXY(d.r, d.c)[0], cellXY(d.r, d.c)[1], 20, '#ffe066'); }
+    if (s.delivered) for (const d of s.delivered) { const sp = sprites.get(d.t.id); if (sp) sp.pop = t; }
     await wait(230);
     let longest = 0;
     for (const f of s.falls || []) {
@@ -2667,14 +2877,14 @@
   root.requestAnimationFrame(frame);
 
   root.SugarRush.ui = {
-    state: () => st, attempt, showEnd, showMap, scrollMapTo, openLevel, startLevel, showIntro, startTutorial, skipTutorial, finishTutorial, showTutStep, beginLevel, beginGoalFinish, showGoalBanner, celebrateOnMap, progress: () => prog, tutorial: () => tut, crush: () => crush,
+    state: () => st, attempt, hud, paintGoalStrip, showEnd, showMap, scrollMapTo, openLevel, startLevel, showIntro, startTutorial, skipTutorial, finishTutorial, showTutStep, beginLevel, beginGoalFinish, showGoalBanner, celebrateOnMap, progress: () => prog, tutorial: () => tut, crush: () => crush,
     seedRace, syncRace, openIconPicker, setRaceOpen, requestCloseSugar, race: () => race,
-    say, chime, callout, unlockAudio, audio,
+    say, chime, callout, unlockAudio, audio, showSaying, hideSaying, showMovesWarn, hideMovesWarn, maybeWarn3,
     clipsReady: () => Object.keys(VOICE_FILES).every(k => !!bufs[k]),
     setSound(on) { soundOn = !!on; ls.set('ib-sugar-sound', soundOn); paintButtons(); },
     setScore(n) { if (!st) return; st.score = n; st.moves = 0; st.over = true; st.won = goalsMet(st); st.stars = starsOf(st); hud(); },
     previewWin(opts) { opts = opts || {}; const n = opts.level || (st && st.lv && st.lv.n) || 2; if (!st || st.lv.n !== n) startLevel(n); st.score = opts.score || Math.max(st.lv.stars[2] || 0, 2400); st.moves = Math.max(st.moves, 1); st.won = true; st.over = true; st.stars = opts.stars || 3; if (opts.resetBadge) prog.badges[n - 1] = 0; winInfo = recordWin(st); hud(); showEnd(); },
-    view: () => ({ score: st && st.score, moves: st && st.moves, busy, soundOn, musicOn, screen, level: st && st.lv && st.lv.n, acState: ac && ac.state, sparkles: sparkles.length, hold: sparkleHoldT != null }),
+    view: () => ({ score: st && st.score, moves: st && st.moves, busy, soundOn, musicOn, screen, level: st && st.lv && st.lv.n, acState: ac && ac.state, sparkles: sparkles.length, hold: sparkleHoldT != null, warned3, lastSaying }),
     musicState, playKind, wantKind, playEndSong, stopAllMusic, stopEnd, gameKind, setMusic,
     // Freeze a sparkling board for screenshots (settled pieces, mid-sweep, a few glints at peak).
     previewSparkle(opts) {
@@ -2696,7 +2906,7 @@
       const want = opts.sweep != null ? opts.sweep : 0.48;
       sparkleHoldT = Math.floor(now() / SHIMMER_MS) * SHIMMER_MS + want * SHIMMER_MS;
       const ids = [...sprites.values()];
-      const picks = opts.glints || [1, 8, 19, 28];
+      const picks = opts.glints || [1, 8, 14, 19, 24, 28, 35];
       sparkles = picks.slice(0, sparkleCap(false)).map((idx, i) => {
         const s = ids[idx % Math.max(1, ids.length)];
         return {
