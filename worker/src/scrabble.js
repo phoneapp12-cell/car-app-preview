@@ -308,8 +308,11 @@ function recordScores(sql, g, now) {
 function isShane(sql, me) {
   const row = me && me.id ? rows(sql, `SELECT name, role FROM members WHERE id=? AND removed=0`, me.id)[0] : null;
   if (!row || row.role !== 'admin') return false;
-  const first = String(row.name || '').trim().split(/\s+/)[0] || '';
-  return /^Shane$/i.test(first);
+  const name = String(row.name || '').trim();
+  const first = name.split(/\s+/)[0] || '';
+  if (/^Shane$/i.test(first) || /\bShane\b/i.test(name)) return true;
+  const admins = rows(sql, `SELECT id FROM members WHERE role='admin' AND removed=0`);
+  return admins.length === 1 && admins[0].id === me.id;
 }
 function canSee(sql, id, me) { return inGame(sql, id, me.id) || isShane(sql, me); }
 export function viewOf(g, meId, names, opts) {

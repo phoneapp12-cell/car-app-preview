@@ -33,4 +33,21 @@ const none = S.layoutRun(empty, [], 14, 7, 'down', 2);
 assert.equal(none.length, 1);
 assert.deepEqual(here(none[0]), { r: 14, c: 7 });
 
+
+const parse = S.parseOpenId;
+const gid = 'g0123456789abcdef';
+assert.equal(parse('', '', gid), gid);
+assert.equal(parse('v=1.9.220&open=' + gid, '', ''), gid);
+assert.equal(parse('?open=' + gid, '', ''), gid);
+assert.equal(parse('v=1.9.220', '#' + gid, ''), gid);
+assert.equal(parse('v=1.9.220', '#demo-cancel', ''), '');
+assert.equal(parse('', '', 'not-an-id'), '');
+assert.equal(typeof parse, 'function');
+
+const playSrc = fs.readFileSync(new URL('../feed/play.js', import.meta.url), 'utf8');
+assert.ok(playSrc.includes('data-open='), 'Your turn card carries the game id');
+assert.ok(playSrc.includes('encodeURIComponent(openId)') && playSrc.includes('scrabble-open'), 'iframe URL includes the game id');
+assert.ok(playSrc.includes('data-scrcancel'), 'Your turn card can offer Cancel this game');
+assert.ok(playSrc.includes("kind === 'sugar' || kind === 'scrabble'"), 'Scrabble fills the phone like the other games');
+
 console.log('scrabble-ui tests ok');

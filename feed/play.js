@@ -332,7 +332,7 @@
     artFrame.replaceWith(next);
     artFrame = next;
   }
-  function openArt(kind, btn) {
+  function openArt(kind, btn, opts) {
     const spec = ART[kind]; if (!spec) return;
     artParts();
     pauseFeed();
@@ -344,7 +344,16 @@
     else { site.hidden = false; site.href = spec.url; site.textContent = spec.host; }
     artFrame.title = spec.local ? spec.title : spec.title + ' on ' + spec.host;
     artKind = kind;
-    artFrame.src = spec.url;
+    let url = spec.url;
+    const openId = opts && opts.open && /^g[0-9a-f]{16}$/.test(String(opts.open)) ? String(opts.open) : '';
+    if (kind === 'scrabble' && openId) {
+      // Put the game id on the iframe URL. sessionStorage is not always visible to a
+      // sandboxed same-origin iframe on Android WebView, so the Your turn card was
+      // opening Scrabble on the start screen instead of that game.
+      try { root.sessionStorage.setItem('scrabble-open', openId); } catch (e) { }
+      url = spec.url + (spec.url.indexOf('?') >= 0 ? '&' : '?') + 'open=' + encodeURIComponent(openId) + '#' + openId;
+    }
+    artFrame.src = url;
     artWin.querySelector('[data-artfs]').hidden = !spec.local;
     artWin.hidden = false;
     lockFeed(true);
@@ -357,7 +366,12 @@
       persistArt();
     }
     // 1.9.211 Sugar Rush map fills the phone, same artfull path as Tetris (no persist).
-    if (kind === 'sugar') setFull(true);
+    // Scrabble uses the same fill so the board and Cancel game are reachable on a phone.
+    if (kind === 'sugar' || kind === 'scrabble') setFull(true);
+    if (kind === 'scrabble' && openId) {
+      const send = () => { try { if (artFrame && artFrame.contentWindow) artFrame.contentWindow.postMessage({ type: 'ib-scrabble-open', id: openId }, '*'); } catch (e) { } };
+      artFrame.addEventListener('load', send, { once: true });
+    }
     const close = artWin.querySelector('[data-artclose]');
     if (close) close.focus();
     if (!artHist) { try { root.history.pushState({ ibArt: kind }, ''); artHist = true; } catch (e) { artHist = false; } }
@@ -388,11 +402,10 @@
         const g = (data.games || []).find(x => x.yourTurn && !x.over);
         const vsNames = g && g.players ? g.players.filter(p => !p.me && !p.resigned).map(p => p.name) : [];
         const vs = !vsNames.length ? '' : vsNames.length === 1 ? vsNames[0] : vsNames.length === 2 ? vsNames[0] + ' and ' + vsNames[1] : vsNames.slice(0, -1).join(', ') + ' and ' + vsNames[vsNames.length - 1];
-        host.innerHTML = '<button type="button" class="scrayour"><b>Your turn</b> in Scrabble' + (vs ? ' vs ' + vs : '') + '<small>' + (n > 1 ? n + ' games waiting · tap to play' : 'Tap to play') + '</small></button>';
-        host.firstChild.addEventListener('click', () => {
-          try { if (g && g.id) root.sessionStorage.setItem('scrabble-open', g.id); } catch (e) { }
-          if (root.ibArt) root.ibArt.open('scrabble');
-        });
+        const gid = g && g.id && /^g[0-9a-f]{16}$/.test(g.id) ? g.id : '';
+        let html = '<button type="button" class="scrayour" data-art="scrabble"' + (gid ? ' data-open="' + gid + '"' : '') + '><b>Your turn</b> in Scrabble' + (vs ? ' vs ' + vs : '') + '<small>' + (n > 1 ? n + ' games waiting · tap to play' : 'Tap to play') + '</small></button>';
+        if (data.admin && gid) html += '<button type="button" class="scraycancel" data-scrcancel="' + gid + '">Cancel this game</button>';
+        host.innerHTML = html;
       }).catch(() => { if (tm) clearTimeout(tm); });
   }
   function closeArt(fromPop) {
@@ -443,9 +456,26 @@
   if (typeof root.setInterval === 'function') root.setInterval(() => { if (!root.document.hidden) scrabbleNotice(); }, 60000);
   if (root.document && root.document.addEventListener) root.document.addEventListener('visibilitychange', () => { if (!root.document.hidden) scrabbleNotice(); });
   maybeRestoreArt();
+  function cancelFamilyGame(id) {
+    if (!/^g[0-9a-f]{16}$/.test(id || '')) return;
+    if (!root.confirm || !root.confirm('Cancel this game for everyone?')) return;
+    let me = null;
+    try { me = JSON.parse(root.localStorage.getItem('mf.member') || 'null'); } catch (e) { }
+    if (!me || !me.tok) return;
+    const api = 'https://shane-my-feed-data.phoneapp12.workers.dev/api';
+    const headers = { Authorization: 'Bearer ' + me.tok, 'Content-Type': 'application/json' };
+    root.fetch(api + '/scrabble/' + id, { headers: { Authorization: 'Bearer ' + me.tok } })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(v => root.fetch(api + '/scrabble/' + id + '/cancel', { method: 'POST', headers, body: JSON.stringify({ rev: v.rev }) }))
+      .then(r => { if (!r.ok) throw new Error('cancel'); return r.json(); })
+      .then(() => { scrabbleNotice(); })
+      .catch(() => { try { root.alert('Could not cancel the game just now. Open Scrabble and try Cancel game there.'); } catch (e) { } });
+  }
   root.document.addEventListener('click', e => {
+    const c = e.target && e.target.closest && e.target.closest('[data-scrcancel]');
+    if (c) { e.preventDefault(); e.stopPropagation(); cancelFamilyGame(c.getAttribute('data-scrcancel')); return; }
     const art = e.target && e.target.closest && e.target.closest('[data-art]');
-    if (art) { e.preventDefault(); openArt(art.dataset.art, art); return; }
+    if (art) { e.preventDefault(); openArt(art.dataset.art, art, art.getAttribute('data-open') ? { open: art.getAttribute('data-open') } : undefined); return; }
     const b = e.target && e.target.closest && e.target.closest('[data-pl]');
     if (!b) return;
     const card = b.closest('article[data-id]'); if (!card) return;

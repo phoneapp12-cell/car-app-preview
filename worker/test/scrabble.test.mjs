@@ -581,4 +581,14 @@ const notAdmin = { id: SHANE2, name: 'Shane', role: 'admin' };
 assert.equal(S.isShane(sqlC3, notAdmin), false);
 assert.equal((await post(sqlC3, notAdmin, '/scrabble/' + gMine.body.id + '/cancel', { rev: 1 })).status, 403);
 
+
+const sqlName = fresh();
+sqlName.db.prepare(`UPDATE members SET name=? WHERE id=?`).run('Shane Jenkins', SHANE);
+assert.equal(S.isShane(sqlName, shane), true, 'Shane Jenkins is still recognised as Shane');
+const sqlSole = fresh();
+sqlSole.db.prepare(`UPDATE members SET name=? WHERE id=?`).run('Family Admin', SHANE);
+assert.equal(S.isShane(sqlSole, shane), true, 'the only admin is treated as Shane');
+sqlSole.db.prepare(`INSERT INTO members (id,name,role,created,removed) VALUES (?,?,?,?,?)`).run('m666666666666', 'Other', 'admin', 10, 0);
+assert.equal(S.isShane(sqlSole, shane), false, 'a renamed admin is not Shane when another admin exists');
+
 console.log('scrabble tests ok');

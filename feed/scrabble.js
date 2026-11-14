@@ -330,7 +330,7 @@
     }
     return out;
   }
-  root.Scrabble = { N, MID, RACK, BINGO, VALUES, COUNTS, PREMIUM, ABC, rng, buildTrie, check, wordsOf, quickScore, genMoves, pickMove, leaveValue, newGame, makeBag, play, swap, pass, finish, cpuChoose, applyCpu, lastText, rackPoints, transpose, idx, layoutRun };
+  root.Scrabble = { N, MID, RACK, BINGO, VALUES, COUNTS, PREMIUM, ABC, rng, buildTrie, check, wordsOf, quickScore, genMoves, pickMove, leaveValue, newGame, makeBag, play, swap, pass, finish, cpuChoose, applyCpu, lastText, rackPoints, transpose, idx, layoutRun, parseOpenId };
 
   /* Worker mode: build the trie once, then answer move requests. */
   if (typeof importScripts === 'function' && typeof root.document === 'undefined') {
@@ -407,8 +407,9 @@
   function isShane() {
     const me = member();
     if (!me) return false;
-    const first = String(me.name || '').trim().split(/\s+/)[0] || '';
-    if ((me.role === 'admin' || me.admin) && /^Shane$/i.test(first)) return true;
+    const name = String(me.name || '').trim();
+    const first = name.split(/\s+/)[0] || '';
+    if ((me.role === 'admin' || me.admin) && (/^Shane$/i.test(first) || /\bShane\b/i.test(name))) return true;
     const S = root.IBScores;
     if (S && S.isShane && S.who) { const w = S.who(); return !!(S.isShane(w) && w && w.admin); }
     return false;
@@ -601,10 +602,19 @@
     else famPick.push(id);
     paintFamily();
   }
+  function parseOpenId(search, hash, stored) {
+    const ok = x => /^g[0-9a-f]{16}$/.test(String(x || ''));
+    if (ok(stored)) return stored;
+    const m = /(?:^|[?&])open=(g[0-9a-f]{16})(?:&|#|$)/i.exec(String(search || ''));
+    if (m && ok(m[1])) return m[1];
+    const h = String(hash || '').replace(/^#/, '');
+    return ok(h) ? h : '';
+  }
   function takeOpenId() {
-    let id = '';
-    try { id = root.sessionStorage.getItem('scrabble-open') || ''; root.sessionStorage.removeItem('scrabble-open'); } catch (e) { }
-    if (!/^g[0-9a-f]{16}$/.test(id)) { const h = String(root.location.hash || '').replace(/^#/, ''); id = /^g[0-9a-f]{16}$/.test(h) ? h : ''; }
+    let stored = '';
+    try { stored = root.sessionStorage.getItem('scrabble-open') || ''; } catch (e) { }
+    const id = parseOpenId(root.location.search, root.location.hash, stored);
+    if (id) { try { root.sessionStorage.removeItem('scrabble-open'); } catch (e) { } }
     return id;
   }
 
@@ -1249,8 +1259,15 @@
     root.addEventListener('visibilitychange', () => { if (!root.document.hidden && st && st.mode === 'family' && !pending.length && !selected.length && !swapPick) { if (onlineId) api('/scrabble/' + onlineId).then(v => { if (st && v.rev !== st.rev) openOnline(v); }).catch(() => {}); peekFamily(); } });
   }
 
+  function onParentOpen(e) {
+    const m = e && e.data || {};
+    if (m.type !== 'ib-scrabble-open' || !/^g[0-9a-f]{16}$/.test(m.id || '')) return;
+    if (st && st.mode === 'family' && st.id === m.id) return;
+    openFamilyGame(m.id);
+  }
   function boot() {
     wire();
+    root.addEventListener('message', onParentOpen);
     show('#loading');
     loadDict().then(() => {
       const hash = String(root.location.hash || '');
@@ -1271,5 +1288,5 @@
     });
   }
   if (d.readyState === 'loading') d.addEventListener('DOMContentLoaded', boot); else boot();
-  root.Scrabble.ui = { seedChallenge: demoChallenge, seedOnline: demoOnline, seedSelect: demoSelect, seedMulti: demoMulti, seedCancel: demoCancel, layoutRun };
+  root.Scrabble.ui = { seedChallenge: demoChallenge, seedOnline: demoOnline, seedSelect: demoSelect, seedMulti: demoMulti, seedCancel: demoCancel, layoutRun, parseOpenId };
 })(typeof self !== 'undefined' ? self : (typeof window !== 'undefined' ? window : globalThis));
