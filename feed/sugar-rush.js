@@ -562,46 +562,61 @@
   function tutorialFor(n) { return TUTORIALS[n] || null; }
 
 
-  // 1.9.210 Sugar Rush main screen: an illustrated candy map of New Zealand.
+  // 1.9.210 Sugar Rush main screen: an illustrated candy map of New Zealand (1.9.227: true geography).
   // Stops start in Onerahi / Whangārei and travel south. Level 2 is Sarah's house.
+  // 1.9.227 Real geography. NZ is drawn from real coastline points (Natural Earth 1:50m) through one projection:
+  // a local equirectangular (cos 41°), turned 25° so the long islands stand up the phone, then scaled 61 px/° across
+  // and 78 px/° down (squeezed sideways a little, like Australia, to fit 400 px). Every stop sits at its real
+  // latitude/longitude through that projection. Onerahi, Sarah's House and Whangārei are a few km apart, so they sit
+  // in a zoomed-in Whangārei inset (20x, same orientation) that keeps their real relative positions.
+  const NZ_PROJ = { cos: 0.754709580222772, rot: -0.4363323129985824, sx: 61.0, sy: 78.0, ox: 218.7531847020796, oy: 507.8180402772627 };
+  function nzXY(lat, lon) {
+    const x = (lon - 173.5) * NZ_PROJ.cos, y = -(lat + 40.5), c = Math.cos(NZ_PROJ.rot), s = Math.sin(NZ_PROJ.rot);
+    return { x: NZ_PROJ.ox + NZ_PROJ.sx * (x * c - y * s), y: NZ_PROJ.oy + NZ_PROJ.sy * (x * s + y * c) };
+  }
+  const WHANGAREI_INSET = { k: 30, x: 114, y: 372, lat: -35.725, lon: 174.323 };
+  function insetXY(lat, lon) {
+    const a = nzXY(lat, lon), b = nzXY(WHANGAREI_INSET.lat, WHANGAREI_INSET.lon);
+    return { x: WHANGAREI_INSET.x + WHANGAREI_INSET.k * (a.x - b.x), y: WHANGAREI_INSET.y + WHANGAREI_INSET.k * (a.y - b.y) };
+  }
+  // Pacific Islands panel and Australia: plain longitude/latitude scales (east longitudes wrap past 180°).
+  function pacXY(lat, lon) { return { x: 70 + 16.86 * (((lon % 360) + 360) % 360 - 184.8), y: 1350 + 21.6 * (-lat - 13.83) }; }
+  function ausXY(lat, lon) { return { x: 8.533 * lon - 937.8, y: 1808 + 10.97 * (-lat - 10.707) }; }
   const MAP_W = 400, MAP_H = 2240;
   const MAP_STOPS = [
-    { n: 1, x: 258, y: 118, place: 'Onerahi', kind: 'town', label: 'right' },
-    { n: 2, x: 168, y: 178, place: "Sarah's House", kind: 'house', label: 'left' },
-    { n: 3, x: 214, y: 236, place: 'Whangārei', kind: 'town', label: 'right' },
-    { n: 4, x: 176, y: 292, place: 'Auckland Post Office', kind: 'post', label: 'left' },
-    { n: 5, x: 168, y: 348, place: 'Hamilton', kind: 'town', label: 'left' },
-    { n: 6, x: 258, y: 368, place: 'Rotorua', kind: 'town', label: 'right' },
-    { n: 7, x: 200, y: 424, place: 'Taupō Station', kind: 'station', label: 'left' },
-    { n: 8, x: 300, y: 500, place: 'Napier', kind: 'town', label: 'left' },
-    { n: 9, x: 246, y: 530, place: 'Wellington', kind: 'town', label: 'right' },
-    { n: 10, x: 148, y: 640, place: 'Nelson', kind: 'town', label: 'left' },
-    // 1.9.219 South Island: east coast to Christchurch, over Arthur's Pass to the West Coast, then south.
-    { n: 11, x: 236, y: 728, place: 'Kaikōura', kind: 'town', label: 'left' },
-    { n: 12, x: 270, y: 852, place: 'Christchurch', kind: 'town', label: 'right' },
-    { n: 13, x: 112, y: 800, place: 'Franz Josef', kind: 'town', label: 'right' },
-    { n: 14, x: 138, y: 948, place: 'Queenstown', kind: 'town', label: 'right' },
-    { n: 15, x: 238, y: 984, place: 'Dunedin', kind: 'town', label: 'right' },
-    // 1.9.222 Bluff, at the bottom of the South Island.
-    { n: 16, x: 176, y: 1026, place: 'Bluff', kind: 'town', label: 'left' },
-    // 1.9.220 Pacific Islands section: fly out to Rarotonga, then west to Tonga and north to Samoa.
-    { n: 17, x: 318, y: 1590, place: 'Rarotonga', kind: 'island', label: 'left' },
-    { n: 18, x: 160, y: 1512, place: 'Tonga', kind: 'island', label: 'left' },
-    { n: 19, x: 200, y: 1352, place: 'Samoa', kind: 'island', label: 'right' },
-    // 1.9.222 Australia section: fly to Sydney, up to the Gold Coast, then across to Perth.
-    { n: 20, x: 353, y: 2063, place: 'Sydney', kind: 'city', label: 'left', via: [{ x: 270, y: 1900 }, { x: 310, y: 2040 }] },
-    { n: 21, x: 368, y: 2006, place: 'Gold Coast', kind: 'city', label: 'left' },
-    { n: 22, x: 49, y: 2041, place: 'Perth', kind: 'city', label: 'right', via: [{ x: 310, y: 1965 }] }
+    { n: 1, x: 208, y: 432, place: "Onerahi", kind: 'town', label: 'below', lat: -35.77, lon: 174.37, inset: 'whangarei' },
+    { n: 2, x: 38, y: 420, place: "Sarah's House", kind: 'house', label: 'right', lat: -35.726, lon: 174.262, inset: 'whangarei' },
+    { n: 3, x: 114, y: 372, place: "Whangārei", kind: 'town', label: 'right', lat: -35.725, lon: 174.323, inset: 'whangarei' },
+    { n: 4, x: 177, y: 218, place: "Auckland Post Office", kind: 'post', label: 'right', lat: -36.848, lon: 174.763, via: [{ x: 174, y: 302 }] },
+    { n: 5, x: 223, y: 272, place: "Hamilton", kind: 'town', label: 'left', lat: -37.787, lon: 175.279 },
+    { n: 6, x: 273, y: 272, place: "Rotorua", kind: 'town', label: 'right', lat: -38.137, lon: 176.251 },
+    { n: 7, x: 279, y: 316, place: "Taupō Station", kind: 'station', label: 'left', lat: -38.686, lon: 176.07 },
+    { n: 8, x: 335, y: 352, place: "Napier", kind: 'town', label: 'below', lat: -39.49, lon: 176.912 },
+    { n: 9, x: 292, y: 532, place: "Wellington", kind: 'town', label: 'below', lat: -41.287, lon: 174.776 },
+    { n: 10, x: 230, y: 568, place: "Nelson", kind: 'town', label: 'left', lat: -41.271, lon: 173.284 },
+    { n: 11, x: 275, y: 638, place: "Kaikōura", kind: 'town', label: 'right', lat: -42.4, lon: 173.681 },
+    { n: 12, x: 261, y: 744, place: "Christchurch", kind: 'town', label: 'right', lat: -43.532, lon: 172.636 },
+    { n: 13, x: 155, y: 795, place: "Franz Josef", kind: 'town', label: 'left', lat: -43.389, lon: 170.183 },
+    { n: 14, x: 134, y: 948, place: "Queenstown", kind: 'town', label: 'left', lat: -45.031, lon: 168.663 },
+    { n: 15, x: 232, y: 962, place: "Dunedin", kind: 'town', label: 'right', lat: -45.874, lon: 170.504 },
+    { n: 16, x: 160, y: 1068, place: "Bluff", kind: 'town', label: 'right', lat: -46.6, lon: 168.333 },
+    { n: 17, x: 330, y: 1509, place: "Rarotonga", kind: 'island', label: 'below', lat: -21.21, lon: -159.78 },
+    { n: 18, x: 70, y: 1508, place: "Tonga", kind: 'island', label: 'right', lat: -21.14, lon: -175.2 },
+    { n: 19, x: 128, y: 1350, place: "Samoa", kind: 'island', label: 'right', lat: -13.83, lon: -171.76 },
+    { n: 20, x: 352, y: 2062, place: "Sydney", kind: 'city', label: 'left', lat: -33.87, lon: 151.21, via: [{ x: 270, y: 1900 }, { x: 310, y: 2040 }] },
+    { n: 21, x: 371, y: 1998, place: "Gold Coast", kind: 'city', label: 'left', lat: -28.0, lon: 153.43 },
+    { n: 22, x: 51, y: 2041, place: "Perth", kind: 'city', label: 'right', lat: -31.95, lon: 115.86, via: [{ x: 310, y: 1965 }] }
   ];
   // Coming soon: other Australian cities. Shown as markers only (no trail), so they never look like the route.
+  // Brisbane and Canberra are nudged a few pixels clear of the Gold Coast and Sydney pins (marked nudged).
   const FUTURE_STOPS = [
-    { place: 'Melbourne', x: 299, y: 2113, label: 'left' },
-    { place: 'Brisbane', x: 372, y: 1940, label: 'left' },
-    { place: 'Adelaide', x: 244, y: 2066, label: 'left' },
-    { place: 'Canberra', x: 328, y: 2088, label: 'left' },
-    { place: 'Hobart', x: 319, y: 2160, label: 'left' },
-    { place: 'Darwin', x: 177, y: 1830, label: 'left' },
-    { place: 'Cairns', x: 306, y: 1874, label: 'left' }
+    { place: 'Melbourne', x: 299, y: 2105, label: 'left', lat: -37.81, lon: 144.96 },
+    { place: 'Brisbane', x: 366, y: 1956, label: 'left', lat: -27.47, lon: 153.03, nudged: true },
+    { place: 'Adelaide', x: 245, y: 2074, label: 'left', lat: -34.93, lon: 138.6 },
+    { place: 'Canberra', x: 327, y: 2089, label: 'left', lat: -35.28, lon: 149.13, nudged: true },
+    { place: 'Hobart', x: 319, y: 2161, label: 'left', lat: -42.88, lon: 147.33 },
+    { place: 'Darwin', x: 179, y: 1827, label: 'left', lat: -12.46, lon: 130.84 },
+    { place: 'Cairns', x: 306, y: 1876, label: 'left', lat: -16.92, lon: 145.77 }
   ];
   const LV_COUNT = 22;
   function stopForLevel(n) { return MAP_STOPS[(n | 0) - 1] || null; }
@@ -645,53 +660,55 @@
       '</filter>' +
       '</defs>' +
       '<rect width="' + MAP_W + '" height="' + MAP_H + '" fill="url(#sr-sea)"/>' +
-      '<circle class="sr-bob" cx="48" cy="90" r="7" fill="#ff8ab8" opacity=".55"/>' +
-      '<circle class="sr-bob" cx="62" cy="102" r="5" fill="#ffe066" opacity=".65"/>' +
-      '<circle class="sr-bob" cx="360" cy="200" r="6" fill="#7ee0a8" opacity=".5"/>' +
+      '<circle class="sr-bob" cx="250" cy="60" r="7" fill="#ff8ab8" opacity=".55"/>' +
+      '<circle class="sr-bob" cx="264" cy="74" r="5" fill="#ffe066" opacity=".65"/>' +
+      '<circle class="sr-bob" cx="372" cy="200" r="6" fill="#7ee0a8" opacity=".5"/>' +
       '<circle class="sr-bob" cx="40" cy="640" r="8" fill="#ffb347" opacity=".45"/>' +
       '<circle class="sr-bob" cx="370" cy="900" r="7" fill="#ff8ab8" opacity=".45"/>' +
-      '<circle class="sr-bob" cx="56" cy="1100" r="6" fill="#fff" opacity=".55"/>' +
-      '<text x="28" y="48" font-size="13" font-weight="800" fill="#2a6a88" font-family="ui-rounded,system-ui,sans-serif">N</text>' +
-      '<path d="M28 54 L28 72 M28 54 L22 62 M28 54 L34 62" fill="none" stroke="#2a6a88" stroke-width="2" stroke-linecap="round"/>' +
-      // North Island
-      '<path filter="url(#sr-soft)" fill="url(#sr-land)" stroke="#fff" stroke-width="8" stroke-linejoin="round" d="' +
-      'M 196 30 C 208 28 222 38 224 54 C 226 72 236 86 230 104 C 238 118 242 132 232 146 C 238 160 232 176 220 188 ' +
-      'C 238 192 268 172 286 162 C 304 152 316 162 312 180 C 308 196 290 204 272 210 C 262 220 278 230 304 236 ' +
-      'C 336 244 362 258 370 280 C 376 300 360 322 350 344 C 340 368 352 386 338 404 C 322 426 316 452 302 476 ' +
-      'C 290 498 280 518 262 528 C 246 536 236 524 228 512 C 214 514 204 500 200 482 C 190 458 176 434 168 410 ' +
-      'C 154 388 132 372 116 352 C 96 334 90 316 108 300 C 124 284 142 276 150 256 C 156 236 148 220 158 208 ' +
-      'C 150 192 142 176 146 158 C 150 136 160 116 168 98 C 174 74 180 52 188 40 C 190 34 192 30 196 30 Z"/>' +
-      '<ellipse cx="226" cy="388" rx="16" ry="13" fill="#7ec8ef" stroke="#fff" stroke-width="2"/>' +
-      // South Island (Banks Peninsula included on the east)
-      '<path filter="url(#sr-soft)" fill="url(#sr-land)" stroke="#fff" stroke-width="8" stroke-linejoin="round" d="' +
-      'M 198 608 C 226 600 252 610 254 636 C 256 670 262 708 258 746 C 256 784 268 812 288 828 ' +
-      'C 308 844 306 866 288 876 C 272 886 258 896 256 922 C 258 950 254 986 236 1006 ' +
-      'C 216 1028 190 1038 166 1030 C 140 1022 118 1004 102 976 C 84 944 70 904 74 862 ' +
-      'C 76 820 66 780 76 740 C 84 700 74 662 84 628 C 94 596 126 584 156 590 C 174 594 186 600 198 608 Z"/>' +
-      '<path fill="#8fd9f8" d="M 86 930 C 78 918 70 910 76 898 C 90 906 96 920 94 934 Z"/>' +
-      '<path fill="#8fd9f8" d="M 80 880 C 70 868 64 854 74 844 C 86 856 90 870 86 884 Z"/>' +
-      '<ellipse filter="url(#sr-soft)" cx="168" cy="1148" rx="28" ry="20" fill="url(#sr-land)" stroke="#fff" stroke-width="6"/>' +
-      // Soft icing alps
-      '<path d="M 132 710 C 142 668 154 668 164 710 C 154 702 142 702 132 710 Z" fill="#fff" opacity=".9"/>' +
-      '<path d="M 152 790 C 164 742 178 742 188 790 C 176 780 164 780 152 790 Z" fill="#fff" opacity=".88"/>' +
-      '<path d="M 140 870 C 152 828 166 828 176 870 C 164 860 152 860 140 870 Z" fill="#fff" opacity=".88"/>' +
-      // Ferry across Cook Strait
-      '<path d="M 210 575 C 200 595 180 615 168 628" fill="none" stroke="#fff" stroke-width="2.4" stroke-dasharray="5 7" stroke-linecap="round" opacity=".85"/>' +
+      '<circle class="sr-bob" cx="330" cy="1110" r="6" fill="#fff" opacity=".55"/>' +
+      // True north: the map is turned so New Zealand stands up the phone, so north points 20° to the left.
+      '<g transform="rotate(-20 360 82)"><text x="360" y="58" text-anchor="middle" font-size="13" font-weight="800" fill="#2a6a88" font-family="ui-rounded,system-ui,sans-serif">N</text>' +
+      '<path d="M360 64 L360 100 M360 64 L353 74 M360 64 L367 74" fill="none" stroke="#2a6a88" stroke-width="2.4" stroke-linecap="round"/></g>' +
+      // North and South Islands and Stewart Island, from real coastline points (see NZ_PROJ).
+      '<path filter="url(#sr-soft)" fill="url(#sr-land)" stroke="#fff" stroke-width="7" stroke-linejoin="round" d="M 223 572 L 228 570 L 241 536 L 248 527 L 250 525 L 248 534 L 251 538 L 251 555 L 254 550 L 253 539 L 255 535 L 252 530 L 261 524 L 262 527 L 266 525 L 265 537 L 260 547 L 265 545 L 271 529 L 273 535 L 270 547 L 266 554 L 266 559 L 274 566 L 273 576 L 276 573 L 283 576 L 283 586 L 277 613 L 279 625 L 273 649 L 271 690 L 261 708 L 257 722 L 254 726 L 260 729 L 255 742 L 261 736 L 264 736 L 270 746 L 283 743 L 288 750 L 288 757 L 282 762 L 277 763 L 273 761 L 263 769 L 265 762 L 259 761 L 257 774 L 255 776 L 240 771 L 251 781 L 235 809 L 227 816 L 226 826 L 222 830 L 226 831 L 234 878 L 228 882 L 236 883 L 236 888 L 234 905 L 236 944 L 242 949 L 244 955 L 230 969 L 228 975 L 226 990 L 220 1009 L 216 1030 L 203 1044 L 193 1051 L 178 1054 L 171 1062 L 166 1063 L 163 1067 L 159 1064 L 156 1057 L 151 1055 L 143 1056 L 134 1063 L 123 1055 L 116 1055 L 111 1066 L 88 1078 L 83 1079 L 81 1075 L 85 1057 L 79 1069 L 76 1070 L 77 1062 L 75 1058 L 72 1065 L 67 1068 L 64 1057 L 77 1046 L 82 1038 L 74 1042 L 72 1038 L 77 1026 L 66 1033 L 65 1022 L 71 1018 L 66 1013 L 81 1013 L 77 1007 L 81 1002 L 71 1003 L 68 996 L 70 988 L 74 990 L 76 987 L 71 983 L 76 965 L 82 973 L 78 962 L 83 945 L 86 939 L 93 941 L 86 931 L 97 889 L 106 874 L 113 871 L 120 856 L 126 857 L 122 851 L 123 847 L 133 828 L 144 814 L 142 808 L 145 806 L 142 805 L 147 796 L 151 777 L 153 774 L 158 775 L 156 772 L 153 772 L 157 763 L 165 763 L 159 759 L 164 752 L 169 755 L 166 748 L 170 728 L 173 730 L 176 738 L 172 725 L 174 707 L 178 701 L 174 698 L 168 649 L 176 638 L 181 620 L 178 592 L 174 573 L 174 557 L 179 542 L 186 527 L 196 523 L 188 530 L 190 540 L 195 545 L 206 545 Z"/>' +
+      '<path filter="url(#sr-soft)" fill="url(#sr-land)" stroke="#fff" stroke-width="7" stroke-linejoin="round" d="M 66 120 L 68 123 L 71 109 L 73 116 L 74 116 L 85 115 L 91 117 L 92 112 L 106 114 L 112 124 L 114 123 L 118 116 L 136 134 L 136 141 L 142 148 L 134 152 L 135 153 L 165 179 L 168 193 L 174 200 L 175 219 L 179 218 L 184 219 L 185 214 L 191 216 L 203 215 L 212 228 L 219 224 L 219 220 L 203 189 L 196 182 L 195 178 L 197 174 L 213 188 L 216 185 L 227 198 L 244 229 L 252 233 L 253 236 L 250 237 L 250 240 L 254 241 L 262 239 L 288 242 L 312 237 L 318 230 L 321 223 L 323 205 L 331 187 L 342 182 L 356 184 L 358 206 L 367 251 L 364 266 L 360 271 L 365 294 L 370 301 L 370 309 L 362 303 L 350 307 L 342 316 L 335 328 L 334 342 L 338 356 L 340 358 L 348 360 L 349 400 L 344 448 L 342 489 L 334 518 L 323 541 L 318 541 L 312 531 L 307 532 L 300 539 L 296 526 L 294 525 L 293 526 L 295 530 L 292 535 L 287 537 L 291 475 L 286 449 L 268 432 L 257 430 L 246 433 L 232 426 L 211 427 L 202 421 L 198 414 L 198 403 L 205 390 L 217 377 L 220 359 L 211 317 L 211 299 L 206 291 L 209 282 L 191 262 L 190 253 L 187 253 L 176 240 L 177 238 L 179 238 L 186 245 L 186 236 L 190 231 L 181 224 L 174 232 L 168 232 L 158 219 L 144 207 L 146 205 L 156 210 L 156 206 L 154 198 L 148 195 L 146 184 L 139 182 L 141 189 L 128 185 L 118 173 L 121 181 L 139 196 L 138 202 L 87 160 L 90 138 L 86 145 L 85 157 L 76 149 L 74 149 L 66 143 L 67 136 L 64 128 L 30 100 L 43 90 L 43 100 Z"/>' +
+      '<path filter="url(#sr-soft)" fill="url(#sr-land)" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="M 159 1091 L 160 1094 L 156 1095 L 157 1098 L 163 1099 L 166 1097 L 169 1103 L 160 1112 L 158 1119 L 152 1122 L 150 1129 L 144 1134 L 143 1130 L 145 1123 L 144 1116 L 146 1112 L 146 1102 L 140 1088 L 147 1084 Z"/>' +
+      '<path filter="url(#sr-soft)" fill="url(#sr-land)" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="M 195 159 L 197 162 L 193 163 L 185 159 L 183 154 L 184 147 L 191 152 Z"/>' +
+      '<path filter="url(#sr-soft)" fill="url(#sr-land)" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="M 70 1040 L 71 1046 L 63 1049 L 62 1044 L 66 1039 Z"/>' +
+      '<path filter="url(#sr-soft)" fill="url(#sr-land)" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="M 245 523 L 241 531 L 239 521 L 241 516 L 244 511 Z"/>' +
+      '<ellipse cx="275" cy="328" rx="9" ry="11" fill="#7ec8ef" stroke="#fff" stroke-width="2"/>' +
+      // Soft icing alps along the Southern Alps
+      '<path d="M 184 746 C 194 704 206 704 216 746 C 206 738 194 738 184 746 Z" fill="#fff" opacity=".9"/>' +
+      '<path d="M 142 828 C 152 786 164 786 174 828 C 164 820 152 820 142 828 Z" fill="#fff" opacity=".9"/>' +
+      '<path d="M 112 932 C 122 890 134 890 144 932 C 134 924 122 924 112 932 Z" fill="#fff" opacity=".9"/>' +
+      // Ferry across Cook Strait (Wellington to Picton)
+      '<path d="M 286 536 C 278 552 274 547 264 551" fill="none" stroke="#fff" stroke-width="2.4" stroke-dasharray="5 7" stroke-linecap="round" opacity=".85"/>' +
+      // 1.9.227 Whangārei close-up (30x): Whangārei, Sarah\'s House and Onerahi at their real relative places,
+      // linked by a dashed leader line to the ring where Whangārei really sits on the coast.
+      '<g class="sr-inset">' +
+      '<path d="M 130 150 L 114 334" stroke="#fff" stroke-width="2.5" stroke-dasharray="4 5" stroke-linecap="round"/>' +
+      '<circle cx="130" cy="150" r="6" fill="none" stroke="#ff4f93" stroke-width="2.5"/>' +
+      '<rect x="15" y="334" width="245" height="190" rx="22" fill="#d8f4ff" stroke="#fff" stroke-width="4"/>' +
+      // Whangārei Harbour opens to the south-east, below Onerahi
+      '<path d="M 35 336 L 240 336 L 258 406 C 188 418 148 442 130 472 C 75 488 35 462 17 472 Z" fill="url(#sr-land)" opacity=".9"/>' +
+      '<text x="29" y="514" text-anchor="start" font-size="11" font-weight="900" fill="#2a6a88" font-family="ui-rounded,system-ui,sans-serif">Whangārei close-up</text>' +
+      '</g>' +
       // 1.9.220 Pacific Islands inset: a lagoon-blue panel with Rarotonga, Tonga and Samoa.
       '<g class="sr-pacific">' +
       '<rect x="16" y="1236" width="368" height="448" rx="30" fill="#7fe6dc" opacity=".55" stroke="#fff" stroke-width="4" stroke-dasharray="10 8"/>' +
       '<rect x="120" y="1222" width="160" height="30" rx="15" fill="#fff" stroke="#3fc1b0" stroke-width="3"/>' +
       '<text x="200" y="1243" text-anchor="middle" font-size="15" font-weight="900" fill="#1b8a7c" font-family="ui-rounded,system-ui,sans-serif">Pacific Islands</text>' +
+      // 1.9.227 Islands at their real relative positions (see pacXY): Samoa north, Tonga and Rarotonga side by side.
       // Samoa: Savai\'i and Upolu
-      '<ellipse cx="168" cy="1352" rx="40" ry="20" fill="#bff5ec" opacity=".8"/><ellipse cx="168" cy="1352" rx="32" ry="14" fill="url(#sr-land)" stroke="#fff" stroke-width="4"/>' +
-      '<ellipse cx="236" cy="1368" rx="34" ry="15" fill="#bff5ec" opacity=".8"/><ellipse cx="236" cy="1368" rx="26" ry="10" fill="url(#sr-land)" stroke="#fff" stroke-width="4"/>' +
-      // Tonga: Tongatapu and small islands to the north
-      '<ellipse cx="160" cy="1514" rx="42" ry="22" fill="#bff5ec" opacity=".8"/><path d="M124 1516 C132 1500 162 1498 192 1506 C198 1516 182 1528 158 1526 C142 1528 128 1524 124 1516 Z" fill="url(#sr-land)" stroke="#fff" stroke-width="4"/>' +
-      '<circle cx="182" cy="1460" r="6" fill="url(#sr-land)" stroke="#fff" stroke-width="2"/><circle cx="172" cy="1440" r="4" fill="url(#sr-land)" stroke="#fff" stroke-width="2"/>' +
+      '<ellipse cx="122" cy="1348" rx="30" ry="20" fill="#bff5ec" opacity=".8"/><ellipse cx="110" cy="1345" rx="13" ry="8" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
+      '<ellipse cx="138" cy="1356" rx="12" ry="6" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
+      // Tonga: Tongatapu, with Ha\'apai and Vava\'u to the north
+      '<ellipse cx="70" cy="1508" rx="34" ry="20" fill="#bff5ec" opacity=".8"/><path d="M48 1510 c6 -10 30 -12 44 -4 c4 8 -10 14 -24 13 c-10 1 -18 -3 -20 -9 Z" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
+      '<circle cx="90" cy="1454" r="5" fill="url(#sr-land)" stroke="#fff" stroke-width="2"/><circle cx="84" cy="1479" r="4" fill="url(#sr-land)" stroke="#fff" stroke-width="2"/>' +
       // Rarotonga: a round island with its reef ring
-      '<circle cx="318" cy="1590" r="34" fill="#bff5ec" opacity=".85"/><circle cx="318" cy="1590" r="30" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="4 4"/><circle cx="318" cy="1590" r="20" fill="url(#sr-land)" stroke="#fff" stroke-width="4"/>' +
-      '<path d="M310 1588 l10 -10 6 12 Z" fill="#7ac77a"/>' +
-      [[150, 1340], [240, 1360], [176, 1530], [334, 1582]].map(function (q) { return '<path d="M' + q[0] + ' ' + q[1] + ' v-12 M' + q[0] + ' ' + (q[1] - 12) + ' q-6 -2 -9 3 M' + q[0] + ' ' + (q[1] - 12) + ' q6 -2 9 3 M' + q[0] + ' ' + (q[1] - 12) + ' q-2 -6 -7 -6 M' + q[0] + ' ' + (q[1] - 12) + ' q2 -6 7 -6" stroke="#2f9a5a" stroke-width="2.4" fill="none" stroke-linecap="round"/>'; }).join('') +
+      '<circle cx="330" cy="1509" r="30" fill="#bff5ec" opacity=".85"/><circle cx="330" cy="1509" r="26" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="4 4"/><circle cx="330" cy="1509" r="16" fill="url(#sr-land)" stroke="#fff" stroke-width="4"/>' +
+      '<path d="M323 1507 l9 -9 5 11 Z" fill="#7ac77a"/>' +
+      [[102, 1339], [150, 1354], [94, 1522], [350, 1503]].map(function (q) { return '<path d="M' + q[0] + ' ' + q[1] + ' v-12 M' + q[0] + ' ' + (q[1] - 12) + ' q-6 -2 -9 3 M' + q[0] + ' ' + (q[1] - 12) + ' q6 -2 9 3 M' + q[0] + ' ' + (q[1] - 12) + ' q-2 -6 -7 -6 M' + q[0] + ' ' + (q[1] - 12) + ' q2 -6 7 -6" stroke="#2f9a5a" stroke-width="2.4" fill="none" stroke-linecap="round"/>'; }).join('') +
       '<path d="M40 1600 q12 -5 24 0 M300 1620 q12 -5 24 0 M90 1660 q12 -5 24 0 M250 1440 q12 -5 24 0" stroke="#fff" stroke-width="2.5" fill="none" opacity=".7"/>' +
       '</g>' +
       // A little plane on the flight out of Dunedin
@@ -1392,6 +1409,10 @@
   // 1.9.223 Spoken sayings: the game reads out the same inventive line that pops up on screen, instead of a generic
   // "Great!" clip. 1.9.226: every line that shows is spoken in full. Nothing is skipped; instead a new saying only
   // appears once the last one has been said (SAY_SHOW_MS at least), and voice lines queue rather than cut each other.
+  // 1.9.227 At least SAY_REST_MS of quiet after a spoken saying finishes before the next one shows. Minor sayings that
+  // land in that rest are simply not shown; big ones (specials, streak level-ups) wait, at most one in the queue.
+  const SAY_REST_MS = 3000, SAY_BIG = ['combo', 'bomb', 'wrap', 'stripe'];
+  function sayBig(kind) { return SAY_BIG.indexOf(kind) >= 0; }
   const SAY_SHOW_MS = 1100, SAY_AFTER_MS = 350, SPEAK_GAP = SAY_SHOW_MS, SPEAK_PITCH = 1.25, SPEAK_RATE = 1.05, SPEAK_VOL = 0.9;
   const SPEAK_LANGS = ['en-nz', 'en-au', 'en-gb', 'en-ie', 'en-za', 'en-us', 'en'];
   const SPEAK_FEMALE = /(female|woman|aria|natasha|karen|catherine|matilda|serena|samantha|libby|sonia|molly|zira|tessa|moira|fiona|victoria|allison|ava|susan|hazel|kate|jenny|clara|google uk english female)/i;
@@ -1442,9 +1463,9 @@
     'sugar-rush-kiss.m4a': '24aced8c', 'sugar-rush-kiss.mp3': '8c1174e4',
     'sugar-rush-song.m4a': 'fb999cd1', 'sugar-rush-song.mp3': '586f9ee6',
     // 1.9.225 Every saying pre-recorded in a female and a male NZ voice, one small sprite per voice.
-    // 1.9.226 Re-cut with padding and a baked-in soft room reverb and echo (about 18% wet, ~0.4 s tail inside each clip).
-    'sugar-rush-say-f.m4a': 'afcc3783', 'sugar-rush-say-f.mp3': 'fe24f80e',
-    'sugar-rush-say-m.m4a': 'e7fa1e02', 'sugar-rush-say-m.mp3': '1b11088a'
+    // 1.9.227 More room: reverb RT60 ~1.4 s and echoes at 120/260/420 ms, about 34% wet, ~0.9 s tail inside each clip.
+    'sugar-rush-say-f.m4a': '26b115df', 'sugar-rush-say-f.mp3': 'b07be725',
+    'sugar-rush-say-m.m4a': '3a94c931', 'sugar-rush-say-m.mp3': 'e4007425'
   };
   // 1.9.225 Spoken sayings as recorded clips, a female voice (Microsoft neural "Molly", en-NZ) and a male one
   // ("Mitchell", en-NZ), so the game mixes the two reliably instead of relying on the phone's voices.
@@ -1452,73 +1473,73 @@
   // SAY_CLIPS[text] = [fStart, fDur, mStart, mDur] in seconds. 1.9.226 adds the streak lines, which show on screen too.
   const SAY_SPRITES = { f: 'sugar-rush-say-f.m4a', m: 'sugar-rush-say-m.m4a' };
   const SAY_CLIPS = {
-    "Sweet as!": [0.25, 1.022, 0.25, 1.049],
-    "Sugar rush!": [1.522, 1.055, 1.549, 1.039],
-    "Choice!": [2.828, 0.75, 2.839, 0.858],
-    "Mean as!": [3.828, 0.968, 3.946, 0.97],
-    "Stripe-tastic!": [5.046, 1.17, 5.166, 1.225],
-    "Candy-licious!": [6.466, 1.1, 6.641, 1.124],
-    "Looking sharp!": [7.815, 0.979, 8.015, 1.007],
-    "Stripe me pink!": [9.044, 1.15, 9.273, 1.104],
-    "That's a wrap!": [10.444, 0.918, 10.627, 0.942],
-    "All wrapped up!": [11.612, 0.997, 11.82, 0.992],
-    "Parcel of yum!": [12.86, 1.15, 13.062, 1.091],
-    "Tied with a bow!": [14.26, 1.206, 14.403, 1.162],
-    "Sprinkle-tastic!": [15.716, 1.263, 15.814, 1.286],
-    "Hundreds and thousands!": [17.229, 1.551, 17.35, 1.375],
-    "Sprinkle party!": [19.03, 1.256, 18.974, 1.204],
-    "Lolly bomb!": [20.536, 1.006, 20.429, 1.032],
-    "Jelly good!": [21.792, 0.924, 21.71, 0.919],
-    "Wobble wobble!": [22.965, 1.053, 22.88, 1.073],
-    "Jelly well done!": [24.268, 1.27, 24.203, 1.114],
-    "Wobbly wonder!": [25.788, 1.129, 25.567, 1.098],
-    "Jar-mazing!": [27.168, 1.085, 26.915, 0.954],
-    "Lock-busted!": [28.503, 0.992, 28.119, 1.016],
-    "Jar-fully done!": [29.744, 1.236, 29.384, 1.127],
-    "Set those jars free!": [31.23, 1.644, 30.761, 1.415],
-    "Ice ice baby!": [33.124, 1.23, 32.425, 1.168],
-    "Icing on the cake!": [34.604, 1.236, 33.844, 1.159],
-    "Chip chip hooray!": [36.091, 1.25, 35.252, 1.245],
-    "Frost-busted!": [37.591, 1.079, 36.748, 1.128],
-    "Down the hatch!": [38.92, 1.19, 38.125, 1.007],
-    "Coming through!": [40.36, 1.038, 39.382, 0.897],
-    "And down she goes!": [41.648, 1.368, 40.529, 1.316],
-    "Nice drop!": [43.267, 0.982, 42.095, 0.964],
-    "Choc-blocked!": [44.498, 0.958, 43.31, 0.936],
-    "No more spreading!": [45.706, 1.266, 44.496, 1.155],
-    "Held the line!": [47.223, 1.084, 45.901, 1.031],
-    "Choc stop!": [48.557, 0.906, 47.181, 0.941],
-    "Gum-believable!": [49.713, 1.12, 48.372, 1.069],
-    "Cherry on top!": [51.083, 1.106, 49.691, 1.03],
-    "Pop those cherries!": [52.439, 1.334, 50.971, 1.293],
-    "Gumdrop gorgeous!": [54.023, 1.419, 52.513, 1.248],
-    "Zesty!": [55.692, 0.827, 54.011, 0.816],
-    "Lemon-sational!": [56.769, 1.202, 55.077, 1.193],
-    "Zing!": [58.222, 0.715, 56.52, 0.67],
-    "Squeeze the day!": [59.186, 1.155, 57.441, 1.109],
-    "Double delight!": [60.591, 1.133, 58.799, 1.011],
-    "Two for tea!": [61.974, 1.035, 60.06, 0.957],
-    "Special times two!": [63.259, 1.531, 61.267, 1.384],
-    "Pair of treats!": [65.04, 1.184, 62.901, 1.125],
-    "Still in it!": [66.474, 0.923, 64.275, 0.923],
-    "Not done yet!": [67.647, 1.119, 65.449, 1.006],
-    "Clutch play!": [69.017, 1.002, 66.705, 0.936],
-    "Comeback sweet!": [70.268, 1.152, 67.89, 1.02],
-    "Pop pop!": [71.67, 0.768, 69.16, 0.829],
-    "Fizz-tastic!": [72.688, 1.04, 70.239, 1.067],
-    "Bubble pop!": [73.978, 0.935, 71.556, 0.875],
-    "Popping candy!": [75.163, 1.128, 72.681, 1.028],
-    "Liquorice-free!": [76.541, 1.097, 73.959, 1.07],
-    "Unwrapped!": [77.888, 0.896, 75.279, 0.851],
-    "Untangled!": [79.034, 0.996, 76.38, 0.978],
-    "Black magic!": [80.28, 1.107, 77.608, 1.045],
-    "Goal achieved!": [81.636, 1.173, 78.903, 1.014],
-    "Sugar Crush!": [83.06, 1.1, 80.167, 1.075],
-    "Voice on!": [84.41, 0.946, 81.493, 0.937],
-    "Sweet streak!": [85.606, 1.102, 82.68, 1.093],
-    "Sweeter streak!": [86.959, 1.1, 84.023, 1.136],
-    "Sugar-high streak!": [88.309, 1.294, 85.409, 1.21],
-    "Ultimate sweet streak!": [89.853, 1.545, 86.869, 1.441]
+    "Sweet as!": [0.25, 1.405, 0.25, 1.372],
+    "Sugar rush!": [1.905, 1.389, 1.872, 1.391],
+    "Choice!": [3.544, 1.185, 3.513, 1.199],
+    "Mean as!": [4.98, 1.275, 4.962, 1.305],
+    "Stripe-tastic!": [6.505, 1.543, 6.517, 1.55],
+    "Candy-licious!": [8.298, 1.418, 8.318, 1.414],
+    "Looking sharp!": [9.966, 1.437, 9.982, 1.405],
+    "Stripe me pink!": [11.653, 1.503, 11.637, 1.456],
+    "That's a wrap!": [13.405, 1.399, 13.343, 1.328],
+    "All wrapped up!": [15.054, 1.423, 14.921, 1.299],
+    "Parcel of yum!": [16.727, 1.46, 16.47, 1.494],
+    "Tied with a bow!": [18.438, 1.68, 18.214, 1.619],
+    "Sprinkle-tastic!": [20.367, 1.673, 20.083, 1.628],
+    "Hundreds and thousands!": [22.29, 1.803, 21.961, 1.714],
+    "Sprinkle party!": [24.344, 1.672, 23.925, 1.676],
+    "Lolly bomb!": [26.266, 1.369, 25.851, 1.416],
+    "Jelly good!": [27.886, 1.402, 27.517, 1.433],
+    "Wobble wobble!": [29.538, 1.443, 29.2, 1.587],
+    "Jelly well done!": [31.23, 1.589, 31.037, 1.502],
+    "Wobbly wonder!": [33.069, 1.553, 32.79, 1.505],
+    "Jar-mazing!": [34.872, 1.43, 34.545, 1.334],
+    "Lock-busted!": [36.552, 1.404, 36.129, 1.41],
+    "Jar-fully done!": [38.206, 1.6, 37.789, 1.556],
+    "Set those jars free!": [40.056, 2.059, 39.595, 1.835],
+    "Ice ice baby!": [42.365, 1.563, 41.68, 1.568],
+    "Icing on the cake!": [44.178, 1.539, 43.497, 1.486],
+    "Chip chip hooray!": [45.966, 1.713, 45.234, 1.682],
+    "Frost-busted!": [47.93, 1.5, 47.166, 1.475],
+    "Down the hatch!": [49.68, 1.484, 48.891, 1.299],
+    "Coming through!": [51.414, 1.506, 50.44, 1.404],
+    "And down she goes!": [53.17, 1.717, 52.094, 1.673],
+    "Nice drop!": [55.136, 1.444, 54.017, 1.39],
+    "Choc-blocked!": [56.83, 1.319, 55.658, 1.301],
+    "No more spreading!": [58.399, 1.645, 57.208, 1.559],
+    "Held the line!": [60.294, 1.425, 59.017, 1.436],
+    "Choc stop!": [61.969, 1.383, 60.704, 1.368],
+    "Gum-believable!": [63.602, 1.556, 62.322, 1.58],
+    "Cherry on top!": [65.407, 1.493, 64.151, 1.422],
+    "Pop those cherries!": [67.151, 1.689, 65.823, 1.711],
+    "Gumdrop gorgeous!": [69.09, 1.721, 67.785, 1.541],
+    "Zesty!": [71.061, 1.244, 69.576, 1.318],
+    "Lemon-sational!": [72.555, 1.516, 71.143, 1.585],
+    "Zing!": [74.321, 1.206, 72.979, 1.205],
+    "Squeeze the day!": [75.777, 1.623, 74.433, 1.581],
+    "Double delight!": [77.65, 1.477, 76.264, 1.414],
+    "Two for tea!": [79.377, 1.501, 77.928, 1.462],
+    "Special times two!": [81.128, 1.984, 79.64, 1.904],
+    "Pair of treats!": [83.362, 1.444, 81.794, 1.448],
+    "Still in it!": [85.057, 1.327, 83.493, 1.359],
+    "Not done yet!": [86.634, 1.478, 85.102, 1.392],
+    "Clutch play!": [88.362, 1.429, 86.744, 1.401],
+    "Comeback sweet!": [90.04, 1.494, 88.394, 1.4],
+    "Pop pop!": [91.784, 1.258, 90.045, 1.283],
+    "Fizz-tastic!": [93.292, 1.434, 91.578, 1.397],
+    "Bubble pop!": [94.975, 1.319, 93.225, 1.217],
+    "Popping candy!": [96.544, 1.589, 94.692, 1.483],
+    "Liquorice-free!": [98.383, 1.548, 96.424, 1.525],
+    "Unwrapped!": [100.181, 1.176, 98.2, 1.176],
+    "Untangled!": [101.607, 1.441, 99.626, 1.426],
+    "Black magic!": [103.297, 1.499, 101.302, 1.343],
+    "Goal achieved!": [105.046, 1.515, 102.895, 1.396],
+    "Sugar Crush!": [106.811, 1.463, 104.541, 1.386],
+    "Voice on!": [108.524, 1.403, 106.177, 1.406],
+    "Sweet streak!": [110.177, 1.54, 107.834, 1.546],
+    "Sweeter streak!": [111.967, 1.521, 109.63, 1.549],
+    "Sugar-high streak!": [113.738, 1.685, 111.429, 1.624],
+    "Ultimate sweet streak!": [115.674, 1.869, 113.302, 1.763]
   };
   function sayClip(text, g) {
     const c = SAY_CLIPS[text]; if (!c) return null;
@@ -2633,9 +2654,9 @@
     return true;
   }
 
-  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_STOPS, FUTURE_STOPS, LV_COUNT, lvId, levelIds, stopId, LEGACY_220_IDS, migrateProg, stopForLevel, icingPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, bubLeft, liqLeft, spreadLiq, LIQ_IDLE, goalCounts, cloneState, bestMove, hintMoveFor, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
+  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_STOPS, FUTURE_STOPS, NZ_PROJ, nzXY, WHANGAREI_INSET, insetXY, pacXY, ausXY, LV_COUNT, lvId, levelIds, stopId, LEGACY_220_IDS, migrateProg, stopForLevel, icingPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, bubLeft, liqLeft, spreadLiq, LIQ_IDLE, goalCounts, cloneState, bestMove, hintMoveFor, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
     allowed: () => !!(root.IBScores && root.IBScores.isShane && root.IBScores.isShane()),
-    SAY_SHOW_MS, SAY_AFTER_MS, sayShowGap, SPEAK_GAP, SPEAK_PITCH, SPEAK_RATE, SPEAK_VOL, pickSpeechVoice, speechGender, speakWorthy, SAY_SPRITES, SAY_CLIPS, sayClip, nextSayVoice, SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL, XF,
+    SAY_REST_MS, SAY_BIG, sayBig, SAY_SHOW_MS, SAY_AFTER_MS, sayShowGap, SPEAK_GAP, SPEAK_PITCH, SPEAK_RATE, SPEAK_VOL, pickSpeechVoice, speechGender, speakWorthy, SAY_SPRITES, SAY_CLIPS, sayClip, nextSayVoice, SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL, XF,
     VOICE_FILES, VOICE_RANK, MEDIA_HASH, mediaUrl, gameTrack, SONG_PLAN, SONG_FILES, SONG_FROM, songMood, attachSfxBus, playTone, playChime, playMovesWarnChime, playClip, voiceForStep,
     SAYINGS, SAYING_COLORS, SAYING_VOICE, sayingKind, pickSaying, sayingColor, MOVES_WARN_AT, MOVES_WARN_MS, HINT_IDLE_MS, HINT_REPEAT_MS,
     SPARKLE_MIN_MS, SPARKLE_MAX_MS, SPARKLE_MAX, SPARKLE_MAX_REDUCE, SHIMMER_MS, sparkleCap, sparkleEase, shimmerAt, drawStarGlint, drawCandyShine,
@@ -3013,7 +3034,13 @@
   }
   function stopSpeech() { try { if (synth) synth.cancel(); } catch (e) { } if (saySrc) { try { saySrc.stop(); } catch (e) { } saySrc = null; } }
   // Big moments: speak the banner words when speech works, otherwise the old clip.
-  function cheer(text, word) { if (!speakLine(text) && !((canSpeak() || clipsReady() || audio()) && voiceOn)) say(word); }
+  // Goal achieved / Sugar Crush / the win line go with their banners: always said, ahead of any waiting saying.
+  function cheer(text, word) {
+    if (sayPendTimer) clearTimeout(sayPendTimer); sayPendTimer = 0; sayPending = null;
+    const d = speakLine(text);
+    if (d > 0) { sayFreeAt = now() + d * 1000 + SAY_REST_MS; return; }
+    if (!((canSpeak() || clipsReady() || audio()) && voiceOn)) say(word);
+  }
   function setVoice(on) { voiceOn = !!on; ls.set('ib-sugar-voice', voiceOn); if (!voiceOn) stopSpeech(); paintButtons(); if (voiceOn) { primeSpeech(); loadSayClips(); speakLine('Voice on!', { force: true }); } }
 
   // ---------- Look ----------
@@ -3962,7 +3989,7 @@
     if (opt.jelly) st.jelly = parseDigits(opt.jelly);
     if (opt.tutorial) st.tutorial = true;
     sel = null; busy = false; lastAct = now();
-    crush = null; warned3 = false; hintOn = false; hintHold = false; hintMove = null; hideHintHand(); hideMovesWarn(); lastSaying = ''; sayUntil = 0; hideSaying();
+    crush = null; warned3 = false; hintOn = false; hintHold = false; hintMove = null; hideHintHand(); hideMovesWarn(); lastSaying = ''; sayUntil = 0; clearSayQueue(); hideSaying();
     resetStreak(); hideCrushBan();
     fitCanvas(); syncAll(); hud();
     paintGoalStrip(lv, st);
@@ -4022,16 +4049,44 @@
     if (el) { el.hidden = true; el.textContent = ''; el.className = 'saypop'; }
     if (sayTimer) { clearTimeout(sayTimer); sayTimer = 0; }
   }
+  // ---- 1.9.227 Saying pace: shown and spoken together, then SAY_REST_MS of quiet. ----
+  let sayFreeAt = 0, sayPending = null, sayPendTimer = 0;
+  function voiceLive() { return soundOn && voiceOn && !(doc && doc.hidden); }
+  function sayFree() { return now() >= sayFreeAt && !sayPending; }
+  function sayShowNow(text, show) {
+    show();
+    const d = speakLine(text);
+    sayFreeAt = now() + (d > 0 ? d * 1000 : SAY_SHOW_MS) + SAY_REST_MS;
+  }
+  // Show-and-speak if the rest is over; otherwise a big line waits (queue of one) and a minor one is dropped unseen.
+  function sayGate(text, big, show) {
+    if (!voiceLive()) { show(); return true; }
+    if (sayFree()) { sayShowNow(text, show); return true; }
+    if (!big || sayPending) return false;
+    sayPending = { text: text, show: show, st: st };
+    sayPendTimer = setTimeout(flushSay, Math.max(0, sayFreeAt - now()));
+    return true;
+  }
+  function flushSay() {
+    const p = sayPending; sayPending = null; sayPendTimer = 0;
+    if (!p || p.st !== st || screen !== 'game' || !st || st.over) return;
+    if (!voiceLive()) { p.show(); return; }
+    sayShowNow(p.text, p.show);
+  }
+  function clearSayQueue() { if (sayPendTimer) clearTimeout(sayPendTimer); sayPendTimer = 0; sayPending = null; sayFreeAt = 0; }
   function showSaying(step, i) {
     const kind = sayingKind(step, step && (step.cascade || (i + 1)), st);
     if (!kind) return null;
-    const t = now();
-    if (t < sayUntil) return null;
+    const t = now(), big = sayBig(kind), live = voiceLive();
+    if (!live && t < sayUntil) return null;
+    if (live && !sayFree() && (!big || sayPending)) return null; // a minor line in the rest: not shown, so never silent
     const text = pickSaying(kind, lastSaying);
     if (!text) return null;
+    if (!live) sayUntil = t + sayShowGap(0, reduce);
+    return sayGate(text, big, () => paintSaying(text, kind)) ? text : null;
+  }
+  function paintSaying(text, kind) {
     lastSaying = text;
-    // 1.9.226 Every saying shown is said in full; the next one waits until this one has been said.
-    sayUntil = t + sayShowGap(speakLine(text), reduce);
     const el = $('saypop');
     if (el) {
       el.textContent = text;
@@ -4044,7 +4099,6 @@
       if (sayTimer) clearTimeout(sayTimer);
       sayTimer = setTimeout(hideSaying, reduce ? 900 : 1100);
     }
-    return text;
   }
   function hideMovesWarn() {
     const el = $('moveswarn');
@@ -4747,7 +4801,8 @@
     if (up && tier > 0) {
       el.classList.remove('up'); void el.offsetWidth; el.classList.add('up');
       const pop = $('streakpop');
-      if (pop) { pop.textContent = STREAK_NAMES[tier] + ' ×' + (tier + 1); speakLine(STREAK_NAMES[tier]); pop.hidden = false; pop.classList.remove('go'); void pop.offsetWidth; pop.classList.add('go'); setTimeout(function () { pop.hidden = true; }, reduce ? 900 : 1400); }
+      // 1.9.227 A streak level-up is a big line: shown and said together, waiting its turn if a saying was just said.
+      if (pop) { const name = STREAK_NAMES[tier], label = name + ' ×' + (tier + 1); sayGate(name, true, function () { pop.textContent = label; pop.hidden = false; pop.classList.remove('go'); void pop.offsetWidth; pop.classList.add('go'); setTimeout(function () { pop.hidden = true; }, reduce ? 900 : 1400); }); }
       playStarChime(Math.min(2, tier - 1));
     }
   }

@@ -3874,7 +3874,7 @@ if (live) {
   assert.ok(SR.stopForLevel(7).place.toLowerCase().includes('station') || SR.stopForLevel(7).place.includes('Taupō'));
   const future = SR.FUTURE_STOPS.map(s => s.place);
   assert.ok(future.includes('Melbourne') && places.includes('Christchurch') && places.includes('Queenstown') && places.includes('Dunedin'));
-  assert.ok(SR.MAP_STOPS.every((a, i) => i === 0 || SR.MAP_STOPS[i].y >= SR.MAP_STOPS[0].y - 40), 'the journey starts up north');
+  assert.ok(SR.MAP_STOPS.slice(0, 16).every(s => s.lat <= SR.MAP_STOPS[0].lat + 0.05), 'the journey starts up north (Onerahi, Whangārei)');
   assert.ok(SR.stopForLevel(15).y < SR.FUTURE_STOPS[0].y, 'future stops lie further south');
   const path = SR.icingPath(SR.MAP_STOPS);
   assert.ok(path.startsWith('M ') && path.includes('C '), 'candy path is a smooth SVG line through the stops');
@@ -4623,7 +4623,7 @@ console.log('1.9.223 hourly lives ok');
   assert.strictEqual(SR.pickSpeechVoice([{ name: 'Amélie', lang: 'fr-CA' }]), null);
   assert.strictEqual(SR.speakWorthy({ cascade: 1, popped: [1, 2, 3], jellyCleared: 1 }, 1), false, 'a plain match is minor');
   assert.strictEqual(SR.speakWorthy({ cascade: 3, popped: [1, 2, 3] }, 3), true);
-  assert.ok(src.includes('sayUntil = t + sayShowGap(speakLine(text), reduce);'), 'speaks the saying on screen');
+  assert.ok(src.includes('const d = speakLine(text);\n    sayFreeAt = now() + (d > 0 ? d * 1000 : SAY_SHOW_MS) + SAY_REST_MS;'), 'speaks the saying on screen');
   assert.ok(src.includes("if (!text || !soundOn || !voiceOn || (doc && doc.hidden)) return 0;"), 'respects Sound and Voice');
   assert.ok(src.includes('duckMusicBrief(Math.min(2.6, c.dur))') && src.includes('duckMusicBrief(Math.min(2.4, est));'));
   assert.ok(src.includes("ls.get('ib-sugar-voice', true)") && html.includes('id="voicebtn"'));
@@ -4679,7 +4679,7 @@ console.log('1.9.224 songs ok');
   for (const g of ['f', 'm']) for (const e of ['m4a', 'mp3']) {
     const f = 'sugar-rush-say-' + g + '.' + e, url = SR.mediaUrl(f);
     assert.strictEqual(SR.MEDIA_HASH[f], sha8('feed/' + url), f);
-    const size = fs.statSync('feed/' + url).size; assert.ok(size > 2e5 && size < 6e5, f + ' small');
+    const size = fs.statSync('feed/' + url).size; assert.ok(size > 2e5 && size < 8e5, f + ' small (1.9.227: longer reverb tails)');
   }
   const vs = [{ name: 'Karen', lang: 'en-AU' }, { name: 'Lee', lang: 'en-AU' }, { name: 'Daniel', lang: 'en-GB' }, { name: 'Google UK English Female', lang: 'en-GB' }];
   assert.strictEqual(SR.pickSpeechVoice(vs, 'm').name, 'Lee'); assert.strictEqual(SR.pickSpeechVoice(vs, 'f').name, 'Karen');
@@ -4703,12 +4703,54 @@ console.log('1.9.225 male and female sayings ok');
   assert.ok(!src.includes('if (speakWorthy(step') && !src.includes("synth.speaking || synth.pending) return false") && !src.includes('t - speakAt < SPEAK_GAP'));
   assert.strictEqual(SR.sayShowGap(0, false), 1100); assert.strictEqual(SR.sayShowGap(1.5, false), 1850); assert.strictEqual(SR.sayShowGap(0.5, true), 1400);
   assert.ok(src.includes('const at = Math.max(ac.currentTime + 0.01, sayEndAt)') && src.includes('src.start(at, c.start, c.dur);'), 'queued, exact padded offsets');
-  assert.ok(src.includes('speakLine(STREAK_NAMES[tier]);'), 'streak lines are said too');
+  assert.ok(src.includes('sayGate(name, true, function () {'), 'streak lines are said too');
   assert.ok(src.includes("if (soundOn && voiceOn) { primeSpeech(); loadSayClips(); }"), 'clips load on the first touch');
   assert.ok(src.includes("p.then(() => { if (now() - t < 1800 && soundOn && voiceOn)"), 'waits for clips still downloading instead of the phone voice');
-  assert.ok(src.includes("'sugar-rush-say-f.m4a': 'afcc3783'") && src.includes("'sugar-rush-say-m.m4a': 'e7fa1e02'"));
+
 }
 console.log('1.9.226 every saying spoken ok');
+
+// 1.9.227 More echo and reverb (longer clips), and ~3 s of quiet between spoken sayings; minor ones in the rest are not shown.
+{
+  const SR = load('feed/sugar-rush.js').SugarRush;
+  const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
+  assert.strictEqual(SR.SAY_REST_MS, 3000);
+  for (const k of ['combo', 'bomb', 'wrap', 'stripe']) assert.ok(SR.sayBig(k), k);
+  for (const k of ['cascade', 'jelly', 'gumdrop', 'lemon', 'ice', 'bub']) assert.ok(!SR.sayBig(k), k);
+  for (const t in SR.SAY_CLIPS) { const c = SR.SAY_CLIPS[t]; assert.ok(c[1] >= 1.0 && c[3] >= 1.0 && c[1] < 2.6 && c[3] < 2.6, 'room tail kept: ' + t); }
+  assert.ok(src.includes("'sugar-rush-say-f.m4a': '26b115df'") && src.includes("'sugar-rush-say-m.m4a': '3a94c931'"));
+  // Shown and spoken together: the display happens inside the gate, only when the voice says it (or voice is off).
+  assert.ok(src.includes('return sayGate(text, big, () => paintSaying(text, kind)) ? text : null;'));
+  assert.ok(src.includes("if (live && !sayFree() && (!big || sayPending)) return null; // a minor line in the rest: not shown, so never silent"));
+  assert.ok(src.includes('if (!big || sayPending) return false;') && src.includes('sayPendTimer = setTimeout(flushSay, Math.max(0, sayFreeAt - now()));'), 'big lines wait, queue of one');
+  assert.ok(src.includes("lastSaying = ''; sayUntil = 0; clearSayQueue(); hideSaying();"), 'queue cleared on a new level');
+  assert.ok(/function cheer\(text, word\) \{\s*if \(sayPendTimer\) clearTimeout\(sayPendTimer\); sayPendTimer = 0; sayPending = null;/.test(src), 'banner lines always said');
+}
+console.log('1.9.227 echo and 3 s pace ok');
+{
+  // 1.9.227 Real geography: every stop sits at its real latitude/longitude through the map's projection.
+  const SR = load('feed/sugar-rush.js').SugarRush;
+  const near = (a, b, tol) => Math.abs(a.x - b.x) <= tol && Math.abs(a.y - b.y) <= tol;
+  const S = SR.MAP_STOPS, by = n => S.find(s => s.place === n);
+  assert.ok(S.every(s => typeof s.lat === 'number' && typeof s.lon === 'number'), 'every stop knows its real lat/lon');
+  S.slice(3, 16).forEach(s => assert.ok(near(s, SR.nzXY(s.lat, s.lon), 1.5), s.place + ' sits at its real NZ position'));
+  S.slice(0, 3).forEach(s => assert.ok(s.inset === 'whangarei' && near(s, SR.insetXY(s.lat, s.lon), 1.5), s.place + ' sits in the Whangārei close-up'));
+  S.slice(16, 19).forEach(s => assert.ok(near(s, SR.pacXY(s.lat, s.lon), 1.5), s.place + ' sits at its real Pacific position'));
+  S.slice(19).forEach(s => assert.ok(near(s, SR.ausXY(s.lat, s.lon), 1.5), s.place + ' sits at its real Australian position'));
+  SR.FUTURE_STOPS.forEach(s => assert.ok(near(s, SR.ausXY(s.lat, s.lon), s.nudged ? 40 : 1.5), s.place + ' coming-soon marker in place'));
+  const nap = by('Napier'), wel = by('Wellington'), akl = by('Auckland Post Office'), blf = by('Bluff');
+  assert.ok(nap.x > akl.x && nap.y < wel.y - 120 && wel.y < by('Christchurch').y && blf.y > by('Dunedin').y, 'Napier on the east coast, Wellington at the bottom of the North Island');
+  const on = by('Onerahi'), wh = by('Whangārei');
+  assert.ok(on.x > wh.x && on.y > wh.y, 'Onerahi sits south-east of Whangārei city');
+  const real = SR.nzXY(-35.725, 174.323), svg = SR.nzMapSvg ? SR.nzMapSvg() : '';
+  assert.ok(real.y < akl.y && real.x < akl.x, 'Whangārei really sits north-west of Auckland');
+  assert.ok(!svg || (svg.includes('sr-inset') && svg.includes('Whangārei close-up')), 'the close-up inset is drawn');
+  // Real coastline calibration: Cape Reinga top-left, East Cape right, Cape Palliser at the bottom of the North Island.
+  const cr = SR.nzXY(-34.43, 172.68), ec = SR.nzXY(-37.69, 178.55), cp = SR.nzXY(-41.61, 175.29), sp = SR.nzXY(-46.6, 168.35);
+  assert.ok(cr.x < 80 && cr.y < 140 && ec.x > 340 && cp.y > wel.y && sp.y > 1050 && sp.y < 1180 && [cr, ec, cp, sp].every(p => p.x > 0 && p.x < SR.MAP_W), 'projection matches real coastline points');
+  console.log('1.9.227 real map geography ok');
+}
+
 
 
 
