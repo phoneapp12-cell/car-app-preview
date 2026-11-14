@@ -72,6 +72,56 @@
   @keyframes badgeIn { 0% { transform: scale(.2) rotate(-12deg); opacity: 0; } 60% { transform: scale(1.12) rotate(4deg); opacity: 1; } 100% { transform: none; } }
   .badgecap { font-size: 14px; font-weight: 800; color: #d6246e; margin: -4px 0 10px; }
   .introheart { font-size: 56px; margin: 4px 0 8px; }
+  /* 1.9.210 NZ candy map */
+  body.onmap { display: flex; flex-direction: column; min-height: 100dvh; height: 100dvh; padding: 8px 8px 12px; background: linear-gradient(180deg, #9be7ff 0%, #b8f3de 100%) fixed; }
+  body.onmap .wrap { max-width: none; width: 100%; flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  #map { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .mapview { flex: 1 1 auto; min-height: 220px; overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-x pan-y; border-radius: 22px; border: 3px solid #fff; box-shadow: 0 6px 0 rgba(80,150,180,.18), 0 10px 24px rgba(40,90,120,.16); background: #9be7ff; }
+  .mapstage { position: relative; width: 100%; min-width: 320px; }
+  .mapstage svg.nzsvg { display: block; width: 100%; height: auto; }
+  .stops { position: absolute; inset: 0; pointer-events: none; }
+  .stops .lv, .stops .future-stop { position: absolute; pointer-events: auto; transform: translate(-50%, -50%); width: auto; height: auto; aspect-ratio: auto; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 1px; border: 0; background: none; box-shadow: none; padding: 0; }
+  .stops .lv .pin, .stops .future-stop .pin { position: relative; display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 50%; border: 3px solid #ffb3d3; background: rgba(255,255,255,.96); box-shadow: 0 3px 0 #f4a0c4, 0 6px 12px rgba(180,40,90,.18); color: #7a1f4c; font: 900 16px/1 ui-rounded, system-ui, sans-serif; }
+  .stops .lv .pin .no { font-size: 16px; }
+  .stops .lv .pin .mark { position: absolute; right: -8px; bottom: -6px; width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 1.5px solid #ffb3d3; font-size: 11px; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 0 #f4a0c4; }
+  .stops .lv.sarah .pin { border-color: #ff7eb0; background: linear-gradient(180deg, #fff, #ffe0ee); }
+  .stops .lv.sarah .pin .mark { border-color: #ff7eb0; }
+  .stops .lv.sarah .pin .no { font-size: 16px; color: #d6246e; }
+  .stops .lv.open:not([disabled]) { cursor: pointer; }
+  .stops .lv.open:not([disabled]) .pin:hover { transform: scale(1.06); }
+  .stops .lv.done .pin { border-color: #f0c14b; }
+  .stops .lv[disabled] { cursor: default; }
+  .stops .lv[disabled] .pin { background: #f4e6ec; color: #c49aaa; box-shadow: none; border-color: #efc2d4; }
+  .stops .lv.here .pin { box-shadow: 0 0 0 4px rgba(255,180,0,.55), 0 3px 0 #f4a0c4; }
+  .stops .lv .st { font-size: 11px; letter-spacing: 1px; color: #e6c7d6; height: 14px; margin-top: 2px; }
+  .stops .lv .st .on { color: #ffb400; }
+  .stops .meta { position: absolute; top: 48px; width: max-content; max-width: 120px; text-align: center; pointer-events: none; }
+  .stops .lab-left .meta { right: 48px; left: auto; top: 6px; text-align: right; }
+  .stops .lab-right .meta { left: 48px; right: auto; top: 6px; text-align: left; }
+  .stops .meta b { display: block; font-size: 11px; font-weight: 800; color: #5a1238; line-height: 1.15; text-shadow: 0 1px 0 #fff; }
+  .stops .meta em { display: block; font-size: 10px; font-style: normal; font-weight: 700; color: #8a3a62; line-height: 1.15; text-shadow: 0 1px 0 #fff; }
+  .stops .gotbadge { position: absolute; top: -4px; right: -2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 1.5px solid #ffb400; font-size: 11px; display: flex; align-items: center; justify-content: center; }
+  .stops .lv.sarah .gotbadge { border-color: #ff6fa8; }
+  .stops .future-stop { pointer-events: none; }
+  .stops .future-stop .pin { width: 22px; height: 22px; border: 2px dashed #ffb3d3; background: rgba(255,255,255,.7); box-shadow: none; }
+  .stops .future-stop .meta b { color: #7a4a62; }
+  .stops .future-stop .meta em { color: #a07088; }
+  @keyframes herepulse { 0%, 100% { box-shadow: 0 0 0 4px rgba(255,180,0,.45), 0 3px 0 #f4a0c4; } 50% { box-shadow: 0 0 0 8px rgba(255,180,0,.18), 0 3px 0 #f4a0c4; } }
+  @keyframes srbob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+  .stops .lv.here:not([disabled]) .pin { animation: herepulse 1.8s ease-in-out infinite; }
+  .nzsvg .sr-bob { transform-box: fill-box; transform-origin: center; animation: srbob 3.6s ease-in-out infinite; }
+  @media (orientation: landscape) and (max-height: 520px) {
+    body.onmap { padding: 4px 8px 8px; }
+    body.onmap .awning { height: 8px; margin: -4px -8px 4px; }
+    #map h1 { font-size: 20px; }
+    #map .help { font-size: 12px; margin: 2px 0 6px; }
+    .shelf-t { margin: 4px 0; }
+    .shelf { padding: 6px; }
+    .badge { min-height: 48px; }
+    .badge i { width: 36px; height: 36px; font-size: 18px; }
+    .acts { margin-top: 8px; }
+    button { min-height: 40px; }
+  }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
@@ -86,10 +136,14 @@
 
     <div id="map" hidden>
       <div class="maphead">
-        <h1>Sugar Rush <small>Levels</small></h1>
+        <h1>Sugar Rush <small>New Zealand</small></h1>
       </div>
-      <p class="help" id="maphelp">Clear a level to unlock the next. Stars and badges stay on the shelf.</p>
-      <div class="path" id="path"></div>
+      <p class="help" id="maphelp">Follow the icing path down New Zealand, starting in Onerahi. Clear a level to unlock the next stop.</p>
+      <div class="mapview" id="mapview">
+        <div class="mapstage" id="mapstage">
+          <div class="stops path" id="path"></div>
+        </div>
+      </div>
       <div class="shelf-t">Badge shelf</div>
       <div class="shelf" id="shelf"></div>
       <div class="acts">

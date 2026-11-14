@@ -72,6 +72,98 @@
       badge: { id: 'night', name: 'Night Light', icon: '🌟' } }
   ];
 
+  // 1.9.210 Sugar Rush main screen: an illustrated candy map of New Zealand.
+  // Stops start in Onerahi / Whangārei and travel south. Level 2 is Sarah's house.
+  const MAP_W = 400, MAP_H = 1280;
+  const MAP_STOPS = [
+    { n: 1, x: 258, y: 118, place: 'Onerahi', kind: 'town', label: 'right' },
+    { n: 2, x: 168, y: 178, place: "Sarah's House", kind: 'house', label: 'left' },
+    { n: 3, x: 214, y: 236, place: 'Whangārei', kind: 'town', label: 'right' },
+    { n: 4, x: 176, y: 292, place: 'Auckland Post Office', kind: 'post', label: 'left' },
+    { n: 5, x: 168, y: 348, place: 'Hamilton', kind: 'town', label: 'left' },
+    { n: 6, x: 258, y: 368, place: 'Rotorua', kind: 'town', label: 'right' },
+    { n: 7, x: 200, y: 424, place: 'Taupō Station', kind: 'station', label: 'left' },
+    { n: 8, x: 300, y: 500, place: 'Napier', kind: 'town', label: 'left' },
+    { n: 9, x: 246, y: 530, place: 'Wellington', kind: 'town', label: 'right' },
+    { n: 10, x: 148, y: 640, place: 'Nelson', kind: 'town', label: 'left' }
+  ];
+  const FUTURE_STOPS = [
+    { place: 'Christchurch', x: 270, y: 852, label: 'right' },
+    { place: 'Queenstown', x: 138, y: 948, label: 'right' },
+    { place: 'Dunedin', x: 252, y: 1010, label: 'left' }
+  ];
+  function stopForLevel(n) { return MAP_STOPS[(n | 0) - 1] || null; }
+  function icingPath(pts) {
+    if (!pts || pts.length < 2) return '';
+    const p = [pts[0]].concat(pts, [pts[pts.length - 1]]);
+    let d = 'M ' + pts[0].x + ' ' + pts[0].y;
+    for (let i = 1; i < p.length - 2; i++) {
+      const p0 = p[i - 1], p1 = p[i], p2 = p[i + 1], p3 = p[i + 2];
+      const c1x = p1.x + (p2.x - p0.x) / 6, c1y = p1.y + (p2.y - p0.y) / 6;
+      const c2x = p2.x - (p3.x - p1.x) / 6, c2y = p2.y - (p3.y - p1.y) / 6;
+      d += ' C ' + c1x + ' ' + c1y + ' ' + c2x + ' ' + c2y + ' ' + p2.x + ' ' + p2.y;
+    }
+    return d;
+  }
+  function nzMapSvg() {
+    const live = icingPath(MAP_STOPS);
+    const future = icingPath([MAP_STOPS[MAP_STOPS.length - 1]].concat(FUTURE_STOPS));
+    return (
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + MAP_W + ' ' + MAP_H + '" width="' + MAP_W + '" height="' + MAP_H + '" aria-hidden="true" class="nzsvg">' +
+      '<defs>' +
+      '<linearGradient id="sr-sea" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0" stop-color="#9be7ff"/><stop offset=".45" stop-color="#8fd9f8"/><stop offset="1" stop-color="#b8f3de"/>' +
+      '</linearGradient>' +
+      '<linearGradient id="sr-land" x1="0" y1="0" x2="1" y2="1">' +
+      '<stop offset="0" stop-color="#fff6fb"/><stop offset=".45" stop-color="#ffd7ea"/><stop offset="1" stop-color="#ffe9c8"/>' +
+      '</linearGradient>' +
+      '<linearGradient id="sr-icing" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0" stop-color="#ff8ab8"/><stop offset=".55" stop-color="#ffb347"/><stop offset="1" stop-color="#ff6fa8"/>' +
+      '</linearGradient>' +
+      '<filter id="sr-soft" x="-6%" y="-6%" width="112%" height="112%">' +
+      '<feDropShadow dx="0" dy="2" stdDeviation="2.2" flood-color="#4a90b8" flood-opacity=".28"/>' +
+      '</filter>' +
+      '</defs>' +
+      '<rect width="' + MAP_W + '" height="' + MAP_H + '" fill="url(#sr-sea)"/>' +
+      '<circle class="sr-bob" cx="48" cy="90" r="7" fill="#ff8ab8" opacity=".55"/>' +
+      '<circle class="sr-bob" cx="62" cy="102" r="5" fill="#ffe066" opacity=".65"/>' +
+      '<circle class="sr-bob" cx="360" cy="200" r="6" fill="#7ee0a8" opacity=".5"/>' +
+      '<circle class="sr-bob" cx="40" cy="640" r="8" fill="#ffb347" opacity=".45"/>' +
+      '<circle class="sr-bob" cx="370" cy="900" r="7" fill="#ff8ab8" opacity=".45"/>' +
+      '<circle class="sr-bob" cx="56" cy="1100" r="6" fill="#fff" opacity=".55"/>' +
+      '<text x="28" y="48" font-size="13" font-weight="800" fill="#2a6a88" font-family="ui-rounded,system-ui,sans-serif">N</text>' +
+      '<path d="M28 54 L28 72 M28 54 L22 62 M28 54 L34 62" fill="none" stroke="#2a6a88" stroke-width="2" stroke-linecap="round"/>' +
+      // North Island
+      '<path filter="url(#sr-soft)" fill="url(#sr-land)" stroke="#fff" stroke-width="8" stroke-linejoin="round" d="' +
+      'M 196 30 C 208 28 222 38 224 54 C 226 72 236 86 230 104 C 238 118 242 132 232 146 C 238 160 232 176 220 188 ' +
+      'C 238 192 268 172 286 162 C 304 152 316 162 312 180 C 308 196 290 204 272 210 C 262 220 278 230 304 236 ' +
+      'C 336 244 362 258 370 280 C 376 300 360 322 350 344 C 340 368 352 386 338 404 C 322 426 316 452 302 476 ' +
+      'C 290 498 280 518 262 528 C 246 536 236 524 228 512 C 214 514 204 500 200 482 C 190 458 176 434 168 410 ' +
+      'C 154 388 132 372 116 352 C 96 334 90 316 108 300 C 124 284 142 276 150 256 C 156 236 148 220 158 208 ' +
+      'C 150 192 142 176 146 158 C 150 136 160 116 168 98 C 174 74 180 52 188 40 C 190 34 192 30 196 30 Z"/>' +
+      '<ellipse cx="226" cy="388" rx="16" ry="13" fill="#7ec8ef" stroke="#fff" stroke-width="2"/>' +
+      // South Island (Banks Peninsula included on the east)
+      '<path filter="url(#sr-soft)" fill="url(#sr-land)" stroke="#fff" stroke-width="8" stroke-linejoin="round" d="' +
+      'M 198 608 C 226 600 252 610 254 636 C 256 670 262 708 258 746 C 256 784 268 812 288 828 ' +
+      'C 308 844 306 866 288 876 C 272 886 258 896 256 922 C 258 950 254 986 236 1006 ' +
+      'C 216 1028 190 1038 166 1030 C 140 1022 118 1004 102 976 C 84 944 70 904 74 862 ' +
+      'C 76 820 66 780 76 740 C 84 700 74 662 84 628 C 94 596 126 584 156 590 C 174 594 186 600 198 608 Z"/>' +
+      '<path fill="#8fd9f8" d="M 86 930 C 78 918 70 910 76 898 C 90 906 96 920 94 934 Z"/>' +
+      '<path fill="#8fd9f8" d="M 80 880 C 70 868 64 854 74 844 C 86 856 90 870 86 884 Z"/>' +
+      '<ellipse filter="url(#sr-soft)" cx="168" cy="1148" rx="28" ry="20" fill="url(#sr-land)" stroke="#fff" stroke-width="6"/>' +
+      // Soft icing alps
+      '<path d="M 132 710 C 142 668 154 668 164 710 C 154 702 142 702 132 710 Z" fill="#fff" opacity=".9"/>' +
+      '<path d="M 152 790 C 164 742 178 742 188 790 C 176 780 164 780 152 790 Z" fill="#fff" opacity=".88"/>' +
+      '<path d="M 140 870 C 152 828 166 828 176 870 C 164 860 152 860 140 870 Z" fill="#fff" opacity=".88"/>' +
+      // Ferry across Cook Strait
+      '<path d="M 210 575 C 200 595 180 615 168 628" fill="none" stroke="#fff" stroke-width="2.4" stroke-dasharray="5 7" stroke-linecap="round" opacity=".85"/>' +
+      '<path id="sr-future" d="' + future + '" fill="none" stroke="#ffb3d3" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 9" opacity=".7"/>' +
+      '<path id="sr-path-wide" d="' + live + '" fill="none" stroke="url(#sr-icing)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path id="sr-path-dash" d="' + live + '" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 10" opacity=".9"/>' +
+      '</svg>'
+    );
+  }
+
   function rng(seed) {
     let a = (seed >>> 0) || 1;
     const f = function () { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -735,7 +827,7 @@
     ctx.fill();
   }
 
-  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, cloneState, bestMove, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
+  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, MAP_W, MAP_H, MAP_STOPS, FUTURE_STOPS, stopForLevel, icingPath, nzMapSvg, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, cloneState, bestMove, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
     allowed: () => !!(root.IBScores && root.IBScores.isShane && root.IBScores.isShane()),
     SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL, XF,
     VOICE_FILES, VOICE_RANK, MEDIA_HASH, mediaUrl, gameTrack, attachSfxBus, playTone, playChime, playClip, voiceForStep,
@@ -1226,17 +1318,49 @@
   }
 
   function renderMap() {
-    const path = $('path'), shelf = $('shelf');
+    const stage = $('mapstage'), path = $('path'), shelf = $('shelf');
+    if (stage && !stage.querySelector('svg.nzsvg')) {
+      const hold = path;
+      stage.insertAdjacentHTML('afterbegin', nzMapSvg());
+      if (hold && hold.parentNode !== stage) stage.appendChild(hold);
+    }
+    const live = icingPath(MAP_STOPS);
+    const future = icingPath([MAP_STOPS[MAP_STOPS.length - 1]].concat(FUTURE_STOPS));
+    const wide = stage && stage.querySelector('#sr-path-wide');
+    const dash = stage && stage.querySelector('#sr-path-dash');
+    const fut = stage && stage.querySelector('#sr-future');
+    if (wide) wide.setAttribute('d', live);
+    if (dash) dash.setAttribute('d', live);
+    if (fut) fut.setAttribute('d', future);
     path.innerHTML = '';
+    const here = Math.min(10, Math.max(1, prog.open));
     LEVELS.forEach((lv, i) => {
-      const n = i + 1, open = n <= prog.open, stars = prog.stars[i] || 0;
+      const n = i + 1, open = n <= prog.open, stars = prog.stars[i] || 0, stop = MAP_STOPS[i];
       const b = doc.createElement('button');
-      b.type = 'button'; b.className = 'lv' + (lv.theme === 'sarah' ? ' sarah' : '') + (open ? ' open' : '') + (stars ? ' done' : '');
+      b.type = 'button';
+      b.className = 'lv lab-' + (stop.label || 'right') + (lv.theme === 'sarah' ? ' sarah' : '') + (open ? ' open' : '') + (stars ? ' done' : '') + (n === here ? ' here' : '') + ' kind-' + (stop.kind || 'town');
       b.disabled = !open;
-      b.innerHTML = '<span class="no">' + (lv.theme === 'sarah' ? '💖' : n) + '</span><span class="st">' + [0, 1, 2].map(k => '<span class="' + (k < stars ? 'on' : '') + '">★</span>').join('') + '</span>';
-      b.setAttribute('aria-label', (open ? 'Play ' : 'Locked: ') + lv.name + (stars ? ', ' + stars + ' stars' : ''));
+      b.dataset.n = String(n);
+      b.style.left = (stop.x / MAP_W * 100) + '%';
+      b.style.top = (stop.y / MAP_H * 100) + '%';
+      const mark = stop.kind === 'house' ? '🏠' : (stop.kind === 'post' ? '✉️' : (stop.kind === 'station' ? '🚂' : ''));
+      const starHtml = [0, 1, 2].map(k => '<span class="' + (k < stars ? 'on' : '') + '">★</span>').join('');
+      const badge = prog.badges[i] && lv.badge ? '<span class="gotbadge" aria-hidden="true">' + lv.badge.icon + '</span>' : '';
+      b.innerHTML = '<span class="pin"><span class="no">' + n + '</span>' + (mark ? '<span class="mark" aria-hidden="true">' + mark + '</span>' : '') + '</span><span class="st">' + starHtml + '</span>' +
+        '<span class="meta"><b>' + stop.place + '</b><em>' + lv.name + '</em></span>' + badge;
+      b.setAttribute('aria-label', (open ? 'Play ' : 'Locked: ') + 'level ' + n + ', ' + lv.name + ', ' + stop.place + (stars ? ', ' + stars + ' stars' : '') + (prog.badges[i] && lv.badge ? ', badge ' + lv.badge.name : ''));
       if (open) b.addEventListener('click', () => { unlockAudio(); openLevel(n); });
       path.appendChild(b);
+    });
+    FUTURE_STOPS.forEach(function (stop) {
+      const el = doc.createElement('div');
+      el.className = 'future-stop lab-' + (stop.label || 'right');
+      el.dataset.place = stop.place;
+      el.style.left = (stop.x / MAP_W * 100) + '%';
+      el.style.top = (stop.y / MAP_H * 100) + '%';
+      el.innerHTML = '<span class="pin"></span><span class="meta"><b>' + stop.place + '</b><em>Coming soon</em></span>';
+      el.setAttribute('aria-label', 'Coming soon: ' + stop.place);
+      path.appendChild(el);
     });
     shelf.innerHTML = '';
     LEVELS.forEach((lv, i) => {
@@ -1247,12 +1371,50 @@
       shelf.appendChild(el);
     });
   }
-  function showMap() {
+  function scrollMapTo(target, opts) {
+    const view = $('mapview');
+    if (!view) return;
+    opts = opts || {};
+    const motion = (opts.behavior) || (reduce ? 'auto' : 'smooth');
+    let el = null, top = 0, left = 0, useEl = true;
+    if (target === 'start' || target === 'north') {
+      useEl = false; top = 0; left = Math.max(0, view.scrollWidth / 2 - view.clientWidth / 2);
+    } else if (target === 'south') {
+      const n9 = view.querySelector('.lv[data-n="9"]');
+      const chch = view.querySelector('.future-stop[data-place="Christchurch"]');
+      if (n9 && chch) {
+        const r1 = n9.getBoundingClientRect(), r2 = chch.getBoundingClientRect(), v = view.getBoundingClientRect();
+        const mid = ((r1.top + r2.bottom) / 2) - v.top + view.scrollTop;
+        top = mid - v.height / 2;
+        left = view.scrollLeft;
+        useEl = false;
+      } else {
+        el = chch || view.querySelector('.lv[data-n="10"]');
+      }
+    } else {
+      const n = target == null ? Math.min(10, Math.max(1, prog.open)) : target;
+      el = view.querySelector('.lv[data-n="' + n + '"]');
+    }
+    if (useEl && el) {
+      const r = el.getBoundingClientRect(), v = view.getBoundingClientRect();
+      top = view.scrollTop + (r.top - v.top) - v.height / 2 + r.height / 2;
+      left = view.scrollLeft + (r.left - v.left) - v.width / 2 + r.width / 2;
+    }
+    view.scrollTo({ top: Math.max(0, top), left: Math.max(0, left), behavior: motion });
+    return { target: target, top: view.scrollTop, left: view.scrollLeft };
+  }
+  function showMap(opts) {
     stopEnd();
     screen = 'map';
     $('game').hidden = true; $('intro').hidden = true; $('end').hidden = true; $('map').hidden = false;
     doc.body.classList.remove('sarah');
+    doc.body.classList.add('onmap');
     renderMap(); paintButtons();
+    const scrollTo = opts && opts.scroll != null ? opts.scroll : Math.min(10, Math.max(1, prog.open));
+    const behavior = (opts && opts.behavior) || (reduce ? 'auto' : 'smooth');
+    const go = function () { scrollMapTo(scrollTo, { behavior: behavior }); };
+    if (root.requestAnimationFrame) root.requestAnimationFrame(function () { root.requestAnimationFrame(go); });
+    else go();
     if (musicOn) playKind(wantKind());
   }
   function openLevel(n) {
@@ -1269,6 +1431,7 @@
   }
   function startLevel(n) {
     $('intro').hidden = true; $('end').hidden = true; $('map').hidden = true; $('game').hidden = false;
+    doc.body.classList.remove('onmap', 'sarah');
     screen = 'game';
     lvNum = n;
     const lv = LEVELS[n - 1];
@@ -1468,7 +1631,7 @@
   root.requestAnimationFrame(frame);
 
   root.SugarRush.ui = {
-    state: () => st, attempt, showEnd, showMap, openLevel, startLevel, progress: () => prog,
+    state: () => st, attempt, showEnd, showMap, scrollMapTo, openLevel, startLevel, progress: () => prog,
     say, chime, callout, unlockAudio, audio,
     clipsReady: () => Object.keys(VOICE_FILES).every(k => !!bufs[k]),
     setSound(on) { soundOn = !!on; ls.set('ib-sugar-sound', soundOn); paintButtons(); },

@@ -3846,3 +3846,45 @@ if (live) {
   assert.strictEqual(tetGame.themeFor(10), tetGame.SEWER_THEME);
   assert.ok(src.includes('prefers-reduced-motion'));
 }
+
+// 1.9.210 Sugar Rush NZ map main screen
+{
+  const SR = load('feed/sugar-rush.js').SugarRush;
+  const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
+  const html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
+  assert.strictEqual(SR.LEVELS.length, 10);
+  assert.strictEqual(SR.LEVELS[1].name, "Sarah's Sweet Spot");
+  assert.strictEqual(SR.LEVELS[1].badge.icon, '💖');
+  assert.strictEqual(SR.LEVELS[1].badge.name, "Sarah's Heart");
+  assert.strictEqual(SR.MAP_STOPS.length, 10);
+  assert.strictEqual(SR.MAP_W, 400);
+  assert.ok(SR.MAP_H > 1000, 'the map is tall enough to scroll south');
+  const places = SR.MAP_STOPS.map(s => s.place);
+  assert.deepStrictEqual(Array.from(places), ['Onerahi', "Sarah's House", 'Whangārei', 'Auckland Post Office', 'Hamilton', 'Rotorua', 'Taupō Station', 'Napier', 'Wellington', 'Nelson']);
+  assert.strictEqual(SR.stopForLevel(2).kind, 'house');
+  assert.strictEqual(SR.stopForLevel(2).place, "Sarah's House");
+  assert.strictEqual(SR.stopForLevel(4).kind, 'post');
+  assert.ok(SR.stopForLevel(4).place.toLowerCase().includes('post'));
+  assert.strictEqual(SR.stopForLevel(7).kind, 'station');
+  assert.ok(SR.stopForLevel(7).place.toLowerCase().includes('station') || SR.stopForLevel(7).place.includes('Taupō'));
+  const future = SR.FUTURE_STOPS.map(s => s.place);
+  assert.ok(future.includes('Christchurch') && future.includes('Queenstown') && future.includes('Dunedin'));
+  assert.ok(SR.MAP_STOPS.every((a, i) => i === 0 || SR.MAP_STOPS[i].y >= SR.MAP_STOPS[0].y - 40), 'the journey starts up north');
+  assert.ok(SR.stopForLevel(10).y < SR.FUTURE_STOPS[0].y, 'future stops lie further south');
+  const path = SR.icingPath(SR.MAP_STOPS);
+  assert.ok(path.startsWith('M ') && path.includes('C '), 'candy path is a smooth SVG line through the stops');
+  const svg = SR.nzMapSvg();
+  assert.ok(svg.includes('North') || svg.includes('M 196 30') || svg.includes('viewBox'), 'has an NZ outline');
+  assert.ok(svg.includes('Cook') || svg.includes('575') || svg.includes('ferry') || svg.includes('sr-future'), 'includes the strait crossing / south path');
+  assert.ok(html.includes('id="mapview"') && html.includes('id="mapstage"') && html.includes('id="path"'));
+  assert.ok(html.includes('Starting in Onerahi') || html.includes('starting in Onerahi'));
+  assert.ok(html.includes('prefers-reduced-motion'));
+  assert.ok(html.includes('orientation: landscape'));
+  assert.ok(src.includes('scrollMapTo') && src.includes('openLevel(n)'));
+  assert.ok(src.includes("playKind(wantKind())") && src.includes("'menu'"));
+  assert.strictEqual(SR.mediaUrl('sugar-rush-menu.mp3'), 'sugar-rush-menu-3343a079.mp3');
+  // Gameplay and badges are unchanged
+  assert.strictEqual(SR.LEVELS[0].name, 'The Sweet Shop');
+  assert.strictEqual(SR.LEVELS[9].name, 'Saturday Night');
+  assert.strictEqual(SR.LEVELS[1].theme, 'sarah');
+}
