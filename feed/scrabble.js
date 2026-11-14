@@ -1,6 +1,8 @@
-/* 1.9.147 Scrabble-style word game for Info Book.
-   Play the computer, or pass the phone round 2 to 4 people. Everything runs on the phone:
-   no sign-in and no network apart from this page's own word list.
+/* 1.9.147 Scrabble-style word game for Info Book. 1.9.207 adds family games: each person
+   plays on their own phone, taking a turn whenever it suits them. The board is kept by the
+   family service. Play the computer, or pass the phone round, still runs on this phone.
+   No sign-in beyond the Info Book family link, and no network apart from the word list
+   and (for a family game) the family service.
    Word list: ENABLE (Enhanced North American Benchmark LEXicon), public domain,
    from https://github.com/dolph/dictionary (enable1.txt), trimmed to 2-15 letters.
    The same file runs as a Web Worker so the computer can think without freezing the board.
@@ -377,7 +379,156 @@
   const sndWord = () => { thud(131, 0, 0.35); thud(165, 0.14, 0.45); };
   const sndNo = () => thud(98, 0, 0.3);
 
-  function save() { if (demo || !st) return; store.set(KEY, JSON.stringify({ st, pending })); }
+  // 1.9.207 Family games. The phone that has the Info Book family link (mf.member) can start
+  // a game with people from the family list. Turns are taken whenever it suits each person.
+  const API = 'https://shane-my-feed-data.phoneapp12.workers.dev/api';
+  let onlineId = '', pollTimer = 0, famList = null, famPeople = null;
+  function member() {
+    try { const m = JSON.parse(store.get('mf.member') || 'null'); return m && m.id && m.tok && !m.pending ? m : null; } catch (e) { return null; }
+  }
+  function api(path, opt) {
+    const me = member();
+    if (!me) return Promise.reject(new Error('This phone needs its Info Book family link.'));
+    const ctl = root.AbortController ? new AbortController() : null;
+    const tm = ctl && setTimeout(() => ctl.abort(), 12000);
+    return fetch(API + path, {
+      method: (opt && opt.method) || 'GET', signal: ctl && ctl.signal,
+      headers: { Authorization: 'Bearer ' + me.tok, ...(opt && opt.body ? { 'Content-Type': 'application/json' } : {}) },
+      body: opt && opt.body
+    }).then(r => r.json().catch(() => ({})).then(j => {
+      if (tm) clearTimeout(tm);
+      if (!r.ok) {
+        const msg = j && j.err;
+        const e = new Error(!msg || msg === 'unknown' ? 'Family Scrabble isn’t on the service yet. It starts when Shane says go live.' : msg);
+        e.status = r.status; throw e;
+      }
+      return j;
+    }), () => { if (tm) clearTimeout(tm); return Promise.reject(new Error('No internet just now. Try again.')); });
+  }
+  function applyView(v) {
+    onlineId = v.id;
+    st = {
+      v: 1, mode: 'family', rev: v.rev, id: v.id, over: !!v.over, turnIsMe: !!v.yourTurn, scored: 1,
+      board: (v.board || []).map(c => c ? { l: c.l, b: c.b ? 1 : 0 } : null),
+      bag: new Array(v.bag | 0),
+      players: (v.players || []).map(p => ({ name: p.name, score: p.score, rack: p.me ? (v.rack || []).slice() : [], me: !!p.me, left: p.left })),
+      turn: v.turn | 0, scoreless: v.scoreless || 0, winners: v.winners || [], out: v.out, last: v.last || null
+    };
+  }
+  function turnBanner() {
+    const el = $('#yourturn'); if (!el) return;
+    if (!st || st.mode !== 'family' || st.over) { el.hidden = true; return; }
+    el.hidden = false;
+    if (st.turnIsMe) { el.textContent = 'Your turn'; el.classList.remove('wait'); }
+    else { const p = st.players[st.turn]; el.textContent = 'Waiting for ' + (p ? p.name : 'the next person'); el.classList.add('wait'); }
+  }
+  function showFamilyAlert() {
+    const el = $('#famalert'); if (!el) return;
+    const n = famList && famList.yourTurn || 0;
+    const playingMine = st && st.mode === 'family' && st.turnIsMe && !st.over;
+    if (!n || playingMine) { el.hidden = true; return; }
+    const g = (famList.games || []).find(x => x.yourTurn);
+    el.hidden = false;
+    el.textContent = n > 1 ? 'Your turn · ' + n + ' games' : 'Your turn';
+    el.dataset.gid = g ? g.id : '';
+  }
+  function pollOnline() {
+    clearInterval(pollTimer); pollTimer = 0;
+    if (!st || st.mode !== 'family' || st.over) return;
+    pollTimer = setInterval(() => {
+      if (root.document.hidden || pending.length || swapPick || busy || !onlineId) return;
+      api('/scrabble/' + onlineId).then(v => {
+        if (!st || st.mode !== 'family' || v.rev === st.rev || pending.length || swapPick) return;
+        openOnline(v);
+      }).catch(() => {});
+    }, st.turnIsMe ? 20000 : 8000);
+  }
+  function openOnline(v) {
+    applyView(v);
+    pending = []; sel = -1; swapPick = null; armed = ''; revealed = true; busy = false;
+    overlay('#over', false); overlay('#cover', false);
+    show('#game'); render();
+    if (st.over) showOver();
+    pollOnline(); showFamilyAlert();
+  }
+  function openFamilyGame(id) {
+    if (!id) return;
+    busy = true; say('Opening the game…');
+    api('/scrabble/' + id).then(v => { busy = false; openOnline(v); }).catch(e => {
+      busy = false; say(e.message, true); if (!st) openSetup();
+    });
+  }
+  function onOnlineErr(e) {
+    busy = false;
+    if (e && (e.status === 409 || e.status === 403)) {
+      pending = []; sel = -1; swapPick = null;
+      say(e.message || 'The board has changed.', true);
+      if (onlineId) api('/scrabble/' + onlineId).then(openOnline).catch(() => render());
+      else render();
+      return;
+    }
+    say((e && e.message) || 'Something went wrong.', true); sndNo(); render();
+  }
+  function sendOnline(kind, extra) {
+    busy = true; render();
+    api('/scrabble/' + onlineId + '/' + kind, { method: 'POST', body: JSON.stringify(Object.assign({ rev: st.rev }, extra || {})) })
+      .then(v => { busy = false; if (kind === 'play') sndWord(); else sndPlace(); openOnline(v); })
+      .catch(onOnlineErr);
+  }
+  function peekFamily() {
+    if (!member()) return;
+    api('/scrabble').then(list => { famList = list; showFamilyAlert(); if (setupMode === 'family') paintFamily(); }).catch(() => {});
+  }
+  function paintFamily() {
+    const status = $('#famstatus'), people = $('#fampeople'), games = $('#famgames'), banner = $('#setupturn');
+    const me = member();
+    if (!me) {
+      status.textContent = 'Play the family needs this phone’s Info Book family link. Open Info Book from your invite, then come back.';
+      people.innerHTML = ''; games.innerHTML = ''; banner.hidden = true; return;
+    }
+    const list = famPeople || [];
+    const others = list.filter(p => p.id !== me.id);
+    people.innerHTML = '<button type="button" class="on" data-self="1" data-mid="' + esc(me.id) + '">You · ' + esc(me.name || 'You') + '</button>' +
+      others.map(p => '<button type="button" data-mid="' + esc(p.id) + '">' + esc(p.name) + '</button>').join('');
+    const gs = (famList && famList.games) || [];
+    const waiting = gs.filter(g => g.yourTurn && !g.over);
+    banner.hidden = !waiting.length;
+    games.innerHTML = gs.map(g => {
+      const who = (g.players || []).map(p => (p.me ? 'You' : p.name) + ' ' + p.score).join(' · ');
+      const label = g.over ? 'Finished · ' + who : g.yourTurn ? 'Your turn · ' + who : 'Waiting for ' + (g.turnName || 'the next person') + ' · ' + who;
+      return '<button type="button" class="' + (g.yourTurn && !g.over ? 'your' : '') + '" data-gid="' + esc(g.id) + '">' + esc(label) + '</button>';
+    }).join('');
+    status.textContent = others.length ? 'Pick who is playing, then start. Or open a game that’s already going.' : 'It’s just you on the family list so far. Ask Shane to add someone in Info Book, then open Scrabble again.';
+  }
+  function loadFamily(force) {
+    const me = member();
+    if (!me) { famPeople = null; paintFamily(); return; }
+    if (famPeople && famList && !force) { paintFamily(); return; }
+    $('#famstatus').textContent = 'Loading the family…';
+    Promise.all([api('/people'), api('/scrabble')]).then(([people, list]) => {
+      famPeople = Array.isArray(people) ? people : [];
+      famList = list;
+      paintFamily(); showFamilyAlert();
+    }).catch(e => { $('#famstatus').textContent = e.message; });
+  }
+  function startFamily() {
+    const me = member();
+    if (!me) { $('#famstatus').textContent = 'This phone needs its Info Book family link.'; return; }
+    const ids = [...d.querySelectorAll('#fampeople button.on')].map(b => b.dataset.mid).filter(Boolean);
+    if (ids.filter(id => id !== me.id).length < 1) { $('#famstatus').textContent = 'Pick at least one other person.'; return; }
+    $('#startbtn').disabled = true;
+    api('/scrabble', { method: 'POST', body: JSON.stringify({ players: ids }) }).then(v => {
+      $('#startbtn').disabled = false; famList = null; openOnline(v);
+    }).catch(e => { $('#startbtn').disabled = false; $('#famstatus').textContent = e.message; });
+  }
+  function takeOpenId() {
+    let id = '';
+    try { id = root.sessionStorage.getItem('scrabble-open') || ''; root.sessionStorage.removeItem('scrabble-open'); } catch (e) { }
+    if (!/^g[0-9a-f]{16}$/.test(id)) { const h = String(root.location.hash || '').replace(/^#/, ''); id = /^g[0-9a-f]{16}$/.test(h) ? h : ''; }
+    return id;
+  }
+
+  function save() { if (demo || !st || st.mode === 'family') return; store.set(KEY, JSON.stringify({ st, pending })); }
   function loadSaved() { try { const o = JSON.parse(store.get(KEY) || 'null'); if (o && o.st && o.st.v === 1 && Array.isArray(o.st.board)) return o; } catch (e) { } return null; }
 
   function onWorker(e) {
@@ -412,8 +563,15 @@
   function show(id) { ['#loading', '#setup', '#game'].forEach(s => { $(s).hidden = s !== id; }); }
   function overlay(id, on) { $(id).hidden = !on; }
   function humanIdx() { if (st.mode === 'cpu') return st.players.findIndex(p => !p.cpu); return st.turn; }
-  function myRack() { return st.players[humanIdx()].rack; }
-  function canAct() { return st && !st.over && !busy && !st.players[st.turn].cpu && (st.mode === 'cpu' || revealed); }
+  function myRack() {
+    if (st && st.mode === 'family') { const p = st.players.find(x => x.me); return p ? p.rack : []; }
+    return st.players[humanIdx()].rack;
+  }
+  function canAct() {
+    if (!st || st.over || busy) return false;
+    if (st.mode === 'family') return !!st.turnIsMe;
+    return !st.players[st.turn].cpu && (st.mode === 'cpu' || revealed);
+  }
   function used(k) { return pending.some(p => p.k === k); }
   function say(t, warn) { const m = $('#msg'); m.textContent = t || ''; m.classList.toggle('warn', !!warn); if (warn && !reduced) { m.classList.remove('nudge'); void m.offsetWidth; m.classList.add('nudge'); } }
   function arm(name, btn, text) {
@@ -462,12 +620,17 @@
     $('#swapbtn').disabled = !act || !!swapPick || st.bag.length < RACK;
     $('#passbtn').textContent = armed === 'pass' ? 'Pass?' : 'Pass';
     $('#passbtn').disabled = !act || !!swapPick;
-    $('#newbtn').textContent = armed === 'new' ? 'New game?' : 'New game';
+    $('#newbtn').textContent = st.mode === 'family' ? 'Games' : (armed === 'new' ? 'New game?' : 'New game');
     $('#soundbtn').textContent = soundOn ? 'Sound on' : 'Sound off';
     $('#zoombtn').textContent = zoom ? 'Smaller' : 'Bigger';
   }
   function hint() {
     if (!st) return;
+    if (st.mode === 'family' && !st.over && !busy && !pending.length && !swapPick) {
+      const lt = lastText(st);
+      say((lt ? lt + ' ' : '') + (st.turnIsMe ? 'Your turn.' : 'Waiting for ' + st.players[st.turn].name + '.'));
+      return;
+    }
     if (st.over) { say('Game over. ' + lastText(st)); return; }
     if (busy) { say(st.players[st.turn].name + ' is thinking…'); return; }
     if (swapPick) { say('Tap the tiles you want to swap, then tap Swap. You miss this turn.'); return; }
@@ -481,7 +644,7 @@
     if (first) say('Tap a tile, then tap a square. The first word must cover the ★.');
     else say((lt ? lt + ' ' : '') + (st.mode === 'cpu' ? 'Your turn.' : st.players[st.turn].name + '’s turn.'));
   }
-  function render() { if (!st) return; drawScores(); drawBoard(); drawRack(); drawButtons(); hint(); }
+  function render() { if (!st) return; drawScores(); drawBoard(); drawRack(); drawButtons(); turnBanner(); hint(); showFamilyAlert(); }
 
   function zoomTo() {
     const wrap = $('#boardwrap');
@@ -529,6 +692,7 @@
     const rows = st.players.map((p, i) => ({ p, i })).sort((a, b) => b.p.score - a.p.score);
     const win = st.winners.map(i => st.players[i].name);
     $('#overtitle').textContent = win.length > 1 ? 'A tie: ' + win.join(' and ') : (st.players[st.winners[0]].cpu ? 'The computer wins' : win[0] + ' wins!');
+    $('#overnew').textContent = st.mode === 'family' ? 'Back to games' : 'New game';
     $('#overlist').innerHTML = rows.map(x => `<li><span>${esc(x.p.name)}</span><strong>${x.p.score}</strong><small>${x.i === st.out ? 'used all tiles, +' + st.players.reduce((a, q, j) => a + (j === st.out ? 0 : q.left), 0) : (x.p.left ? '−' + x.p.left + ' left in rack' : '')}</small></li>`).join('');
     overlay('#over', true);
     overScores();
@@ -544,6 +708,7 @@
   }
   function overScores() {
     const S = root.IBScores, box = $('#overscores'); if (!S || !box || demo) return;
+    if (st.mode === 'family') { box.hidden = false; S.fill(box, 'scrabble', { note: 'This game is on the family scoreboard.' }); return; }
     const opp = st.mode === 'cpu' ? 'computer' : 'family', oi = ownerIdx(), me = S.who();
     const label = opp === 'computer' ? 'v 🤖' : 'pass the phone';
     let sent = null;
@@ -593,6 +758,11 @@
   }
   function doPlay() {
     if (!canAct()) return;
+    if (st.mode === 'family') {
+      if (swapPick) sendOnline('swap', { letters: [...swapPick].map(k => myRack()[k]) });
+      else sendOnline('play', { tiles: pending.map(p => ({ r: p.r, c: p.c, l: p.l, b: p.b ? 1 : 0 })) });
+      return;
+    }
     if (swapPick) {
       const rack = myRack(), letters = [...swapPick].map(k => rack[k]);
       const r = swap(st, letters);
@@ -617,9 +787,14 @@
   function doPass() {
     if (!canAct()) return;
     if (!arm('pass', null, 'Tap Pass again to skip your turn.')) return;
+    if (st.mode === 'family') { sendOnline('pass'); return; }
     pass(st); afterTurn();
   }
   function doNew() {
+    if (st && st.mode === 'family') {
+      clearInterval(pollTimer); pollTimer = 0; onlineId = ''; st = null;
+      setupMode = 'family'; openSetup(); loadFamily(true); return;
+    }
     if (st && !st.over && !arm('new', null, 'Tap New game again to end this game and start a new one.')) return;
     openSetup();
   }
@@ -639,6 +814,8 @@
     d.querySelectorAll('[data-count]').forEach(b => b.classList.toggle('on', +b.dataset.count === setupCount));
     $('#cpuopts').hidden = setupMode !== 'cpu';
     $('#passopts').hidden = setupMode !== 'pass';
+    const fam = $('#famopts'); if (fam) fam.hidden = setupMode !== 'family';
+    if (setupMode === 'family') loadFamily(false);
     const nm = names();
     const box = $('#namebox');
     const have = [...box.querySelectorAll('input')].map(x => x.value);
@@ -698,15 +875,19 @@
     $('#soundbtn').addEventListener('click', () => { soundOn = !soundOn; store.set(SKEY, soundOn ? 'on' : 'off'); drawButtons(); if (soundOn) sndPlace(); });
     $('#zoombtn').addEventListener('click', () => { zoom = !zoom; $('#boardwrap').classList.toggle('zoom', zoom); drawButtons(); zoomTo(); });
     $('#coverbtn').addEventListener('click', () => { revealed = true; overlay('#cover', false); render(); });
-    $('#overnew').addEventListener('click', () => { overlay('#over', false); openSetup(); });
+    $('#overnew').addEventListener('click', () => { overlay('#over', false); if (st && st.mode === 'family') doNew(); else openSetup(); });
     $('#overlook').addEventListener('click', () => overlay('#over', false));
     d.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => { setupMode = b.dataset.mode; drawSetup(); }));
     d.querySelectorAll('[data-level]').forEach(b => b.addEventListener('click', () => { setupLevel = b.dataset.level; drawSetup(); }));
     d.querySelectorAll('[data-count]').forEach(b => b.addEventListener('click', () => { setupCount = +b.dataset.count; drawSetup(); }));
-    $('#startbtn').addEventListener('click', startGame);
+    $('#startbtn').addEventListener('click', () => { if (setupMode === 'family') startFamily(); else startGame(); });
+    $('#fampeople').addEventListener('click', e => { const b = e.target.closest('button[data-mid]'); if (!b || b.dataset.self) return; b.classList.toggle('on'); });
+    $('#famgames').addEventListener('click', e => { const b = e.target.closest('[data-gid]'); if (b) openFamilyGame(b.dataset.gid); });
+    $('#famalert').addEventListener('click', () => openFamilyGame($('#famalert').dataset.gid));
     { const sb = $('#scoresbtn'), gb = $('#gscoresbtn'); const go = () => root.IBScores && root.IBScores.open('scrabble'); if (sb) sb.addEventListener('click', go); if (gb) gb.addEventListener('click', go); }
     $('#contbtn').addEventListener('click', () => { const s = loadSaved(); if (s) resume(s); });
     root.addEventListener('pagehide', save);
+    root.addEventListener('visibilitychange', () => { if (!root.document.hidden && st && st.mode === 'family' && !pending.length && !swapPick) { if (onlineId) api('/scrabble/' + onlineId).then(v => { if (st && v.rev !== st.rev) openOnline(v); }).catch(() => {}); peekFamily(); } });
   }
 
   function boot() {
@@ -714,8 +895,11 @@
     show('#loading');
     loadDict().then(() => {
       if (/^#demo/.test(root.location.hash)) { demoGame(); return; }
+      const want = takeOpenId();
+      if (want) { openFamilyGame(want); peekFamily(); return; }
       const saved = loadSaved();
       if (saved && !saved.st.over) resume(saved); else openSetup();
+      peekFamily();
     }).catch(err => {
       $('#loadmsg').textContent = 'The word list did not load. Check the internet connection, then close and open Scrabble again.';
       if (root.console) root.console.warn('Scrabble word list', err);

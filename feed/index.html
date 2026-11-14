@@ -688,6 +688,9 @@ html.portal-on #feed > .card:not(.portal-rise),html.portal-on #feed > .hrow:not(
 @keyframes pspark{from{transform:translate3d(0,8px,0);opacity:0}40%{opacity:1}to{transform:translate3d(0,-90px,0);opacity:0}}
 @media (prefers-reduced-motion:reduce){#ibportal,#ibrise{display:none}html.portal-on #feed,html.portal-on #stories-host,html.portal-on #instb,html.portal-on #instwrap,html.portal-on #feed > .card:not(.portal-rise),html.portal-on #feed > .hrow:not(.portal-rise){visibility:visible}#ibrise .ib-ghost.ib-go{animation:none}}
 body[data-artopen] .artwin, body[data-artopen] .artbar{overscroll-behavior:none;touch-action:none}
+#scrayourhost{max-width:640px;margin:0 auto;padding:12px 10px 0}#scrayourhost:empty{display:none;padding:0}
+.scrayour{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left;padding:14px 16px;border-radius:16px;background:var(--card);color:var(--ink);border:2px solid var(--acc);box-shadow:var(--shadow);font-weight:800;font-size:1.15rem;cursor:pointer}
+.scrayour small{display:block;font-weight:600;color:var(--mute);font-size:.85rem}
 </style>
 </head>
 <body>
@@ -707,25 +710,25 @@ body[data-artopen] .artwin, body[data-artopen] .artbar{overscroll-behavior:none;
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="scores.js?v=1.9.206"></script>
-<script src="portal.js?v=1.9.206"></script>
-<script src="family.js?v=1.9.206"></script>
-<script src="app.js?v=1.9.206"></script>
-<script src="extras.js?v=1.9.206"></script>
-<script src="jokes.js?v=1.9.206"></script>
-<script src="learn.js?v=1.9.206"></script>
-<script src="common-en.js?v=1.9.206"></script>
-<script src="explain.js?v=1.9.206"></script>
-<script src="effects.js?v=1.9.206"></script>
-<script src="stories.js?v=1.9.206"></script>
-<script src="weekly.js?v=1.9.206"></script>
-<script src="play.js?v=1.9.206"></script>
-<script src="nz.js?v=1.9.206"></script>
-<script src="sights.js?v=1.9.206"></script>
-<script src="art3d.js?v=1.9.206"></script>
-<script src="read.js?v=1.9.206"></script>
-<script src="cal.js?v=1.9.206"></script>
-<script src="back.js?v=1.9.206"></script>
+<script src="scores.js?v=1.9.207"></script>
+<script src="portal.js?v=1.9.207"></script>
+<script src="family.js?v=1.9.207"></script>
+<script src="app.js?v=1.9.207"></script>
+<script src="extras.js?v=1.9.207"></script>
+<script src="jokes.js?v=1.9.207"></script>
+<script src="learn.js?v=1.9.207"></script>
+<script src="common-en.js?v=1.9.207"></script>
+<script src="explain.js?v=1.9.207"></script>
+<script src="effects.js?v=1.9.207"></script>
+<script src="stories.js?v=1.9.207"></script>
+<script src="weekly.js?v=1.9.207"></script>
+<script src="play.js?v=1.9.207"></script>
+<script src="nz.js?v=1.9.207"></script>
+<script src="sights.js?v=1.9.207"></script>
+<script src="art3d.js?v=1.9.207"></script>
+<script src="read.js?v=1.9.207"></script>
+<script src="cal.js?v=1.9.207"></script>
+<script src="back.js?v=1.9.207"></script>
 <script>
 /* 1.9.82 self-heal: if the feed is still skeletons after 9s (crash/stale cache), offer a manual reload.
    Auto-reload only on a real JS error, at most once per 10 minutes (localStorage). No controllerchange reload —

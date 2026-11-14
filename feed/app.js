@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.206';
+const APP_VERSION = '1.9.207';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -1375,7 +1375,8 @@ function sugarOk() { try { return !!(window.IBScores && window.IBScores.isShane(
 function sugarOpt() { return sugarOk() ? '<button type="button" class="mfopt" data-art="sugar"><span class="mfe">🍬</span><span>Play Sugar Rush</span></button>' : '<button type="button" class="mfopt" disabled aria-disabled="true"><span class="mfe">🍬</span><span>Sugar Rush · coming soon</span></button>'; }
 let GAMES_OPEN = false; // 1.9.146 Games sub-menu: play straight from the menu. 1.9.166 adds Scrabble
 function gameSub() {
-  return `<button type="button" class="mfopt${GAMES_OPEN ? ' on' : ''}" data-gamesmenu="1" aria-expanded="${GAMES_OPEN}"><span class="mfe">🎮</span><span>Games · new</span><i>${GAMES_OPEN ? '▾' : '▸'}</i></button><div class="intsub"${GAMES_OPEN ? '' : ' hidden'}><button type="button" class="mfopt" data-art="tetris"><span class="mfe">🧱</span><span>Play Tetris</span></button><button type="button" class="mfopt" data-art="scrabble"><span class="mfe">🔤</span><span>Play Scrabble</span></button>${sugarOpt()}</div>`;
+  const scrabTurn = window.ibScrabbleTurn ? ' · your turn' : '';
+  return `<button type="button" class="mfopt${GAMES_OPEN ? ' on' : ''}" data-gamesmenu="1" aria-expanded="${GAMES_OPEN}"><span class="mfe">🎮</span><span>Games · new</span><i>${GAMES_OPEN ? '▾' : '▸'}</i></button><div class="intsub"${GAMES_OPEN ? '' : ' hidden'}><button type="button" class="mfopt" data-art="tetris"><span class="mfe">🧱</span><span>Play Tetris</span></button><button type="button" class="mfopt" data-art="scrabble"><span class="mfe">🔤</span><span>Play Scrabble${scrabTurn}</span></button>${sugarOpt()}</div>`;
 }
 let INT_OPEN = false; // 1.9.122 Interests stays open while its switches are tapped
 function intSub() {

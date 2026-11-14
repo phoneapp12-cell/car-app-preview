@@ -15,5 +15,7 @@
   // 1.9.12 Info Bot: Workers AI (free daily allocation)
   "ai": { "binding": "AI" },
   // Secrets (set already, not in this file): SEED_KEY, VAPID_PRIVATE
-  "triggers": { "crons": ["*/10 * * * *"] }
+  "triggers": { "crons": ["*/10 * * * *"] },
+  // 1.9.207 Scrabble checks words against the ENABLE list shipped with the page
+  "rules": [{ "type": "Text", "globs": ["**/*.txt"], "fallthrough": true }]
 }
