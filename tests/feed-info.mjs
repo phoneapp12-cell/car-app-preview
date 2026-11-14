@@ -4254,3 +4254,118 @@ if (live) {
   assert.ok(!/candy crush/i.test(src + html), 'no Candy Crush names in the game');
 }
 
+
+// 1.9.218 Sugar Rush presentation polish: scenes, juicier matches, specials, streak, finale, chest, daily spin, boosters, candy UI.
+{
+  const SR = load('feed/sugar-rush.js').SugarRush;
+  const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
+  const html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
+  // D. A themed NZ scene for every stop on the race map.
+  assert.strictEqual(SR.SCENES.length, SR.LEVELS.length, 'one scene per level');
+  const sceneIds = new Set();
+  for (let n = 1; n <= SR.LEVELS.length; n++) {
+    const sc = SR.sceneFor(n);
+    assert.ok(sc && sc.id && !sceneIds.has(sc.id), 'scene ' + n + ' is unique');
+    sceneIds.add(sc.id);
+    const svg = SR.sceneSvg(n);
+    assert.ok(svg.startsWith('<svg') && svg.endsWith('</svg>') && svg.includes('viewBox="0 0 390 844"') && svg.length > 600, 'scene ' + n + ' svg');
+    assert.ok(!/<script|on[a-z]+=/i.test(svg), 'scene svg is static');
+    const spr = SR.sceneSprites(n);
+    assert.ok(spr.includes('class="scs '), 'scene ' + n + ' has moving bits');
+  }
+  assert.strictEqual(SR.sceneFor(99).id, SR.sceneFor(1).id, 'unknown levels fall back to the first scene');
+  assert.ok(SR.SCENES[SR.LEVELS.length - 1].night, 'Nelson is a Saturday night scene');
+  assert.ok(!/rugby|cricket|netball|football|soccer|all blacks|stadium/i.test(SR.SCENES.map((s, i) => SR.sceneSvg(i + 1) + SR.sceneSprites(i + 1)).join('')), 'no sport in the scenes');
+  // C. Sweet streak grows with cascades and specials, cools on a plain match, and never changes the score.
+  assert.strictEqual(SR.streakGain([]), 0);
+  assert.strictEqual(SR.streakGain([{ popped: [1, 2, 3] }]), -1, 'a plain single match cools the streak');
+  const bigGain = SR.streakGain([{ fired: [{ s: 'row' }], made: [1] }, {}, {}]);
+  assert.ok(bigGain >= 6, 'cascades and specials build the streak');
+  assert.strictEqual(SR.streakNext(0, -1), 0);
+  assert.strictEqual(SR.streakNext(10, 1000), SR.STREAK_STEP * SR.STREAK_MAX_TIER);
+  assert.strictEqual(SR.streakTier(0), 0);
+  assert.strictEqual(SR.streakTier(SR.STREAK_STEP), 1);
+  assert.strictEqual(SR.streakTier(999), SR.STREAK_MAX_TIER);
+  assert.strictEqual(SR.streakFill(SR.STREAK_STEP * SR.STREAK_MAX_TIER), 1);
+  assert.ok(SR.streakFill(SR.STREAK_STEP / 2) === 0.5);
+  assert.strictEqual(SR.STREAK_NAMES.length, SR.STREAK_MAX_TIER + 1);
+  assert.ok(!/streakPts[^;]*st\.score|st\.score[^;]*streak/.test(src), 'the streak never touches the score');
+  // The existing sayings stay, and they grow with the streak.
+  assert.ok(SR.SAYINGS && Object.keys(SR.SAYINGS).length >= 4);
+  assert.ok(src.includes("' t' + streakTierNow") && html.includes('.saypop.t4'));
+  // A. Juicy feedback.
+  assert.strictEqual(SR.shakeLevel([{ popped: [1, 2, 3] }]), 0);
+  assert.strictEqual(SR.shakeLevel([{ fired: [{ s: 'row' }] }]), 1);
+  assert.strictEqual(SR.shakeLevel([{ fired: [{ s: 'b' }] }]), 2, 'a colour bomb shakes hard');
+  assert.ok(src.includes("type: 'shard'") && src.includes("type: 'glint'") && src.includes('FX_CAP'));
+  assert.ok(html.includes('@keyframes shk1') && html.includes('@keyframes shk2'));
+  assert.ok((src.match(/ctx\.shadowBlur =/g) || []).length <= 1, 'no new shadowBlur for phone performance');
+  // B. Bigger specials with their own glow.
+  assert.ok(src.includes('function drawSpecialGlow'));
+  // I. Boosters and the daily spin.
+  assert.strictEqual(JSON.stringify(SR.BOOSTERS.map(b => b.id)), JSON.stringify(['moves', 'hammer', 'shuffle']));
+  assert.strictEqual(SR.EXTRA_MOVES, 3);
+  assert.strictEqual(JSON.stringify(SR.normBoosters({ moves: '2', hammer: -4, junk: 9 })), JSON.stringify({ moves: 2, hammer: 0, shuffle: 0 }));
+  assert.strictEqual(JSON.stringify(SR.addPrize({}, { id: 'all', n: 1 })), JSON.stringify({ moves: 1, hammer: 1, shuffle: 1 }));
+  assert.strictEqual(JSON.stringify(SR.addPrize({ hammer: 1 }, { id: 'hammer', n: 2 })), JSON.stringify({ moves: 0, hammer: 3, shuffle: 0 }));
+  assert.strictEqual(SR.takeBooster({ hammer: 0 }, 'hammer').ok, false);
+  const took = SR.takeBooster({ shuffle: 2 }, 'shuffle');
+  assert.ok(took.ok && took.inv.shuffle === 1);
+  assert.strictEqual(SR.SPIN_PRIZES.length, 8);
+  for (let i = 0; i < SR.SPIN_PRIZES.length; i++) {
+    for (const from of [0, 123, 1800.5, -40]) {
+      const a = SR.spinAngle(i, 5, from, 0);
+      assert.ok(a >= from + 5 * 360, 'the wheel always turns forwards');
+      assert.strictEqual(SR.prizeAt(a), i, 'segment ' + i + ' lands under the pointer');
+      assert.strictEqual(SR.prizeAt(SR.spinAngle(i, 5, from, 15)), i, 'jitter stays inside the segment');
+    }
+    assert.ok(SR.SPIN_PRIZES[i].id === 'all' || SR.BOOSTERS.some(b => b.id === SR.SPIN_PRIZES[i].id));
+  }
+  assert.strictEqual(SR.spinPick(() => 0), 0);
+  assert.strictEqual(SR.spinPick(() => 0.9999), 7);
+  // NZ days: 10:59 UTC on 14 Nov is 23:59 on 14 Nov in Auckland, 11:01 UTC is 15 Nov.
+  assert.strictEqual(SR.nzDay(Date.parse('2026-11-14T10:59:00Z')), '2026-11-14');
+  assert.strictEqual(SR.nzDay(Date.parse('2026-11-14T11:01:00Z')), '2026-11-15');
+  assert.strictEqual(SR.canSpin(null, NOW), true);
+  assert.strictEqual(SR.canSpin(SR.nzDay(NOW), NOW), false, 'one spin per NZ day');
+  assert.strictEqual(SR.canSpin(SR.nzDay(NOW), NOW + 86400000), true);
+  assert.ok(src.includes("'ib-sugar-spin' + memberTag()") && src.includes("'ib-sugar-boosters' + memberTag()"), 'stored locally per player');
+  // H. Treasure chest.
+  assert.strictEqual(SR.chestReward(3, 2, 2, false), null, 'no chest for a replay without a new star record');
+  assert.ok(SR.chestReward(3, 1, 0, true), 'a first clear opens the chest');
+  assert.ok(SR.chestReward(3, 3, 2, false), 'a new star record opens the chest');
+  assert.ok(SR.BOOSTERS.some(b => b.id === SR.chestReward(4, 3, 1, false).id));
+  // Hammer uses no move and keeps the goals objective-based.
+  const hs = SR.newGame({ level: SR.LEVELS[2], seed: 7 });
+  const movesBefore = hs.moves, jellyBefore = SR.jellyLeft(hs);
+  let hr = null, hrc = null;
+  for (let r = 0; r < 8 && !hr; r++) for (let c = 0; c < 8 && !hr; c++) { const t = hs.board[r][c]; if (t && SR.isCandy(t) && !t.lock && !t.s) { hrc = [r, c]; hr = SR.hammerAt(hs, r, c); } }
+  assert.ok(hr && hr.valid && hr.steps.length >= 1, 'the hammer smashes a sweet');
+  assert.strictEqual(hs.moves, movesBefore, 'the hammer uses no move');
+  assert.ok(SR.jellyLeft(hs) <= jellyBefore);
+  assert.ok(SR.hasMove(hs.board, hs.mask), 'the board still has a move after a hammer');
+  assert.strictEqual(SR.hammerAt(Object.assign(SR.cloneState(hs), { over: true }), hrc[0], hrc[1]).valid, false);
+  assert.strictEqual(SR.hammerAt(Object.assign(SR.cloneState(hs), { tutorial: true }), hrc[0], hrc[1]).valid, false);
+  assert.strictEqual(SR.shuffleBooster(Object.assign(SR.cloneState(hs), { tutorial: true })), false);
+  const shu = SR.cloneState(hs);
+  assert.ok(SR.shuffleBooster(shu) && SR.hasMove(shu.board, shu.mask));
+  assert.ok(SR.LEVELS.every(l => !l.target && (l.collect || l.jelly || l.locks || l.ice || l.ings || l.choco)), 'goals stay objective-based, never a score');
+  // F. Sugar Crush finale fits Goal achieved and the play-out.
+  assert.ok(src.includes('function sugarCrushFinale') && src.includes('showCrushBan') && src.includes('fireworks('));
+  assert.ok(src.includes('goalban') && src.includes('moveswarn') && src.includes('hintMoveFor'), 'goal card, 3 MOVES LEFT and the hint stay');
+  // HTML has the new pieces.
+  for (const id of ['scene', 'streak', 'streakfill', 'streakx', 'streakpop', 'boosters', 'boosthint', 'crushban', 'fxov', 'endchest', 'endloot', 'morebtn', 'spinbtn', 'spin', 'wheel', 'spinmsg', 'spinwon', 'spininv', 'spinbtn2']) {
+    assert.ok(html.includes('id="' + id + '"'), 'html has #' + id);
+  }
+  for (const b of ['moves', 'hammer', 'shuffle']) assert.ok(html.includes('data-boost="' + b + '"'));
+  assert.ok(html.includes('data-spin="close"') && html.includes('Daily spin') && html.includes('Sugar Crush!'));
+  // J. Candy buttons and bounce-in screens.
+  assert.ok(html.includes('@keyframes pop') && html.includes('.scr-in') && src.includes('function enterScreen'));
+  // Reduced motion and no background music.
+  const lastReduce = html.slice(html.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
+  assert.ok(lastReduce.includes('.hinthand'), 'the idle hint keeps its reduced-motion rule');
+  assert.ok(/prefers-reduced-motion: reduce\) \{\s*\.scs, \.scs \.fallin/.test(html), 'scenes and celebrations stop for reduced motion');
+  assert.ok(src.includes('if (!reduce)') || src.includes('reduce ?'), 'particles respect reduced motion');
+  assert.ok(!/new Audio\([^)]*(bgm|music|loop)/i.test(src.slice(src.indexOf('1.9.218'))), 'no new background music');
+  assert.ok(!/candy crush/i.test(src + html), 'no Candy Crush names in the game');
+}
