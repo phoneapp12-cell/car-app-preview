@@ -688,11 +688,11 @@ html.portal-on #feed > .card:not(.portal-rise),html.portal-on #feed > .hrow:not(
 @keyframes pbeam{from{transform:translate3d(0,12px,0) scaleY(.6);opacity:.2}to{transform:translate3d(0,-70px,0) scaleY(1);opacity:0}}
 @keyframes pspark{from{transform:translate3d(0,8px,0);opacity:0}40%{opacity:1}to{transform:translate3d(0,-90px,0);opacity:0}}
 @media (prefers-reduced-motion:reduce){#ibportal,#ibrise{display:none}html.portal-on #feed,html.portal-on #stories-host,html.portal-on #instb,html.portal-on #instwrap,html.portal-on #feed > .card:not(.portal-rise),html.portal-on #feed > .hrow:not(.portal-rise){visibility:visible}#ibrise .ib-ghost.ib-go{animation:none}}
-body[data-artopen] .artwin, body[data-artopen] .artbar{overscroll-behavior:none;touch-action:none}
+body[data-artopen] .artwin{overscroll-behavior:none}body[data-artopen] .artbar{overscroll-behavior:none;touch-action:none}
 
 #scrayourhost{max-width:640px;margin:0 auto;padding:12px 10px 0}#scrayourhost:empty{display:none;padding:0}
 .scrayour{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left;padding:14px 16px;border-radius:16px;background:var(--card);color:var(--ink);border:2px solid var(--acc);box-shadow:var(--shadow);font-weight:800;font-size:1.15rem;cursor:pointer}
-.scrayour small{display:block;font-weight:600;color:var(--mute);font-size:.85rem}
+.scrayour small{display:block;font-weight:600;color:var(--mute);font-size:.85rem}#scrayourhost .scraycancel{display:block;width:100%;margin-top:8px;padding:10px 16px;border-radius:14px;background:transparent;color:var(--ink);border:1px solid var(--line,rgba(127,127,127,.35));font-weight:700}
 </style>
 </head>
 <body>
