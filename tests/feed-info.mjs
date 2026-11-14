@@ -574,13 +574,13 @@ assert.ok(cal.ics(saved).includes('TRIGGER:-PT1H'));
 const calFile = fs.readFileSync('feed/cal.js', 'utf8');
 assert.ok(calFile.includes('data-art="tetris"'));
 assert.ok(calFile.includes('Play Tetris'));
-// 1.9.166 Scrabble is playable; Sugar Rush is the next game coming soon
+// 1.9.166 Scrabble is playable; 1.9.228 Sugar Rush is playable for everyone
 assert.ok(calFile.includes('data-art="scrabble"'));
 assert.ok(calFile.includes('Play Scrabble'));
-assert.ok(calFile.includes('<span>Coming soon: Sugar Rush 🍬, a Candy Crush style matching game</span>'));
+assert.ok(!/Coming soon: Sugar Rush|candy crush/i.test(calFile), 'Sugar Rush no longer coming soon');
 assert.ok(!/Scrabble is the next game|Coming soon: Scrabble|Scrabble · coming soon/.test(calFile + appSrc));
 assert.ok(appSrc.includes('data-art="scrabble"><span class="mfe">🔤</span><span>Play Scrabble</span>'));
-assert.ok(appSrc.includes('<span>Sugar Rush · coming soon</span>'));
+assert.ok(!appSrc.includes('Sugar Rush · coming soon'));
 assert.ok(!/scrabble\.html|href=[^>\n]*scrabble/i.test(calFile));
 assert.ok(!/<iframe/i.test(calFile));
 assert.ok(!/tetris\.html|href=[^>\n]*tetris/i.test(calFile));
@@ -919,9 +919,9 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   // After a move that leaves no moves, play() shuffles
   for (let s = 1; s <= 40; s++) { const g = SR.newGame({ seed: s }); while (!g.over) { const m = SR.findMove(g.board); assert.ok(m); assert.ok(SR.play(g, m[0], m[1]).valid); assert.ok(SR.hasMove(g.board)); } assert.ok(g.over); assert.strictEqual(g.won, (g.collected[0] || 0) >= 20); assert.strictEqual(g.stars, g.won ? SR.starsFor(g.score) : 0); }
   assert.strictEqual(SR.starsFor(2999), 0); assert.strictEqual(SR.starsFor(3000), 1); assert.strictEqual(SR.starsFor(6500), 2); assert.strictEqual(SR.starsFor(9000), 3);
-  // Access: only Shane (IBScores.isShane()); no scores sent yet
-  assert.strictEqual(SR.allowed(), false, 'no scores.js: nobody');
-  ctx.IBScores = { isShane: () => false }; assert.strictEqual(SR.allowed(), false);
+  // Access: 1.9.228 every family member (was Shane-only); no scores sent yet
+  assert.strictEqual(SR.allowed(), true, '1.9.228: open to everyone');
+  ctx.IBScores = { isShane: () => false }; assert.strictEqual(SR.allowed(), true, 'non-Shane member can play');
   ctx.IBScores = { isShane: () => true }; assert.strictEqual(SR.allowed(), true);
   const srJs = fs.readFileSync('feed/sugar-rush.js', 'utf8'), srHtml = fs.readFileSync('feed/sugar-rush.html', 'utf8');
   assert.ok(!/\.submit\(/.test(srJs), 'Sugar Rush does not post to the family scoreboard yet');
@@ -976,14 +976,14 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   for (const lv of SR.LEVELS.slice(1)) {
     assert.ok(SR.tryBeat(lv, 16) >= 1, 'level ' + lv.n + ' should be beatable');
   }
-  // Menu and Games card: Play Sugar Rush only for Shane
+  // Menu and Games card: 1.9.228 Play Sugar Rush for every family member
   const app = fs.readFileSync('feed/app.js', 'utf8'), cal = fs.readFileSync('feed/cal.js', 'utf8'), play = fs.readFileSync('feed/play.js', 'utf8'), idx = fs.readFileSync('feed/index.html', 'utf8'), sw = fs.readFileSync('feed/sw.js', 'utf8');
-  assert.ok(app.includes('window.IBScores.isShane()') && app.includes('data-art="sugar"><span class="mfe">🍬</span><span>Play Sugar Rush</span>') && app.includes('<span>Sugar Rush · coming soon</span>'));
+  assert.ok(!/isShane/.test(app) && app.includes('data-art="sugar"><span class="mfe">🍬</span><span>Play Sugar Rush</span>') && !app.includes('Sugar Rush · coming soon'));
   const sugarOpt = new Function('window', app.match(/function sugarOk\(\)[^\n]+\nfunction sugarOpt\(\)[^\n]+/)[0] + '\nreturn sugarOpt();');
   assert.ok(sugarOpt({ IBScores: { isShane: () => true } }).includes('Play Sugar Rush'));
-  assert.ok(sugarOpt({ IBScores: { isShane: () => false } }).includes('Sugar Rush · coming soon'));
-  assert.ok(sugarOpt({}).includes('disabled'));
-  assert.ok(cal.includes("root.IBScores && root.IBScores.isShane()") && cal.includes('data-art="sugar">Play Sugar Rush'));
+  assert.ok(sugarOpt({ IBScores: { isShane: () => false } }).includes('Play Sugar Rush'));
+  assert.ok(sugarOpt({}).includes('Play Sugar Rush') && !sugarOpt({}).includes('disabled'));
+  assert.ok(!/isShane/.test(cal) && cal.includes("const sugar = !!(i && i.x === 'gamesoon');") && cal.includes('data-art="sugar">Play Sugar Rush'));
   assert.ok(play.includes("url: gameUrl('sugar-rush')") && /sugar:[\s\S]{0,220}local: true/.test(play));
   assert.ok(idx.indexOf('scores.js?v=') > 0 && idx.indexOf('scores.js?v=') < idx.indexOf('app.js?v='));
   assert.ok(sw.includes("'sugar-rush', 'sugar-rush.js?v=' + VERSION") && sw.includes("'scores.js?v=' + VERSION"));
@@ -1357,7 +1357,7 @@ if (live) {
   assert.ok(src.includes('function wantKind() { return screen === \'game\' ? gameKind(lvNum) : \'menu\'; }') || src.includes('gameKind(lvNum)'));
   assert.ok(src.includes('playKind(wantKind())'));
   assert.ok(!src.includes("playKind('game')"), 'level start must pick the level-1 track');
-  assert.ok(src.includes('IBScores.isShane'), 'level 1 (and the game) stay Shane-only');
+  assert.ok(!src.includes('IBScores.isShane') && src.includes('allowed: () => true'), '1.9.228: the game is open to every family member');
 }
 
 // LEVEL UP! overlay after a theme change, plus a distinct whoosh-to-chord cue
@@ -1531,7 +1531,7 @@ if (live) {
   assert.ok(src.includes("game2: 'sugar-rush-l2.mp3'"));
   assert.ok(src.includes("n === 2 ? 'game2'"));
   assert.ok(src.includes('playKind(wantKind())'));
-  assert.ok(src.includes('IBScores.isShane'), 'the game stays Shane-only');
+  assert.ok(!src.includes('IBScores.isShane'), '1.9.228: the game is open to every family member');
 }
 
 // 1.9.171 One music controller: no overlapping Sugar Rush tracks, stale loads cancelled
