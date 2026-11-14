@@ -1675,6 +1675,11 @@ if (live) {
   assert.ok(fam.includes("?friend=") && fam.includes("FAM_API + '/join'") && fam.includes("fam('/friends/invite'") && fam.includes("fam('/admin/people'"), 'friend join, invites and People admin wired up');
   assert.ok(fam.includes("const IS_FRIEND = FAM_ON && MEMBER.role === 'friend'") && ex.includes('if (IS_FRIEND) { try {'), 'friends skip the family-only fetches');
   assert.ok(wrk.includes("if (isFriend(me) && !friendMay(p, m)) return J({ err: 'not for friends' }, 403)"), 'worker default-denies friends');
+  // 1.9.231 Shane's answers: hosts remove their own friends, removing a family member removes their friends, friends get trivia + weather, reposts pick an audience
+  assert.ok(fam.includes('data-frrm=') && fam.includes("fam('/friends/' + fr.dataset.frrm, { method: 'DELETE' })") && wrk.includes("t.host !== me.id) return J({ err: 'only your own friends' }, 403)"), 'host removes own friends (server-checked)');
+  assert.ok(wrk.includes("role='friend' AND host=?`, t.id)) this.removeMember(f)"), 'removing a family member removes their friends');
+  assert.ok(ex.includes("fam('/weather').catch(() => null), fam('/trivia')") && ex.includes("x: 'trivia', q: X.triv"), 'friends get weather warnings and daily trivia');
+  assert.ok(fam.includes("repostSheet(id, snap)") && fam.includes("audPicker('rpaud', false)"), 'reposts offer Family / Friends / Both');
   assert.ok(app.includes("i.kind === 'text'") && app.includes('card shared words') && app.includes('wdbody'), 'All/Family card renderer has a words card');
   assert.ok(html.includes('.card.words') && html.includes('.wdbody'), 'words cards have their own soft-card style');
   assert.ok(wrk.includes("p === '/shares/text'") && wrk.includes('priv,at,vis,aud,circ) VALUES (?,?,?,?,4,?,?,?,?)'), 'Worker accepts kind text via POST /shares/text (priv 4)');

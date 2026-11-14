@@ -14,7 +14,8 @@ const ICON = '🎂';
 /* ---- load everything (members only), refreshed with the family data ---- */
 async function xLoad(force) {
   if (!FAM_ON || (!force && Date.now() - X.got < 60e3)) return; X.got = Date.now();
-  if (IS_FRIEND) { try { const [prof, push] = await Promise.all([fam('/profile').catch(() => null), fam('/push/prefs').catch(() => null)]); if (prof) X.prof = prof; if (push) X.push = push; if (prof && prof.streak) stChip(prof.streak); } catch (e) { } return; } // 1.9.230 friends: no family cards (the server says no anyway)
+  if (IS_FRIEND) { try { const [prof, push, wx, triv] = await Promise.all([fam('/profile').catch(() => null), fam('/push/prefs').catch(() => null), fam('/weather').catch(() => null), fam('/trivia').catch(() => null)]); if (prof) X.prof = prof; if (push) X.push = push; X.wx = (wx && wx.list) || []; X.triv = triv && Array.isArray(triv.qs) ? triv : null; if (tab === 'family' || (tab === 'all' && scrollY < 300)) draw(); // 1.9.231 friends: weather warnings and daily trivia too
+    if (prof && prof.streak) stChip(prof.streak); } catch (e) { } return; } // 1.9.230 friends: no family cards (the server says no anyway)
   const g = (p, d) => fam(p).catch(() => d);
   const [daily, poll, mems, dates, cars, prof, push, streaks, reno, wx, sap] = await Promise.all([g('/daily', null), g('/poll', null), g('/memories', []), g('/dates', { list: [] }), g('/cars', { cars: [] }), g('/profile', null), g('/push/prefs', null), g('/streaks', { list: [] }), g('/reno', { reno: null }), g('/weather', { list: [] }), g('/sappts', { list: [] })]);
   const pw = await g('/power', { list: [] }); X.pwr = (pw && pw.list) || []; X.pwrAt = (pw && pw.checked) || 0;
@@ -176,6 +177,7 @@ window.pins = function () {
 const baseDrawFamily = drawFamily;
 window.drawFamily = function () {
   baseDrawFamily();
+  if (FAM_ON && IS_FRIEND && X.triv) { const f = $('#feed').querySelector('.load'); if (f) f.insertAdjacentHTML('afterend', window.card({ id: 'trivia' + X.triv.day, x: 'trivia', q: X.triv, topic: 'family', t: '🧠 Daily trivia', sn: 'Daily trivia' })); } // 1.9.231 friends: daily trivia (family have the poll)
   if (!FAM_ON || IS_FRIEND) return;
   const m = $('#feed'), first = m.querySelector('.load');
   const extra = [X.poll && X.poll.q && { id: X.poll.key, x: 'poll', p: X.poll, topic: 'family', t: '📊 ' + X.poll.q, sn: 'Family poll' }, X.daily && X.daily.type === 'photo' && { id: X.daily.key, x: 'daily', q: X.daily, topic: 'family', t: X.daily.text, sn: 'Daily question' }, X.streaks.length && { id: 'streaks', x: 'streaks', topic: 'family' }, ...memItems()].filter(Boolean); order = extra.concat(order);
@@ -265,7 +267,7 @@ function badgeCheck(prof) {
 function triviaCard(i) {
   const t = i.q, m = t.mine;
   return `<article class="card xc trivia" data-id="trivia${esc(t.day)}">${xHead('🧠', 'Daily trivia', '5 easy questions · same for everyone · one go a day', 'Trivia')}
-    <div class="bd">${m ? `<h3 class="xq">You got ${m.score}/5 today ${m.score === 5 ? '🏆' : m.score >= 3 ? '🎉' : '👍'}</h3><p class="xwho">New questions tomorrow. ${t.played > 1 ? t.played + ' in the family have played today.' : ''}</p>` : `<h3 class="xq">Today’s 5 questions are ready</h3><p class="xwho">A mix of TV, science & garden, Aotearoa, music & games, and general knowledge. ${t.played ? t.played + ' played so far today.' : ''}</p>`}
+    <div class="bd">${m ? `<h3 class="xq">You got ${m.score}/5 today ${m.score === 5 ? '🏆' : m.score >= 3 ? '🎉' : '👍'}</h3><p class="xwho">New questions tomorrow. ${t.played > 1 ? t.played + (IS_FRIEND ? ' in your circle' : ' in the family') + ' have played today.' : ''}</p>` : `<h3 class="xq">Today’s 5 questions are ready</h3><p class="xwho">A mix of TV, science & garden, Aotearoa, music & games, and general knowledge. ${t.played ? t.played + ' played so far today.' : ''}</p>`}
     <div class="xbtns">${m ? '' : '<button class="btn pri" data-trivia="play">▶️ Play</button>'}<button class="btn" data-trivia="board">🏅 Leaderboard</button></div></div></article>`;
 }
 function dateCard(i) {
@@ -313,7 +315,7 @@ async function triviaBoard() {
   $('#sheet').classList.add('on'); $('#sheetin').innerHTML = '<h2>🏅 Trivia leaderboard</h2><p>Loading…</p>';
   try {
     const b = await fam('/trivia/board'), list = (l, unit) => l.length ? l.map((r, n) => `<div class="row${r.me ? ' me' : ''}"><span>${['🥇', '🥈', '🥉'][n] || n + 1 + '.'} ${esc(r.me ? 'You' : r.name)}</span><span>${r.pts} pts${unit ? ' · ' + r.days + ' day' + (r.days > 1 ? 's' : '') : ''}</span></div>`).join('') : '<p class="sst">Nobody yet.</p>';
-    $('#sheetin').innerHTML = `<h2>🏅 Trivia leaderboard</h2><h3>Today</h3>${list(b.today)}<h3>This week</h3>${list(b.week, 1)}<h3>All time</h3>${list(b.all, 1)}<p class="sst">Family only. 1 point per right answer, 5 a day. Weeks start on Monday.</p><button class="btn" data-close>Close</button>`;
+    $('#sheetin').innerHTML = `<h2>🏅 Trivia leaderboard</h2><h3>Today</h3>${list(b.today)}<h3>This week</h3>${list(b.week, 1)}<h3>All time</h3>${list(b.all, 1)}<p class="sst">${IS_FRIEND ? 'Just you and your friends circle' : 'Family only'}. 1 point per right answer, 5 a day. Weeks start on Monday.</p><button class="btn" data-close>Close</button>`;
   } catch (e) { $('#sheetin').innerHTML = `<p>${esc(e.message)}</p>`; }
 }
 

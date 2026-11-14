@@ -6,7 +6,7 @@ import { dailyPoll } from './polls.js';
 import { dailyPrompt, nzDay } from './daily.js';
 import { BANK } from './trivia.js';
 import { EASY } from './trivia_easy.js';
-import { FRIEND_NOTES, shareVisible, sees } from './circle.js'; // 1.9.230 friends
+import { FRIEND_NOTES, shareVisible, sees, gameIds } from './circle.js'; // 1.9.230 friends
 
 export const VAPID_PUBLIC = 'BGFa-WGEmSF-yZ-9PX6RjtuTc2SK7biQ95mUL--DgXy60LAB9cuWvi5D-Yy2kfZrZ-lNya048_1lv_JR9cKTcoU';
 export const TAGS = { dq: /^dq\d{8}$/ }; // photo-post tags; a '🔨 Reno' tag later is one more line here: reno: /^reno$/
@@ -544,7 +544,7 @@ export class Retain {
     }
     if (p === '/trivia' && m === 'GET') {
       const mine = this.one(`SELECT score, ans, at FROM trivia WHERE mid=? AND day=?`, me.id, today), qs = triviaFor(today, mine && mine.at < V191_AT);
-      return J({ day: today, qs: qs.map(q => ({ cat: q.cat, q: q.q, opts: q.opts, ...(mine ? { ans: q.ans } : {}) })), mine: mine ? { score: mine.score, ans: JSON.parse(mine.ans || '[]') } : null, played: (this.one(`SELECT COUNT(*) n FROM trivia WHERE day=?`, today) || {}).n || 0 });
+      return J({ day: today, qs: qs.map(q => ({ cat: q.cat, q: q.q, opts: q.opts, ...(mine ? { ans: q.ans } : {}) })), mine: mine ? { score: mine.score, ans: JSON.parse(mine.ans || '[]') } : null, played: (() => { const g = gameIds(this.sql, me); return this.all(`SELECT mid FROM trivia WHERE day=?`, today).filter(r => g.has(r.mid)).length; })() }); // 1.9.231 only people in the same group
     }
     if (p === '/trivia' && m === 'POST') {
       if (this.one(`SELECT score FROM trivia WHERE mid=? AND day=?`, me.id, today)) return J({ err: 'one go a day – come back tomorrow for 5 new questions' }, 409);
@@ -554,8 +554,8 @@ export class Retain {
       return J({ score, right: qs.map(q => q.ans) });
     }
     if (p === '/trivia/board') {
-      const tn = dnum(today), dow = (new Date(tn * 864e5).getUTCDay() + 6) % 7, wk = keyOf(tn - dow); // weeks start Monday (NZ)
-      const q = (where, ...a) => this.all(`SELECT t.mid, m.name, SUM(t.score) pts, COUNT(*) days FROM trivia t JOIN members m ON m.id=t.mid AND m.removed=0 ${where} GROUP BY t.mid ORDER BY pts DESC, days ASC LIMIT 30`, ...a).map(r => ({ ...r, me: r.mid === me.id }));
+      const g = gameIds(this.sql, me), tn = dnum(today), dow = (new Date(tn * 864e5).getUTCDay() + 6) % 7, wk = keyOf(tn - dow); // weeks start Monday (NZ)
+      const q = (where, ...a) => this.all(`SELECT t.mid, m.name, SUM(t.score) pts, COUNT(*) days FROM trivia t JOIN members m ON m.id=t.mid AND m.removed=0 ${where} GROUP BY t.mid ORDER BY pts DESC, days ASC LIMIT 400`, ...a).filter(r => g.has(r.mid)).slice(0, 30).map(r => ({ ...r, me: r.mid === me.id })); // 1.9.231 family board for family, circle board for a friend
       return J({ week: q(`WHERE t.day>=?`, wk), all: q(''), today: q(`WHERE t.day=?`, today), weekFrom: wk });
     }
     if (p === '/memories') { // family posts and photos from a week, a month and a year ago (never Shane's own boards)

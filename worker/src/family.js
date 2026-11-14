@@ -134,6 +134,7 @@ export class Family extends DurableObject {
     this.sql.exec(`UPDATE members SET removed=1, tok=NULL WHERE id=?`, t.id); this.sql.exec(`DELETE FROM prefs WHERE mid=?`, t.id); this.sql.exec(`DELETE FROM reacts WHERE mid=?`, t.id); this.sql.exec(`DELETE FROM subs WHERE mid=?`, t.id); this.sql.exec(`DELETE FROM notes WHERE mid=?`, t.id);
     this.sql.exec(`UPDATE finv SET revoked=1 WHERE host=? AND used IS NULL`, t.id); // their unused friend invites stop working too
     if (t.role === 'friend') this.hideFriend(t.id);
+    else for (const f of this.all(`SELECT id, role FROM members WHERE removed=0 AND role='friend' AND host=?`, t.id)) this.removeMember(f); // 1.9.231 Shane: removing a family member removes their friends too
   }
   botReact(what, id, text = '', p = 0.4) { // 1.9.61 🤖 Info Bot sometimes reacts too (never to its own, never sport/money)
     try {
@@ -249,6 +250,11 @@ export class Family extends DurableObject {
       if (isFriend(me)) { const h = this.one(`SELECT id, name FROM members WHERE id=? AND removed=0`, me.host); return J({ friend: 1, host: h ? { name: h.name } : null, circle: this.all(`SELECT id, name, created FROM members WHERE removed=0 AND role='friend' AND host=? AND id!=? ORDER BY created`, me.host, me.id) }); }
       return J({ friends: this.all(`SELECT id, name, created, seen FROM members WHERE removed=0 AND role='friend' AND host=? ORDER BY created`, me.id), invites: this.all(`SELECT id, label, created, exp FROM finv WHERE host=? AND used IS NULL AND revoked=0 AND exp>? ORDER BY created DESC`, me.id, now) });
     }
+    mm00: { const fm = p.match(/^\/friends\/(m[0-9a-f]{12})$/); if (!fm || m !== 'DELETE') break mm00; // 1.9.231 a host removes one of their own friends
+      if (!isFam(me)) return J({ err: 'not for friends' }, 403);
+      const t = this.one(`SELECT id, role, host FROM members WHERE id=? AND removed=0`, fm[1]);
+      if (!t || !isFriend(t) || t.host !== me.id) return J({ err: 'only your own friends' }, 403);
+      this.removeMember(t); return J({ ok: 1 }); }
     if (p === '/friends/invite' && m === 'POST') { // a family member makes a one-time invite link (7 days)
       if (!isFam(me)) return J({ err: 'not for friends' }, 403);
       const b = await body(), label = clean(b.name || b.label, 40);

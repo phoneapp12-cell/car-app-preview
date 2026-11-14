@@ -172,11 +172,27 @@ async function shareCard(id, isLife) {
     const i = order.find(x => x.id === id) || (FEED.items || []).find(x => x.id === id); if (!isPublicCard(i)) { toast('That one stays private'); return; }
     snap = { t: i.t, s: i.s, url: i.url, img: i.img, vid: i.vid, sn: i.sn, topic: i.topic, src: i.src, kind: i.kind, ev: i.ev };
   }
+  if (!priv && !IS_FRIEND) { repostSheet(id, snap); return; } // 1.9.231 reposting a news card: Family / Friends / Both
   const caption = prompt('Add a short note for ' + famWord() + '? (optional)', '');
   if (caption === null) return;
   try { const r = await fam('/shares', { method: 'POST', body: JSON.stringify({ orig: id, priv, snap, caption }) }); toast(r.dup ? 'Already shared' : '🔁 Shared with ' + famWord()); await loadShares(); }
   catch (e) { toast(e.message); }
 }
+let RP = null;
+function repostSheet(id, snap) {
+  RP = { id, snap }; $('#sheet').classList.add('on');
+  $('#sheetin').innerHTML = `<h2>🔁 Share this</h2><p class="sst">${esc(snap.t || '')}</p>
+    <textarea id="rpcap" rows="2" maxlength="200" placeholder="Add a short note (optional)" aria-label="Your note"></textarea>
+    ${audPicker('rpaud', false)}
+    <div class="xbtns"><button class="btn pri" id="rpgo">Share</button><button class="btn" data-close>Cancel</button></div>`;
+}
+async function repostGo(b) {
+  if (!RP) return; const A = audRead('rpaud'), caption = (($('#rpcap') || {}).value || '').trim();
+  b.disabled = true;
+  try { const r = await fam('/shares', { method: 'POST', body: JSON.stringify({ orig: RP.id, priv: false, snap: RP.snap, caption, ...(A.aud ? { aud: A.aud } : {}) }) }); $('#sheet').classList.remove('on'); RP = null; toast(r.dup ? 'Already shared' : '🔁 Shared with ' + A.who); await loadShares(); }
+  catch (e) { b.disabled = false; toast(e.message); }
+}
+document.addEventListener('click', e => { const t = e.target; if (t && t.id === 'rpgo') repostGo(t); });
 async function unshare(sid, up, text) {
   if (!confirm(up ? 'Delete this photo post for everyone?' : text ? 'Delete this post for everyone?' : 'Stop sharing this with the family?')) return;
   try { await fam('/shares/' + sid, { method: 'DELETE' }); toast('Not shared any more'); SHARES = SHARES.filter(s => s.id !== +sid); draw(); } catch (e) { toast(e.message); }
@@ -344,7 +360,7 @@ function famSettings() {
 function friendsBox() {
   return `<h2 style="margin-top:18px">🤝 Friends</h2><p>Invite a friend to their own Info Book. They see posts you send to <b>Friends</b> or <b>Both</b>, and can play games with you and your other friends. They never see family posts, family members or family cards.</p>
     <div class="famadd"><input id="frname" maxlength="40" placeholder="Their name (just for you), e.g. Jo" aria-label="Friend’s name"><button class="btn pri" id="frinv">Make invite link</button></div>
-    <div id="frlink"></div><div id="frlist" class="famlist">Loading…</div>${typeof IS_SHANE !== 'undefined' && IS_SHANE() ? '<p><button class="btn pri" id="ppl">👥 People: everyone in Info Book</button></p>' : ''}`;
+    <div id="frlink"></div><h3>My friends</h3><div id="frlist" class="famlist">Loading…</div>${typeof IS_SHANE !== 'undefined' && IS_SHANE() ? '<p><button class="btn pri" id="ppl">👥 People: everyone in Info Book</button></p>' : ''}`;
 }
 const IS_SHANE = () => IS_ADMIN && (/\bShane\b/i.test(MEMBER.name || '') || !!MEMBER.shane);
 const shortDay = ms => ms ? new Date(ms).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Pacific/Auckland' }) : '';
@@ -353,7 +369,7 @@ async function frList() {
   try {
     const r = await fam('/friends');
     if (r.friend) { el.innerHTML = `<div class="row"><span>🏠 ${esc((r.host || {}).name || 'Your host')}<small class="sst">invited you</small></span><span></span></div>` + (r.circle || []).map(x => `<div class="row"><span>🤝 ${esc(x.name)}<small class="sst">friend since ${esc(shortDay(x.created))}</small></span><span></span></div>`).join('') || ''; return; }
-    el.innerHTML = (r.friends || []).map(x => `<div class="row"><span>🤝 ${esc(x.name)}<small class="sst">joined ${esc(shortDay(x.created))} · ${x.seen ? 'last here ' + esc(ago(x.seen)) + ' ago' : 'not back yet'}</small></span><span></span></div>`).join('')
+    el.innerHTML = (r.friends || []).map(x => `<div class="row"><span>🤝 ${esc(x.name)}<small class="sst">joined ${esc(shortDay(x.created))} · ${x.seen ? 'last here ' + esc(ago(x.seen)) + ' ago' : 'not back yet'}</small></span><span><button class="mini warn" data-frrm="${esc(x.id)}" data-n="${esc(x.name)}">Remove</button></span></div>`).join('')
       + (r.invites || []).map(x => `<div class="row"><span>✉️ ${esc(x.label || 'Invite')}<small class="sst">waiting · link works until ${esc(shortDay(x.exp))}</small></span><span><button class="mini" data-frrev="${esc(x.id)}">Cancel</button></span></div>`).join('')
       || '<p class="sst">No friends yet.</p>';
   } catch (e) { el.textContent = e.message; }
@@ -398,8 +414,8 @@ async function peopleSheet() { // Shane only (the server checks too)
   $('#sheet').classList.add('on'); $('#sheetin').innerHTML = '<h2>👥 People</h2><p>Loading…</p>';
   let r; try { r = await fam('/admin/people'); } catch (e) { $('#sheetin').innerHTML = `<h2>👥 People</h2><p>${esc(e.message)}</p><button class="btn" data-close>Close</button>`; return; }
   const P = r.people || [], fam0 = P.filter(p => p.group === 'family'), fr = P.filter(p => p.group === 'friend');
-  const row = p => `<div class="row pplr"><span>${p.group === 'family' ? (p.admin ? '⭐' : '👤') : '🤝'} <b>${esc(p.name)}</b><small class="sst">${p.group === 'family' ? 'Family' : 'Friend of ' + esc(p.host ? p.host.name : '?') + (p.host && p.host.removed ? ' (removed)' : '')} · joined ${esc(shortDay(p.joined))} · ${p.me ? 'you' : p.seen ? 'last seen ' + esc(ago(p.seen)) + ' ago' : 'not seen yet'}</small></span><span>${p.me ? '' : `<button class="mini warn" data-pplrm="${esc(p.id)}" data-n="${esc(p.name)}" data-g="${p.group}">Remove</button>`}</span></div>`;
-  $('#sheetin').innerHTML = `<h2>👥 People</h2><p class="sst">Everyone in Info Book and which group they’re in. Only you can see this page. Remove takes someone out straight away: their link stops working${fr.length ? ', and a friend’s posts and comments are hidden' : ''}.</p>
+  const row = p => `<div class="row pplr"><span>${p.group === 'family' ? (p.admin ? '⭐' : '👤') : '🤝'} <b>${esc(p.name)}</b><small class="sst">${p.group === 'family' ? 'Family' : 'Friend of ' + esc(p.host ? p.host.name : '?') + (p.host && p.host.removed ? ' (removed)' : '')} · joined ${esc(shortDay(p.joined))} · ${p.me ? 'you' : p.seen ? 'last seen ' + esc(ago(p.seen)) + ' ago' : 'not seen yet'}</small></span><span>${p.me ? '' : `<button class="mini warn" data-pplrm="${esc(p.id)}" data-n="${esc(p.name)}" data-g="${p.group}" data-nf="${P.filter(q => q.host && q.host.id === p.id).length}">Remove</button>`}</span></div>`;
+  $('#sheetin').innerHTML = `<h2>👥 People</h2><p class="sst">Everyone in Info Book and which group they’re in. Only you can see this page. Remove takes someone out straight away: their link stops working, a friend’s posts and comments are hidden, and removing a family member removes their friends too.</p>
     <h3>👨‍👩‍👧 Family · ${fam0.length}</h3><div class="famlist">${fam0.map(row).join('')}</div>
     <h3>🤝 Friends · ${fr.length}</h3><div class="famlist">${fr.map(row).join('') || '<p class="sst">No friends yet.</p>'}</div>
     <h3>✉️ Invites waiting · ${(r.invites || []).length}</h3><div class="famlist">${(r.invites || []).map(x => `<div class="row"><span>✉️ ${esc(x.label || 'Invite')}<small class="sst">from ${esc(x.host)} · works until ${esc(shortDay(x.exp))}</small></span><span><button class="mini" data-frrev="${esc(x.id)}" data-ppl="1">Revoke</button></span></div>`).join('') || '<p class="sst">None.</p>'}</div>
@@ -413,7 +429,9 @@ document.addEventListener('click', async e => {
   const fs = t.closest('[data-frshare]'); if (fs) { try { await navigator.share({ title: 'Info Book', text: 'Join me on Info Book', url: fs.dataset.frshare }); } catch (er) { } return; }
   const rv = t.closest('[data-frrev]'); if (rv) { if (!confirm('Cancel this invite? The link stops working.')) return; try { await fam('/friends/invite/' + rv.dataset.frrev, { method: 'DELETE' }); toast('Invite cancelled'); if (rv.dataset.ppl) peopleSheet(); else frList(); } catch (er) { toast(er.message); } return; }
   if (t.id === 'ppl') { peopleSheet(); return; }
-  const rm = t.closest('[data-pplrm]'); if (rm) { if (!confirm(`Remove ${rm.dataset.n} from Info Book? Their link stops working straight away${rm.dataset.g === 'friend' ? ' and their posts and comments are hidden' : ''}. This can’t be undone.`)) return; try { await fam('/admin/people/' + rm.dataset.pplrm, { method: 'DELETE' }); toast(rm.dataset.n + ' removed'); peopleSheet(); } catch (er) { toast(er.message); } return; }
+  const fr = t.closest('[data-frrm]'); if (fr) { if (!confirm(`Remove ${fr.dataset.n} from Info Book? Their link stops working straight away and their posts and comments are hidden. This can’t be undone.`)) return; try { await fam('/friends/' + fr.dataset.frrm, { method: 'DELETE' }); toast(fr.dataset.n + ' removed'); frList(); } catch (er) { toast(er.message); } return; } // 1.9.231 a host removes their own friend
+  const rm = t.closest('[data-pplrm]'); if (rm) { const nf = rm.dataset.g === 'family' ? +(rm.dataset.nf || 0) : 0;
+    if (!confirm(`Remove ${rm.dataset.n} from Info Book? Their link stops working straight away${rm.dataset.g === 'friend' ? ' and their posts and comments are hidden' : nf ? `, and their ${nf} friend${nf === 1 ? '' : 's'} are removed too` : ''}. This can’t be undone.`)) return; try { await fam('/admin/people/' + rm.dataset.pplrm, { method: 'DELETE' }); toast(rm.dataset.n + ' removed'); peopleSheet(); } catch (er) { toast(er.message); } return; }
 });
 async function famList() {
   frList(); // 1.9.230

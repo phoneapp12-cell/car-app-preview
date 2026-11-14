@@ -63,11 +63,12 @@ export const FRIEND_OK = [
   [/^\/popular$/, 'GET'], [/^\/likes$/, '*'], [/^\/photos$/, 'POST'], [/^\/photos\/\d+$/, 'GET'], [/^\/photos\/usage$/, 'GET'],
   [/^\/preview$/, 'GET'], [/^\/preview\/pics$/, 'GET'], [/^\/prefs$/, '*'], [/^\/aibot$/, 'GET'], [/^\/aibot\/mute$/, 'PUT'],
   [/^\/push\/(key|sub|prefs|inbox|test)$/, '*'], [/^\/visit(\/award)?$/, 'POST'], [/^\/profile$/, 'GET'], // /profile: their own only (retain.js)
+  [/^\/weather$/, 'GET'], [/^\/trivia$/, '*'], [/^\/trivia\/board$/, 'GET'], // 1.9.231 MetService's public warnings; trivia boards and counts are scoped to the circle (retain.js)
 ];
 export function friendMay(p, m) { return FRIEND_OK.some(([re, mm]) => re.test(p) && (mm === '*' || mm === m)); }
-// Card ids that belong to family-only cards (reno, poll, daily question, trivia, streaks, dates, game notices …):
+// Card ids that belong to family-only cards (reno, poll, daily question, streaks, dates, game notices …):
 // friends can't read, comment on or react to them, even though they look like public card ids.
-export const FAMILY_CARD = /^(reno$|poll\d|dq\d|trivia|streaks$|intlist|sugg$|date\d|bday|cars?$|sappt|sa:|comeback|scrabble-|sugar-)/;
+export const FAMILY_CARD = /^(reno$|poll\d|dq\d|streaks$|intlist|sugg$|date\d|bday|cars?$|sappt|sa:|comeback|scrabble-|sugar-)/;
 // Notification types a friend can get; the rest (daily poll, birthdays, streaks, weather, events, appointments,
 // come-back teasers) are about the family and are never queued for a friend.
 export const FRIEND_NOTES = new Set(['mine', 'reply', 'photo', 'scrabble', 'sugar']);

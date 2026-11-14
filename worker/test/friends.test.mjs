@@ -84,7 +84,7 @@ assert.equal((await call(null, '/join', 'POST', { code: rv2.code, name: 'X' })).
 
 // friends can't invite, and can't reach family-only routes (default deny)
 assert.equal((await call(fern.token, '/friends/invite', 'POST', {})).status, 403, 'friends cannot invite');
-for (const [p, m] of [['/members', 'GET'], ['/reno', 'GET'], ['/dates', 'GET'], ['/poll', 'GET'], ['/daily', 'GET'], ['/trivia', 'GET'], ['/trivia/board', 'GET'], ['/memories', 'GET'], ['/streaks', 'GET'], ['/cars', 'GET'], ['/sappts', 'GET'], ['/interest', 'GET'], ['/weather', 'GET'], ['/power', 'GET'], ['/bdays', 'GET'], ['/admin/people', 'GET'], ['/devices', 'GET'], ['/comeback', 'GET'], ['/purge', 'POST'], ['/stages', 'GET'], ['/anything-new', 'GET']])
+for (const [p, m] of [['/members', 'GET'], ['/reno', 'GET'], ['/dates', 'GET'], ['/poll', 'GET'], ['/daily', 'GET'], ['/memories', 'GET'], ['/streaks', 'GET'], ['/cars', 'GET'], ['/sappts', 'GET'], ['/interest', 'GET'], ['/power', 'GET'], ['/bdays', 'GET'], ['/admin/people', 'GET'], ['/devices', 'GET'], ['/comeback', 'GET'], ['/purge', 'POST'], ['/stages', 'GET'], ['/anything-new', 'GET']])
   assert.equal((await call(fern.token, p, m)).status, 403, 'friend denied ' + p);
 r = ok(await call(fern.token, '/profile'), 'a friend reads their own profile'); assert.equal(r.id, fern.id); assert.ok(!r.birthday);
 assert.equal((await call(fern.token, '/profile?id=' + sarah.id)).status, 404, 'not the host’s profile');
@@ -161,7 +161,7 @@ r = ok(await call(fern.token, '/shares')).find(s => s.id === sarahBoth.id); asse
 r = ok(await call(SH.token, '/shares')).find(s => s.id === sarahBoth.id); assert.deepEqual(r.likes.map(l => l.name), ['Shane Demo']);
 r = ok(await call(fern.token, '/popular')); assert.ok(!JSON.stringify(r).includes('Shane'), 'popular leaks no family names');
 // family-only card ids can't be read or commented on by friends
-for (const card of ['reno', 'poll20261114', 'dq20261114', 'trivia', 'streaks', 'date12']) {
+for (const card of ['reno', 'poll20261114', 'dq20261114', 'streaks', 'date12']) {
   assert.ok(FAMILY_CARD.test(card));
   assert.equal((await call(fern.token, '/comments', 'POST', { card, text: 'hi' })).status, 400, 'friend comment on ' + card);
 }
@@ -197,6 +197,34 @@ await fam.rt.note(sarah.id, 'daily', 'Today’s family poll', 'poll1');
 assert.ok(!notesFor(fern.id).some(n => ['daily', 'dates', 'comeback'].includes(n.type)));
 assert.ok(notesFor(sarah.id).some(n => n.type === 'daily'));
 
+// ---- 1.9.231 friends get trivia and the weather card (MetService's public warnings), scoped so nothing about the family leaks
+assert.ok(!FAMILY_CARD.test('trivia20261114'));
+ok(await call(fern.token, '/weather'), 'friend reads weather warnings');
+assert.equal((await call(fern.token, '/weather/test', 'POST')).status, 403, 'but not the admin test switch');
+assert.equal((await call(fern.token, '/power')).status, 403, 'power cuts stay family-only');
+ok(await call(SH.token, '/trivia', 'POST', { ans: [0, 0, 0, 0, 0] }), 'Shane plays trivia');
+ok(await call(hana.token, '/trivia', 'POST', { ans: [1, 1, 1, 1, 1] }), 'Hana plays trivia');
+r = ok(await call(fern.token, '/trivia')); assert.equal(r.qs.length, 5); assert.equal(r.played, 0, 'Fern’s “played today” counts only her circle');
+ok(await call(fern.token, '/trivia', 'POST', { ans: [2, 2, 2, 2, 2] }), 'Fern plays trivia');
+assert.equal((await call(fern.token, '/trivia', 'POST', { ans: [2, 2, 2, 2, 2] })).status, 409, 'one go a day for friends too');
+r = ok(await call(fern.token, '/trivia/board')); assert.deepEqual([...new Set([...r.week, ...r.all, ...r.today].map(x => x.name))], ['Fern Friend'], 'Fern’s board: her circle only (no Shane, no Hana)');
+r = ok(await call(SH.token, '/trivia/board')); assert.deepEqual(r.all.map(x => x.name), ['Shane Demo'], 'the family board has no friends');
+r = ok(await call(hana.token, '/trivia/board')); assert.deepEqual(r.all.map(x => x.name), ['Hana Friend']);
+assert.equal(ok(await call(sarah.token, '/trivia')).played, 1, 'family count is family only');
+
+// ---- 1.9.231 a host removes their own friends (and only their own)
+const kai = ok(await call(null, '/join', 'POST', { code: ok(await call(sarah.token, '/friends/invite', 'POST', { name: 'Kai' })).code, name: 'Kai Friend' }));
+ok(await call(kai.token, '/shares/text', 'POST', { text: 'Kai was here' }));
+assert.equal((await call(aranea.token, '/friends/' + kai.id, 'DELETE')).status, 403, 'not someone else’s friend');
+assert.equal((await call(gus.token, '/friends/' + kai.id, 'DELETE')).status, 403, 'friends can’t remove anyone');
+assert.equal((await call(SH.token, '/friends/' + kai.id, 'DELETE')).status, 403, 'Shane uses People, not this');
+assert.equal((await call(sarah.token, '/friends/' + aranea.id, 'DELETE')).status, 403, 'not a family member');
+assert.equal((await call(sarah.token, '/friends/m000000000000', 'DELETE')).status, 403, 'not a made-up id');
+ok(await call(sarah.token, '/friends/' + kai.id, 'DELETE'), 'Sarah removes Kai');
+assert.equal((await call(kai.token, '/me')).status, 401, 'Kai’s token stops working straight away');
+assert.ok(!texts(ok(await call(sarah.token, '/shares'))).includes('Kai was here'), 'and Kai’s posts are hidden');
+assert.ok(!ok(await call(sarah.token, '/friends')).friends.some(f => f.id === kai.id));
+
 // ---- Shane-only People page and removal
 assert.equal((await call(sarah.token, '/admin/people')).status, 403, 'family members can’t open People');
 r = ok(await call(SH.token, '/admin/people'));
@@ -218,10 +246,15 @@ assert.equal((await call(fern.token, '/shares')).status, 401);
 assert.ok(!texts(ok(await call(sarah.token, '/shares'))).includes('Fern says hi to the circle'), 'a removed friend’s posts are hidden');
 assert.ok(!who(ok(await call(sarah.token, '/comments?card=sh' + sarahBoth.id))).includes('Fern Friend'), 'and their comments');
 assert.deepEqual(names(ok(await call(gus.token, '/people'))), ['Gus Friend', 'Sarah Demo']);
-// removing a host revokes their unused invites
+// removing a host revokes their unused invites and (1.9.231) removes all their friends
 const sInv = ok(await call(aranea.token, '/friends/invite', 'POST', {}));
+const hPost = ok(await call(hana.token, '/shares/text', 'POST', { text: 'Hana’s post' }));
 ok(await call(SH.token, '/admin/people/' + aranea.id, 'DELETE'));
 assert.equal((await call(aranea.token, '/me')).status, 401);
+assert.equal((await call(hana.token, '/me')).status, 401, 'the removed host’s friend is removed too');
+assert.equal(sql.exec(`SELECT del FROM shares WHERE mid=?`, hana.id).toArray().every(x => x.del === 1), true, 'and their posts are hidden');
+assert.ok(!ok(await call(SH.token, '/admin/people')).people.some(p => p.name === 'Hana Friend'));
+assert.ok(ok(await call(gus.token, '/me')), 'other hosts’ friends are untouched');
 assert.equal((await call(null, '/join', 'POST', { code: sInv.code, name: 'Late' })).status, 404, 'a removed host’s invite stops working');
 ok(await call(SH.token, '/friends/invite/' + pend.id, 'DELETE'));
 r = ok(await call(SH.token, '/admin/people')); assert.ok(!r.invites.some(i => i.id === pend.id));
