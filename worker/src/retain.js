@@ -101,7 +101,7 @@ export const TRIVIA_SIZE = BANK.length;
 const RENO_KV = 'reno-v1:90d2e183c7f30bc8fe35f9c1f7f88dc507f6f7e1fe752f828472bbf85d480a31', RENO_DEADLINE = '2026-11-22';
 const RENO_ROOMS = [['main', 'Main bedroom', '🛏️'], ['spare', 'Spare bedroom', '🛋️'], ['bath', 'Bathroom', '🛁'], ['hall', 'Hallway', '🚪'], ['lounge', 'Lounge', '📺'], ['dining', 'Dining', '🍽️'], ['kitchen', 'Kitchen', '🍳'], ['pantry', 'Pantry', '🥫'], ['laundry', 'Laundry', '🧺']];
 const RENO_JOBS = RENO_ROOMS.flatMap(([k, n, e]) => [['clean', 'Clean'], ['mop', 'Mop ceiling'], ['speckle', 'Apply speckle'], ['sand', 'Sand'], ['ceiling', 'Paint ceiling'], ['walls', 'Paint walls'], ['floor', 'Flooring']].map(([j, jn]) => ({ id: k + '-' + j, area: n, e, job: jn })))
-  .concat([['wash', 'House wash'], ['gutters', 'Clear gutters & downpipes'], ['decks', 'Clean decks & paths'], ['metal', 'Scrap metal pickup'], ['dump', 'Dump runs']].map(([j, jn]) => ({ id: 'out-' + j, area: 'Outside', e: '🏡', job: jn })));
+  .concat([['wash', 'House wash'], ['waterblast', 'Waterblasting'], ['decks', 'Clean decks & paths'], ['metal', 'Scrap metal pickup'], ['dump', 'Dump runs']].map(([j, jn]) => ({ id: 'out-' + j, area: 'Outside', e: '🏡', job: jn })));
 export function renoSummary(list, now = Date.now()) {
   const by = {}; for (const x of list || []) if (x && x.id) by[x.id] = x;
   const proj = by.project || {}, deadline = /^\d{4}-\d{2}-\d{2}$/.test(proj.deadline || '') ? proj.deadline : RENO_DEADLINE;
