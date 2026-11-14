@@ -348,6 +348,7 @@
     artWin.querySelector('[data-artfs]').hidden = !spec.local;
     artWin.hidden = false;
     lockFeed(true);
+    artWin.classList.toggle('artsugar', kind === 'sugar');
     if (kind === 'tetris') {
       if (typeof root.setTetrisChrome === 'function') root.setTetrisChrome(true);
       else if (typeof setTetrisChrome === 'function') setTetrisChrome(true);
@@ -355,6 +356,8 @@
       setFull(true);
       persistArt();
     }
+    // 1.9.211 Sugar Rush map fills the phone, same artfull path as Tetris (no persist).
+    if (kind === 'sugar') setFull(true);
     const close = artWin.querySelector('[data-artclose]');
     if (close) close.focus();
     if (!artHist) { try { root.history.pushState({ ibArt: kind }, ''); artHist = true; } catch (e) { artHist = false; } }
@@ -365,6 +368,7 @@
     setFull(false);
     unloadArt();
     artWin.hidden = true;
+    artWin.classList.remove('artsugar');
     artKind = null;
     lockFeed(false);
     if (wasTetris) clearArtPersist();
@@ -377,8 +381,9 @@
   }
   root.addEventListener('message', e => {
     const d = e && e.data;
-    if (!d || d.type !== 'ib-tetris-close') return;
-    if (!isTetrisOpen()) return;
+    if (!d || (d.type !== 'ib-tetris-close' && d.type !== 'ib-sugar-close')) return;
+    if (d.type === 'ib-tetris-close' && !isTetrisOpen()) return;
+    if (d.type === 'ib-sugar-close' && artKind !== 'sugar') return;
     if (artFrame && e.source && e.source !== artFrame.contentWindow) return;
     closeArt(false);
   });

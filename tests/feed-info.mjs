@@ -3936,3 +3936,28 @@ if (live) {
   assert.deepStrictEqual(workerIds, Array.from(ids), 'client and worker share the same icon ids');
   assert.ok(html.includes('prefers-reduced-motion') && html.includes('orientation: landscape'));
 }
+
+// 1.9.211 Sugar Rush NZ map fills almost the entire phone screen
+{
+  const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
+  const html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
+  const play = fs.readFileSync('feed/play.js', 'utf8');
+  const idx = fs.readFileSync('feed/index.html', 'utf8');
+  const SR = load('feed/sugar-rush.js').SugarRush;
+  assert.strictEqual(SR.LEVELS.length, 10);
+  assert.strictEqual(SR.LEVELS[1].name, "Sarah's Sweet Spot");
+  assert.ok(html.includes('id="mapbar"') && html.includes('id="mapexit"') && html.includes('Exit'));
+  assert.ok(html.includes('id="racechip"') && html.includes('id="pickicon"') && html.includes('Pick your icon'));
+  assert.ok(html.includes('id="mapview"') && html.includes('id="mapstage"') && html.includes('id="racers"'));
+  assert.ok(html.includes('body.onmap') && html.includes('padding: 0') && html.includes('inset: 0'));
+  assert.ok(html.includes('env(safe-area-inset-top') && html.includes('safe-area-inset-bottom') && html.includes('viewport-fit=cover'));
+  assert.ok(html.includes('orientation: landscape') && html.includes('prefers-reduced-motion'));
+  assert.ok(html.includes('id="maphelp"') && html.includes('hidden') && html.includes('starting in Onerahi'));
+  assert.ok(src.includes('requestCloseSugar') && src.includes("postMessage({ type: 'ib-sugar-close' }"));
+  assert.ok(src.includes('setRaceOpen') && src.includes("chip.hidden = !!on"));
+  assert.ok(play.includes("kind === 'sugar'") && play.includes('setFull(true)'));
+  assert.ok(play.includes("d.type !== 'ib-sugar-close'") && play.includes("d.type !== 'ib-tetris-close'"));
+  assert.ok(idx.includes('.artwin.artsugar.artfull .artfsx{display:none}'));
+  assert.ok(html.includes('id="shelf"') && html.includes('Badge shelf'));
+  assert.ok(src.includes("playKind(wantKind())") && src.includes("'menu'"));
+}
