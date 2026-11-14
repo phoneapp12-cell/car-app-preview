@@ -567,14 +567,16 @@
   // 1.9.227 Real geography. NZ is drawn from real coastline points (Natural Earth 1:50m) through one projection:
   // a local equirectangular (cos 41°), turned 25° so the long islands stand up the phone, then scaled 61 px/° across
   // and 78 px/° down (squeezed sideways a little, like Australia, to fit 400 px). Every stop sits at its real
-  // latitude/longitude through that projection. Onerahi, Sarah's House and Whangārei are a few km apart, so they sit
-  // in a zoomed-in Whangārei inset (20x, same orientation) that keeps their real relative positions.
+  // latitude/longitude through that projection. Onerahi and Whangārei are a few km apart, so they sit
+  // in a zoomed-in Whangārei inset (30x, same orientation) that keeps their real relative positions. Sarah's House is
+  // in Onerahi, east of central Whangārei (1.9.228); its pin is nudged (nudged: true) just east of the Onerahi pin so
+  // both labels stay readable.
   const NZ_PROJ = { cos: 0.754709580222772, rot: -0.4363323129985824, sx: 61.0, sy: 78.0, ox: 218.7531847020796, oy: 507.8180402772627 };
   function nzXY(lat, lon) {
     const x = (lon - 173.5) * NZ_PROJ.cos, y = -(lat + 40.5), c = Math.cos(NZ_PROJ.rot), s = Math.sin(NZ_PROJ.rot);
     return { x: NZ_PROJ.ox + NZ_PROJ.sx * (x * c - y * s), y: NZ_PROJ.oy + NZ_PROJ.sy * (x * s + y * c) };
   }
-  const WHANGAREI_INSET = { k: 30, x: 114, y: 372, lat: -35.725, lon: 174.323 };
+  const WHANGAREI_INSET = { k: 30, x: 54, y: 372, lat: -35.725, lon: 174.323 };
   function insetXY(lat, lon) {
     const a = nzXY(lat, lon), b = nzXY(WHANGAREI_INSET.lat, WHANGAREI_INSET.lon);
     return { x: WHANGAREI_INSET.x + WHANGAREI_INSET.k * (a.x - b.x), y: WHANGAREI_INSET.y + WHANGAREI_INSET.k * (a.y - b.y) };
@@ -584,10 +586,10 @@
   function ausXY(lat, lon) { return { x: 8.533 * lon - 937.8, y: 1808 + 10.97 * (-lat - 10.707) }; }
   const MAP_W = 400, MAP_H = 2240;
   const MAP_STOPS = [
-    { n: 1, x: 208, y: 432, place: "Onerahi", kind: 'town', label: 'below', lat: -35.77, lon: 174.37, inset: 'whangarei' },
-    { n: 2, x: 38, y: 420, place: "Sarah's House", kind: 'house', label: 'right', lat: -35.726, lon: 174.262, inset: 'whangarei' },
-    { n: 3, x: 114, y: 372, place: "Whangārei", kind: 'town', label: 'right', lat: -35.725, lon: 174.323, inset: 'whangarei' },
-    { n: 4, x: 177, y: 218, place: "Auckland Post Office", kind: 'post', label: 'right', lat: -36.848, lon: 174.763, via: [{ x: 174, y: 302 }] },
+    { n: 1, x: 148, y: 432, place: "Onerahi", kind: 'town', label: 'left', lat: -35.77, lon: 174.37, inset: 'whangarei' },
+    { n: 2, x: 204, y: 432, place: "Sarah's House", kind: 'house', label: 'below', lat: -35.762, lon: 174.385, inset: 'whangarei', nudged: true },
+    { n: 3, x: 54, y: 372, place: "Whangārei", kind: 'town', label: 'right', lat: -35.725, lon: 174.323, inset: 'whangarei' },
+    { n: 4, x: 177, y: 218, place: "Auckland Post Office", kind: 'post', label: 'right', lat: -36.848, lon: 174.763, via: [{ x: 114, y: 302 }] },
     { n: 5, x: 223, y: 272, place: "Hamilton", kind: 'town', label: 'left', lat: -37.787, lon: 175.279 },
     { n: 6, x: 273, y: 272, place: "Rotorua", kind: 'town', label: 'right', lat: -38.137, lon: 176.251 },
     { n: 7, x: 279, y: 316, place: "Taupō Station", kind: 'station', label: 'left', lat: -38.686, lon: 176.07 },
@@ -683,15 +685,15 @@
       '<path d="M 112 932 C 122 890 134 890 144 932 C 134 924 122 924 112 932 Z" fill="#fff" opacity=".9"/>' +
       // Ferry across Cook Strait (Wellington to Picton)
       '<path d="M 286 536 C 278 552 274 547 264 551" fill="none" stroke="#fff" stroke-width="2.4" stroke-dasharray="5 7" stroke-linecap="round" opacity=".85"/>' +
-      // 1.9.227 Whangārei close-up (30x): Whangārei, Sarah\'s House and Onerahi at their real relative places,
+      // 1.9.227 Whangārei close-up (30x): Whangārei and Onerahi at their real relative places, Sarah\'s House beside Onerahi,
       // linked by a dashed leader line to the ring where Whangārei really sits on the coast.
       '<g class="sr-inset">' +
-      '<path d="M 130 150 L 114 334" stroke="#fff" stroke-width="2.5" stroke-dasharray="4 5" stroke-linecap="round"/>' +
+      '<path d="M 130 150 L 54 334" stroke="#fff" stroke-width="2.5" stroke-dasharray="4 5" stroke-linecap="round"/>' +
       '<circle cx="130" cy="150" r="6" fill="none" stroke="#ff4f93" stroke-width="2.5"/>' +
-      '<rect x="15" y="334" width="245" height="190" rx="22" fill="#d8f4ff" stroke="#fff" stroke-width="4"/>' +
+      '<rect x="4" y="334" width="256" height="188" rx="22" fill="#d8f4ff" stroke="#fff" stroke-width="4"/>' +
       // Whangārei Harbour opens to the south-east, below Onerahi
-      '<path d="M 35 336 L 240 336 L 258 406 C 188 418 148 442 130 472 C 75 488 35 462 17 472 Z" fill="url(#sr-land)" opacity=".9"/>' +
-      '<text x="29" y="514" text-anchor="start" font-size="11" font-weight="900" fill="#2a6a88" font-family="ui-rounded,system-ui,sans-serif">Whangārei close-up</text>' +
+      '<path d="M 24 336 L 240 336 L 258 406 C 128 418 88 442 130 472 C 64 488 24 462 6 472 Z" fill="url(#sr-land)" opacity=".9"/>' +
+      '<text x="18" y="512" text-anchor="start" font-size="11" font-weight="900" fill="#2a6a88" font-family="ui-rounded,system-ui,sans-serif">Whangārei close-up</text>' +
       '</g>' +
       // 1.9.220 Pacific Islands inset: a lagoon-blue panel with Rarotonga, Tonga and Samoa.
       '<g class="sr-pacific">' +
