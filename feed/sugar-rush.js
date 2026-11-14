@@ -1,4 +1,4 @@
-/* Info Book 1.9.166 – Sugar Rush, levels 1–15. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.166 – Sugar Rush, levels 1–18. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -24,6 +24,9 @@
   // 1.9.219 South Island trays: a glacier valley (Franz Josef) and a factory floor (Dunedin).
   const GLACIER = ['XXXXXXXX', 'XXXXXXXX', '.XXXXXX.', '.XXXXXX.', '..XXXX..', '..XXXX..', '.XXXXXX.', 'XXXXXXXX'];
   const FACTORY = ['XXXXXXXX', 'XXXXXXXX', 'XXXXXXXX', 'XXX..XXX', 'XXX..XXX', 'XXXXXXXX', 'XXXXXXXX', 'XXXXXXXX'];
+  // 1.9.220 Pacific Islands: a round island with its reef (Rarotonga) and two islands side by side (Samoa).
+  const ATOLL = ['..XXXX..', '.XXXXXX.', 'XXXXXXXX', 'XXXXXXXX', 'XXXXXXXX', 'XXXXXXXX', '.XXXXXX.', '..XXXX..'];
+  const TWIN_ISLES = ['XXXX.XXX', 'XXXX.XXX', 'XXXXXXXX', 'XXXXXXXX', 'XXXXXXXX', 'XXXXXXXX', 'XXX.XXXX', 'XXX.XXXX'];
 
   const LEVELS = [
     { n: 1, name: 'The Sweet Shop', target: 0, moves: 20, stars: [3000, 6000, 9000], kinds: 6,
@@ -100,7 +103,24 @@
       bub: ['10000001', '10000001', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000'],
       liq: ['00011000', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000'],
       help: 'The big finish: keep the chocolate in check, clear the jelly, pop the sugar bubbles and free the liquorice in 28 moves.',
-      badge: { id: 'ticket', name: 'Golden Ticket', icon: '🎫' } }
+      badge: { id: 'ticket', name: 'Golden Ticket', icon: '🎫' } },
+    // 1.9.220 Pacific Islands.
+    { n: 16, name: 'Rarotonga Lagoon', target: 0, moves: 30, stars: [0, 3300, 6600], kinds: 6, mask: ATOLL,
+      jelly: ['00111100', '01000010', '00000000', '00000000', '00000000', '00000000', '01000010', '00111100'],
+      bub: ['00000000', '00000000', '00100100', '00011000', '00011000', '00100100', '00000000', '00000000'],
+      help: 'Clear the jelly reef at the top and bottom of the island and pop the sugar bubbles in the lagoon in 30 moves.',
+      badge: { id: 'hibiscus', name: 'Hibiscus Flower', icon: '🌺' } },
+    { n: 17, name: 'Tongan Coconut Coast', target: 0, moves: 34, stars: [0, 4400, 8800], kinds: 6,
+      ings: [[0, 2], [0, 5]], ingStyle: 'coconut', ingIcon: '🥥',
+      liq: ['00000000', '00100100', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000'],
+      help: 'Free the liquorice under the two coconut treats, then bring both down to the beach in 34 moves.',
+      badge: { id: 'coconut', name: 'Coconut', icon: '🥥' } },
+    { n: 18, name: 'Samoan Sunset', target: 0, moves: 34, stars: [0, 3100, 6200], kinds: 6, mask: TWIN_ISLES,
+      jelly: ['00000000', '00000000', '00000000', '00000000', '00000000', '11000011', '11100111', '00000000'],
+      locks: ['00000000', '00000000', '00000000', '00011000', '00011000', '00000000', '00000000', '00000000'],
+      liq: ['00000000', '00000000', '01000010', '00000000', '00000000', '00000000', '00000000', '00000000'],
+      help: 'Clear the jelly on both islands, free the locked jars and free the liquorice in 34 moves.',
+      badge: { id: 'shell', name: 'Sunset Shell', icon: '🐚' } }
   ];
 
 
@@ -120,7 +140,10 @@
     { icon: '🚋', goal: 'Clear the jelly, free the jars and pop the bubbles', detail: 'Clear every double jelly, free the 4 locked jars and pop the 4 sugar bubbles in 24 moves.', tip: 'The garden beds have two layers of jelly. Work the corners while the middle jars wait.', mechanic: 'garden' },
     { icon: '🎁', goal: 'Bring both ingredients down and clear the icing', detail: 'Guide both ingredients down the glacier and clear all the icing in 38 moves.', tip: 'Thick icing needs two hits. Clear a path under each ingredient.', mechanic: 'glacier' },
     { icon: '➿', goal: 'Free all the liquorice', detail: 'Free every liquorice-wrapped sweet in 28 moves.', tip: 'Include a wrapped sweet in a match to free it. If two moves in a row free none, the liquorice creeps onto a sweet next to it.', mechanic: 'liq' },
-    { icon: '🎫', goal: 'Finish every objective', detail: 'Clear the jelly, pop the sugar bubbles and free the liquorice, with chocolate on the loose — all in 28 moves.', tip: 'The big finish. Hit the chocolate when you can, and never leave the liquorice alone for long.', mechanic: 'factory' }
+    { icon: '🎫', goal: 'Finish every objective', detail: 'Clear the jelly, pop the sugar bubbles and free the liquorice, with chocolate on the loose — all in 28 moves.', tip: 'The big finish. Hit the chocolate when you can, and never leave the liquorice alone for long.', mechanic: 'factory' },
+    { icon: '🌺', goal: 'Clear the reef jelly and pop the lagoon bubbles', detail: 'Clear the jelly reef at the top and bottom of the island and pop the 8 sugar bubbles in the lagoon in 30 moves.', tip: 'Bubbles touching each other pop together. Pop one in the middle of the lagoon and watch the rest follow.', mechanic: 'reef' },
+    { icon: '🥥', goal: 'Bring both coconuts down to the beach', detail: 'Free the liquorice under the two coconuts, then bring both down to the bottom in 34 moves.', tip: 'The coconuts sit on liquorice. Free it first, then match underneath to drop them. Do not leave the liquorice alone for long.', mechanic: 'coconut' },
+    { icon: '🐚', goal: 'Clear the jelly, free the jars and the liquorice', detail: 'Clear the jelly on both islands, free the 4 locked jars and free the liquorice in 34 moves.', tip: 'Two islands side by side. Free the liquorice early, then work the jelly on each beach.', mechanic: 'sunset' }
   ];
   function levelIntro(n, p) {
     const lv = LEVELS[(n | 0) - 1]; if (!lv) return null;
@@ -417,6 +440,41 @@
           { icon: '➿', text: 'Free the liquorice before it creeps' }
         ]
       }
+    ],
+    // 1.9.220 Pacific Islands recaps.
+    16: [
+      {
+        id: 'recap16', kind: 'recap',
+        title: 'Kia orana, Rarotonga!',
+        bubble: 'Welcome to the Pacific Islands. Two things to finish here.',
+        items: [
+          { icon: '💜', text: 'Clear the jelly reef at the top and bottom' },
+          { icon: '🫧', text: 'Pop the sugar bubbles in the lagoon' }
+        ]
+      }
+    ],
+    17: [
+      {
+        id: 'recap17', kind: 'recap',
+        title: "Mālō e lelei, Tonga!",
+        bubble: 'Bring the coconuts down to the beach.',
+        items: [
+          { icon: '➿', text: 'Free the liquorice under each coconut' },
+          { icon: '🥥', text: 'Match under a coconut to drop it down' }
+        ]
+      }
+    ],
+    18: [
+      {
+        id: 'recap18', kind: 'recap',
+        title: 'Talofa, Samoa!',
+        bubble: 'Two islands, one sunset. Three things to finish.',
+        items: [
+          { icon: '💜', text: 'Clear the jelly on both islands' },
+          { icon: '🔒', text: 'Free the 4 locked jars' },
+          { icon: '➿', text: 'Free the liquorice' }
+        ]
+      }
     ]
   };
   function tutorialFor(n) { return TUTORIALS[n] || null; }
@@ -424,7 +482,7 @@
 
   // 1.9.210 Sugar Rush main screen: an illustrated candy map of New Zealand.
   // Stops start in Onerahi / Whangārei and travel south. Level 2 is Sarah's house.
-  const MAP_W = 400, MAP_H = 1280;
+  const MAP_W = 400, MAP_H = 1720;
   const MAP_STOPS = [
     { n: 1, x: 258, y: 118, place: 'Onerahi', kind: 'town', label: 'right' },
     { n: 2, x: 168, y: 178, place: "Sarah's House", kind: 'house', label: 'left' },
@@ -441,12 +499,16 @@
     { n: 12, x: 270, y: 852, place: 'Christchurch', kind: 'town', label: 'right' },
     { n: 13, x: 112, y: 800, place: 'Franz Josef', kind: 'town', label: 'right' },
     { n: 14, x: 138, y: 948, place: 'Queenstown', kind: 'town', label: 'right' },
-    { n: 15, x: 238, y: 984, place: 'Dunedin', kind: 'town', label: 'right' }
+    { n: 15, x: 238, y: 984, place: 'Dunedin', kind: 'town', label: 'right' },
+    // 1.9.220 Pacific Islands section: fly out to Rarotonga, then west to Tonga and north to Samoa.
+    { n: 16, x: 318, y: 1590, place: 'Rarotonga', kind: 'island', label: 'left' },
+    { n: 17, x: 160, y: 1512, place: 'Tonga', kind: 'island', label: 'left' },
+    { n: 18, x: 200, y: 1352, place: 'Samoa', kind: 'island', label: 'right' }
   ];
   const FUTURE_STOPS = [
-    { place: 'Bluff', x: 176, y: 1026, label: 'left' }
+    { place: 'Sydney', x: 58, y: 1430, label: 'right' }
   ];
-  const LV_COUNT = 15;
+  const LV_COUNT = 18;
   function stopForLevel(n) { return MAP_STOPS[(n | 0) - 1] || null; }
   function icingPath(pts) {
     if (!pts || pts.length < 2) return '';
@@ -512,6 +574,25 @@
       '<path d="M 140 870 C 152 828 166 828 176 870 C 164 860 152 860 140 870 Z" fill="#fff" opacity=".88"/>' +
       // Ferry across Cook Strait
       '<path d="M 210 575 C 200 595 180 615 168 628" fill="none" stroke="#fff" stroke-width="2.4" stroke-dasharray="5 7" stroke-linecap="round" opacity=".85"/>' +
+      // 1.9.220 Pacific Islands inset: a lagoon-blue panel with Rarotonga, Tonga and Samoa.
+      '<g class="sr-pacific">' +
+      '<rect x="16" y="1236" width="368" height="448" rx="30" fill="#7fe6dc" opacity=".55" stroke="#fff" stroke-width="4" stroke-dasharray="10 8"/>' +
+      '<rect x="120" y="1222" width="160" height="30" rx="15" fill="#fff" stroke="#3fc1b0" stroke-width="3"/>' +
+      '<text x="200" y="1243" text-anchor="middle" font-size="15" font-weight="900" fill="#1b8a7c" font-family="ui-rounded,system-ui,sans-serif">Pacific Islands</text>' +
+      // Samoa: Savai\'i and Upolu
+      '<ellipse cx="168" cy="1352" rx="40" ry="20" fill="#bff5ec" opacity=".8"/><ellipse cx="168" cy="1352" rx="32" ry="14" fill="url(#sr-land)" stroke="#fff" stroke-width="4"/>' +
+      '<ellipse cx="236" cy="1368" rx="34" ry="15" fill="#bff5ec" opacity=".8"/><ellipse cx="236" cy="1368" rx="26" ry="10" fill="url(#sr-land)" stroke="#fff" stroke-width="4"/>' +
+      // Tonga: Tongatapu and small islands to the north
+      '<ellipse cx="160" cy="1514" rx="42" ry="22" fill="#bff5ec" opacity=".8"/><path d="M124 1516 C132 1500 162 1498 192 1506 C198 1516 182 1528 158 1526 C142 1528 128 1524 124 1516 Z" fill="url(#sr-land)" stroke="#fff" stroke-width="4"/>' +
+      '<circle cx="182" cy="1460" r="6" fill="url(#sr-land)" stroke="#fff" stroke-width="2"/><circle cx="172" cy="1440" r="4" fill="url(#sr-land)" stroke="#fff" stroke-width="2"/>' +
+      // Rarotonga: a round island with its reef ring
+      '<circle cx="318" cy="1590" r="34" fill="#bff5ec" opacity=".85"/><circle cx="318" cy="1590" r="30" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="4 4"/><circle cx="318" cy="1590" r="20" fill="url(#sr-land)" stroke="#fff" stroke-width="4"/>' +
+      '<path d="M310 1588 l10 -10 6 12 Z" fill="#7ac77a"/>' +
+      [[150, 1340], [240, 1360], [176, 1530], [334, 1582]].map(function (q) { return '<path d="M' + q[0] + ' ' + q[1] + ' v-12 M' + q[0] + ' ' + (q[1] - 12) + ' q-6 -2 -9 3 M' + q[0] + ' ' + (q[1] - 12) + ' q6 -2 9 3 M' + q[0] + ' ' + (q[1] - 12) + ' q-2 -6 -7 -6 M' + q[0] + ' ' + (q[1] - 12) + ' q2 -6 7 -6" stroke="#2f9a5a" stroke-width="2.4" fill="none" stroke-linecap="round"/>'; }).join('') +
+      '<path d="M40 1600 q12 -5 24 0 M300 1620 q12 -5 24 0 M90 1660 q12 -5 24 0 M250 1440 q12 -5 24 0" stroke="#fff" stroke-width="2.5" fill="none" opacity=".7"/>' +
+      '</g>' +
+      // A little plane on the flight out of Dunedin
+      '<g class="sr-plane" transform="translate(300 1150) rotate(70)"><path d="M0 -14 L3 -4 L14 2 L14 5 L3 2 L2 10 L6 13 L6 15 L0 13 L-6 15 L-6 13 L-2 10 L-3 2 L-14 5 L-14 2 L-3 -4 Z" fill="#fff" stroke="#3d8bfd" stroke-width="1.5"/></g>' +
       '<path id="sr-future" d="' + future + '" fill="none" stroke="#ffb3d3" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 9" opacity=".7"/>' +
       '<path id="sr-path-wide" d="' + live + '" fill="none" stroke="url(#sr-icing)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>' +
       '<path id="sr-path-dash" d="' + live + '" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 10" opacity=".9"/>' +
@@ -966,7 +1047,8 @@
       const n = lv.ings.length;
       const have = stt ? (n - (stt.ingsLeft || 0)) : 0;
       const left = stt ? (stt.ingsLeft || 0) : n;
-      out.push({ kind: 'ings', icon: '🎁', left: left, have: have, n: n, lab: have + '/' + n, text: '🎁 ' + have + '/' + n });
+      const ii = lv.ingIcon || '🎁';
+      out.push({ kind: 'ings', icon: ii, left: left, have: have, n: n, lab: have + '/' + n, text: ii + ' ' + have + '/' + n });
     }
     if (lv.jelly) {
       const left = stt ? jellyLeft(stt) : 0;
@@ -1885,6 +1967,80 @@
         { x: 20, y: 8, w: 4, cls: 'sc-twinkle', d: 1.8, svg: 'glint' },
         { x: 66, y: 22, w: 3.5, cls: 'sc-twinkle', d: 2.2, dl: -0.7, svg: 'glint' },
         { x: 46, y: 4, w: 16, cls: 'sc-shoot', d: 8, svg: 'shoot' }
+      ] },
+    // 1.9.220 Pacific Islands scenes: lagoons, palms and reefs.
+    { n: 16, id: 'rarotonga', place: 'Rarotonga', title: 'Muri Lagoon, Rarotonga', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#4fc3ff'], [0.6, '#aee9ff'], [1, '#fff6d8']]) + scGrad('lg', [[0, '#5fe0d6'], [1, '#22b3c9']]) + scGrad('oc', [[0, '#1f7fc4'], [1, '#14619e']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(300, 100, 1, 0.9) + scCloud(80, 170, 0.7, 0.8) +
+          '<circle cx="80" cy="96" r="62" fill="#fff6c2" opacity=".45"/><circle cx="80" cy="96" r="34" fill="#fff3a0"/>' +
+          '<path d="M0 560 C40 440 110 400 170 470 C200 420 250 390 300 450 C340 420 370 440 390 470 L390 600 L0 600 Z" fill="#2f8a52"/>' +
+          '<path d="M150 470 C176 430 196 420 214 452 C200 446 184 450 170 470 Z" fill="#256e42"/>' +
+          '<rect y="590" width="390" height="40" fill="url(#oc)"/>' +
+          '<path d="M0 626 C60 616 120 634 190 624 C260 614 330 630 390 622" stroke="#fff" stroke-width="7" fill="none" opacity=".85" stroke-dasharray="14 8"/>' +
+          '<rect y="628" width="390" height="130" fill="url(#lg)"/>' +
+          '<path d="M30 660 q14 -5 28 0 M170 690 q14 -5 28 0 M290 670 q14 -5 28 0 M90 720 q14 -5 28 0 M250 736 q14 -5 28 0" stroke="#fff" stroke-width="2.5" fill="none" opacity=".6"/>' +
+          '<ellipse cx="300" cy="650" rx="44" ry="10" fill="#f6e2a8"/><path d="M300 648 V620" stroke="#7a4a2a" stroke-width="3"/>' +
+          '<path d="M0 752 C90 738 190 760 290 744 C340 738 370 742 390 744 L390 844 L0 844 Z" fill="#f6dfa0"/>' +
+          '<path d="M0 772 C90 760 200 782 300 768 C350 762 375 764 390 766 L390 844 L0 844 Z" fill="#ffecb8"/>' +
+          [[60, 800, '#ff6fa8'], [330, 812, '#ff8a5c']].map(function (f) { return '<circle cx="' + f[0] + '" cy="' + f[1] + '" r="9" fill="' + f[2] + '"/><circle cx="' + f[0] + '" cy="' + f[1] + '" r="3" fill="#fff3a0"/>'; }).join('') +
+          '<ellipse cx="210" cy="818" rx="10" ry="6" fill="#fff4e6"/>';
+      },
+      sprites: [
+        { x: 2, y: 66, w: 26, cls: 'sc-sway', d: 3.6, svg: 'palm' },
+        { x: 76, y: 70, w: 22, cls: 'sc-sway', d: 4.2, dl: -1.4, svg: 'palm' },
+        { x: 40, y: 78, w: 16, cls: 'sc-bob', d: 3, svg: 'vaka' },
+        { x: 22, y: 84, w: 7, cls: 'sc-drift', d: 8, svg: 'fish' },
+        { x: 60, y: 86, w: 6, cls: 'sc-drift', d: 10, dl: -3, svg: 'fish' },
+        { x: 50, y: 12, w: 24, cls: 'sc-drift', d: 22, svg: 'cloud' },
+        { x: 14, y: 40, w: 6, cls: 'sc-float', d: 7, emoji: '🌺' }
+      ] },
+    { n: 17, id: 'tonga', place: 'Tonga', title: 'Coconut coast, Tongatapu', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#62cfff'], [0.6, '#c6f1ff'], [1, '#fff3d6']]) + scGrad('lg', [[0, '#3fd0d8'], [1, '#1592b8']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(90, 90, 1) + scCloud(280, 150, 0.8, 0.85) +
+          '<rect y="560" width="390" height="190" fill="url(#lg)"/>' +
+          '<path d="M0 600 C70 590 140 606 210 596 C280 586 340 600 390 594" stroke="#bff5ec" stroke-width="5" fill="none" opacity=".8"/>' +
+          '<path d="M20 640 q14 -5 28 0 M160 660 q14 -5 28 0 M300 640 q14 -5 28 0 M80 700 q14 -5 28 0 M230 712 q14 -5 28 0" stroke="#fff" stroke-width="2.5" fill="none" opacity=".6"/>' +
+          // blowholes along the reef
+          '<path d="M250 600 C246 570 252 540 258 520 C264 540 270 570 266 600 Z" fill="#fff" opacity=".85"/><path d="M110 606 C108 590 112 574 116 564 C120 574 124 590 122 606 Z" fill="#fff" opacity=".75"/>' +
+          '<path d="M0 600 L60 606 L120 604 L180 610 L250 604 L320 608 L390 602 L390 616 L0 616 Z" fill="#8a7a6a"/>' +
+          '<path d="M0 740 C90 726 190 748 290 732 C340 726 370 730 390 732 L390 844 L0 844 Z" fill="#f4d998"/>' +
+          '<path d="M0 768 C100 754 200 778 300 762 C350 756 375 758 390 760 L390 844 L0 844 Z" fill="#ffe8b0"/>' +
+          [[70, 790], [96, 800], [82, 812]].map(function (c) { return '<circle cx="' + c[0] + '" cy="' + c[1] + '" r="11" fill="#7a4a24"/><circle cx="' + (c[0] - 3) + '" cy="' + (c[1] - 3) + '" r="2" fill="#2e1a0c"/>'; }).join('') +
+          '<rect x="250" y="770" width="80" height="44" rx="4" fill="#c98a4a"/><path d="M240 772 L290 744 L340 772 Z" fill="#8a5a2a"/><rect x="282" y="788" width="16" height="26" fill="#6b3a1f"/>';
+      },
+      sprites: [
+        { x: 0, y: 62, w: 28, cls: 'sc-sway', d: 4, svg: 'palm' },
+        { x: 18, y: 66, w: 20, cls: 'sc-sway', d: 3.4, dl: -1, svg: 'palm' },
+        { x: 80, y: 64, w: 24, cls: 'sc-sway', d: 4.6, dl: -2, svg: 'palm' },
+        { x: 60, y: 62, w: 10, cls: 'sc-rise', d: 3.2, puff: 1 },
+        { x: 44, y: 78, w: 10, cls: 'sc-drift', d: 12, svg: 'turtle' },
+        { x: 10, y: 14, w: 8, cls: 'sc-drift', d: 9, svg: 'gull' },
+        { x: 46, y: 8, w: 24, cls: 'sc-drift', d: 24, svg: 'cloud' }
+      ] },
+    { n: 18, id: 'samoa', place: 'Samoa', title: 'Sunset over Samoa', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#5a4ab8'], [0.45, '#ff7aa8'], [0.75, '#ffb35c'], [1, '#ffe39a']]) + scGrad('se', [[0, '#ff9a6a'], [0.4, '#c25a8a'], [1, '#3a3a8a']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' +
+          '<circle cx="195" cy="560" r="80" fill="#ffe08a" opacity=".5"/><circle cx="195" cy="560" r="52" fill="#fff0a0"/>' +
+          '<path d="M0 560 C40 520 90 510 130 540 L150 580 L0 580 Z" fill="#3a2a5a"/><path d="M250 570 C290 520 340 516 390 540 L390 580 L240 580 Z" fill="#3a2a5a"/>' +
+          '<rect y="576" width="390" height="190" fill="url(#se)"/>' +
+          '<path d="M150 600 h90 M160 626 h70 M172 652 h46 M182 678 h26" stroke="#fff3a0" stroke-width="4" opacity=".6" stroke-linecap="round"/>' +
+          '<path d="M20 700 q14 -5 28 0 M300 690 q14 -5 28 0 M90 740 q14 -5 28 0 M260 736 q14 -5 28 0" stroke="#fff" stroke-width="2" fill="none" opacity=".45"/>' +
+          '<path d="M0 760 C90 746 190 768 290 752 C340 746 370 750 390 752 L390 844 L0 844 Z" fill="#e8b878"/>' +
+          '<path d="M0 786 C100 774 200 796 300 782 C350 776 375 778 390 780 L390 844 L0 844 Z" fill="#f4cc8a"/>' +
+          // a fale on the beach
+          '<rect x="276" y="756" width="70" height="40" fill="none"/><path d="M262 762 Q311 714 360 762 Z" fill="#8a5a2a"/>' + [272, 292, 312, 332, 350].map(function (x) { return '<rect x="' + x + '" y="760" width="4" height="40" fill="#6b3a1f"/>'; }).join('') +
+          '<path d="M60 830 c4 -10 18 -10 22 0 Z" fill="#ffd0e4"/><path d="M200 826 c3 -8 14 -8 17 0 Z" fill="#fff4e6"/>';
+      },
+      sprites: [
+        { x: 4, y: 68, w: 26, cls: 'sc-sway', d: 4, svg: 'palmdusk' },
+        { x: 40, y: 72, w: 16, cls: 'sc-bob', d: 3.4, svg: 'vaka' },
+        { x: 30, y: 10, w: 4, cls: 'sc-twinkle', d: 1.8, svg: 'glint' },
+        { x: 72, y: 16, w: 3.5, cls: 'sc-twinkle', d: 2.2, dl: -0.7, svg: 'glint' },
+        { x: 56, y: 24, w: 8, cls: 'sc-drift', d: 10, svg: 'gull' },
+        { x: 80, y: 44, w: 6, cls: 'sc-float', d: 7, emoji: '🌺' }
       ] }
   ];
   const SCENE_SPRITE_SVG = {
@@ -1903,6 +2059,11 @@
     punt: '<svg viewBox="0 0 60 40"><path d="M2 30 H58 L54 36 H6 Z" fill="#9a5b3a"/><rect x="20" y="20" width="10" height="10" rx="3" fill="#ff8ab8"/><circle cx="25" cy="16" r="4" fill="#f2c79a"/><path d="M44 30 L50 2" stroke="#7a4a2a" stroke-width="2"/><rect x="38" y="20" width="8" height="10" rx="2" fill="#fff"/><rect x="38" y="13" width="8" height="3" fill="#333"/><circle cx="42" cy="17" r="3" fill="#f2c79a"/></svg>',
     heli: '<svg viewBox="0 0 80 40"><path d="M10 6 H70" stroke="#333" stroke-width="2.5" stroke-linecap="round"/><rect x="38" y="6" width="3" height="6" fill="#333"/><ellipse cx="38" cy="20" rx="16" ry="9" fill="#e0333a"/><path d="M24 20 H4 L2 14" stroke="#e0333a" stroke-width="4" fill="none"/><path d="M46 16 a8 7 0 0 1 6 8 H44 Z" fill="#bfe9ff"/><path d="M28 32 H52 M32 29 V32 M48 29 V32" stroke="#333" stroke-width="2"/></svg>',
     gondola: '<svg viewBox="0 0 40 50"><path d="M20 0 V10" stroke="#4a3a4a" stroke-width="2"/><rect x="6" y="10" width="28" height="30" rx="6" fill="#e0333a"/><rect x="10" y="15" width="20" height="12" rx="3" fill="#bfe9ff"/><rect x="6" y="34" width="28" height="6" rx="3" fill="#b0262c"/></svg>',
+    palm: '<svg viewBox="0 0 80 120"><path d="M40 118 C42 90 44 60 40 34" stroke="#8a5a2a" stroke-width="7" fill="none" stroke-linecap="round"/><path d="M40 34 C24 22 10 26 2 38 C16 32 28 34 40 36 Z M40 34 C56 22 70 26 78 38 C64 32 52 34 40 36 Z M40 34 C30 14 16 8 6 12 C20 16 30 24 40 36 Z M40 34 C50 14 64 8 74 12 C60 16 50 24 40 36 Z M40 34 C38 18 42 6 48 2 C46 14 44 24 40 36 Z" fill="#2fa65a"/><circle cx="36" cy="38" r="4" fill="#7a4a24"/><circle cx="44" cy="39" r="4" fill="#7a4a24"/></svg>',
+    palmdusk: '<svg viewBox="0 0 80 120"><path d="M40 118 C42 90 44 60 40 34" stroke="#3a2a4a" stroke-width="7" fill="none" stroke-linecap="round"/><path d="M40 34 C24 22 10 26 2 38 C16 32 28 34 40 36 Z M40 34 C56 22 70 26 78 38 C64 32 52 34 40 36 Z M40 34 C30 14 16 8 6 12 C20 16 30 24 40 36 Z M40 34 C50 14 64 8 74 12 C60 16 50 24 40 36 Z M40 34 C38 18 42 6 48 2 C46 14 44 24 40 36 Z" fill="#3a2a5a"/></svg>',
+    vaka: '<svg viewBox="0 0 80 50"><path d="M40 4 L40 34 L18 34 Z" fill="#fff6e6"/><path d="M42 10 L42 34 L60 34 Z" fill="#ffb3a0"/><path d="M4 36 H76 L68 44 H12 Z" fill="#8a4a2a"/><path d="M14 44 V48 M66 44 V48 M10 48 H70" stroke="#6b3a1f" stroke-width="2.5"/></svg>',
+    fish: '<svg viewBox="0 0 40 24"><path d="M4 12 C10 2 26 2 32 12 C26 22 10 22 4 12 Z" fill="#ffb400"/><path d="M30 12 L40 4 L40 20 Z" fill="#ff7a3a"/><path d="M14 5 V19" stroke="#fff" stroke-width="2.5"/><circle cx="9" cy="10" r="1.6" fill="#222"/></svg>',
+    turtle: '<svg viewBox="0 0 60 40"><ellipse cx="30" cy="22" rx="18" ry="13" fill="#3f8a5a"/><path d="M20 16 L30 12 L40 16 L38 26 L30 30 L22 26 Z" fill="#2f6e46" stroke="#8fd27a" stroke-width="1.5"/><circle cx="50" cy="20" r="5" fill="#7ac77a"/><path d="M14 12 L6 6 M14 32 L6 38 M44 32 L50 38 M44 12 L50 8" stroke="#7ac77a" stroke-width="5" stroke-linecap="round"/></svg>',
     steamer: '<svg viewBox="0 0 100 40"><path d="M2 24 H98 L90 36 H10 Z" fill="#fff"/><path d="M2 30 H96" stroke="#e0333a" stroke-width="3"/><rect x="20" y="14" width="56" height="10" fill="#fff"/><rect x="24" y="17" width="48" height="3" fill="#3d3d6b"/><rect x="44" y="2" width="10" height="13" fill="#e0333a"/><rect x="44" y="2" width="10" height="3" fill="#222"/></svg>'
   };
   function sceneFor(n) { return SCENES[(n | 0) - 1] || SCENES[0]; }
@@ -2090,9 +2251,9 @@
     while (stars.length < LV_COUNT) stars.push(0);
     while (best.length < LV_COUNT) best.push(0);
     while (badges.length < LV_COUNT) badges.push(0);
-    // 1.9.219 Anyone who already finished level 10 (stars on it) can go on to level 11.
+    // 1.9.219/1.9.220 Anyone who already finished the last level of an older release (stars on it) can go on to the next.
     let open = Math.max(1, Math.min(LV_COUNT, p.open || 1));
-    if (open === 10 && (stars[9] || 0) > 0) open = 11;
+    while (open < LV_COUNT && (stars[open - 1] || 0) > 0) open++;
     return { open: open, stars, best, badges };
   }
   function saveProg() { ls.set('ib-sugar-progress', prog); }
@@ -2369,6 +2530,18 @@
     if (t.bub > 0) { drawBubbled(t, x, y, R, sc, al, wob); return; }
     ctx.save(); ctx.translate(x, y); if (wob) ctx.rotate(wob); ctx.scale(sc, sc); ctx.globalAlpha = al;
     ctx.fillStyle = 'rgba(70,10,40,.16)'; ctx.beginPath(); ctx.ellipse(0, R * .88, R * .72, R * .18, 0, 0, Math.PI * 2); ctx.fill();
+    if (t.ing && st && st.lv && st.lv.ingStyle === 'coconut') {
+      // 1.9.220 Tonga: the ingredients are coconuts.
+      const g = ctx.createRadialGradient(-R * .25, -R * .3, R * .1, 0, 0, R * .85);
+      g.addColorStop(0, '#a8714a'); g.addColorStop(1, '#5a3418');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R * .78, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,230,190,.35)'; ctx.lineWidth = R * .05;
+      for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.arc(0, 0, R * (.3 + i * .1), -2.6 + i * .2, -1.6 + i * .2); ctx.stroke(); }
+      ctx.fillStyle = '#2e1a0c'; [[-.2, -.3], [.12, -.36], [-.04, -.12]].forEach(function (d) { ctx.beginPath(); ctx.arc(R * d[0], R * d[1], R * .09, 0, Math.PI * 2); ctx.fill(); });
+      ctx.fillStyle = '#3fbf6a'; ctx.beginPath(); ctx.ellipse(R * .42, -R * .62, R * .28, R * .1, -0.6, 0, Math.PI * 2); ctx.fill();
+      drawCandyShine(ctx, R * 0.78, .7);
+      ctx.restore(); return;
+    }
     if (t.ing) {
       ctx.fillStyle = '#c45c2e'; rr(-R * .7, -R * .55, R * 1.4, R * 1.2, R * .18); ctx.fill();
       ctx.fillStyle = '#e8b04a'; rr(-R * .7, -R * .55, R * 1.4, R * .4, R * .16); ctx.fill();
@@ -2824,6 +2997,9 @@
     if (kind === 'liq') return '<span class="liqp"></span>';
     if (kind === 'garden') return '<span class="dbl"><i></i><i></i></span><span class="lock">🔒</span><span class="bubp sm"></span>';
     if (kind === 'glacier') return '<span class="ing">🎁</span><span class="ice thick"></span>';
+    if (kind === 'reef') return '<span class="jelly"></span><span class="bubp"></span><span class="bubp sm"></span>';
+    if (kind === 'coconut') return '<span class="ing">🥥</span><span class="liqp sm"></span>';
+    if (kind === 'sunset') return '<span class="jelly"></span><span class="lock">🔒</span><span class="liqp sm"></span>';
     if (kind === 'factory') return '<span class="choco"></span><span class="bubp sm"></span><span class="liqp sm"></span>';
     if (kind === 'ice') return '<span class="ice"></span>';
     if (kind === 'ings') return '<span class="ing">🍒</span><span class="ing">🍋</span>';
@@ -3422,7 +3598,7 @@
       b.dataset.n = String(n);
       b.style.left = (stop.x / MAP_W * 100) + '%';
       b.style.top = (stop.y / MAP_H * 100) + '%';
-      const mark = stop.kind === 'house' ? '🏠' : (stop.kind === 'post' ? '✉️' : (stop.kind === 'station' ? '🚂' : ''));
+      const mark = stop.kind === 'house' ? '🏠' : (stop.kind === 'post' ? '✉️' : (stop.kind === 'station' ? '🚂' : (stop.kind === 'island' ? '🌴' : '')));
       const starHtml = [0, 1, 2].map(k => '<span class="' + (k < stars ? 'on' : '') + '">★</span>').join('');
       const badge = prog.badges[i] && lv.badge ? '<span class="gotbadge" aria-hidden="true">' + lv.badge.icon + '</span>' : '';
       b.innerHTML = '<span class="pin"><span class="no">' + n + '</span>' + (mark ? '<span class="mark" aria-hidden="true">' + mark + '</span>' : '') + '</span><span class="st">' + starHtml + '</span>' +
@@ -3469,6 +3645,8 @@
     let el = null, top = 0, left = 0, useEl = true;
     if (target === 'start' || target === 'north') {
       useEl = false; top = 0; left = Math.max(0, view.scrollWidth / 2 - view.clientWidth / 2);
+    } else if (target === 'pacific') {
+      el = view.querySelector('.lv[data-n="17"]') || view.querySelector('.lv[data-n="16"]');
     } else if (target === 'south') {
       // 1.9.219 'south' frames the South Island stops, Kaikōura down to Dunedin.
       const n9 = view.querySelector('.lv[data-n="11"]') || view.querySelector('.lv[data-n="9"]');
