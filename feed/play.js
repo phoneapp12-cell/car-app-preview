@@ -386,7 +386,8 @@
         }
         if (!n) { host.innerHTML = ''; return; }
         const g = (data.games || []).find(x => x.yourTurn && !x.over);
-        const vs = g && g.players ? g.players.filter(p => !p.me).map(p => p.name).join(' and ') : '';
+        const vsNames = g && g.players ? g.players.filter(p => !p.me && !p.resigned).map(p => p.name) : [];
+        const vs = !vsNames.length ? '' : vsNames.length === 1 ? vsNames[0] : vsNames.length === 2 ? vsNames[0] + ' and ' + vsNames[1] : vsNames.slice(0, -1).join(', ') + ' and ' + vsNames[vsNames.length - 1];
         host.innerHTML = '<button type="button" class="scrayour"><b>Your turn</b> in Scrabble' + (vs ? ' vs ' + vs : '') + '<small>' + (n > 1 ? n + ' games waiting · tap to play' : 'Tap to play') + '</small></button>';
         host.firstChild.addEventListener('click', () => {
           try { if (g && g.id) root.sessionStorage.setItem('scrabble-open', g.id); } catch (e) { }

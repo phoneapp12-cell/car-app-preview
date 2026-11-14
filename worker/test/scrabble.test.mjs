@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { DatabaseSync } from 'node:sqlite';
-import { bindDict, hasWord, check, play, pass, swap, resign, finish, scrabbleInit, scrabbleRoute, createGame, PREMIUM, VALUES, COUNTS, N, MID, BINGO, RACK } from '../src/scrabble.js';
+import { bindDict, hasWord, check, play, pass, swap, resign, finish, scrabbleInit, scrabbleRoute, createGame, PREMIUM, VALUES, COUNTS, N, MID, BINGO, RACK, _test as S } from '../src/scrabble.js';
 
 function stubSql() {
   const db = new DatabaseSync(':memory:');
@@ -19,8 +19,8 @@ function stubSql() {
   };
 }
 
-const SHANE = 'm111111111111', SARAH = 'm222222222222', ARANEA = 'm333333333333', GONE = 'm999999999999';
-const shane = { id: SHANE, name: 'Shane' }, sarah = { id: SARAH, name: 'Sarah' }, aranea = { id: ARANEA, name: 'Aranea' };
+const SHANE = 'm111111111111', SARAH = 'm222222222222', ARANEA = 'm333333333333', ALEX = 'm444444444444', GONE = 'm999999999999';
+const shane = { id: SHANE, name: 'Shane' }, sarah = { id: SARAH, name: 'Sarah' }, aranea = { id: ARANEA, name: 'Aranea' }, alex = { id: ALEX, name: 'Alex' };
 
 function fresh() {
   const sql = stubSql();
@@ -28,7 +28,8 @@ function fresh() {
   sql.db.prepare(`INSERT INTO members (id,name,role,created,removed) VALUES (?,?,?,?,?)`).run(SHANE, 'Shane', 'admin', 1, 0);
   sql.db.prepare(`INSERT INTO members (id,name,role,created,removed) VALUES (?,?,?,?,?)`).run(SARAH, 'Sarah', 'member', 2, 0);
   sql.db.prepare(`INSERT INTO members (id,name,role,created,removed) VALUES (?,?,?,?,?)`).run(ARANEA, 'Aranea', 'member', 3, 0);
-  sql.db.prepare(`INSERT INTO members (id,name,role,created,removed) VALUES (?,?,?,?,?)`).run(GONE, 'Gone', 'member', 4, 1);
+  sql.db.prepare(`INSERT INTO members (id,name,role,created,removed) VALUES (?,?,?,?,?)`).run(ALEX, 'Alex', 'member', 4, 0);
+  sql.db.prepare(`INSERT INTO members (id,name,role,created,removed) VALUES (?,?,?,?,?)`).run(GONE, 'Gone', 'member', 5, 1);
   scrabbleInit(sql);
   bindDict('aa\ncat\ndog\nto\nat\ncd\nao\ntg\ndag\nhello\nqi\nzzzzzz\n');
   return sql;
@@ -349,5 +350,148 @@ const sql8 = fresh();
 const g8 = createGame(sql8, shane, [SHANE, SARAH], t, { order: [SHANE, SARAH], racks: ['CATXXXX', 'DOGYYYY'], bag: 'E'.repeat(86) });
 assert.equal((await post(sql8, aranea, '/scrabble/' + g8.body.id + '/resign', { rev: 1 })).status, 404);
 assert.equal((await post(sql8, sarah, '/scrabble/' + g8.body.id + '/play', { rev: 1, tiles: cat })).status, 403);
+
+
+assert.equal(S.listNames(['Sarah', 'Aranea', 'Alex']), 'Sarah, Aranea and Alex');
+assert.equal(S.listNames(['Sarah', 'Aranea']), 'Sarah and Aranea');
+const namesAll = { [SHANE]: 'Shane', [SARAH]: 'Sarah', [ARANEA]: 'Aranea', [ALEX]: 'Alex' };
+assert.equal(S.vsNames({ players: [
+  { mid: SHANE }, { mid: SARAH }, { mid: ARANEA }, { mid: ALEX, resigned: true }
+] }, SHANE, namesAll), 'Sarah and Aranea');
+
+// finish() does not deduct leftover tiles twice for someone who already resigned
+const end3 = {
+  over: false, board: new Array(N * N).fill(null), bag: [],
+  players: [
+    { mid: SHANE, score: 20, rack: [] },
+    { mid: SARAH, score: 7, rack: [], resigned: true, left: 8 },
+    { mid: ARANEA, score: 15, rack: ['A', 'A'] }
+  ],
+  turn: 0, scoreless: 0
+};
+finish(end3, 0);
+assert.equal(end3.players[0].score, 20 + 2);
+assert.equal(end3.players[1].score, 7, 'resigned leftover already settled');
+assert.equal(end3.players[2].score, 13);
+assert.deepEqual(end3.winners, [0]);
+
+// 3-player game: turns rotate, racks stay hidden, resign drops out and the others carry on
+notes.length = 0;
+const sql9 = fresh();
+bindDict('cat\nto\nat\ndog\nqi\nax\n');
+const g3 = createGame(sql9, shane, [SARAH, ARANEA], t, {
+  order: [SHANE, SARAH, ARANEA],
+  racks: ['CATXXXX', 'TOYYYYY', 'DOGZZZZ'],
+  bag: 'E'.repeat(79)
+});
+const gid3 = g3.body.id;
+assert.equal(g3.body.players.length, 3);
+r = await post(sql9, shane, '/scrabble/' + gid3 + '/play', { rev: 1, tiles: cat });
+assert.equal(r.status, 200, r.body.err);
+assert.equal(r.body.turn, 1);
+assert.equal(r.body.players.find(p => p.turn).name, 'Sarah');
+assert.ok(notes.some(n => n.mid === SARAH && n.text.startsWith('Your turn in Scrabble vs Sarah, Aranea and Shane'.slice(0, 20))));
+assert.ok(notes.some(n => n.mid === SARAH && /vs Shane and Aranea/.test(n.text)), JSON.stringify(notes));
+assert.ok(!notes.some(n => n.mid === ARANEA && /Your turn/.test(n.text)), 'only the next player is told it is their turn');
+const sneak3 = JSON.stringify((await get(sql9, sarah, '/scrabble/' + gid3)).body);
+assert.ok(!sneak3.includes('"X"'), sneak3);
+r = await post(sql9, sarah, '/scrabble/' + gid3 + '/play', { rev: r.body.rev, tiles: [{ r: MID + 1, c: MID + 1, l: 'O', b: 0 }] });
+assert.equal(r.status, 200, r.body.err);
+assert.equal(r.body.turn, 2);
+assert.ok(notes.some(n => n.mid === ARANEA && /Your turn in Scrabble vs Shane and Sarah/.test(n.text)));
+
+// Aranea resigns; Shane and Sarah carry on; leftover is taken off now; turn goes to Shane
+notes.length = 0;
+const beforeResign = await get(sql9, aranea, '/scrabble/' + gid3);
+const araneaRackPts = beforeResign.body.rack.reduce((a, l) => a + (VALUES[l] || 0), 0);
+r = await post(sql9, aranea, '/scrabble/' + gid3 + '/resign', { rev: beforeResign.body.rev });
+assert.equal(r.status, 200, r.body.err);
+assert.equal(r.body.over, false, 'a 3-player resign leaves the others playing');
+assert.equal(r.body.players.find(p => p.name === 'Aranea').resigned, true);
+assert.equal(r.body.players.find(p => p.name === 'Aranea').score, 0 - araneaRackPts);
+assert.equal(r.body.turn, 0);
+assert.equal(r.body.players.find(p => p.turn).name, 'Shane');
+assert.ok(notes.some(n => n.mid === SHANE && /Your turn in Scrabble vs Sarah/.test(n.text) && /resigned/.test(n.text)), JSON.stringify(notes));
+assert.ok(!notes.some(n => n.mid === SARAH && /Your turn/.test(n.text)));
+// Shane's view does not include Aranea's old rack letters as his rack; tiles stay out of the bag
+assert.equal(r.body.bag, 75, 'resigned tiles stay out of the bag; earlier plays already drew replacements');
+const list3 = await get(sql9, shane, '/scrabble');
+assert.equal(list3.body.games[0].players.find(p => p.name === 'Aranea').resigned, true);
+
+// pass skips the resigned player
+r = await post(sql9, shane, '/scrabble/' + gid3 + '/pass', { rev: r.body.rev });
+assert.equal(r.status, 200, r.body.err);
+assert.equal(r.body.turn, 1, 'turn goes to Sarah, skipping Aranea');
+assert.equal(r.body.over, false);
+
+// Sarah resigns; only Shane remains, so the game ends and Shane wins
+notes.length = 0;
+r = await post(sql9, sarah, '/scrabble/' + gid3 + '/resign', { rev: r.body.rev });
+assert.equal(r.status, 200, r.body.err);
+assert.equal(r.body.over, true);
+assert.deepEqual(r.body.winnerNames, ['Shane']);
+assert.ok(notes.some(n => n.mid === SHANE && /Sarah resigned/.test(n.text) && /Shane wins/.test(n.text)));
+const board3 = sql9.db.prepare(`SELECT mid, won FROM scores WHERE game='scrabble' AND ref LIKE ?`).all('scrabble:' + gid3 + '%');
+assert.equal(board3.length, 3);
+assert.equal(board3.find(row => row.mid === SHANE).won, 1);
+assert.equal(board3.find(row => row.mid === SARAH).won, 0);
+assert.equal(board3.find(row => row.mid === ARANEA).won, 0);
+
+// 4-player game: turns rotate around the table; one person can resign off their turn; the rest keep playing
+notes.length = 0;
+const sql10 = fresh();
+bindDict('cat\nto\nat\ndog\nqi\nax\n');
+r = await post(sql10, shane, '/scrabble', { players: [SARAH, ARANEA, ALEX] });
+assert.equal(r.status, 200, r.body.err);
+assert.equal(r.body.players.length, 4);
+const gid4 = r.body.id;
+for (const mid of [SARAH, ARANEA, ALEX]) {
+  assert.ok(notes.some(n => n.mid === mid && /Shane started/.test(n.text)), 'each opponent hears that Shane started the game');
+}
+// whoever starts, every other player got a start or a your-turn notice, never a live game on the family backend
+const first = r.body.players[r.body.turn];
+assert.equal(first.turn, true);
+// scripted 4-player from a known order
+const sql11 = fresh();
+bindDict('cat\nto\nat\ndog\nqi\nax\n');
+const g4 = createGame(sql11, shane, [SARAH, ARANEA, ALEX], t, {
+  order: [SHANE, SARAH, ARANEA, ALEX],
+  racks: ['CATXXXX', 'TOYYYYY', 'DOGZZZZ', 'QIWWWWW'],
+  bag: 'E'.repeat(72)
+});
+const gid4b = g4.body.id;
+assert.equal(g4.body.players.length, 4);
+r = await post(sql11, shane, '/scrabble/' + gid4b + '/play', { rev: 1, tiles: cat });
+assert.equal(r.status, 200, r.body.err);
+assert.equal(r.body.turn, 1);
+r = await post(sql11, sarah, '/scrabble/' + gid4b + '/pass', { rev: r.body.rev });
+assert.equal(r.body.turn, 2);
+r = await post(sql11, aranea, '/scrabble/' + gid4b + '/pass', { rev: r.body.rev });
+assert.equal(r.body.turn, 3);
+r = await post(sql11, alex, '/scrabble/' + gid4b + '/pass', { rev: r.body.rev });
+assert.equal(r.body.turn, 0);
+assert.equal(r.body.scoreless, 3);
+assert.equal(r.body.over, false);
+// Sarah resigns while it is Shane's turn; the turn stays with Shane and the game goes on with 3
+notes.length = 0;
+const revShane = (await get(sql11, shane, '/scrabble/' + gid4b)).body.rev;
+r = await post(sql11, sarah, '/scrabble/' + gid4b + '/resign', { rev: revShane });
+assert.equal(r.status, 200, r.body.err);
+assert.equal(r.body.over, false);
+assert.equal(r.body.turn, 0);
+assert.equal(r.body.players.filter(p => p.resigned).length, 1);
+assert.ok(!notes.some(n => /Your turn/.test(n.text)), 'resigning off-turn does not re-notify the person already to play');
+r = await post(sql11, shane, '/scrabble/' + gid4b + '/pass', { rev: r.body.rev });
+assert.equal(r.status, 200, r.body.err);
+assert.equal(r.body.turn, 2, 'Shane’s pass skips resigned Sarah and goes to Aranea');
+assert.ok(notes.some(n => n.mid === ARANEA && /Your turn in Scrabble vs Shane and Alex/.test(n.text)), JSON.stringify(notes));
+// swap still works with three people left
+r = await post(sql11, aranea, '/scrabble/' + gid4b + '/swap', { rev: r.body.rev, letters: ['D'] });
+assert.equal(r.status, 200, r.body.err);
+assert.equal(r.body.over, false);
+assert.equal(r.body.turn, 3);
+const alexView = await get(sql11, alex, '/scrabble/' + gid4b);
+assert.ok(!JSON.stringify(alexView.body).includes('"D"') || alexView.body.rack.includes('D') === false);
+assert.ok(!alexView.body.players.some(p => p.me === false && p.rack), 'other racks stay hidden');
 
 console.log('scrabble tests ok');
