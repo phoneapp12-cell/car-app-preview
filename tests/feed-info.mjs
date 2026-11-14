@@ -799,6 +799,11 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   assert.strictEqual(calls.length, 1, 'other pass-the-phone players stay on this phone');
   assert.deepStrictEqual(S.localBests('tetris').map(x => x.score), [900, 500]);
   await S.load('scrabble'); assert.strictEqual(calls[1].url, S.API + '/scores?game=scrabble');
+  await S.loadRace(); assert.strictEqual(calls[2].url, S.API + '/sugar-race');
+  await S.saveRace({ icon: 'lolly', stop: 5, stars: 10 });
+  assert.strictEqual(calls[3].url, S.API + '/sugar-race');
+  assert.strictEqual(calls[3].opt.method, 'POST');
+  assert.deepStrictEqual(JSON.parse(calls[3].opt.body), { icon: 'lolly', stop: 5, stars: 10 });
   assert.strictEqual(S.nzDate(Date.UTC(2026, 10, 11, 11, 30)), '12 Nov', 'dates are NZ dates');
   ctx.fetch = async () => { throw new Error('offline'); };
   assert.strictEqual(await S.load('tetris'), null, 'offline fails quietly');
@@ -3887,4 +3892,47 @@ if (live) {
   assert.strictEqual(SR.LEVELS[0].name, 'The Sweet Shop');
   assert.strictEqual(SR.LEVELS[9].name, 'Saturday Night');
   assert.strictEqual(SR.LEVELS[1].theme, 'sarah');
+}
+
+// 1.9.210 Sugar Rush family race on the NZ map
+{
+  const SR = load('feed/sugar-rush.js').SugarRush;
+  const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
+  const html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
+  const scoresSrc = fs.readFileSync('feed/scores.js', 'utf8');
+  const workerSrc = fs.readFileSync('worker/src/scores.js', 'utf8');
+  assert.ok(SR.RACE_ICONS.length >= 16, 'a family-sized set of icons');
+  const ids = SR.RACE_ICONS.map(x => x.id);
+  assert.ok(new Set(ids).size === ids.length, 'icon ids are unique');
+  assert.ok(SR.RACE_ICONS.every(x => x.emoji && x.color && x.name));
+  assert.ok(ids.includes('lolly') && ids.includes('cupcake') && ids.includes('kiwi') && ids.includes('train') && ids.includes('car'));
+  assert.strictEqual(SR.allocateIcon(['lolly', 'cupcake'], 'seed-a') === 'lolly', false);
+  const a = SR.allocateIcon([], 'Shane');
+  const b = SR.allocateIcon([], 'Sarah');
+  assert.ok(a && b);
+  // same seed is stable; different members prefer different defaults when the pool is free
+  assert.strictEqual(SR.allocateIcon([], 'Shane'), a);
+  const takenAll = ids.slice(0, -1);
+  const last = SR.allocateIcon(takenAll, 'x');
+  assert.ok(ids.includes(last) && !takenAll.includes(last), 'last free icon is still allocated uniquely');
+  assert.deepStrictEqual(
+    SR.rankRacers([{ name: 'Alex', stop: 5, stars: 12 }, { name: 'Sarah', stop: 6, stars: 8 }, { name: 'Shane', stop: 5, stars: 14 }]).map(r => r.name),
+    ['Sarah', 'Shane', 'Alex'],
+    'furthest stop wins, then stars'
+  );
+  assert.strictEqual(SR.raceStop({ open: 7, stars: [3, 3, 3, 2, 2, 1, 1, 0, 0, 0] }), 7);
+  assert.strictEqual(SR.raceStars({ stars: [3, 3, 3, 2, 2, 1, 1, 0, 0, 0] }), 15);
+  const one = SR.stackOffsets(1, 0), twoA = SR.stackOffsets(2, 0), twoB = SR.stackOffsets(2, 1);
+  assert.ok(one && typeof one.x === 'number' && typeof one.y === 'number');
+  assert.ok(twoA.x !== twoB.x, 'two racers on the same stop are offset');
+  assert.ok(html.includes('id="pickicon"') && html.includes('Pick your icon'));
+  assert.ok(html.includes('id="raceboard"') && html.includes('id="racers"') && html.includes('id="iconpick"'));
+  assert.ok(html.includes('racer.me') && (html.includes('Family race') || html.includes('family race')));
+  assert.ok(src.includes('seedRace') && src.includes('raceDemo') && src.includes("call('/sugar-race'") === false);
+  assert.ok(src.includes('seedRace') && src.includes('never POST') || src.includes('Never talks to the family backend') || src.includes('never talks to the family backend') || src.includes('never POST to the family backend'));
+  assert.ok(scoresSrc.includes('loadRace') && scoresSrc.includes('/sugar-race'));
+  assert.ok(workerSrc.includes("p === '/sugar-race'") && workerSrc.includes('sugar_race') && workerSrc.includes('icon taken'));
+  const workerIds = workerSrc.match(/export const RACE_ICONS = \[([^\]]+)\]/)[1].replace(/['"\s]/g, '').split(',');
+  assert.deepStrictEqual(workerIds, Array.from(ids), 'client and worker share the same icon ids');
+  assert.ok(html.includes('prefers-reduced-motion') && html.includes('orientation: landscape'));
 }

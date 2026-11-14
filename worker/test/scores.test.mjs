@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
-import { checkScore, tetrisMax, scoresInit, scoresRoute, addScore, board, RATE, clearShaneTetrisOnce, CLEAR_SHANE_TETRIS_KEY, clearShaneTetrisOnce20261113, CLEAR_SHANE_TETRIS_KEY2, clearAllTetrisOnce20261114, CLEAR_ALL_TETRIS_KEY } from '../src/scores.js';
+import { checkScore, tetrisMax, scoresInit, scoresRoute, addScore, board, RATE, RACE_ICONS, checkRace, saveRace, raceBoard, clearShaneTetrisOnce, CLEAR_SHANE_TETRIS_KEY, clearShaneTetrisOnce20261113, CLEAR_SHANE_TETRIS_KEY2, clearAllTetrisOnce20261114, CLEAR_ALL_TETRIS_KEY } from '../src/scores.js';
 
 function stubSql() {
   const db = new DatabaseSync(':memory:');
@@ -184,6 +184,47 @@ assert.equal(recAll2.already, true);
 assert.equal(recAll2.n, 4);
 assert.deepEqual(board(sql5, shane, 'tetris').body.top.map(x => [x.name, x.score]), [['Shane Jenkins', 500]], 'the second clear is a no-op');
 assert.ok(fam.includes('clearAllTetrisOnce20261114(this.sql)'));
+
+
+// 1.9.210 Sugar Rush family race: one row per member, unique icons, names from the server
+assert.ok(RACE_ICONS.length >= 16);
+assert.ok(checkRace({ icon: 'lolly', stop: 5, stars: 9 }).ok);
+assert.ok(checkRace({ icon: 'spaceship', stop: 5, stars: 9 }).err, 'unknown icon refused');
+assert.ok(checkRace({ icon: 'lolly', stop: 0, stars: 0 }).err);
+assert.ok(checkRace({ icon: 'lolly', stop: 11, stars: 0 }).err);
+assert.ok(checkRace({ icon: 'lolly', stop: 3, stars: 31 }).err);
+assert.ok(checkRace({ icon: 'lolly', stop: 3, stars: -1 }).err);
+assert.ok(checkRace({ icon: 'lolly', stop: 1.5, stars: 1 }).err);
+
+const sqlR = stubSql();
+sqlR.db.exec(`CREATE TABLE members (id TEXT PRIMARY KEY, name TEXT NOT NULL, role TEXT NOT NULL, tok TEXT, created INTEGER, seen INTEGER, removed INTEGER DEFAULT 0)`);
+for (const [id, name, role, removed] of [['m1', 'Shane', 'admin', 0], ['m2', 'Sarah', 'member', 0], ['m3', 'Aranea', 'member', 0], ['m9', 'Gone', 'member', 1]])
+  sqlR.db.prepare(`INSERT INTO members (id,name,role,created,removed) VALUES (?,?,?,?,?)`).run(id, name, role, 1, removed);
+scoresInit(sqlR);
+const racePost = (me, b, t) => scoresRoute(sqlR, me, '/sugar-race', 'POST', new URL('https://x/api/sugar-race'), async () => b, t);
+const raceGet = (me) => scoresRoute(sqlR, me, '/sugar-race', 'GET', new URL('https://x/api/sugar-race'), async () => ({}), 1);
+let rr = await racePost(shane, { icon: 'lolly', stop: 5, stars: 10 }, 1000);
+assert.equal(rr.status, 200); assert.equal(rr.body.icon, 'lolly'); assert.equal(rr.body.stop, 5);
+rr = await racePost(sarah, { icon: 'lolly', stop: 6, stars: 14 }, 2000);
+assert.equal(rr.status, 409); assert.equal(rr.body.err, 'icon taken'); assert.ok(rr.body.suggested && rr.body.suggested !== 'lolly');
+rr = await racePost(sarah, { icon: 'cupcake', stop: 6, stars: 14 }, 2000);
+assert.equal(rr.status, 200);
+rr = await racePost(aranea, { icon: 'kiwi', stop: 3, stars: 6 }, 3000);
+assert.equal(rr.status, 200);
+rr = await racePost(gone, { icon: 'train', stop: 10, stars: 30 }, 4000);
+assert.equal(rr.status, 200, 'removed members can still write their own row');
+rr = await raceGet(sarah);
+assert.equal(rr.status, 200);
+assert.deepEqual(rr.body.racers.map(x => [x.name, x.icon, x.stop, x.stars]), [['Sarah', 'cupcake', 6, 14], ['Shane', 'lolly', 5, 10], ['Aranea', 'kiwi', 3, 6]], 'removed members are hidden; sorted by stop then stars');
+assert.equal(rr.body.racers[0].mine, true);
+assert.ok(!JSON.stringify(rr.body).includes('m1') && !JSON.stringify(rr.body).includes('Gone'), 'no member ids or removed names');
+// progress never goes backwards if a stale phone posts a lower stop
+rr = await racePost(shane, { icon: 'lolly', stop: 2, stars: 3 }, 5000);
+assert.equal(rr.status, 200); assert.equal(rr.body.stop, 5); assert.equal(rr.body.stars, 10);
+rr = await racePost(shane, { icon: 'rocket', stop: 7, stars: 12 }, 6000);
+assert.equal(rr.body.icon, 'rocket'); assert.equal(rr.body.stop, 7);
+assert.equal((await raceGet(shane)).body.racers.find(x => x.mine).icon, 'rocket');
+assert.equal((await scoresRoute(sqlR, shane, '/sugar-race', 'PUT', new URL('https://x/api/sugar-race'), async () => ({}), 7000)).status, 405);
 
 console.log('scores tests ok');
 
