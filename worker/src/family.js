@@ -9,6 +9,8 @@ import { InfoBot, BOT_ID, BOT_NAME, AI_MODEL } from './ai.js';
 import { paywallUrl, paywallHtml } from './paywall.js';
 import { preview, blockedWhy, findUrl, safeUrl, stockPics } from './preview.js';
 import { scoresInit, scoresRoute, clearShaneTetrisOnce, clearShaneTetrisOnce20261113, clearAllTetrisOnce20261114 } from './scores.js'; // 1.9.149 family scoreboard; 12–14 Nov 2026 one-off Tetris clears
+import { scrabbleInit, scrabbleRoute, bindDict } from './scrabble.js'; // 1.9.214 family Scrabble online challenges
+import lexicon from './lexicon.js';
 
 const ORIGINS = /^https:\/\/([a-z0-9]+\.)?shane-my-app\.pages\.dev$|^http:\/\/localhost:\d+$/;
 const PRIVATE_ID = /:|^tip\d/;                        // Shane's own cards (life:, app:, ph:, you:) and the app's tips: never commentable
@@ -65,6 +67,8 @@ export class Family extends DurableObject {
     try { this.sql.exec(`ALTER TABLE shares ADD COLUMN vis TEXT`); } catch (e) { } // 1.9.16 link shares for chosen people: ',mid,mid,' (null = whole family)
     try { this.sql.exec(`ALTER TABLE members ADD COLUMN pron TEXT`); } catch (e) { } try { this.sql.exec(`ALTER TABLE members ADD COLUMN pshow INTEGER DEFAULT 0`); } catch (e) { } // 1.9.15 pronouns (optional; not set = they)
     scoresInit(this.sql); // 1.9.149 game scores (Tetris, Scrabble)
+    scrabbleInit(this.sql); // 1.9.214 family Scrabble games, in this same database
+    bindDict(lexicon);
     this.rt = new Retain(this); // 1.9.0
     this.bot = new InfoBot(this); // 1.9.12
     this.sql.exec(`CREATE TABLE IF NOT EXISTS clikes (cid INTEGER NOT NULL, mid TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (cid, mid))`); // 1.9.14 ❤️ on comments
@@ -172,6 +176,7 @@ export class Family extends DurableObject {
     if (p === '/me') return J({ id: me.id, name: me.name, role: me.role });
     if (p === '/people') return J(this.all(`SELECT id,name,role FROM members WHERE removed=0 ORDER BY created`));
     { const r = await scoresRoute(this.sql, me, p, m, u, body, now); if (r) return J(r.body, r.status); } // 1.9.149 family scoreboard
+    { const r = await scrabbleRoute(this.sql, me, p, m, u, body, now, { note: (mid, text, card) => this.rt.note(mid, 'scrabble', text, card) }); if (r) return J(r.body, r.status); } // 1.9.214 family Scrabble
 
     // ---- admin: members and their invite links
     if (p === '/members' && m === 'GET') { if (!admin) return J({ err: 'admin only' }, 403); return J(this.all(`SELECT m.id,m.name,m.role,m.created,m.seen,m.ver,m.pron,m.pshow,p.age,p.stage,p.sugg,p.sit FROM members m LEFT JOIN mprof p ON p.mid=m.id WHERE m.removed=0 ORDER BY m.created`)); }

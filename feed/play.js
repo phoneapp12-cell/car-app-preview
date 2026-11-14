@@ -206,7 +206,7 @@
     // Relative tetris.html is /feed/tetris.html. ship-pages.sh already sends SAMEORIGIN for /feed/tetris.html and /feed/tetris.
     tetris: { url: gameUrl('tetris'), title: 'Tetris', host: 'Info Book', live: 'Sound starts when you tap', local: true },
     // 1.9.147 Scrabble, our own page like Tetris. ship-pages.sh sends SAMEORIGIN for /feed/scrabble too.
-    scrabble: { url: gameUrl('scrabble'), title: 'Scrabble', host: 'Info Book', live: 'Play the computer or pass the phone', local: true },
+    scrabble: { url: gameUrl('scrabble'), title: 'Scrabble', host: 'Info Book', live: 'Play the computer, pass the phone, or challenge family', local: true },
     // 1.9.156 Sugar Rush level 1 (Shane only for now; the page itself checks too). ship-pages.sh sends SAMEORIGIN for /feed/sugar-rush.
     sugar: { url: gameUrl('sugar-rush'), title: 'Sugar Rush', host: 'Info Book', live: 'Levels 1–10 · soft sounds start when you tap', local: true }
   };
@@ -362,9 +362,42 @@
     if (close) close.focus();
     if (!artHist) { try { root.history.pushState({ ibArt: kind }, ''); artHist = true; } catch (e) { artHist = false; } }
   }
+
+  // 1.9.214 A clear Your turn notice in Info Book when a family Scrabble game is waiting.
+  function scrabbleNotice() {
+    let me = null;
+    try { me = JSON.parse(root.localStorage.getItem('mf.member') || 'null'); } catch (e) { }
+    if (!me || !me.tok || !me.id || me.pending || !root.document) return;
+    const ctl = root.AbortController ? new AbortController() : null;
+    const tm = ctl && setTimeout(() => ctl.abort(), 8000);
+    root.fetch('https://shane-my-feed-data.phoneapp12.workers.dev/api/scrabble', { headers: { Authorization: 'Bearer ' + me.tok }, signal: ctl && ctl.signal })
+      .then(r => { if (tm) clearTimeout(tm); return r.ok ? r.json() : null; })
+      .then(data => {
+        const n = data && data.yourTurn || 0;
+        root.ibScrabbleTurn = n;
+        root.document.querySelectorAll('[data-art="scrabble"] span:last-child').forEach(el => { el.textContent = n ? 'Play Scrabble · your turn' : 'Play Scrabble'; });
+        let host = root.document.getElementById('scrayourhost');
+        if (!host) {
+          host = root.document.createElement('div');
+          host.id = 'scrayourhost';
+          const feed = root.document.getElementById('feed');
+          if (!feed || !feed.parentNode) return;
+          feed.parentNode.insertBefore(host, feed);
+        }
+        if (!n) { host.innerHTML = ''; return; }
+        const g = (data.games || []).find(x => x.yourTurn && !x.over);
+        const vs = g && g.players ? g.players.filter(p => !p.me).map(p => p.name).join(' and ') : '';
+        host.innerHTML = '<button type="button" class="scrayour"><b>Your turn</b> in Scrabble' + (vs ? ' vs ' + vs : '') + '<small>' + (n > 1 ? n + ' games waiting · tap to play' : 'Tap to play') + '</small></button>';
+        host.firstChild.addEventListener('click', () => {
+          try { if (g && g.id) root.sessionStorage.setItem('scrabble-open', g.id); } catch (e) { }
+          if (root.ibArt) root.ibArt.open('scrabble');
+        });
+      }).catch(() => { if (tm) clearTimeout(tm); });
+  }
   function closeArt(fromPop) {
     if (!artWin || artWin.hidden) return;
     const wasTetris = artKind === 'tetris';
+    const wasScrabble = artKind === 'scrabble';
     setFull(false);
     unloadArt();
     artWin.hidden = true;
@@ -372,6 +405,7 @@
     artKind = null;
     lockFeed(false);
     if (wasTetris) clearArtPersist();
+    if (wasScrabble) scrabbleNotice();
     if (typeof root.setTetrisChrome === 'function') root.setTetrisChrome(false);
     else if (typeof setTetrisChrome === 'function') setTetrisChrome(false);
     const back = artHist && !fromPop;
@@ -404,6 +438,9 @@
   });
   root.addEventListener('pageshow', () => { maybeRestoreArt(); });
   root.ibArt = { isTetris: isTetrisOpen, kind: () => (artWin && !artWin.hidden ? artKind : null), open: openArt, close: closeArt, persist: persistArt, restore: maybeRestoreArt, read: readArtPersist };
+  scrabbleNotice();
+  if (typeof root.setInterval === 'function') root.setInterval(() => { if (!root.document.hidden) scrabbleNotice(); }, 60000);
+  if (root.document && root.document.addEventListener) root.document.addEventListener('visibilitychange', () => { if (!root.document.hidden) scrabbleNotice(); });
   maybeRestoreArt();
   root.document.addEventListener('click', e => {
     const art = e.target && e.target.closest && e.target.closest('[data-art]');
