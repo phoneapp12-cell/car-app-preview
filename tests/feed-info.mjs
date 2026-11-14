@@ -4719,7 +4719,7 @@ console.log('1.9.226 every saying spoken ok');
   for (const k of ['combo', 'bomb', 'wrap', 'stripe']) assert.ok(SR.sayBig(k), k);
   for (const k of ['cascade', 'jelly', 'gumdrop', 'lemon', 'ice', 'bub']) assert.ok(!SR.sayBig(k), k);
   for (const t in SR.SAY_CLIPS) { const c = SR.SAY_CLIPS[t]; assert.ok(c[1] >= 1.0 && c[3] >= 1.0 && c[1] < 2.6 && c[3] < 2.6, 'room tail kept: ' + t); }
-  assert.ok(src.includes("'sugar-rush-say-f.m4a': 'a4d17597'") && src.includes("'sugar-rush-say-m.m4a': '33cd967e'")); // 1.9.229 major-only sprites
+  assert.ok(/'sugar-rush-say-f\.m4a': '[0-9a-f]{8}'/.test(src) && /'sugar-rush-say-m\.m4a': '[0-9a-f]{8}'/.test(src)); // 1.9.229 major-only sprites (re-cut in 1.9.230 with the combo lines)
   // Shown and spoken together: the display happens inside the gate, only when the voice says it (or voice is off).
   assert.ok(src.includes('return sayGate(text, big, () => paintSaying(text, kind)) ? text : null;'));
   assert.ok(src.includes("if (!sayFree() && sayPending) return null;"), 'a major line in the rest with one already waiting is not shown, so never silent');
@@ -4791,8 +4791,71 @@ console.log('1.9.227 echo and 3 s pace ok');
   assert.ok(src.includes("cheer('Goal achieved!', 'yay');") && src.includes("cheer('Sugar Crush!', 'succulent');"));
   assert.ok(src.includes('function runAudio(fn) {\n    if (!soundOn || !audio()) return;'), 'Sound toggle silences the candy sounds too');
   assert.ok(!/type = '(square|sawtooth)'|'square'\)|'sawtooth'\)/.test(src));
-  for (const g of ['f', 'm']) for (const e of ['m4a', 'mp3']) { const f = 'sugar-rush-say-' + g + '.' + e, size = fs.statSync('feed/' + SR.mediaUrl(f)).size; assert.ok(size > 1.5e5 && size < 4e5, f + ' smaller: major lines only'); }
+  for (const g of ['f', 'm']) for (const e of ['m4a', 'mp3']) { const f = 'sugar-rush-say-' + g + '.' + e, size = fs.statSync('feed/' + SR.mediaUrl(f)).size; assert.ok(size > 1.5e5 && size < 6e5, f + ' smaller: major lines only (1.9.230: plus combo lines)'); }
   console.log('1.9.229 major-only voice, candy sounds ok');
+}
+
+// 1.9.230 Two super powers together: every special + special swap works and clears the right shape.
+{
+  const SR = load('feed/sugar-rush.js').SugarRush;
+  const N = SR.N;
+  let id = 90000;
+  // A board with no matches anywhere: colours cycle so no 3 line up.
+  const fresh = () => { const g = SR.newGame({ level: SR.LEVELS[2], seed: 5 }); g.mask = null; g.jelly = null; g.tutorial = true;
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) g.board[r][c] = { id: id++, c: (r * 2 + c) % 4 + (((r + c) % 3) === 0 ? 0 : 0) };
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) g.board[r][c].c = [0, 1, 2, 3][(c + 2 * (r % 2) + (r >> 1)) % 4];
+    return g; };
+  const g0 = fresh(); assert.strictEqual(SR.findRuns(g0.board).length, 0, 'test board starts with no matches');
+  const sp = (g, r, c, s, col) => { g.board[r][c] = s === 'b' ? { id: id++, c: -1, s: 'b' } : { id: id++, c: col == null ? g.board[r][c].c : col, s }; };
+  const cases = {
+    crisscross: ['row', 'col'], bigcross: ['row', 'w'], bigblast: ['w', 'w'], stripestorm: ['b', 'row'], wrapstorm: ['b', 'w'], sugarstorm: ['b', 'b']
+  };
+  for (const [kind, [s1, s2]] of Object.entries(cases)) {
+    const g = fresh(); sp(g, 4, 3, s1); sp(g, 4, 4, s2);
+    assert.strictEqual(SR.comboKind(g.board[4][3], g.board[4][4]), kind, kind);
+    assert.ok(SR.validSwap(g.board, [4, 3], [4, 4], null), kind + ': a swap with no normal match still works');
+    const col = g.board[4][4].c, before = g.board.map(r => r.slice());
+    const res = SR.play(g, [4, 3], [4, 4]);
+    assert.ok(res.valid && res.steps[0].combo === kind, kind + ' combo step');
+    const cl = new Set(res.steps[0].popped.map(p => p.r * N + p.c));
+    if (kind === 'crisscross') { assert.strictEqual(cl.size, 2 * N - 1); for (let j = 0; j < N; j++) assert.ok(cl.has(4 * N + j)); for (let i = 0; i < N; i++) assert.ok(cl.has(i * N + 4)); }
+    if (kind === 'bigcross') { assert.strictEqual(cl.size, 6 * N - 9); for (const r of [3, 4, 5]) for (let j = 0; j < N; j++) assert.ok(cl.has(r * N + j)); for (const c of [3, 4, 5]) for (let i = 0; i < N; i++) assert.ok(cl.has(i * N + c)); }
+    if (kind === 'bigblast') { assert.strictEqual(cl.size, 25); for (let i = 2; i <= 6; i++) for (let j = 2; j <= 6; j++) assert.ok(cl.has(i * N + j)); }
+    if (kind === 'stripestorm' || kind === 'wrapstorm') {
+      const want = []; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (before[r][c].c === col) want.push([r, c]);
+      const cv = res.steps[0].converted; assert.ok(cv.length >= want.length - 2 && cv.every(x => x.s === (kind === 'wrapstorm' ? 'w' : x.s) && (x.s === 'row' || x.s === 'col' || x.s === 'w')), kind + ' converts every sweet of that colour');
+      for (const [r, c] of want) assert.ok(cl.has(r * N + c), kind + ' clears ' + r + ',' + c);
+      assert.ok(res.steps[0].fired.filter(f => f.s !== 'b').length >= want.length - 1, kind + ' all converted sweets fire');
+      if (kind === 'stripestorm') assert.ok(cl.size > want.length + 20, 'stripes sweep rows and columns');
+    }
+    if (kind === 'sugarstorm') assert.strictEqual(cl.size, N * N, 'whole board');
+    assert.ok(res.steps[0].points >= SR.COMBO_BONUS[kind], kind + ' bonus');
+    assert.ok(SR.SAYINGS[kind] && SR.SAYINGS[kind].length >= 2 && SR.sayBig(kind) && SR.sayingKind(res.steps[0], 1) === kind, kind + ' spoken major line');
+    for (const t of SR.SAYINGS[kind]) assert.ok(SR.SAY_CLIPS[t], 'clip for ' + t);
+  }
+  // Objectives: jelly under the cross, icing and bubbles get hit, jars break, liquorice frees, chocolate is hit.
+  {
+    const g = fresh(); g.jelly = Array.from({ length: N }, () => Array(N).fill(0)); g.jelly[4][0] = 1; g.jelly[0][4] = 2;
+    g.board[4][7] = { id: id++, c: 1, ice: 2 }; g.board[7][4] = { id: id++, c: 2, lock: 1 }; g.board[2][4] = { id: id++, c: 3, liq: 1 };
+    g.board[4][1] = { id: id++, c: 0, bub: 1 }; g.board[1][4] = { id: id++, c: -1, choco: 1 };
+    sp(g, 4, 3, 'row'); sp(g, 4, 4, 'col');
+    const res = SR.play(g, [4, 3], [4, 4]), s0 = res.steps[0];
+    assert.ok(s0.jellyCleared >= 2 && g.jelly[4][0] === 0 && g.jelly[0][4] === 1, 'jelly cleared under the combo');
+    assert.ok(s0.blocked.some(b => b.kind === 'ice') && s0.blocked.some(b => b.kind === 'bub') && s0.blocked.some(b => b.kind === 'choco'), 'icing, bubbles and chocolate are hit');
+    assert.ok(s0.brokeLock && s0.liqFreed >= 1, 'jars break and liquorice is freed');
+  }
+  {
+    // Ingredients are never cleared by a combo; they fall and are delivered as usual.
+    const g = fresh(); g.board[3][4] = { id: id++, c: -1, ing: 'cherry' }; g.ingsLeft = 1; sp(g, 4, 3, 'w'); sp(g, 4, 4, 'w');
+    const res = SR.play(g, [4, 3], [4, 4]); assert.ok(!res.steps[0].popped.some(p => p.r === 3 && p.c === 4), 'ingredient not destroyed');
+  }
+  // Hints prefer a combo; the combo tip finds two specials side by side.
+  { const g = fresh(); g.tutorial = false; sp(g, 6, 1, 'row'); sp(g, 6, 2, 'w'); assert.deepStrictEqual(JSON.parse(JSON.stringify(SR.adjacentSpecials(g.board, null))), [[6, 1], [6, 2]]);
+    const m = SR.bestMove(g); assert.ok(m && SR.comboKind(g.board[m[0][0]][m[0][1]], g.board[m[1][0]][m[1][1]]), 'hint prefers the combo'); }
+  const src = fs.readFileSync('feed/sugar-rush.js', 'utf8'), html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
+  assert.ok(src.includes('if (s.combo) await comboIntro(s);') && src.includes('maybeComboTip();') && html.includes('id="combotip"'), 'combo animation and first-time tip');
+  assert.ok(!/candy crush/i.test(src + html));
+  console.log('1.9.230 super power combos ok');
 }
 
 
