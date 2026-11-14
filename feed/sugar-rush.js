@@ -72,6 +72,87 @@
       badge: { id: 'night', name: 'Night Light', icon: '🌟' } }
   ];
 
+
+  // 1.9.212 Level intro copy and the level-1 tutorial. Gameplay rules are unchanged.
+  const LEVEL_INTROS = [
+    { icon: '🎯', goal: 'Score 3,000 points', detail: 'Reach 3,000 points in 20 moves.', tip: 'Swap two neighbours to make a line of three. Longer lines and special sweets score more.', mechanic: 'match' },
+    { icon: '🍒', goal: 'Collect 10 cherry gumdrops', detail: 'Collect 10 cherry gumdrops in 25 moves.', tip: "This heart-shaped tray is Sarah's corner of the shop. Take your time and gather the cherry gumdrops.", mechanic: 'collect' },
+    { icon: '💜', goal: 'Clear all the jelly', detail: 'Clear every jelly in 22 moves.', tip: 'Make a match on a jelly tile to clear it.', mechanic: 'jelly' },
+    { icon: '🔒', goal: 'Score 2,500 points', detail: 'Reach 2,500 points in 22 moves. Break the locked jars along the way.', tip: 'Locked jars cannot be swapped, but a match that includes them still counts and frees them.', mechanic: 'locks' },
+    { icon: '🧁', goal: 'Clear all the icing', detail: 'Clear all the icing in 24 moves.', tip: 'A match next to a block of icing, or a special sweet that hits it, chips it away.', mechanic: 'ice' },
+    { icon: '🍨', goal: 'Clear all the double jelly', detail: 'Clear every jelly in 24 moves.', tip: 'These jellies have two layers, so some tiles need two clears.', mechanic: 'double' },
+    { icon: '🎁', goal: 'Bring the ingredients down to the bottom', detail: 'Guide both ingredients down to the bottom in 34 moves.', tip: 'A little icing sits in the way. Match under an ingredient to drop it down.', mechanic: 'ings' },
+    { icon: '🍫', goal: 'Clear all the jelly', detail: 'Keep the chocolate in check and clear every jelly in 24 moves.', tip: 'Chocolate spreads to a neighbouring tile at the end of a move if you did not hit it.', mechanic: 'choco' },
+    { icon: '🍋', goal: 'Clear the jelly and collect 6 lemon drops', detail: 'Clear the jelly and collect 6 lemon drops in 28 moves.', tip: 'The path runs around the edge of the tray. Stay on it.', mechanic: 'path' },
+    { icon: '🌟', goal: 'Finish every objective', detail: 'Clear the jelly, bring both ingredients down, break the icing and free the locked jars — all in 32 moves.', tip: 'A little of everything. Take it one match at a time.', mechanic: 'mix' }
+  ];
+  function levelIntro(n, p) {
+    const lv = LEVELS[(n | 0) - 1]; if (!lv) return null;
+    const info = LEVEL_INTROS[(n | 0) - 1] || LEVEL_INTROS[0];
+    const stop = stopForLevel(n) || { place: '' };
+    const stars = (p && p.stars && p.stars[n - 1]) || 0;
+    return {
+      n: lv.n, name: lv.name, place: stop.place, title: lv.name,
+      stopLine: 'Level ' + lv.n + ' · ' + stop.place,
+      icon: info.icon, goal: info.goal, detail: info.detail, tip: info.tip, mechanic: info.mechanic,
+      moves: lv.moves, badge: lv.badge, stars: stars, theme: lv.theme || '',
+      strip: info.goal + ' · ' + lv.moves + ' moves'
+    };
+  }
+  const TUTORIAL_KEY = 'ib-sugar-tutorial-done';
+  const TUTORIAL_STEPS = [
+    {
+      id: 'match3', kind: 'move',
+      board: ['02402402','13513513','24024024','35101035','40240240','51351351','02402402','13513513'],
+      move: [[3, 4], [4, 4]],
+      hl: [[3, 3], [3, 4], [3, 5], [4, 4]],
+      bubble: 'Swap two neighbouring sweets to make a line of three.',
+      special: ''
+    },
+    {
+      id: 'striped', kind: 'move',
+      board: ['02402402','13513513','24024024','30010135','40200240','51351351','02402402','13513513'],
+      move: [[3, 3], [4, 3]],
+      hl: [[3, 1], [3, 2], [3, 3], [3, 4], [4, 3]],
+      bubble: 'A match of four makes a striped sweet. It clears a whole row or column.',
+      special: 'col'
+    },
+    {
+      id: 'wrapped', kind: 'move',
+      board: ['02402402','13013513','20100324','35035135','40040240','51351351','02402402','13513513'],
+      move: [[2, 2], [1, 2]],
+      hl: [[1, 2], [2, 1], [2, 2], [2, 3], [2, 4], [3, 2], [4, 2]],
+      bubble: 'An L or a T shape makes a wrapped sweet. It clears the 3×3 around it.',
+      special: 'w'
+    },
+    {
+      id: 'bomb', kind: 'move',
+      board: ['02402402','13513513','24024024','30010035','40200240','51351351','02402402','13513513'],
+      move: [[3, 3], [4, 3]],
+      hl: [[3, 1], [3, 2], [3, 3], [3, 4], [3, 5], [4, 3]],
+      bubble: 'Five in a line makes a sprinkle bomb. Swap it with a colour to clear every sweet of that colour.',
+      special: 'b'
+    },
+    {
+      id: 'goal', kind: 'hud', hlHud: ['goalstrip', 'score', 'moves'],
+      bubble: 'Your goal is up the top. On this level, reach 3,000 points in 20 moves.'
+    },
+    {
+      id: 'stars', kind: 'hud', hlHud: ['starbars'],
+      bubble: 'Stars fill as you score. Hit 3,000, 6,000 and 9,000 points for one, two or three stars.'
+    },
+    {
+      id: 'ready', kind: 'ready',
+      bubble: "You're ready!"
+    }
+  ];
+  function sameTutMove(a, z, move) {
+    if (!a || !z || !move) return false;
+    const b = move[0], c = move[1];
+    return (a[0] === b[0] && a[1] === b[1] && z[0] === c[0] && z[1] === c[1]) ||
+      (a[0] === c[0] && a[1] === c[1] && z[0] === b[0] && z[1] === b[1]);
+  }
+
   // 1.9.210 Sugar Rush main screen: an illustrated candy map of New Zealand.
   // Stops start in Onerahi / Whangārei and travel south. Level 2 is Sarah's house.
   const MAP_W = 400, MAP_H = 1280;
@@ -579,10 +660,10 @@
       steps.push(s); st.score += s.points;
     }
     let shuffled = false;
-    if (!hasMove(b, mask)) { shuffle(b, st.rand, st.kinds, mask); shuffled = true; }
+    if (!st.tutorial && !hasMove(b, mask)) { shuffle(b, st.rand, st.kinds, mask); shuffled = true; }
     const chocoHit = steps.some(s => s.chocoHit);
-    const spread = (!chocoHit && chocoLeft(b)) ? spreadChoco(st) : null;
-    finishIfDone(st);
+    const spread = (!st.tutorial && !chocoHit && chocoLeft(b)) ? spreadChoco(st) : null;
+    if (!st.tutorial) finishIfDone(st);
     return { valid: true, steps, shuffled, swapped: [A, Z], spread };
   }
 
@@ -885,7 +966,7 @@
   }
   function racerFirst(name) { return String(name || 'Player').trim().split(/\s+/)[0] || 'Player'; }
 
-  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, MAP_W, MAP_H, MAP_STOPS, FUTURE_STOPS, stopForLevel, icingPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, cloneState, bestMove, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
+  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_STOPS, FUTURE_STOPS, stopForLevel, icingPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, cloneState, bestMove, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
     allowed: () => !!(root.IBScores && root.IBScores.isShane && root.IBScores.isShane()),
     SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL, XF,
     VOICE_FILES, VOICE_RANK, MEDIA_HASH, mediaUrl, gameTrack, attachSfxBus, playTone, playChime, playClip, voiceForStep,
@@ -1330,6 +1411,23 @@
         const y = s.y * CS + CS / 2 + sp.oy * R * s.sc;
         drawStarGlint(ctx, x, y, R * (0.16 + 0.14 * life) * s.sc, 0.85 * life * s.al, sp.rot);
       }
+      if (tut && tut.active && tut.step && tut.step.hl && tut.step.kind === 'move') {
+        ctx.fillStyle = 'rgba(40, 8, 28, 0.55)';
+        ctx.fillRect(0, 0, W, W);
+        const lit = new Set(tut.step.hl.map(function (p) { return p[0] + ',' + p[1]; }));
+        for (const key of lit) {
+          const r = +key.split(',')[0], c = +key.split(',')[1];
+          const jelly = st.jelly ? (st.jelly[r][c] || 0) : 0;
+          ctx.fillStyle = jelly ? 'rgba(255,120,190,.28)' : ((r + c) % 2 ? 'rgba(255,255,255,.7)' : 'rgba(255,228,240,.85)');
+          rr(c * CS + 1.5, r * CS + 1.5, CS - 3, CS - 3, CS * .18); ctx.fill();
+        }
+        const R2 = CS * .37;
+        for (const s of sprites.values()) {
+          if (s.y < -0.5) continue;
+          if (!lit.has((Math.round(s.r)) + ',' + Math.round(s.c)) && !lit.has(Math.round(s.y) + ',' + Math.round(s.x))) continue;
+          drawSweet(s.t, s.x * CS + CS / 2, s.y * CS + CS / 2, R2, s.sc, s.al, 0);
+        }
+      }
       for (const f of fx) if (f.type === 'bit') {
         const p = Math.min(1, (t - f.t0) / f.dur); ctx.globalAlpha = 1 - p; ctx.fillStyle = f.col;
         ctx.beginPath(); ctx.arc(f.x + f.vx * p * CS, f.y + f.vy * p * CS + p * p * CS * .5, CS * .07 * (1 - p * .5), 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
@@ -1358,6 +1456,148 @@
     } catch (e) { }
   }
 
+
+  let tut = null;
+  function tutorialStorageKey() {
+    const me = root.IBScores && root.IBScores.who && root.IBScores.who();
+    return TUTORIAL_KEY + (me && me.id ? ':' + me.id : '');
+  }
+  function tutorialDone() { return !!ls.get(tutorialStorageKey(), false); }
+  function markTutorialDone() { ls.set(tutorialStorageKey(), true); }
+  function mechanicPreview(kind) {
+    if (kind === 'collect' || kind === 'path') return '<span class="hearts">' + (kind === 'collect' ? '💖' : '🍋') + '</span>';
+    if (kind === 'jelly' || kind === 'double') return kind === 'double' ? '<span class="dbl"><i></i><i></i></span>' : '<span class="jelly"></span>';
+    if (kind === 'locks') return '<span class="lock">🔒</span>';
+    if (kind === 'ice') return '<span class="ice"></span>';
+    if (kind === 'ings') return '<span class="ing">🍒</span><span class="ing">🍋</span>';
+    if (kind === 'choco') return '<span class="choco"></span>';
+    if (kind === 'mix') return '<span class="jelly"></span><span class="lock">🔒</span><span class="ing">🎁</span>';
+    return '<span class="pip c0"></span><span class="pip c1"></span><span class="pip c0"></span>';
+  }
+  function paintGoalStrip(lv, stt) {
+    const info = levelIntro(lv && lv.n || 1, prog);
+    if ($('gicon')) $('gicon').textContent = info.icon;
+    if ($('help')) {
+      $('help').textContent = stt ? (info.goal + ' · ' + stt.moves + ' moves left') : info.strip;
+    }
+    const strip = $('goalstrip');
+    if (strip) strip.dataset.n = String(info.n);
+  }
+  function showIntro(n) {
+    const info = levelIntro(n, prog); if (!info) return;
+    pendingLv = n;
+    doc.body.classList.toggle('sarah', info.theme === 'sarah');
+    $('introstop').textContent = info.stopLine;
+    $('introtitle').textContent = info.name;
+    $('introicon').textContent = info.icon;
+    $('introgoal').textContent = info.detail;
+    $('intromoves').textContent = info.moves + ' moves';
+    $('introbody').textContent = info.tip;
+    $('introstars').innerHTML = [0, 1, 2].map(i => '<span class="' + (i < info.stars ? 'on' : '') + '">★</span>').join('');
+    $('introstars').setAttribute('aria-label', info.stars ? info.stars + ' stars earned' : 'No stars yet');
+    const b = info.badge;
+    $('introbadge').textContent = b ? ('Badge: ' + b.icon + ' ' + b.name) : '';
+    $('introprev').innerHTML = mechanicPreview(info.mechanic);
+    $('introprev').dataset.mechanic = info.mechanic;
+    $('introbtn').textContent = "Let's go!";
+    const how = $('introhow');
+    if (how) { how.hidden = n !== 1; how.textContent = tutorialDone() ? 'Replay tutorial' : 'How to play'; }
+    $('intro').hidden = false;
+    if (musicOn) playKind(wantKind());
+  }
+  function hideIntro() {
+    if ($('intro')) $('intro').hidden = true;
+    doc.body.classList.remove('sarah');
+  }
+  function paintTutHud(on, ids) {
+    const mark = function (el, yes) { if (el) el.classList.toggle('tut-hl', !!yes); };
+    mark($('goalstrip'), on && ids && ids.indexOf('goalstrip') >= 0);
+    if ($('score')) mark($('score').parentNode, on && ids && ids.indexOf('score') >= 0);
+    if ($('moves')) mark($('moves').parentNode, on && ids && ids.indexOf('moves') >= 0);
+    mark($('starbars') || doc.querySelector('.goal'), on && ids && ids.indexOf('starbars') >= 0);
+  }
+  function placeTutHand(a, z) {
+    const el = $('tuthand');
+    if (!el || !a || !z) { if (el) el.hidden = true; return; }
+    const b = cv.getBoundingClientRect();
+    const p = function (r, c) { return [b.left + (c + 0.5) * b.width / N, b.top + (r + 0.5) * b.height / N]; };
+    const p1 = p(a[0], a[1]), p2 = p(z[0], z[1]);
+    el.style.setProperty('--x1', p1[0] + 'px');
+    el.style.setProperty('--y1', p1[1] + 'px');
+    el.style.setProperty('--x2', p2[0] + 'px');
+    el.style.setProperty('--y2', p2[1] + 'px');
+    el.hidden = false;
+  }
+  function hideTutUi() {
+    if ($('tut')) $('tut').hidden = true;
+    if ($('tuthand')) $('tuthand').hidden = true;
+    if ($('tutnext')) $('tutnext').hidden = true;
+    paintTutHud(false, []);
+    doc.body.classList.remove('ontut');
+  }
+  function showTutStep(i) {
+    const step = TUTORIAL_STEPS[i];
+    if (!step) { finishTutorial(true); return; }
+    tut = { active: true, i: i, step: step };
+    doc.body.classList.add('ontut');
+    if (step.kind === 'move' || i === 0 || !st) bootLevel(1, { board: step.board, tutorial: true });
+    if (step.kind === 'hud' || step.kind === 'ready') {
+      if (!st) bootLevel(1, { board: TUTORIAL_STEPS[0].board, tutorial: true });
+      st.score = 0; st.moves = LEVELS[0].moves; st.over = false; hud();
+    }
+    $('tut').hidden = false;
+    $('tuttext').textContent = step.bubble;
+    const next = $('tutnext');
+    next.hidden = step.kind === 'move';
+    next.textContent = step.kind === 'ready' ? "Let's play!" : 'Next';
+    paintTutHud(step.kind === 'hud', step.hlHud || []);
+    const goHand = function () { placeTutHand(step.kind === 'move' ? step.move[0] : null, step.kind === 'move' ? step.move[1] : null); };
+    if (root.requestAnimationFrame) root.requestAnimationFrame(function () { root.requestAnimationFrame(goHand); });
+    else goHand();
+    if (step.kind !== 'move' && $('tuthand')) $('tuthand').hidden = true;
+  }
+  function finishTutorial(playOn) {
+    markTutorialDone();
+    tut = null;
+    hideTutUi();
+    if (playOn !== false) startLevel(1);
+    else showMap();
+  }
+  function skipTutorial() { finishTutorial(true); }
+  function startTutorial(opts) {
+    opts = opts || {};
+    hideIntro();
+    $('end').hidden = true;
+    tut = { active: true, i: opts.step || 0 };
+    showTutStep(tut.i);
+  }
+  function bootLevel(n, opt) {
+    opt = opt || {};
+    $('intro').hidden = true; $('end').hidden = true; $('map').hidden = true; $('game').hidden = false;
+    if (!opt.tutorial) hideTutUi();
+    doc.body.classList.remove('onmap');
+    if (!opt.tutorial) doc.body.classList.remove('sarah');
+    screen = 'game';
+    lvNum = n;
+    const lv = LEVELS[n - 1];
+    doc.body.classList.toggle('sarah', lv.theme === 'sarah');
+    $('lvname').textContent = 'Level ' + n + ' · ' + lv.name;
+    paintGoalStrip(lv);
+    st = newGame(opt.board ? { level: lv, board: fromRows(opt.board) } : { level: lv });
+    if (opt.tutorial) st.tutorial = true;
+    sel = null; busy = false; lastAct = now();
+    fitCanvas(); syncAll(); hud();
+    paintGoalStrip(lv, st);
+    hintMove = opt.tutorial ? null : findMove(st.board, st.mask);
+    for (const s of sprites.values()) { s.y = s.r - N - 1 + (N - s.r) * .2; moveTo(s, s.r, s.c, 300 + (N - s.r) * 40, easeOut); }
+    if (musicOn) playKind(wantKind());
+  }
+  function beginLevel(n) {
+    hideIntro();
+    if (n === 1 && !tutorialDone()) startTutorial();
+    else startLevel(n);
+  }
+
   function paintButtons() {
     const s = soundOn ? '🔉 Sound on' : '🔇 Sound off', m = musicOn ? '🎵 Music on' : '🎵 Music off';
     if ($('soundbtn')) $('soundbtn').textContent = s;
@@ -1381,6 +1621,7 @@
     $('moves').textContent = st.moves;
     $('best').textContent = Math.max(prog.best[st.lv.n - 1] || 0, st.score).toLocaleString('en-NZ');
     $('obj').textContent = objText(st);
+    if (st.lv) paintGoalStrip(st.lv, st);
     const stars = st.lv.stars, max = stars[2] || 1, p = Math.min(1, st.score / max);
     $('fill').style.width = (p * 100).toFixed(1) + '%';
     stars.forEach((s, i) => { const el = $('st' + i); el.style.left = (s / max * 100) + '%'; el.classList.toggle('got', st.score >= s && (s > 0 || st.won)); });
@@ -1686,34 +1927,27 @@
   function openLevel(n) {
     const lv = LEVELS[n - 1]; if (!lv || n > prog.open) return;
     pendingLv = n;
-    if (lv.intro) {
-      $('introtitle').textContent = lv.intro.title;
-      $('introbody').textContent = lv.intro.body;
-      $('introbtn').textContent = 'Play level ' + n;
-      $('intro').hidden = false;
-      return;
-    }
-    startLevel(n);
+    showIntro(n);
   }
   function startLevel(n) {
-    $('intro').hidden = true; $('end').hidden = true; $('map').hidden = true; $('game').hidden = false;
-    doc.body.classList.remove('onmap', 'sarah');
-    screen = 'game';
-    lvNum = n;
-    const lv = LEVELS[n - 1];
-    doc.body.classList.toggle('sarah', lv.theme === 'sarah');
-    $('lvname').textContent = 'Level ' + n + ' · ' + lv.name;
-    $('help').textContent = lv.help;
-    st = newGame({ level: lv });
-    sel = null; busy = false; lastAct = now();
-    fitCanvas(); syncAll(); hud();
-    hintMove = findMove(st.board, st.mask);
-    for (const s of sprites.values()) { s.y = s.r - N - 1 + (N - s.r) * .2; moveTo(s, s.r, s.c, 300 + (N - s.r) * 40, easeOut); }
-    if (musicOn) playKind(wantKind());
+    tut = null;
+    hideTutUi();
+    bootLevel(n);
   }
 
   async function attempt(a, z) {
     if (busy || !st || st.over) return;
+    if (tut && tut.active && tut.step && tut.step.kind === 'move' && !sameTutMove(a, z, tut.step.move)) {
+      // bounce any other swap; the player must make the shown move
+      const Atb = st.board[a[0]][a[1]], Ztb = st.board[z[0]][z[1]];
+      if (!Atb || !Ztb) return;
+      sel = null; busy = true;
+      const As = sprites.get(Atb.id), Zs = sprites.get(Ztb.id);
+      if (As) moveTo(As, z[0], z[1], 160); if (Zs) moveTo(Zs, a[0], a[1], 160);
+      await wait(170);
+      if (As) moveTo(As, a[0], a[1], 180); if (Zs) moveTo(Zs, z[0], z[1], 180);
+      await wait(190); busy = false; return;
+    }
     const At = st.board[a[0]][a[1]], Zt = st.board[z[0]][z[1]];
     if (!At || !Zt || isHole(At) || isHole(Zt)) return;
     sel = null; busy = true; lastAct = now(); hintMove = null;
@@ -1736,6 +1970,11 @@
     hud();
     hintMove = findMove(st.board, st.mask);
     busy = false; lastAct = now();
+    if (tut && tut.active && tut.step && tut.step.kind === 'move') {
+      await wait(500 * SP);
+      showTutStep(tut.i + 1);
+      return;
+    }
     if (st.over) finish();
   }
   function addText(str, x, y, size, col) { fx.push({ type: 'text', str, x, y, size, col, t0: now(), dur: 900 * SP }); }
@@ -1787,6 +2026,7 @@
     return { newBadge, yum: newBadge || firstThree, firstThree, stars };
   }
   function finish() {
+    if ((tut && tut.active) || (st && st.tutorial)) return;
     const won = st.won;
     if (st.score > (prog.best[st.lv.n - 1] || 0)) { prog.best[st.lv.n - 1] = st.score; saveProg(); }
     winInfo = won ? recordWin(st) : { newBadge: false, yum: false, stars: 0 };
@@ -1827,6 +2067,7 @@
   }
   function leaveEnd() { stopEnd(); $('end').hidden = true; }
   function restart() {
+    if (tut && tut.active) return;
     leaveEnd();
     startLevel(lvNum);
   }
@@ -1838,6 +2079,7 @@
   }
   function backToMap() {
     leaveEnd();
+    if (tut) { tut = null; hideTutUi(); }
     showMap();
   }
 
@@ -1879,7 +2121,18 @@
   $('nextbtn').addEventListener('click', goNext);
   $('mapbtn').addEventListener('click', backToMap);
   $('endmap').addEventListener('click', backToMap);
-  $('introbtn').addEventListener('click', () => { unlockAudio(); startLevel(pendingLv); });
+  $('introbtn').addEventListener('click', () => { unlockAudio(); beginLevel(pendingLv); });
+  if ($('introx')) $('introx').addEventListener('click', () => { unlockAudio(); hideIntro(); });
+  if ($('intro')) $('intro').addEventListener('click', e => { if (e.target === $('intro')) hideIntro(); });
+  if ($('introhow')) $('introhow').addEventListener('click', () => { unlockAudio(); startTutorial(); });
+  if ($('howtobtn')) $('howtobtn').addEventListener('click', () => { unlockAudio(); startTutorial(); });
+  if ($('tutskip')) $('tutskip').addEventListener('click', () => { unlockAudio(); skipTutorial(); });
+  if ($('tutnext')) $('tutnext').addEventListener('click', () => {
+    unlockAudio();
+    if (!tut || !tut.active) return;
+    if (tut.step && tut.step.kind === 'ready') finishTutorial(true);
+    else showTutStep(tut.i + 1);
+  });
   if ($('pickicon')) $('pickicon').addEventListener('click', () => { unlockAudio(); openIconPicker(); });
   if ($('iconpick')) $('iconpick').addEventListener('click', e => {
     if (e.target === $('iconpick') || (e.target.closest && e.target.closest('[data-iconpick=close]'))) $('iconpick').hidden = true;
@@ -1904,14 +2157,14 @@
     }
   });
   root.addEventListener('pagehide', () => { stopAllMusic(); if (ac) ac.close().catch(() => { }); });
-  root.addEventListener('resize', fitCanvas);
+  root.addEventListener('resize', () => { fitCanvas(); if (tut && tut.active && tut.step && tut.step.move) placeTutHand(tut.step.move[0], tut.step.move[1]); });
 
   paintButtons();
   showMap();
   root.requestAnimationFrame(frame);
 
   root.SugarRush.ui = {
-    state: () => st, attempt, showEnd, showMap, scrollMapTo, openLevel, startLevel, progress: () => prog,
+    state: () => st, attempt, showEnd, showMap, scrollMapTo, openLevel, startLevel, showIntro, startTutorial, skipTutorial, finishTutorial, showTutStep, beginLevel, progress: () => prog, tutorial: () => tut,
     seedRace, syncRace, openIconPicker, setRaceOpen, requestCloseSugar, race: () => race,
     say, chime, callout, unlockAudio, audio,
     clipsReady: () => Object.keys(VOICE_FILES).every(k => !!bufs[k]),
