@@ -4616,16 +4616,16 @@ console.log('1.9.223 hourly lives ok');
   // Spoken sayings: the on-screen line is read out (not a generic "Great!"), throttled, minor ones skipped, own Voice toggle.
   const SR = load('feed/sugar-rush.js').SugarRush;
   const src = fs.readFileSync('feed/sugar-rush.js', 'utf8'), html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
-  assert.ok(SR.SPEAK_GAP >= 2000 && SR.SPEAK_PITCH > 1 && SR.SPEAK_PITCH < 1.5);
+  assert.ok(SR.SPEAK_PITCH > 1 && SR.SPEAK_PITCH < 1.5); // 1.9.226: no speech gap; sayings are paced on screen instead
   const vs = [{ name: 'Daniel', lang: 'en-GB' }, { name: 'Karen', lang: 'en-AU' }, { name: 'Alex', lang: 'en-US' }];
   assert.strictEqual(SR.pickSpeechVoice(vs).name, 'Karen', 'en-AU over en-GB');
   assert.strictEqual(SR.pickSpeechVoice(vs.concat([{ name: 'Aria', lang: 'en_NZ' }])).name, 'Aria', 'en-NZ first');
   assert.strictEqual(SR.pickSpeechVoice([{ name: 'Amélie', lang: 'fr-CA' }]), null);
   assert.strictEqual(SR.speakWorthy({ cascade: 1, popped: [1, 2, 3], jellyCleared: 1 }, 1), false, 'a plain match is minor');
   assert.strictEqual(SR.speakWorthy({ cascade: 3, popped: [1, 2, 3] }, 3), true);
-  assert.ok(src.includes('if (speakWorthy(step, step && (step.cascade || (i + 1)))) speakLine(text);'), 'speaks the saying on screen');
-  assert.ok(src.includes("if (!text || !soundOn || !voiceOn || (doc && doc.hidden)) return false;"), 'respects Sound and Voice');
-  assert.ok(src.includes('if (!opt.force && t - speakAt < SPEAK_GAP) return false;') && src.includes('duckMusicBrief(Math.min(2.4,'));
+  assert.ok(src.includes('sayUntil = t + sayShowGap(speakLine(text), reduce);'), 'speaks the saying on screen');
+  assert.ok(src.includes("if (!text || !soundOn || !voiceOn || (doc && doc.hidden)) return 0;"), 'respects Sound and Voice');
+  assert.ok(src.includes('duckMusicBrief(Math.min(2.6, c.dur))') && src.includes('duckMusicBrief(Math.min(2.4, est));'));
   assert.ok(src.includes("ls.get('ib-sugar-voice', true)") && html.includes('id="voicebtn"'));
   assert.ok(src.includes('if (word && !canSpeak() && !clipsReady()) say(word);'), 'old word clips only where speech and saying clips are missing');
   assert.ok(!/say\('(great|sweetas|awesome)'\)/.test(src));
@@ -4670,7 +4670,7 @@ console.log('1.9.224 songs ok');
   for (const t of pool) { const c = SR.SAY_CLIPS[t]; assert.ok(c && c.length === 4 && c.every(x => x >= 0) && c[1] > 0.2 && c[1] < 2.4 && c[3] > 0.2 && c[3] < 2.4, 'clips for ' + t); }
   for (const t of ['Goal achieved!', 'Sugar Crush!', 'Voice on!']) assert.ok(SR.SAY_CLIPS[t], t);
   // Clips sit in order without overlapping, inside each sprite.
-  for (const [i, j] of [[0, 1], [2, 3]]) { const xs = Object.values(SR.SAY_CLIPS).map(c => [c[i], c[i] + c[j]]).sort((a, b) => a[0] - b[0]); for (let k = 1; k < xs.length; k++) assert.ok(xs[k][0] - xs[k - 1][1] >= 0.25, 'gap'); }
+  for (const [i, j] of [[0, 1], [2, 3]]) { const xs = Object.values(SR.SAY_CLIPS).map(c => [c[i], c[i] + c[j]]).sort((a, b) => a[0] - b[0]); for (let k = 1; k < xs.length; k++) assert.ok(xs[k][0] - xs[k - 1][1] >= 0.2, 'gap'); }
   assert.deepStrictEqual(JSON.parse(JSON.stringify(SR.sayClip('Cherry on top!', 'm'))), { start: SR.SAY_CLIPS['Cherry on top!'][2], dur: SR.SAY_CLIPS['Cherry on top!'][3] });
   assert.strictEqual(SR.sayClip('Nope', 'f'), null);
   assert.strictEqual(SR.nextSayVoice('f', 0.1), 'm'); assert.strictEqual(SR.nextSayVoice('m', 0.1), 'f'); assert.strictEqual(SR.nextSayVoice('f', 0.9), 'f');
@@ -4685,10 +4685,31 @@ console.log('1.9.224 songs ok');
   assert.strictEqual(SR.pickSpeechVoice(vs, 'm').name, 'Lee'); assert.strictEqual(SR.pickSpeechVoice(vs, 'f').name, 'Karen');
   assert.strictEqual(SR.speechGender({ name: 'Microsoft Mitchell Online (Natural) - English (New Zealand)' }), 'm');
   assert.strictEqual(SR.speechGender({ name: 'Microsoft Molly Online (Natural) - English (New Zealand)' }), 'f');
-  assert.ok(src.includes('if (playSayClip(line, g, opt.force)) { sayVoice = g; speakAt = t; return true; }') && src.includes('const gv = speakVoices[g] || speakVoice;'));
+  assert.ok(src.includes('if (used) { sayVoice = used; speakAt = t; return queued + sayClip(line, used).dur; }') && src.includes('const gv = speakVoices[g] || speakVoice;'));
   assert.ok(src.includes("function loadSayClips() { if (soundOn && voiceOn && audio()) { loadBuf('say_f'); loadBuf('say_m'); } }"), 'lazy, only with sound and voice on');
 }
 console.log('1.9.225 male and female sayings ok');
+
+// 1.9.226 Every on-screen saying is spoken in full: no skips, paced display, queued voice, padded clips with a soft reverb.
+{
+  const SR = load('feed/sugar-rush.js').SugarRush;
+  const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
+  // Every line that can show on screen has a clip in both voices, under the exact key speakLine looks up.
+  const shown = new Set(); for (const k in SR.SAYINGS) SR.SAYINGS[k].forEach(x => shown.add(x)); SR.STREAK_NAMES.filter(Boolean).forEach(x => shown.add(x));
+  ['Goal achieved!', 'Sugar Crush!', 'Voice on!'].forEach(x => shown.add(x));
+  for (const t of shown) { const c = SR.SAY_CLIPS[t]; assert.ok(c, 'clip for ' + t); assert.ok(c[1] >= 0.6 && c[3] >= 0.6, 'padded with a reverb tail: ' + t); }
+  assert.strictEqual(Object.keys(SR.SAY_CLIPS).length, shown.size, 'no stray clips');
+  // No skipping left in the voice path; display pacing follows the spoken length.
+  assert.ok(!src.includes('if (speakWorthy(step') && !src.includes("synth.speaking || synth.pending) return false") && !src.includes('t - speakAt < SPEAK_GAP'));
+  assert.strictEqual(SR.sayShowGap(0, false), 1100); assert.strictEqual(SR.sayShowGap(1.5, false), 1850); assert.strictEqual(SR.sayShowGap(0.5, true), 1400);
+  assert.ok(src.includes('const at = Math.max(ac.currentTime + 0.01, sayEndAt)') && src.includes('src.start(at, c.start, c.dur);'), 'queued, exact padded offsets');
+  assert.ok(src.includes('speakLine(STREAK_NAMES[tier]);'), 'streak lines are said too');
+  assert.ok(src.includes("if (soundOn && voiceOn) { primeSpeech(); loadSayClips(); }"), 'clips load on the first touch');
+  assert.ok(src.includes("p.then(() => { if (now() - t < 1800 && soundOn && voiceOn)"), 'waits for clips still downloading instead of the phone voice');
+  assert.ok(src.includes("'sugar-rush-say-f.m4a': 'afcc3783'") && src.includes("'sugar-rush-say-m.m4a': 'e7fa1e02'"));
+}
+console.log('1.9.226 every saying spoken ok');
+
 
 
 
