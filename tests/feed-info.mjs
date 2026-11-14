@@ -965,7 +965,7 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   assert.strictEqual(SR.voiceForStep({ popped: [{}, {}, {}], made: [], fired: [{ s: 'b' }], bomb: true, cascade: 1 }, 1), 'succulent');
   assert.strictEqual(SR.voiceForStep({ popped: Array(12).fill({}), made: [], fired: [], cascade: 1 }, 1), 'succulent');
   assert.strictEqual(SR.voiceForStep({ popped: [{}, {}, {}], made: [], fired: [], cascade: 5 }, 5), 'succulent');
-  assert.ok(srJs.includes("if (won) say('yay')") && srJs.includes('function chime') && srJs.includes('function say'));
+  assert.ok(srJs.includes("if (won) cheer(") && srJs.includes('function chime') && srJs.includes('function say'));
   assert.ok(srJs.includes('duckMusicBrief') && srJs.includes('linearRampToValueAtTime(1, t0 + dur + 0.22)'));
   assert.ok(SR.LEVELS.length === 22 && SR.LEVELS[1].name === "Sarah's Sweet Spot");
   assert.ok(SR.LEVELS[1].theme === 'sarah' && SR.LEVELS[1].badge && SR.LEVELS[1].badge.special);
@@ -1323,7 +1323,7 @@ if (live) {
   }
   const srJs = fs.readFileSync('feed/sugar-rush.js', 'utf8');
   const srHtml = fs.readFileSync('feed/sugar-rush.html', 'utf8');
-  assert.ok(srJs.includes('fetch(mediaUrl(TRACKS[kind]))'), 'decoded-buffer fetches use the same busting');
+  assert.ok((srJs.includes('fetch(mediaUrl(TRACKS[kind]))') || srJs.includes('const get = f => fetch(mediaUrl(f))')), 'decoded-buffer fetches use the same busting');
   assert.ok(srJs.includes('function musicWatch') && srJs.includes('musicWatch()'));
   assert.ok(srHtml.includes('sugar-rush.js?v=') && srHtml.includes('scores.js?v='));
   const sw = fs.readFileSync('feed/sw.js', 'utf8');
@@ -4549,12 +4549,10 @@ console.log('1.9.220 pacific levels ok');
   // Race events.
   assert.ok(html.includes('id="racebar"') && html.includes('id="racebar2"') && html.includes('id="raceon"'));
   assert.ok(src.includes('function seedRaceEvent') && src.includes("if (!raceDemo) playSting()"));
-  // Lives: 3 a day, NZ midnight top-up, losing or leaving part-way costs one, tutorials and +3 moves never do, family gifts.
-  assert.ok(src.includes('const LIVES_PER_DAY = 3;') && src.includes("v = { day: day, n: Math.max(LIVES_PER_DAY, v.n | 0) }"), 'midnight top-up keeps gifted extras');
+  // Lives: losing or leaving part-way costs one, tutorials and +3 moves never do, family gifts (1.9.223: hourly regeneration below).
   assert.ok(/function settleLife\(\) \{\s*if \(!st \|\| st\.tutorial \|\| st\.won \|\| st\.lifeDone\) return;/.test(src), 'tutorials and wins never cost a life');
   assert.ok(src.includes('if (lives() <= 0) { tut = null; hideTutUi(); showLives(\'out\'); return; }'), 'no lives, no level');
   assert.ok(src.includes('st.played = true; // Keep going'), '+3 moves keeps going on the same life');
-  assert.ok(src.includes("timeZone: 'Pacific/Auckland', hour: '2-digit'") && src.includes('function countdownText'));
   assert.ok(src.includes("S.postLives({ act: 'claim' })") && src.includes("S.postLives({ act: 'ask' })") && src.includes("S.postLives({ act: 'send', to: btn.dataset.lifeTo })"));
   assert.ok(html.includes('id="maphearts"') && html.includes('id="hearts2"') && html.includes('id="livesov"'));
   const scoresJs = fs.readFileSync('feed/scores.js', 'utf8');
@@ -4563,4 +4561,82 @@ console.log('1.9.220 pacific levels ok');
   assert.ok(!/candy crush/i.test(src + html), 'no Candy Crush names in the game');
 }
 console.log('1.9.222 bluff, australia, hard, lightning and race ok');
+
+// 1.9.223: lives regenerate one an hour up to 3 (timestamps, so it works while closed); gifts can go above 3.
+{
+  const SR = load('feed/sugar-rush.js').SugarRush;
+  const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
+  const H = 36e5, T0 = Date.UTC(2026, 10, 14, 1, 0, 0);
+  assert.strictEqual(SR.LIVES_MAX, 3);
+  assert.strictEqual(SR.LIFE_MS, H);
+  const plain = v => JSON.parse(JSON.stringify(v));
+  assert.deepStrictEqual(plain(SR.regenLives(null, T0)), { v: 2, n: 3, t: null }, 'new players start full');
+  // Spending from full starts the clock; one hour later a life is back, and it stops at 3.
+  let v = SR.changeLives({ v: 2, n: 3, t: null }, -1, T0);
+  assert.deepStrictEqual(plain(v), { v: 2, n: 2, t: T0 });
+  assert.strictEqual(SR.nextLifeMs(v, T0 + 15 * 60e3), 45 * 60e3);
+  assert.strictEqual(SR.regenLives(v, T0 + H - 1).n, 2);
+  assert.deepStrictEqual(plain(SR.regenLives(v, T0 + H)), { v: 2, n: 3, t: null });
+  // From 0, closed for 2.5 hours: 2 lives back and the third is half an hour away.
+  v = SR.changeLives(SR.changeLives(SR.changeLives({ v: 2, n: 3, t: null }, -1, T0), -1, T0 + 60e3), -1, T0 + 120e3);
+  assert.strictEqual(v.n, 0); assert.strictEqual(v.t, T0, 'spending below 3 keeps the running clock');
+  const later = SR.regenLives(v, T0 + 2.5 * H);
+  assert.deepStrictEqual(plain(later), { v: 2, n: 2, t: T0 + 2 * H });
+  assert.strictEqual(SR.nextLifeMs(v, T0 + 2.5 * H), H / 2);
+  assert.strictEqual(SR.regenLives(v, T0 + 30 * H).n, 3, 'never regenerates past 3');
+  // Gifts go above 3 and nothing regenerates while above 3; spending back down from 4 to 3 starts no clock.
+  v = SR.changeLives({ v: 2, n: 3, t: null }, 2, T0);
+  assert.deepStrictEqual(plain(v), { v: 2, n: 5, t: null });
+  assert.strictEqual(SR.regenLives(v, T0 + 10 * H).n, 5);
+  assert.deepStrictEqual(plain(SR.changeLives({ v: 2, n: 4, t: null }, -1, T0)), { v: 2, n: 3, t: null });
+  assert.strictEqual(SR.nextLifeMs({ v: 2, n: 4, t: null }, T0), 0);
+  // A gift while waiting tops up but keeps the clock running.
+  assert.deepStrictEqual(plain(SR.changeLives({ v: 2, n: 1, t: T0 }, 1, T0 + 10 * 60e3)), { v: 2, n: 2, t: T0 });
+  // Migration from 1.9.222 { day, n }: an older day tops up to 3 (gift extras kept); today's low count starts the clock now.
+  assert.deepStrictEqual(plain(SR.regenLives({ day: '2026-11-13', n: 1 }, T0)), { v: 2, n: 3, t: null });
+  assert.deepStrictEqual(plain(SR.regenLives({ day: '2026-11-13', n: 5 }, T0)), { v: 2, n: 5, t: null });
+  assert.deepStrictEqual(plain(SR.regenLives({ day: SR.nzDay ? SR.nzDay(T0) : '2026-11-14', n: 1 }, T0)), { v: 2, n: 1, t: T0 });
+  assert.deepStrictEqual(plain(SR.regenLives({ day: '2026-11-14', n: 0 }, T0)), { v: 2, n: 0, t: T0 });
+  assert.strictEqual(SR.regenLives({ v: 2, n: 'x' }, T0).n, 3, 'junk resets to full');
+  assert.strictEqual(SR.regenLives({ v: 2, n: 1, t: T0 + 5 * H }, T0).n, 1, 'a clock in the future is clamped, not trusted');
+  assert.strictEqual(SR.mmss(45 * 60e3), '45:00'); assert.strictEqual(SR.mmss(61e3 - 1), '01:01'); assert.strictEqual(SR.mmss(0), '00:00');
+  // UI: hearts and the out-of-lives card count down mm:ss to the next life, not to midnight.
+  assert.ok(src.includes("'<em class=\"hn\">' + mmss(ms) + '</em>'") && src.includes('heartsTimer = setInterval'));
+  assert.ok(src.includes('<span>Next life in</span><b id="livescount">\' + mmss(nextLife())') || src.includes("<span>Next life in</span><b id=\"livescount\">' + mmss(nextLife())"));
+  assert.ok(!/midnight \(NZ time\)|topped up at midnight|New lives at midnight|LIVES_PER_DAY|msToNzMidnight/.test(src), 'no midnight refill left');
+  assert.ok(src.includes('addLives(-1);') && src.includes('addLives(got.claimed);'));
+}
+{
+  const ex = fs.readFileSync('feed/extras.js', 'utf8'), rt = fs.readFileSync('worker/src/retain.js', 'utf8');
+  assert.ok(ex.includes("['sugar', '🍬 Sugar Rush races & lives from family']"), 'Settings toggle for Sugar Rush race and lives pushes');
+  assert.ok(/NOTE_TYPES = \[[^\]]*'sugar'/.test(rt) && /sugar: 1/.test(rt), 'the Worker knows the sugar type and defaults it on');
+}
+console.log('1.9.223 hourly lives ok');
+{
+  // Spoken sayings: the on-screen line is read out (not a generic "Great!"), throttled, minor ones skipped, own Voice toggle.
+  const SR = load('feed/sugar-rush.js').SugarRush;
+  const src = fs.readFileSync('feed/sugar-rush.js', 'utf8'), html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
+  assert.ok(SR.SPEAK_GAP >= 2000 && SR.SPEAK_PITCH > 1 && SR.SPEAK_PITCH < 1.5);
+  const vs = [{ name: 'Daniel', lang: 'en-GB' }, { name: 'Karen', lang: 'en-AU' }, { name: 'Alex', lang: 'en-US' }];
+  assert.strictEqual(SR.pickSpeechVoice(vs).name, 'Karen', 'en-AU over en-GB');
+  assert.strictEqual(SR.pickSpeechVoice(vs.concat([{ name: 'Aria', lang: 'en_NZ' }])).name, 'Aria', 'en-NZ first');
+  assert.strictEqual(SR.pickSpeechVoice([{ name: 'Amélie', lang: 'fr-CA' }]), null);
+  assert.strictEqual(SR.speakWorthy({ cascade: 1, popped: [1, 2, 3], jellyCleared: 1 }, 1), false, 'a plain match is minor');
+  assert.strictEqual(SR.speakWorthy({ cascade: 3, popped: [1, 2, 3] }, 3), true);
+  assert.ok(src.includes('if (speakWorthy(step, step && (step.cascade || (i + 1)))) speakLine(text);'), 'speaks the saying on screen');
+  assert.ok(src.includes("if (!text || !soundOn || !voiceOn || !canSpeak() || (doc && doc.hidden)) return false;"), 'respects Sound and Voice');
+  assert.ok(src.includes('if (!opt.force && t - speakAt < SPEAK_GAP) return false;') && src.includes('duckMusicBrief(Math.min(2.4,'));
+  assert.ok(src.includes("ls.get('ib-sugar-voice', true)") && html.includes('id="voicebtn"'));
+  assert.ok(src.includes('if (word && !canSpeak()) say(word);'), 'clips only where speech is missing');
+  assert.ok(!/say\('(great|sweetas|awesome)'\)/.test(src));
+  // Song slots: levels 1-7 keep our tunes; Shane's songs by mood from level 8; nothing changes until a file is listed.
+  assert.strictEqual(SR.SONG_FROM, 8);
+  assert.deepStrictEqual(Array.from(SR.SONG_PLAN.intense), [13, 15, 19, 22]);
+  for (let n = 1; n <= 7; n++) assert.strictEqual(SR.songMood(n), null);
+  assert.strictEqual(SR.songMood(17), 'calm'); assert.strictEqual(SR.songMood(9), 'upbeat'); assert.strictEqual(SR.songMood(22), 'intense');
+  for (const k in SR.SONG_FILES) { const f = SR.SONG_FILES[k]; assert.ok(/\.m4a$/.test(f) && SR.MEDIA_HASH[f] && SR.MEDIA_HASH[f.replace(/\.m4a$/, '.mp3')], k); assert.ok(fs.existsSync('feed/' + SR.mediaUrl(f)) && fs.existsSync('feed/' + SR.mediaUrl(f.replace(/\.m4a$/, '.mp3')))); }
+  assert.ok(src.includes("loading[kind] = get(file).catch(e => { if (mp3 !== file && MEDIA_HASH[mp3]) return get(mp3); throw e; })"), 'mp3 fallback');
+}
+console.log('1.9.223 voice and song slots ok');
+
 

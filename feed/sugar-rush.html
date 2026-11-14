@@ -638,9 +638,11 @@
   .hearts { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px 4px 8px; min-height: 0; border-radius: 999px; border: 2px solid #ffb3d3; background: rgba(255,255,255,.95); box-shadow: 0 3px 0 #f4a0c4; color: #c2185b; font: 900 15px/1 ui-rounded, system-ui, sans-serif; cursor: pointer; width: auto; }
   .hearts i { font-style: normal; font-size: 16px; }
   .hearts.out { border-color: #c9a0b3; color: #8a5a70; }
+  .hearts .hn { font-style: normal; font-size: 11px; font-weight: 800; color: #b0457a; margin-left: 3px; font-variant-numeric: tabular-nums; }
+  .hearts.inlevel .hn { font-size: 10px; }
   .hearts.onmap { position: absolute; left: 10px; top: 58px; z-index: 7; }
   .hearts.inlevel { position: absolute; right: 20px; top: 22px; z-index: 3; }
-  body.ingame #game h1 { padding-right: 76px; }
+  body.ingame #game h1 { padding-right: 112px; }
   #game { position: relative; }
   .livesov .livescard { text-align: center; }
   .livesov .lv-big { font-size: 54px; line-height: 1; }
@@ -749,6 +751,7 @@
       <div class="acts">
         <button type="button" id="soundbtn">🔉 Sound on</button>
         <button type="button" id="musicbtn">🎵 Music on</button>
+        <button type="button" id="voicebtn">🗣️ Voice on</button>
         <button type="button" id="restartbtn">Restart</button>
         <button type="button" id="mapbtn">Levels</button>
       </div>

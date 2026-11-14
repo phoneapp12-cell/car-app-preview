@@ -1389,6 +1389,26 @@
   const SFX_MASTER = 0.96, SFX_NOTE = 0.10, SFX_LP = 2500, SFX_MAX_HZ = 800;
   const VOICE_VOL = 0.36, CHIME_VOL = 0.10, CHIME_DUR = 0.20, VOICE_GAP = 1.2;
   const SCALE = [440.0, 523.3, 587.3, 659.3, 784.0];
+  // 1.9.223 Spoken sayings: the game reads out the same inventive line that pops up on screen, instead of a generic
+  // "Great!" clip. A cheerful device voice (en-NZ, then en-AU, preferred) a little pitched up; at most one every
+  // SPEAK_GAP ms, and the minor ones (a plain match that only chipped a goal) are skipped.
+  const SPEAK_GAP = 2500, SPEAK_PITCH = 1.25, SPEAK_RATE = 1.05, SPEAK_VOL = 0.9;
+  const SPEAK_LANGS = ['en-nz', 'en-au', 'en-gb', 'en-ie', 'en-za', 'en-us', 'en'];
+  function pickSpeechVoice(list) {
+    list = Array.from(list || []);
+    const cheer = /(female|aria|natasha|karen|catherine|matilda|serena|samantha|libby|sonia|molly|zira|google uk english female)/i;
+    let best = null, bestScore = -1;
+    list.forEach(function (v) {
+      const lang = String(v && v.lang || '').toLowerCase().replace('_', '-');
+      let i = SPEAK_LANGS.findIndex(function (l) { return lang === l || lang.indexOf(l + '-') === 0 || (l === 'en' && lang.indexOf('en') === 0); });
+      if (i < 0) return;
+      const score = (SPEAK_LANGS.length - i) * 10 + (cheer.test(v.name || '') ? 3 : 0) + (v.localService ? 1 : 0);
+      if (score > bestScore) { bestScore = score; best = v; }
+    });
+    return best;
+  }
+  // Minor sayings are not spoken: a lone plain match that only chipped a goal tile. Specials, cascades and combos are.
+  function speakWorthy(step, cascade) { return !!voiceForStep(step, cascade); }
   const VOICE_FILES = {
     yay: 'sugar-rush-voice-yay.mp3',
     great: 'sugar-rush-voice-great.mp3',
@@ -1407,10 +1427,26 @@
     'sugar-rush-voice-yay.mp3': '6ca043f6', 'sugar-rush-voice-great.mp3': 'c287c114', 'sugar-rush-voice-awesome.mp3': 'a56af295',
     'sugar-rush-voice-sweetas.mp3': '50b435e6', 'sugar-rush-voice-succulent.mp3': '1d5018ba'
   };
-  function mediaUrl(file) { return file.replace(/\.mp3$/, '-' + MEDIA_HASH[file] + '.mp3'); }
+  function mediaUrl(file) { return file.replace(/\.(mp3|m4a)$/, '-' + MEDIA_HASH[file] + '.$1'); }
+  // 1.9.223 Shane's songs for the later levels, picked by mood: the most intense for the Hard and Super Hard levels,
+  // the calmest for the Pacific islands, the upbeat one for the rest. Levels 1-7 keep our own tunes (Shane likes
+  // them for the early stages). Each song ships as AAC (.m4a, ~96 kbps) with an .mp3 fallback; a mood with no
+  // file yet simply keeps the usual loop, so this is safe before the songs land.
+  const SONG_PLAN = { intense: [13, 15, 19, 22], calm: [17, 18], upbeat: [8, 9, 10, 11, 12, 14, 16, 20, 21] };
+  const SONG_FILES = {};
+  const SONG_FROM = 8;
+  function songMood(level) {
+    if (!(level >= SONG_FROM)) return null;
+    for (const k in SONG_PLAN) if (SONG_PLAN[k].indexOf(level) >= 0) return k;
+    return 'upbeat';
+  }
   // Level 1 plays Shane's "Sugar Rush" song, level 2 plays "Sarah's Sugar Sprint";
-  // later levels keep the usual gameplay loop.
-  function gameTrack(level) { return level === 1 ? 'sugar-rush-l1.mp3' : level === 2 ? 'sugar-rush-l2.mp3' : 'sugar-rush-music.mp3'; }
+  // later levels keep the usual gameplay loop until their song is in.
+  function gameTrack(level) {
+    const mood = songMood(level);
+    if (mood && SONG_FILES[mood]) return SONG_FILES[mood];
+    return level === 1 ? 'sugar-rush-l1.mp3' : level === 2 ? 'sugar-rush-l2.mp3' : 'sugar-rush-music.mp3';
+  }
 
   function attachSfxBus(ctx) {
     const mix = ctx.createGain(); mix.gain.value = 1;
@@ -2433,6 +2469,39 @@
     const lv = LEVELS[(levelN | 0) - 1], hard = (lv && lv.hard) || 0;
     return { id: ids[((levelN | 0) + (firstWin ? 0 : (stars | 0))) % 3], n: 1 + hard };
   }
+  // 1.9.223 Lives regenerate: one every hour up to 3, worked out from timestamps so it carries on while the app is closed.
+  // Gifted lives can go above 3; nothing regenerates while above 3. v = { v: 2, n, t } where t is when the next hour started.
+  const LIVES_MAX = 3, LIFE_MS = 36e5;
+  function regenLives(v, now) {
+    now = now == null ? Date.now() : now;
+    if (!v || typeof v !== 'object' || typeof v.n !== 'number' || !isFinite(v.n)) return { v: 2, n: LIVES_MAX, t: null };
+    let n = Math.max(0, Math.floor(v.n));
+    if (v.v !== 2) {
+      // 1.9.222 saved { day, n } with a midnight top-up: an older day tops up to 3 first; below 3, the hourly clock starts now.
+      if (typeof v.day === 'string' && v.day !== nzDay(now)) n = Math.max(LIVES_MAX, n);
+      return { v: 2, n: n, t: n < LIVES_MAX ? now : null };
+    }
+    let t = typeof v.t === 'number' && isFinite(v.t) ? Math.min(v.t, now) : null;
+    if (n >= LIVES_MAX) return { v: 2, n: n, t: null };
+    if (t == null) t = now;
+    const gained = Math.floor((now - t) / LIFE_MS);
+    if (gained > 0) { n = Math.min(LIVES_MAX, n + gained); t = n >= LIVES_MAX ? null : t + gained * LIFE_MS; }
+    return { v: 2, n: n, t: t };
+  }
+  // Spend (or add) lives on a regenerated state: dropping below 3 from 3 or more starts the hourly clock.
+  function changeLives(v, delta, now) {
+    now = now == null ? Date.now() : now;
+    const cur = regenLives(v, now);
+    const n = Math.max(0, cur.n + delta);
+    if (n >= LIVES_MAX) return { v: 2, n: n, t: null };
+    return { v: 2, n: n, t: cur.n >= LIVES_MAX ? now : (cur.t == null ? now : cur.t) };
+  }
+  function nextLifeMs(v, now) {
+    now = now == null ? Date.now() : now;
+    const cur = regenLives(v, now);
+    return cur.n >= LIVES_MAX || cur.t == null ? 0 : Math.max(0, cur.t + LIFE_MS - now);
+  }
+  function mmss(ms) { const s = Math.max(0, Math.ceil(ms / 1000)); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
   function hardWinLine(h) {
     return h === 2 ? 'Super Hard level conquered! You are a true sweet legend! 🔥🔥 ' : h === 1 ? 'Hard level beaten! Brilliant sweet skills! 🔥 ' : '';
   }
@@ -2462,12 +2531,12 @@
 
   root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_STOPS, FUTURE_STOPS, LV_COUNT, lvId, levelIds, stopId, LEGACY_220_IDS, migrateProg, stopForLevel, icingPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, bubLeft, liqLeft, spreadLiq, LIQ_IDLE, goalCounts, cloneState, bestMove, hintMoveFor, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
     allowed: () => !!(root.IBScores && root.IBScores.isShane && root.IBScores.isShane()),
-    SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL, XF,
-    VOICE_FILES, VOICE_RANK, MEDIA_HASH, mediaUrl, gameTrack, attachSfxBus, playTone, playChime, playMovesWarnChime, playClip, voiceForStep,
+    SPEAK_GAP, SPEAK_PITCH, SPEAK_RATE, SPEAK_VOL, pickSpeechVoice, speakWorthy, SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL, XF,
+    VOICE_FILES, VOICE_RANK, MEDIA_HASH, mediaUrl, gameTrack, SONG_PLAN, SONG_FILES, SONG_FROM, songMood, attachSfxBus, playTone, playChime, playMovesWarnChime, playClip, voiceForStep,
     SAYINGS, SAYING_COLORS, SAYING_VOICE, sayingKind, pickSaying, sayingColor, MOVES_WARN_AT, MOVES_WARN_MS, HINT_IDLE_MS, HINT_REPEAT_MS,
     SPARKLE_MIN_MS, SPARKLE_MAX_MS, SPARKLE_MAX, SPARKLE_MAX_REDUCE, SHIMMER_MS, sparkleCap, sparkleEase, shimmerAt, drawStarGlint, drawCandyShine,
     SCENES, sceneFor, sceneSvg, sceneSprites, STREAK_STEP, STREAK_MAX_TIER, STREAK_NAMES, streakStepGain, streakGain, streakNext, streakTier, streakFill, shakeLevel,
-    BOOSTERS, EXTRA_MOVES, normBoosters, addPrize, takeBooster, SPIN_PRIZES, nzDay, canSpin, spinPick, spinAngle, prizeAt, chestReward, boosterInfo, hammerAt, shuffleBooster };
+    BOOSTERS, EXTRA_MOVES, normBoosters, addPrize, takeBooster, SPIN_PRIZES, nzDay, canSpin, spinPick, spinAngle, prizeAt, chestReward, boosterInfo, hammerAt, shuffleBooster, LIVES_MAX, LIFE_MS, regenLives, changeLives, nextLifeMs, mmss };
 
   if (!root.document) return;
   const doc = root.document;
@@ -2480,7 +2549,7 @@
 
   const reduce = root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const SP = reduce ? 0.35 : 1;
-  let soundOn = ls.get('ib-sugar-sound', true), musicOn = ls.get('ib-sugar-music', true);
+  let soundOn = ls.get('ib-sugar-sound', true), musicOn = ls.get('ib-sugar-music', true), voiceOn = ls.get('ib-sugar-voice', true);
   let screen = 'map', lvNum = 1, st = null, pendingLv = 1;
   let busy = false, sel = null, down = null, lastAct = performance.now();
   let sprites = new Map(), fx = [], hintMove = null;
@@ -2546,13 +2615,21 @@
     if (bufs[kind]) return Promise.resolve(bufs[kind]);
     if (loading[kind]) return loading[kind];
     if (!audio()) return Promise.resolve(null);
-    loading[kind] = fetch(mediaUrl(TRACKS[kind])).then(r => r.arrayBuffer()).then(ab => ac.decodeAudioData(ab.slice(0))).then(b => { bufs[kind] = b; return b; }).catch(() => { loading[kind] = null; return null; });
+    const file = TRACKS[kind] || (kind.indexOf('song_') === 0 ? SONG_FILES[kind.slice(5)] : null);
+    if (!file) return Promise.resolve(null);
+    const get = f => fetch(mediaUrl(f)).then(r => { if (!r.ok) throw new Error('media ' + r.status); return r.arrayBuffer(); }).then(ab => ac.decodeAudioData(ab.slice(0)));
+    // AAC first (smaller); if this phone cannot fetch or decode it, the mp3 twin.
+    const mp3 = file.replace(/\.m4a$/, '.mp3');
+    loading[kind] = get(file).catch(e => { if (mp3 !== file && MEDIA_HASH[mp3]) return get(mp3); throw e; })
+      .then(b => { bufs[kind] = b; return b; }).catch(() => { loading[kind] = null; return null; });
     return loading[kind];
   }
   const TRACKS = { game: 'sugar-rush-music.mp3', game1: 'sugar-rush-l1.mp3', game2: 'sugar-rush-l2.mp3', menu: 'sugar-rush-menu.mp3', win: 'sugar-rush-win.mp3', yum: 'sugar-rush-yum.mp3', yay: VOICE_FILES.yay, great: VOICE_FILES.great, awesome: VOICE_FILES.awesome, sweetas: VOICE_FILES.sweetas, succulent: VOICE_FILES.succulent };
   function volFor(kind) { return kind === 'menu' ? MENU_VOL : BGM_VOL; }
   function gameKind(level) {
     const n = level == null ? lvNum : level;
+    const mood = songMood(n);
+    if (mood && SONG_FILES[mood]) return 'song_' + mood;
     return n === 1 ? 'game1' : n === 2 ? 'game2' : 'game';
   }
   // 1.9.171 One music controller: exactly one intended track at a time.
@@ -2705,6 +2782,7 @@
     silentUnlock(ac);
     const p = (ac.state === 'suspended' || ac.state === 'interrupted') ? ac.resume() : Promise.resolve();
     p.then(() => { if (musicOn) playKind(wantKind()); }).catch(() => { });
+    if (soundOn && voiceOn) primeSpeech();
   }
 
   function stopVoice() {
@@ -2727,7 +2805,7 @@
   // Spoken callouts: never overlap, at most one every VOICE_GAP seconds, bigger word wins.
   function say(word) {
     const rank = VOICE_RANK[word] || 0;
-    if (!rank) return;
+    if (!rank || !voiceOn) return;
     runAudio(() => {
       const t = ac.currentTime;
       if (t < voiceUntil && rank <= voiceRank) return;
@@ -2749,10 +2827,47 @@
     });
   }
   function callout(step, i) {
+    // 1.9.223 With speech available the saying itself is spoken (from showSaying); the clips are the fallback.
     const word = voiceForStep(step, step && (step.cascade || (i + 1)));
-    if (word) say(word);
-    else chime();
+    if (word && !canSpeak()) say(word);
+    else if (!word) chime();
   }
+  // ---- 1.9.223 Spoken sayings (speechSynthesis) ----
+  const synth = root.speechSynthesis || null;
+  let speakVoice = null, speakAt = -1e9, speakPrimed = false;
+  function canSpeak() { return !!(synth && root.SpeechSynthesisUtterance); }
+  function loadSpeechVoice() { try { speakVoice = pickSpeechVoice(synth.getVoices()); } catch (e) { speakVoice = null; } }
+  if (canSpeak()) { loadSpeechVoice(); try { synth.addEventListener('voiceschanged', loadSpeechVoice); } catch (e) { } }
+  function primeSpeech() {
+    // iOS only lets speech start from a tap: speak a silent blank once on the first touch.
+    if (speakPrimed || !canSpeak()) return;
+    speakPrimed = true;
+    try { const u = new root.SpeechSynthesisUtterance(' '); u.volume = 0; synth.speak(u); } catch (e) { }
+  }
+  function speakLine(text, opt) {
+    opt = opt || {};
+    if (!text || !soundOn || !voiceOn || !canSpeak() || (doc && doc.hidden)) return false;
+    const t = now();
+    if (!opt.force && t - speakAt < SPEAK_GAP) return false;
+    const line = String(text).replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF\uFE0F]/gu, '').trim();
+    if (!line) return false;
+    try {
+      if (opt.force) synth.cancel();
+      else if (synth.speaking || synth.pending) return false;
+      const u = new root.SpeechSynthesisUtterance(line);
+      if (!speakVoice) loadSpeechVoice();
+      if (speakVoice) { u.voice = speakVoice; u.lang = speakVoice.lang; } else u.lang = 'en-NZ';
+      u.pitch = SPEAK_PITCH; u.rate = SPEAK_RATE; u.volume = SPEAK_VOL;
+      speakAt = t;
+      duckMusicBrief(Math.min(2.4, 0.45 + line.length * 0.065));
+      synth.speak(u);
+      return true;
+    } catch (e) { return false; }
+  }
+  function stopSpeech() { try { if (synth) synth.cancel(); } catch (e) { } }
+  // Big moments: speak the banner words when speech works, otherwise the old clip.
+  function cheer(text, word, force) { if (!speakLine(text, { force: !!force }) && !(canSpeak() && voiceOn)) say(word); }
+  function setVoice(on) { voiceOn = !!on; ls.set('ib-sugar-voice', voiceOn); if (!voiceOn) stopSpeech(); paintButtons(); if (voiceOn) { primeSpeech(); speakLine('Voice on!', { force: true }); } }
 
   // ---------- Look ----------
   const COL = [['#ff6b88', '#ff1a4a', '#c40032'], ['#ffb347', '#ff6a00', '#c44e00'], ['#ffe566', '#ffc107', '#d99400'], ['#5dff7a', '#12d04a', '#0b8a2c'], ['#6ed0ff', '#1a8cff', '#0b5ad6'], ['#d894ff', '#c026f0', '#7a12b0']];
@@ -3247,46 +3362,31 @@
 
 
   let tut = null, crush = null;
-  /* ---- 1.9.222 Lives: 3 a day, refilled at NZ midnight (no timed regeneration). Losing or leaving a level part-way
-     costs one. Family members can send a life (the Worker carries it); gifted lives can go above 3. ---- */
-  const LIVES_PER_DAY = 3;
-  let livesDemo = false, livesTimer = 0, livesInfo = null;
+  /* ---- 1.9.222 Lives (1.9.223: one regenerates every hour up to 3). Losing or leaving a level part-way costs one.
+     Family members can send a life (the Worker carries it); gifted lives can go above 3. ---- */
+  let livesDemo = false, livesTimer = 0, livesInfo = null, heartsTimer = 0;
   function livesKey() { return 'ib-sugar-lives' + memberTag(); }
-  function lives() {
-    const day = nzDay();
-    let v = ls.get(livesKey(), null);
-    if (!v || typeof v !== 'object' || typeof v.n !== 'number') v = { day: day, n: LIVES_PER_DAY };
-    else if (v.day !== day) v = { day: day, n: Math.max(LIVES_PER_DAY, v.n | 0) }; // midnight top-up; gifted extras carry over
-    ls.set(livesKey(), v);
-    return Math.max(0, v.n | 0);
-  }
-  function setLives(n) { ls.set(livesKey(), { day: nzDay(), n: Math.max(0, n | 0) }); paintHearts(); }
+  function livesState() { const v = regenLives(ls.get(livesKey(), null)); ls.set(livesKey(), v); return v; }
+  function lives() { return livesState().n; }
+  function addLives(delta) { ls.set(livesKey(), changeLives(ls.get(livesKey(), null), delta)); paintHearts(); }
+  function setLives(n) { const cur = livesState(); addLives((n | 0) - cur.n); }
+  function nextLife() { return nextLifeMs(ls.get(livesKey(), null)); }
   function settleLife() {
     if (!st || st.tutorial || st.won || st.lifeDone) return;
     if (!(st.played || st.over)) return;
     st.lifeDone = true;
-    setLives(lives() - 1);
-  }
-  function msToNzMidnight(t) {
-    t = t == null ? Date.now() : t;
-    try {
-      const parts = new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).formatToParts(new Date(t));
-      const g = function (k) { const x = parts.find(function (p) { return p.type === k; }); return x ? +x.value % 24 : 0; };
-      return Math.max(1000, ((23 - g('hour')) * 3600 + (59 - g('minute')) * 60 + (60 - g('second'))) * 1000);
-    } catch (e) { return 36e5; }
-  }
-  function countdownText(ms) {
-    const s = Math.ceil(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
-    return h + ':' + String(m).padStart(2, '0') + ':' + String(x).padStart(2, '0');
+    addLives(-1);
   }
   function paintHearts() {
-    const n = lives();
+    const n = lives(), ms = nextLife();
     ['maphearts', 'hearts2'].forEach(function (id) {
       const el = $(id); if (!el) return;
-      el.innerHTML = (n ? '<i aria-hidden="true">❤️</i>' : '<i aria-hidden="true">💔</i>') + '<b>' + n + '</b>';
+      el.innerHTML = (n ? '<i aria-hidden="true">❤️</i>' : '<i aria-hidden="true">💔</i>') + '<b>' + n + '</b>' + (ms ? '<em class="hn">' + mmss(ms) + '</em>' : '');
       el.classList.toggle('out', !n);
-      el.setAttribute('aria-label', n + (n === 1 ? ' life' : ' lives') + ' left' + (n ? '' : '. New lives at midnight.'));
+      el.setAttribute('aria-label', n + (n === 1 ? ' life' : ' lives') + ' left' + (ms ? '. Next life in ' + Math.ceil(ms / 60000) + ' minutes.' : ''));
     });
+    // Tick the mm:ss countdown once a second while a life is on its way.
+    if (ms && !heartsTimer) heartsTimer = setInterval(function () { if (!nextLife()) { clearInterval(heartsTimer); heartsTimer = 0; } paintHearts(); }, 1000);
   }
   function livesApi() { const S = root.IBScores; return !livesDemo && S && S.who && S.who() && S.loadLives && S.postLives ? S : null; }
   // On each open of the map: collect any lives the family has sent.
@@ -3298,7 +3398,7 @@
     if (!info || !info.pending) return;
     let got = null;
     try { got = await S.postLives({ act: 'claim' }); } catch (e) { got = null; }
-    if (got && got.claimed > 0) { livesInfo = got; setLives(lives() + got.claimed); showLives('gift', { claimed: got.claimed, from: got.from || [] }); }
+    if (got && got.claimed > 0) { livesInfo = got; addLives(got.claimed); showLives('gift', { claimed: got.claimed, from: got.from || [] }); }
   }
   function familyRows(info) {
     const fam = (info && info.family) || [];
@@ -3317,8 +3417,8 @@
     let html = '';
     if (mode === 'out') {
       html = '<div class="lv-big" aria-hidden="true">💔</div><h2>Out of lives</h2>' +
-        '<p>You have used today\'s lives. New lives arrive at midnight (NZ time), or ask the family to send you one.</p>' +
-        '<div class="lv-count"><span>New lives in</span><b id="livescount">' + countdownText(msToNzMidnight()) + '</b></div>' +
+        '<p>A new life arrives every hour, up to ' + LIVES_MAX + '. Or ask the family to send you one.</p>' +
+        '<div class="lv-count"><span>Next life in</span><b id="livescount">' + mmss(nextLife()) + '</b></div>' +
         '<button type="button" class="pri" id="askbtn"' + (info && info.asked ? ' disabled' : '') + '>' + (info && info.asked ? 'Asked today ✓' : '🙏 Ask family for lives') + '</button>' +
         '<p class="lv-msg" id="livesmsg" aria-live="polite">' + (data.msg || '') + '</p>' +
         '<button type="button" data-lives="close">Back to map</button>';
@@ -3332,7 +3432,7 @@
       ov.className = 'ov livesov gift';
     } else {
       html = '<div class="lv-hd"><span class="lv-hearts">' + (n ? '❤️' : '💔') + ' <b>' + n + '</b></span><h2>Lives</h2></div>' +
-        '<p>' + LIVES_PER_DAY + ' lives every day, topped up at midnight. Losing or leaving a level uses one; tutorials and +3 moves never do.</p>' +
+        '<p>Up to ' + LIVES_MAX + ' lives, with a new one every hour' + (nextLife() ? ' (next in ' + mmss(nextLife()) + ')' : '') + '. Losing or leaving a level uses one; tutorials and +3 moves never do.</p>' +
         '<h3>Send a life</h3><p class="lv-sub">One life a day to each family member.</p>' + familyRows(info) +
         (n ? '' : '<button type="button" class="pri" id="askbtn"' + (info && info.asked ? ' disabled' : '') + '>' + (info && info.asked ? 'Asked today ✓' : '🙏 Ask family for lives') + '</button>') +
         '<p class="lv-msg" id="livesmsg" aria-live="polite">' + (data.msg || '') + '</p>' +
@@ -3343,8 +3443,7 @@
     ov.hidden = false;
     if (mode === 'out') livesTimer = setInterval(function () {
       const el = $('livescount'); if (!el || ov.hidden) { clearInterval(livesTimer); return; }
-      const ms = msToNzMidnight();
-      el.textContent = countdownText(ms);
+      el.textContent = mmss(nextLife());
       if (lives() > 0) { clearInterval(livesTimer); ov.hidden = true; paintHearts(); }
     }, 1000);
   }
@@ -3371,7 +3470,10 @@
     else { btn.disabled = false; msg('Could not send just now. Try again soon.'); }
   }
   // Test / screenshot helpers: never talk to the family backend.
-  function seedLives(n, info) { livesDemo = true; if (info) livesInfo = info; setLives(n); }
+  function seedLives(n, info, ageMs) {
+    livesDemo = true; if (info) livesInfo = info;
+    if (typeof ageMs === 'number') { ls.set(livesKey(), { v: 2, n: Math.max(0, n | 0), t: n < LIVES_MAX ? Date.now() - ageMs : null }); paintHearts(); } else setLives(n);
+  }
   function memberTag() {
     const me = root.IBScores && root.IBScores.who && root.IBScores.who();
     return (me && me.id) ? ':' + me.id : '';
@@ -3732,6 +3834,9 @@
     if ($('musicbtn')) $('musicbtn').textContent = m;
     if ($('mapsound')) { $('mapsound').textContent = soundOn ? '🔉' : '🔇'; $('mapsound').setAttribute('aria-label', s); }
     if ($('mapmusic')) { $('mapmusic').textContent = '🎵'; $('mapmusic').setAttribute('aria-label', m); $('mapmusic').classList.toggle('off', !musicOn); }
+    const v = voiceOn ? '🗣️ Voice on' : '🤐 Voice off';
+    if ($('voicebtn')) $('voicebtn').textContent = v;
+    if ($('mapvoice')) { $('mapvoice').textContent = voiceOn ? '🗣️' : '🤐'; $('mapvoice').setAttribute('aria-label', v); $('mapvoice').classList.toggle('off', !voiceOn); }
   }
   function objText(g) {
     if (!g || !g.lv) return '';
@@ -3790,6 +3895,7 @@
       if (sayTimer) clearTimeout(sayTimer);
       sayTimer = setTimeout(hideSaying, reduce ? 900 : 1100);
     }
+    if (speakWorthy(step, step && (step.cascade || (i + 1)))) speakLine(text);
     return text;
   }
   function hideMovesWarn() {
@@ -4849,7 +4955,7 @@
     hud();
     showGoalBanner(true);
     playSting();
-    say('yay');
+    cheer('Goal achieved!', 'yay', true);
     // 1.9.218 Confetti and the first fireworks as the goal lands.
     ovFit(); confetti(80, ovW / 2, ovH * 0.42, { speed: 520 }); fireworks(2, { gap: 320 });
     await crushWait(reduce ? 200 : 900);
@@ -4888,7 +4994,7 @@
     if (!st) return;
     showCrushBan();
     playSting();
-    say('succulent');
+    cheer('Sugar Crush!', 'succulent');
     ovFit();
     fireworks(6, { gap: 220 });
     confetti(110, ovW / 2, -10, { down: true, speed: 260, wide: ovW });
@@ -4901,7 +5007,7 @@
     const won = st.won;
     if (st.score > (prog.best[st.lv.n - 1] || 0)) { prog.best[st.lv.n - 1] = st.score; saveProg(); }
     winInfo = won ? recordWin(st) : { newBadge: false, yum: false, stars: 0 };
-    if (won) say('yay');
+    if (won) cheer(pickSaying('cascade', lastSaying) || 'Sweet as!', 'yay');
     if (won && musicOn) setTimeout(() => { if (musicOn) playEndSong(winInfo.yum ? 'yum' : 'win'); }, 480);
     setTimeout(() => showEnd(), 500 * SP);
   }
@@ -5089,11 +5195,13 @@
   cv.addEventListener('touchend', unlockAudio, { passive: true });
   cv.addEventListener('pointercancel', () => { down = null; });
 
-  function toggleSound() { soundOn = !soundOn; ls.set('ib-sugar-sound', soundOn); paintButtons(); unlockAudio(); }
+  function toggleSound() { soundOn = !soundOn; ls.set('ib-sugar-sound', soundOn); if (!soundOn) stopSpeech(); paintButtons(); unlockAudio(); }
   $('soundbtn').addEventListener('click', toggleSound);
   $('mapsound').addEventListener('click', toggleSound);
   $('musicbtn').addEventListener('click', () => setMusic(!musicOn));
   $('mapmusic').addEventListener('click', () => setMusic(!musicOn));
+  if ($('voicebtn')) $('voicebtn').addEventListener('click', () => setVoice(!voiceOn));
+  if ($('mapvoice')) $('mapvoice').addEventListener('click', () => setVoice(!voiceOn));
   $('restartbtn').addEventListener('click', restart);
   $('againbtn').addEventListener('click', restart);
   $('nextbtn').addEventListener('click', goNext);
@@ -5155,7 +5263,7 @@
   doc.addEventListener('pointerup', unlockAudio, { passive: true });
   doc.addEventListener('touchend', unlockAudio, { passive: true });
   doc.addEventListener('visibilitychange', () => {
-    if (doc.hidden) { if (ac) ac.suspend().catch(() => { }); }
+    if (doc.hidden) { if (ac) ac.suspend().catch(() => { }); stopSpeech(); }
     else {
       if (ac && (soundOn || musicOn)) ac.resume().catch(() => { });
       if (musicOn && !doc.hidden) playKind(wantKind());
@@ -5170,11 +5278,12 @@
 
   root.SugarRush.ui = {
     state: () => st, attempt, hud, paintGoalStrip, showEnd, showMap, scrollMapTo, openLevel, startLevel, showIntro, startTutorial, skipTutorial, finishTutorial, showTutStep, beginLevel, beginGoalFinish, showGoalBanner, celebrateOnMap, progress: () => prog, tutorial: () => tut, crush: () => crush,
-    seedLives, showLives, openLivesPanel, lives: () => lives(), settleLife, msToNzMidnight,
+    seedLives, showLives, openLivesPanel, lives: () => lives(), settleLife, nextLife: () => nextLife(),
     seedRace, seedRaceEvent, showRaceOn, showRaceResult, racePrize, syncRace, openIconPicker, setRaceOpen, requestCloseSugar, race: () => race,
     say, chime, callout, unlockAudio, audio, showSaying, hideSaying, showMovesWarn, hideMovesWarn, maybeWarn3, showHint, hideHintHand, noteActivity,
     clipsReady: () => Object.keys(VOICE_FILES).every(k => !!bufs[k]),
     setSound(on) { soundOn = !!on; ls.set('ib-sugar-sound', soundOn); paintButtons(); },
+    setVoice(on) { setVoice(on); }, voiceState: () => ({ voiceOn, canSpeak: canSpeak(), voice: speakVoice ? speakVoice.name + ' ' + speakVoice.lang : null }), speakLine: (t, o) => speakLine(t, o),
     setScore(n) { if (!st) return; st.score = n; st.moves = 0; st.over = true; st.won = goalsMet(st); st.stars = starsOf(st); hud(); },
     previewWin(opts) { opts = opts || {}; const n = opts.level || (st && st.lv && st.lv.n) || 2; if (!st || st.lv.n !== n) startLevel(n); st.score = opts.score || Math.max(st.lv.stars[2] || 0, 2400); st.moves = Math.max(st.moves, 1); st.won = true; st.over = true; st.stars = opts.stars || 3; if (opts.resetBadge) prog.badges[n - 1] = 0; winInfo = recordWin(st); hud(); showEnd(); },
     view: () => ({ score: st && st.score, moves: st && st.moves, busy, soundOn, musicOn, screen, level: st && st.lv && st.lv.n, acState: ac && ac.state, sparkles: sparkles.length, hold: sparkleHoldT != null, warned3, lastSaying, hintOn, hintMove: hintMove && hintMove.map(function (p) { return p.slice(); }), lastAct, streak: streakPts, streakTier: streakTier(streakPts), boosts: normBoosters(inv()), hammerMode, spinReady: spinReady(), overlay: ovp.length, scene: ($('scene') && $('scene').dataset.n) || '' }),
