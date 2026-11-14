@@ -4058,3 +4058,70 @@ if (live) {
   assert.strictEqual(SR.LEVELS[1].badge.name, "Sarah's Heart");
   assert.ok(src.includes('seedRace') && src.includes('never POST to the family backend'));
 }
+
+// 1.9.213 Sugar Rush per-level tutorials and Goal achieved play-out
+{
+  const SR = load('feed/sugar-rush.js').SugarRush;
+  const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
+  const html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
+  assert.strictEqual(SR.LEVELS.length, 10);
+  assert.ok(SR.LEVELS[1].intro && /Sarah, Shane's partner/.test(SR.LEVELS[1].intro.body));
+  assert.ok(SR.TUTORIALS[1] && SR.TUTORIALS[1] === SR.TUTORIAL_STEPS);
+  assert.strictEqual(SR.tutorialFor(1), SR.TUTORIAL_STEPS);
+  for (let n = 1; n <= 10; n++) {
+    const steps = SR.tutorialFor(n);
+    assert.ok(steps && steps.length, 'level ' + n + ' has a tutorial or recap');
+    if (n === 1) {
+      assert.ok(steps.length >= 7);
+      assert.ok(steps.some(s => s.kind === 'move'));
+    } else if (n < 10) {
+      assert.ok(steps.length >= 2 && steps.length <= 4, 'level ' + n + ' is short (2-4 steps)');
+      assert.ok(steps.some(s => s.kind === 'move'));
+    } else {
+      assert.strictEqual(steps[0].kind, 'recap');
+      assert.ok(steps[0].items && steps[0].items.length >= 4);
+    }
+    for (const step of steps) {
+      if (step.kind !== 'move') continue;
+      const lv = SR.LEVELS[n - 1];
+      const st = SR.newGame({ level: lv, board: SR.fromRows(step.board), seed: 7, mask: lv.mask || null });
+      if (step.locks) {
+        for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) {
+          if (+(step.locks[r] && step.locks[r][c]) && st.board[r][c] && st.board[r][c].c >= 0) st.board[r][c].lock = 1;
+        }
+      }
+      if (step.jelly) st.jelly = step.jelly.map(row => row.split('').map(ch => +ch || 0));
+      assert.strictEqual(SR.findRuns(st.board).length, 0, step.id + ' starts with no runs');
+      const res = SR.play(st, step.move[0], step.move[1]);
+      assert.strictEqual(res.valid, true, step.id + ' move is valid');
+      if (n === 3) assert.ok(res.steps.some(s => s.jellyCleared > 0), 'jelly is cleared');
+      if (n === 4) assert.ok(res.steps.some(s => s.brokeLock), 'a lock is freed');
+      if (n === 5) assert.ok(res.steps.some(s => (s.blocked || []).some(b => b.kind === 'ice')), 'icing is hit');
+      if (n === 6) assert.ok(res.steps.some(s => s.jellyCleared > 0), 'a jelly layer is cleared');
+      if (step.id === 'ing-down') assert.ok(res.steps.some(s => (s.delivered || []).length > 0), 'ingredient is collected');
+      if (step.id === 'choco-spread') assert.ok(res.spread, 'chocolate spreads when not hit');
+      if (step.id === 'choco-hit') assert.ok(res.steps.some(s => s.chocoHit), 'chocolate is hit');
+      if (n === 2) assert.ok((st.collected[0] || 0) >= 3, 'cherries are collected');
+      if (n === 9) assert.ok((st.collected[2] || 0) >= 3, 'lemon drops are collected');
+    }
+  }
+  assert.ok(html.includes('id="introhow"') && html.includes('Replay tutorial') === false || html.includes('id="introhow"'));
+  assert.ok(src.includes('How this level works') && src.includes('tutorialStorageKey(n'));
+  assert.ok(src.includes('beginGoalFinish') && src.includes('grantPlayOutSpecial') && src.includes('celebrateOnMap'));
+  assert.ok(html.includes('id="goalban"') && html.includes('Goal achieved!') && html.includes('id="goalskip"'));
+  assert.ok(html.includes('id="tutrecap"') && html.includes('id="goalnext"') && html.includes('id="goalnextbtn"'));
+  assert.ok(html.includes('prefers-reduced-motion') && html.includes('orientation: landscape'));
+  const st = SR.newGame({ level: SR.LEVELS[0], seed: 3 });
+  st.score = 3000; st.moves = 4;
+  const before = st.score;
+  const out = SR.runPlayOut(st);
+  assert.ok(out.granted.length >= 1 && out.granted.length <= 4);
+  assert.ok(out.score > before, 'play-out adds bonus points');
+  assert.strictEqual(st.moves, 0);
+  assert.ok(out.granted.every(g => g.s === 'row' || g.s === 'col' || g.s === 'w'));
+  assert.ok(SR.goalsMet({ lv: SR.LEVELS[0], score: 3000, collected: [], ingsLeft: 0, board: st.board, jelly: null }));
+  assert.strictEqual(SR.LEVELS[0].target, 3000);
+  assert.strictEqual(SR.LEVELS[0].moves, 20);
+  assert.strictEqual(SR.LEVELS[6].name, 'Bring it Down');
+  assert.ok(src.includes('seedRace') && src.includes('never POST to the family backend'));
+}
