@@ -1425,7 +1425,11 @@
     'sugar-rush-music.mp3': '39970f66', 'sugar-rush-menu.mp3': '3343a079', 'sugar-rush-win.mp3': '9b0efbad', 'sugar-rush-yum.mp3': 'ac1b2cf5',
     'sugar-rush-l1.mp3': '3fd00f38', 'sugar-rush-l2.mp3': '34c4b4be',
     'sugar-rush-voice-yay.mp3': '6ca043f6', 'sugar-rush-voice-great.mp3': 'c287c114', 'sugar-rush-voice-awesome.mp3': 'a56af295',
-    'sugar-rush-voice-sweetas.mp3': '50b435e6', 'sugar-rush-voice-succulent.mp3': '1d5018ba'
+    'sugar-rush-voice-sweetas.mp3': '50b435e6', 'sugar-rush-voice-succulent.mp3': '1d5018ba',
+    // 1.9.224 Shane's songs (made with Suno), -17 LUFS like the other tunes, AAC 96k with an mp3 twin.
+    'sugar-rush-travel.m4a': 'd4c901aa', 'sugar-rush-travel.mp3': '662a7337',
+    'sugar-rush-kiss.m4a': '24aced8c', 'sugar-rush-kiss.mp3': '8c1174e4',
+    'sugar-rush-song.m4a': 'fb999cd1', 'sugar-rush-song.mp3': '586f9ee6'
   };
   function mediaUrl(file) { return file.replace(/\.(mp3|m4a)$/, '-' + MEDIA_HASH[file] + '.$1'); }
   // 1.9.223 Shane's songs for the later levels, picked by mood: the most intense for the Hard and Super Hard levels,
@@ -1433,7 +1437,9 @@
   // them for the early stages). Each song ships as AAC (.m4a, ~96 kbps) with an .mp3 fallback; a mood with no
   // file yet simply keeps the usual loop, so this is safe before the songs land.
   const SONG_PLAN = { intense: [13, 15, 19, 22], calm: [17, 18], upbeat: [8, 9, 10, 11, 12, 14, 16, 20, 21] };
-  const SONG_FILES = {};
+  // "Sugar Rush travel" (~136 BPM, the loudest and punchiest) drives the Hard levels; "Sugar Rush Kiss" (~89 BPM,
+  // the softest, "let it linger") floats over the Pacific islands; "Sugar Rush" ("now I can't sit still") for the rest.
+  const SONG_FILES = { intense: 'sugar-rush-travel.m4a', calm: 'sugar-rush-kiss.m4a', upbeat: 'sugar-rush-song.m4a' };
   const SONG_FROM = 8;
   function songMood(level) {
     if (!(level >= SONG_FROM)) return null;
