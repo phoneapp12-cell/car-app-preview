@@ -827,7 +827,65 @@
     ctx.fill();
   }
 
-  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, MAP_W, MAP_H, MAP_STOPS, FUTURE_STOPS, stopForLevel, icingPath, nzMapSvg, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, cloneState, bestMove, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
+
+  // 1.9.210 Family race: each member gets a distinct candy / animal / vehicle icon
+  // and stands on the NZ map stop they have reached.
+  const RACE_ICONS = [
+    { id: 'lolly', emoji: '🍭', color: '#ff5ea8', name: 'Lolly' },
+    { id: 'cupcake', emoji: '🧁', color: '#ff8ab5', name: 'Cupcake' },
+    { id: 'donut', emoji: '🍩', color: '#c97b4a', name: 'Donut' },
+    { id: 'cherry', emoji: '🍒', color: '#e63946', name: 'Cherry' },
+    { id: 'icecream', emoji: '🍦', color: '#7ec8e3', name: 'Ice cream' },
+    { id: 'cookie', emoji: '🍪', color: '#d4a017', name: 'Cookie' },
+    { id: 'kiwi', emoji: '🥝', color: '#7cb518', name: 'Kiwi' },
+    { id: 'cat', emoji: '🐱', color: '#ffb347', name: 'Cat' },
+    { id: 'dog', emoji: '🐶', color: '#c4a484', name: 'Dog' },
+    { id: 'bunny', emoji: '🐰', color: '#e8a0bf', name: 'Bunny' },
+    { id: 'unicorn', emoji: '🦄', color: '#c77dff', name: 'Unicorn' },
+    { id: 'car', emoji: '🚗', color: '#3d8bfd', name: 'Car' },
+    { id: 'train', emoji: '🚂', color: '#e85d04', name: 'Train' },
+    { id: 'bike', emoji: '🚲', color: '#2a9d8f', name: 'Bike' },
+    { id: 'rocket', emoji: '🚀', color: '#6c63ff', name: 'Rocket' },
+    { id: 'star', emoji: '🌟', color: '#ffd166', name: 'Star' },
+    { id: 'bear', emoji: '🧸', color: '#c27b4f', name: 'Bear' },
+    { id: 'bee', emoji: '🐝', color: '#f4d35e', name: 'Bee' },
+    { id: 'butterfly', emoji: '🦋', color: '#7b68ee', name: 'Butterfly' },
+    { id: 'boat', emoji: '⛵', color: '#00b4d8', name: 'Boat' }
+  ];
+  function raceIcon(id) { return RACE_ICONS.find(function (x) { return x.id === id; }) || null; }
+  function isRaceIcon(id) { return !!raceIcon(id); }
+  function raceStars(p) { return (p && p.stars || []).reduce(function (a, n) { return a + (n || 0); }, 0); }
+  function raceStop(p) { return Math.max(1, Math.min(10, (p && p.open) || 1)); }
+  function hashStr(s) {
+    let h = 2166136261;
+    s = String(s || '');
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
+  function allocateIcon(taken, seed) {
+    const used = new Set((taken || []).filter(Boolean));
+    const start = hashStr(seed) % RACE_ICONS.length;
+    for (let i = 0; i < RACE_ICONS.length; i++) {
+      const id = RACE_ICONS[(start + i) % RACE_ICONS.length].id;
+      if (!used.has(id)) return id;
+    }
+    return RACE_ICONS[start].id;
+  }
+  function rankRacers(list) {
+    return (list || []).slice().sort(function (a, b) {
+      return (b.stop || 0) - (a.stop || 0) || (b.stars || 0) - (a.stars || 0) || String(a.name || '').localeCompare(String(b.name || ''), 'en');
+    });
+  }
+  function stackOffsets(count, i, label) {
+    const side = label === 'left' ? 1 : -1; // sit on the opposite side from the place name
+    if (count <= 1) return { x: 22 * side, y: -30 };
+    const spread = Math.min(34, 64 / Math.max(1, count - 1));
+    const mid = (count - 1) / 2;
+    return { x: (i - mid) * spread + 8 * side, y: -34 - (Math.abs(i - mid) < 0.2 ? 10 : 0) };
+  }
+  function racerFirst(name) { return String(name || 'Player').trim().split(/\s+/)[0] || 'Player'; }
+
+  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, MAP_W, MAP_H, MAP_STOPS, FUTURE_STOPS, stopForLevel, icingPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, cloneState, bestMove, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
     allowed: () => !!(root.IBScores && root.IBScores.isShane && root.IBScores.isShane()),
     SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL, XF,
     VOICE_FILES, VOICE_RANK, MEDIA_HASH, mediaUrl, gameTrack, attachSfxBus, playTone, playChime, playClip, voiceForStep,
@@ -863,6 +921,9 @@
   }
   function saveProg() { ls.set('ib-sugar-progress', prog); }
   const prog = loadProg();
+  let race = { racers: [], offline: true, mine: null };
+  let raceDemo = false; // test / screenshot only: never POST to the family backend
+
 
   // ---------- Sound: one AudioContext for voices, chime, music, menu and end songs ----------
   // 1.9.159 played the loop with a standalone HTMLAudioElement. On iOS (and some phones)
@@ -1317,6 +1378,175 @@
     return words[Math.min(words.length - 1, i + 1)];
   }
 
+
+  function myLocalRacer() {
+    const S = root.IBScores;
+    const me = S && S.who && S.who();
+    const taken = (race.racers || []).filter(function (r) { return !r.mine; }).map(function (r) { return r.icon; });
+    let icon = ls.get('ib-sugar-icon', null);
+    if (!isRaceIcon(icon) || (taken.indexOf(icon) >= 0 && !(race.mine && race.mine.icon === icon))) {
+      icon = allocateIcon(taken, (me && (me.id || me.name)) || 'me');
+      ls.set('ib-sugar-icon', icon);
+    }
+    return { name: (me && (me.first || me.name)) || 'You', icon: icon, stop: raceStop(prog), stars: raceStars(prog), mine: true };
+  }
+  function renderRacers() {
+    const hold = $('racers');
+    if (!hold) return;
+    hold.innerHTML = '';
+    const list = race.racers && race.racers.length ? race.racers : (race.mine ? [race.mine] : []);
+    const byStop = new Map();
+    list.forEach(function (r) {
+      const n = Math.max(1, Math.min(10, r.stop || 1));
+      if (!byStop.has(n)) byStop.set(n, []);
+      byStop.get(n).push(r);
+    });
+    byStop.forEach(function (group, n) {
+      const stop = stopForLevel(n);
+      if (!stop) return;
+      const ordered = group.slice().sort(function (a, b) { return (a.mine ? 1 : 0) - (b.mine ? 1 : 0); });
+      ordered.forEach(function (r, i) {
+        const ic = raceIcon(r.icon) || RACE_ICONS[0];
+        const off = stackOffsets(ordered.length, i, stop.label);
+        const el = doc.createElement('div');
+        el.className = 'racer' + (r.mine ? ' me' : '');
+        el.dataset.name = racerFirst(r.name);
+        el.dataset.stop = String(n);
+        el.style.left = (stop.x / MAP_W * 100) + '%';
+        el.style.top = (stop.y / MAP_H * 100) + '%';
+        el.style.transform = 'translate(calc(-50% + ' + off.x + 'px), calc(-50% + ' + off.y + 'px))';
+        el.innerHTML = '<span class="face" style="--ic:' + ic.color + '">' + ic.emoji + '</span><span class="nm">' + racerFirst(r.name) + '</span>';
+        el.setAttribute('aria-label', racerFirst(r.name) + ' is at ' + stop.place + (r.mine ? ' (you)' : ''));
+        hold.appendChild(el);
+      });
+    });
+  }
+  function renderRaceBoard() {
+    const board = $('raceboard'), list = $('racelist'), note = $('racenote');
+    if (!board || !list) return;
+    const rows = rankRacers(race.racers && race.racers.length ? race.racers : (race.mine ? [race.mine] : []));
+    list.innerHTML = '';
+    rows.forEach(function (r, i) {
+      const ic = raceIcon(r.icon) || RACE_ICONS[0];
+      const stop = stopForLevel(r.stop) || { place: 'Start' };
+      const li = doc.createElement('li');
+      if (r.mine) li.className = 'me';
+      li.innerHTML = '<span class="rk">' + (i + 1) + '</span><span class="face" style="--ic:' + ic.color + '">' + ic.emoji + '</span><span class="who">' + racerFirst(r.name) + (r.mine ? ' <em>you</em>' : '') + '</span><span class="at">' + stop.place + '</span><span class="rs">' + (r.stars || 0) + '★</span>';
+      list.appendChild(li);
+    });
+    if (note) {
+      note.hidden = !race.offline;
+      note.textContent = race.offline ? 'Just you on this phone (offline).' : '';
+    }
+    board.hidden = false;
+  }
+  function applyRace(data, offline) {
+    const self = myLocalRacer();
+    let racers = (data && Array.isArray(data.racers)) ? data.racers.map(function (r) {
+      return { name: r.name, icon: r.icon, stop: r.stop, stars: r.stars, mine: !!r.mine };
+    }) : [];
+    if (!racers.some(function (r) { return r.mine; })) racers.push(self);
+    else racers = racers.map(function (r) { return r.mine ? Object.assign({}, r, self) : r; });
+    race = { racers: racers, offline: !!offline, mine: self };
+    renderRacers();
+    renderRaceBoard();
+  }
+  // Local test / screenshot helper. Never talks to the family backend.
+  function seedRace(list) {
+    raceDemo = true;
+    const self = myLocalRacer();
+    const racers = (list || []).map(function (r) {
+      return { name: r.name, icon: r.icon, stop: r.stop, stars: r.stars || 0, mine: !!r.mine };
+    });
+    if (!racers.some(function (r) { return r.mine; })) {
+      const mine = racers.find(function (r) { return racerFirst(r.name) === self.name; });
+      if (mine) mine.mine = true;
+      else racers.push(self);
+    }
+    const me = racers.find(function (r) { return r.mine; });
+    if (me) ls.set('ib-sugar-icon', me.icon);
+    race = { racers: racers, offline: false, mine: me || self };
+    renderRacers();
+    renderRaceBoard();
+    return racers;
+  }
+  async function syncRace(push) {
+    if (raceDemo) { renderRacers(); renderRaceBoard(); return race; }
+    const S = root.IBScores;
+    const me = S && S.who && S.who();
+    const self = myLocalRacer();
+    race.mine = self;
+    if (!me || !S || !S.loadRace) {
+      applyRace({ racers: [self] }, true);
+      return race;
+    }
+    let data = null;
+    try { data = await S.loadRace(); } catch (e) { data = null; }
+    const family = data && Array.isArray(data.racers) ? data.racers : null;
+    if (!family) {
+      applyRace({ racers: [self] }, true);
+      if (push && S.saveRace) { try { await S.saveRace({ icon: self.icon, stop: self.stop, stars: self.stars }); } catch (e) { } }
+      return race;
+    }
+    const taken = family.filter(function (r) { return !r.mine; }).map(function (r) { return r.icon; });
+    const mineRow = family.find(function (r) { return r.mine; });
+    let icon = self.icon;
+    if (mineRow && isRaceIcon(mineRow.icon) && (!isRaceIcon(ls.get('ib-sugar-icon', null)) || mineRow.icon === ls.get('ib-sugar-icon', null))) {
+      icon = mineRow.icon;
+      ls.set('ib-sugar-icon', icon);
+    } else if (taken.indexOf(icon) >= 0) {
+      icon = allocateIcon(taken, (me && (me.id || me.name)) || 'me');
+      ls.set('ib-sugar-icon', icon);
+    }
+    self.icon = icon;
+    if (push !== false && S.saveRace) {
+      try {
+        const saved = await S.saveRace({ icon: icon, stop: self.stop, stars: self.stars });
+        if (saved && saved.err === 'icon taken' && saved.suggested && isRaceIcon(saved.suggested)) {
+          icon = saved.suggested;
+          ls.set('ib-sugar-icon', icon);
+          self.icon = icon;
+          await S.saveRace({ icon: icon, stop: self.stop, stars: self.stars });
+        }
+        data = await S.loadRace() || data;
+      } catch (e) { }
+    }
+    applyRace(data || { racers: family }, false);
+    return race;
+  }
+  function openIconPicker() {
+    const ov = $('iconpick');
+    if (!ov) return;
+    const grid = $('icongrid');
+    const takenBy = {};
+    (race.racers || []).forEach(function (r) { if (r.icon && !r.mine) takenBy[r.icon] = racerFirst(r.name); });
+    const mine = (race.mine && race.mine.icon) || ls.get('ib-sugar-icon', null) || allocateIcon(Object.keys(takenBy), 'me');
+    grid.innerHTML = '';
+    RACE_ICONS.forEach(function (ic) {
+      const b = doc.createElement('button');
+      b.type = 'button';
+      const taken = takenBy[ic.id];
+      b.className = 'iconopt' + (ic.id === mine ? ' on' : '') + (taken ? ' taken' : '');
+      b.disabled = !!taken;
+      b.dataset.id = ic.id;
+      b.innerHTML = '<span class="face" style="--ic:' + ic.color + '">' + ic.emoji + '</span><span class="lab">' + (taken ? taken : ic.name) + '</span>';
+      b.setAttribute('aria-label', taken ? (ic.name + ' is used by ' + taken) : ('Pick ' + ic.name));
+      if (!taken) b.addEventListener('click', function () {
+        ls.set('ib-sugar-icon', ic.id);
+        ov.hidden = true;
+        if (raceDemo && race.mine) {
+          race.mine.icon = ic.id;
+          race.racers = race.racers.map(function (r) { return r.mine ? Object.assign({}, r, { icon: ic.id }) : r; });
+          renderRacers(); renderRaceBoard();
+        } else {
+          syncRace(true);
+        }
+      });
+      grid.appendChild(b);
+    });
+    ov.hidden = false;
+  }
+
   function renderMap() {
     const stage = $('mapstage'), path = $('path'), shelf = $('shelf');
     if (stage && !stage.querySelector('svg.nzsvg')) {
@@ -1370,6 +1600,8 @@
       el.innerHTML = '<i>' + (got ? lv.badge.icon : '·') + '</i><b>' + (got ? lv.badge.name : 'Level ' + (i + 1)) + '</b>';
       shelf.appendChild(el);
     });
+    renderRacers();
+    renderRaceBoard();
   }
   function scrollMapTo(target, opts) {
     const view = $('mapview');
@@ -1410,6 +1642,7 @@
     doc.body.classList.remove('sarah');
     doc.body.classList.add('onmap');
     renderMap(); paintButtons();
+    syncRace(true);
     const scrollTo = opts && opts.scroll != null ? opts.scroll : Math.min(10, Math.max(1, prog.open));
     const behavior = (opts && opts.behavior) || (reduce ? 'auto' : 'smooth');
     const go = function () { scrollMapTo(scrollTo, { behavior: behavior }); };
@@ -1514,6 +1747,7 @@
     if (newBadge) prog.badges[i] = 1;
     if (g.lv.n >= prog.open && g.lv.n < 10) prog.open = g.lv.n + 1;
     saveProg();
+    syncRace(true);
     const firstThree = stars === 3 && prevStars < 3;
     // Yum! when a new badge is earned (first win) or the first 3-star on a level;
     // Sweet Sparkle for a later ordinary win.
@@ -1613,6 +1847,10 @@
   $('mapbtn').addEventListener('click', backToMap);
   $('endmap').addEventListener('click', backToMap);
   $('introbtn').addEventListener('click', () => { unlockAudio(); startLevel(pendingLv); });
+  if ($('pickicon')) $('pickicon').addEventListener('click', () => { unlockAudio(); openIconPicker(); });
+  if ($('iconpick')) $('iconpick').addEventListener('click', e => {
+    if (e.target === $('iconpick') || (e.target.closest && e.target.closest('[data-iconpick=close]'))) $('iconpick').hidden = true;
+  });
   doc.addEventListener('pointerdown', unlockAudio, { passive: true });
   doc.addEventListener('pointerup', unlockAudio, { passive: true });
   doc.addEventListener('touchend', unlockAudio, { passive: true });
@@ -1632,6 +1870,7 @@
 
   root.SugarRush.ui = {
     state: () => st, attempt, showEnd, showMap, scrollMapTo, openLevel, startLevel, progress: () => prog,
+    seedRace, syncRace, openIconPicker, race: () => race,
     say, chime, callout, unlockAudio, audio,
     clipsReady: () => Object.keys(VOICE_FILES).every(k => !!bufs[k]),
     setSound(on) { soundOn = !!on; ls.set('ib-sugar-sound', soundOn); paintButtons(); },

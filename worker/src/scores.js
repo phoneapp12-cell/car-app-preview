@@ -30,10 +30,14 @@ export function checkScore(b) {
   return { ok: { game, score: b.score, lines: null, level: null, won: b.won ? 1 : 0, opp } };
 }
 
+export const RACE_ICONS = ['lolly','cupcake','donut','cherry','icecream','cookie','kiwi','cat','dog','bunny','unicorn','car','train','bike','rocket','star','bear','bee','butterfly','boat'];
+export const RACE_LIMITS = { stop: 10, stars: 30, gapMs: 1000, perDay: 300 };
+
 export function scoresInit(sql) {
   sql.exec(`CREATE TABLE IF NOT EXISTS scores (id INTEGER PRIMARY KEY AUTOINCREMENT, game TEXT NOT NULL, mid TEXT NOT NULL, score INTEGER NOT NULL, lines INTEGER, level INTEGER, won INTEGER, opp TEXT, at INTEGER NOT NULL);
     CREATE INDEX IF NOT EXISTS s_game ON scores(game, score DESC);
     CREATE INDEX IF NOT EXISTS s_mid ON scores(mid, game, at);`);
+  sql.exec(`CREATE TABLE IF NOT EXISTS sugar_race (mid TEXT PRIMARY KEY, icon TEXT NOT NULL, stop INTEGER NOT NULL, stars INTEGER NOT NULL, at INTEGER NOT NULL)`);
   clearShaneTetrisOnce(sql);
   clearShaneTetrisOnce20261113(sql);
   clearAllTetrisOnce20261114(sql);
@@ -154,7 +158,56 @@ export function board(sql, me, game) {
 }
 
 /* Called from Family.fetch once the member's token has been checked. Returns null for paths that aren't /scores. */
+export function checkRace(b) {
+  if (!b || typeof b !== 'object') return { err: 'bad race' };
+  const icon = typeof b.icon === 'string' ? b.icon.trim() : '';
+  if (!RACE_ICONS.includes(icon)) return { err: 'bad icon' };
+  if (!isInt(b.stop, 1, RACE_LIMITS.stop)) return { err: 'bad stop' };
+  if (!isInt(b.stars, 0, RACE_LIMITS.stars)) return { err: 'bad stars' };
+  return { ok: { icon, stop: b.stop, stars: b.stars } };
+}
+
+function suggestedIcon(sql, mid, want) {
+  const taken = new Set(rows(sql, `SELECT icon FROM sugar_race WHERE mid != ?`, mid).map(r => r.icon));
+  if (want && !taken.has(want)) return want;
+  for (const id of RACE_ICONS) if (!taken.has(id)) return id;
+  return want || RACE_ICONS[0];
+}
+
+export function saveRace(sql, me, body, now = Date.now()) {
+  const c = checkRace(body); if (c.err) return { status: 400, body: { err: c.err } };
+  const prev = rows(sql, `SELECT icon, stop, stars, at FROM sugar_race WHERE mid=?`, me.id)[0];
+  if (prev && prev.at && now - prev.at < RACE_LIMITS.gapMs && prev.icon === c.ok.icon && prev.stop === c.ok.stop && prev.stars === c.ok.stars)
+    return { status: 200, body: { ok: 1, icon: prev.icon, stop: prev.stop, stars: prev.stars } };
+  const today = rows(sql, `SELECT COUNT(*) n FROM sugar_race WHERE mid=? AND at > ?`, me.id, now - 864e5)[0] || {};
+  // upserts rewrite one row, so the "per day" cap is only a flood brake on first-time inserts; updates are always allowed after the short gap
+  const owner = rows(sql, `SELECT mid FROM sugar_race WHERE icon=? AND mid != ?`, c.ok.icon, me.id)[0];
+  if (owner) {
+    const suggested = suggestedIcon(sql, me.id, null);
+    return { status: 409, body: { err: 'icon taken', suggested } };
+  }
+  const stop = Math.max(c.ok.stop, prev ? prev.stop : 0);
+  const stars = Math.max(c.ok.stars, prev ? prev.stars : 0);
+  if (prev) sql.exec(`UPDATE sugar_race SET icon=?, stop=?, stars=?, at=? WHERE mid=?`, c.ok.icon, stop, stars, now, me.id);
+  else {
+    if ((today.n || 0) >= RACE_LIMITS.perDay) return { status: 429, body: { err: 'too many today' } };
+    sql.exec(`INSERT INTO sugar_race (mid, icon, stop, stars, at) VALUES (?,?,?,?,?)`, me.id, c.ok.icon, stop, stars, now);
+  }
+  return { status: 200, body: { ok: 1, icon: c.ok.icon, stop, stars } };
+}
+
+export function raceBoard(sql, me) {
+  const racers = rows(sql, `SELECT r.mid, m.name, r.icon, r.stop, r.stars, r.at FROM sugar_race r JOIN members m ON m.id=r.mid AND m.removed=0 ORDER BY r.stop DESC, r.stars DESC, m.name ASC`)
+    .map(r => ({ name: r.name, icon: r.icon, stop: r.stop, stars: r.stars, at: r.at, mine: r.mid === me.id }));
+  return { status: 200, body: { me: me.name, racers } };
+}
+
 export async function scoresRoute(sql, me, p, m, url, readBody, now = Date.now()) {
+  if (p === '/sugar-race') {
+    if (m === 'GET') return raceBoard(sql, me);
+    if (m === 'POST') return saveRace(sql, me, await readBody(), now);
+    return { status: 405, body: { err: 'method' } };
+  }
   if (p !== '/scores') return null;
   if (m === 'GET') return board(sql, me, url.searchParams.get('game'));
   if (m === 'POST') return addScore(sql, me, await readBody(), now);
