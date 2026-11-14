@@ -917,7 +917,7 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   assert.ok(SR.hasMove(b)); assert.strictEqual(SR.findRuns(b).length, 0);
   assert.strictEqual(b.flat().map(t => t.c).sort().join(''), kinds, 'same sweets, new places');
   // After a move that leaves no moves, play() shuffles
-  for (let s = 1; s <= 40; s++) { const g = SR.newGame({ seed: s }); while (!g.over) { const m = SR.findMove(g.board); assert.ok(m); assert.ok(SR.play(g, m[0], m[1]).valid); assert.ok(SR.hasMove(g.board)); } assert.strictEqual(g.moves, 0); assert.strictEqual(g.won, g.score >= 3000); assert.strictEqual(g.stars, SR.starsFor(g.score)); }
+  for (let s = 1; s <= 40; s++) { const g = SR.newGame({ seed: s }); while (!g.over) { const m = SR.findMove(g.board); assert.ok(m); assert.ok(SR.play(g, m[0], m[1]).valid); assert.ok(SR.hasMove(g.board)); } assert.ok(g.over); assert.strictEqual(g.won, (g.collected[0] || 0) >= 20); assert.strictEqual(g.stars, g.won ? SR.starsFor(g.score) : 0); }
   assert.strictEqual(SR.starsFor(2999), 0); assert.strictEqual(SR.starsFor(3000), 1); assert.strictEqual(SR.starsFor(6500), 2); assert.strictEqual(SR.starsFor(9000), 3);
   // Access: only Shane (IBScores.isShane()); no scores sent yet
   assert.strictEqual(SR.allowed(), false, 'no scores.js: nobody');
@@ -3970,7 +3970,7 @@ if (live) {
   assert.strictEqual(SR.LEVELS.length, 10);
   assert.ok(SR.LEVELS[1].intro && /Sarah, Shane's partner/.test(SR.LEVELS[1].intro.body));
   assert.strictEqual(SR.LEVEL_INTROS.length, 10);
-  assert.strictEqual(SR.LEVELS[0].target, 3000);
+  assert.strictEqual(SR.LEVELS[0].target, 0);
   assert.strictEqual(SR.LEVELS[0].moves, 20);
   const lines = {
     1: 'Level 1 · Onerahi',
@@ -3985,10 +3985,10 @@ if (live) {
     10: 'Level 10 · Nelson'
   };
   const goals = {
-    1: 'Score 3,000 points',
+    1: 'Collect 20 cherry gumdrops',
     2: 'Collect 10 cherry gumdrops',
     3: 'Clear all the jelly',
-    4: 'Score 2,500 points',
+    4: 'Free all the locked jars',
     5: 'Clear all the icing',
     6: 'Clear all the double jelly',
     7: 'Bring the ingredients down to the bottom',
@@ -4022,7 +4022,7 @@ if (live) {
   assert.ok(/striped sweet/.test(SR.TUTORIAL_STEPS[1].bubble));
   assert.ok(/wrapped sweet/.test(SR.TUTORIAL_STEPS[2].bubble));
   assert.ok(/sprinkle bomb/.test(SR.TUTORIAL_STEPS[3].bubble));
-  assert.ok(/3,000 points in 20 moves/.test(SR.TUTORIAL_STEPS[4].bubble));
+  assert.ok(/20 cherry gumdrops in 20 moves/.test(SR.TUTORIAL_STEPS[4].bubble));
   assert.ok(/Stars fill/.test(SR.TUTORIAL_STEPS[5].bubble));
   assert.strictEqual(SR.TUTORIAL_STEPS[6].bubble, "You're ready!");
   for (const step of SR.TUTORIAL_STEPS.filter(s => s.kind === 'move')) {
@@ -4119,9 +4119,24 @@ if (live) {
   assert.ok(out.score > before, 'play-out adds bonus points');
   assert.strictEqual(st.moves, 0);
   assert.ok(out.granted.every(g => g.s === 'row' || g.s === 'col' || g.s === 'w'));
-  assert.ok(SR.goalsMet({ lv: SR.LEVELS[0], score: 3000, collected: [], ingsLeft: 0, board: st.board, jelly: null }));
-  assert.strictEqual(SR.LEVELS[0].target, 3000);
+  assert.ok(!SR.goalsMet({ lv: SR.LEVELS[0], score: 3000, collected: [], ingsLeft: 0, board: st.board, jelly: null }));
+  const collected = new Array(6).fill(0); collected[0] = 20;
+  assert.ok(SR.goalsMet({ lv: SR.LEVELS[0], score: 0, collected, ingsLeft: 0, board: st.board, jelly: null }), 'level 1 wins on cherries, not score');
+  assert.strictEqual(SR.LEVELS[0].target, 0);
   assert.strictEqual(SR.LEVELS[0].moves, 20);
   assert.strictEqual(SR.LEVELS[6].name, 'Bring it Down');
   assert.ok(src.includes('seedRace') && src.includes('never POST to the family backend'));
+  // Goals are always objectives. Score only decides stars.
+  assert.ok(SR.LEVELS.every(lv => !lv.target), 'no level has a score target as the win condition');
+  assert.deepStrictEqual({ ...SR.LEVELS[0].collect }, { color: 0, n: 20 });
+  assert.ok(SR.LEVELS[3].locks && SR.locksLeft(SR.newGame({ level: SR.LEVELS[3], seed: 1 }).board) > 0);
+  assert.deepStrictEqual(Array.from(SR.LEVELS[0].stars), [3000, 6000, 9000]);
+  assert.deepStrictEqual(Array.from(SR.LEVELS[3].stars), [2500, 5000, 8000]);
+  assert.ok(SR.tryBeat(SR.LEVELS[0], 16) >= 8, 'level 1 is easy to beat');
+  assert.ok(SR.tryBeat(SR.LEVELS[3], 16) >= 1, 'level 4 is beatable by freeing every lock');
+  const lockSt = SR.newGame({ level: SR.LEVELS[3], seed: 1 });
+  const nLocks = SR.locksLeft(lockSt.board);
+  const cleared = Object.assign({}, lockSt, { board: lockSt.board.map(row => row.map(t => t && t.lock ? Object.assign({}, t, { lock: 0 }) : t)) });
+  assert.ok(!SR.goalsMet(lockSt) && SR.goalsMet(cleared) && nLocks > 0);
 }
+
