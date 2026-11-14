@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
-import { checkScore, tetrisMax, scoresInit, scoresRoute, addScore, board, RATE, RACE_ICONS, checkRace, saveRace, raceBoard, clearShaneTetrisOnce, CLEAR_SHANE_TETRIS_KEY, clearShaneTetrisOnce20261113, CLEAR_SHANE_TETRIS_KEY2, clearAllTetrisOnce20261114, CLEAR_ALL_TETRIS_KEY } from '../src/scores.js';
+import { checkScore, tetrisMax, scoresInit, scoresRoute, addScore, board, RATE, RACE_ICONS, RACE_LIMITS, checkRace, saveRace, raceBoard, clearShaneTetrisOnce, CLEAR_SHANE_TETRIS_KEY, clearShaneTetrisOnce20261113, CLEAR_SHANE_TETRIS_KEY2, clearAllTetrisOnce20261114, CLEAR_ALL_TETRIS_KEY } from '../src/scores.js';
 
 function stubSql() {
   const db = new DatabaseSync(':memory:');
@@ -191,8 +191,12 @@ assert.ok(RACE_ICONS.length >= 16);
 assert.ok(checkRace({ icon: 'lolly', stop: 5, stars: 9 }).ok);
 assert.ok(checkRace({ icon: 'spaceship', stop: 5, stars: 9 }).err, 'unknown icon refused');
 assert.ok(checkRace({ icon: 'lolly', stop: 0, stars: 0 }).err);
-assert.ok(checkRace({ icon: 'lolly', stop: 11, stars: 0 }).err);
-assert.ok(checkRace({ icon: 'lolly', stop: 3, stars: 31 }).err);
+// 1.9.219 Levels 11-15: the race now runs to stop 15 (Dunedin) with up to 45 stars.
+assert.deepEqual(RACE_LIMITS, { stop: 15, stars: 45, gapMs: 1000, perDay: 300 });
+assert.ok(checkRace({ icon: 'lolly', stop: 11, stars: 31 }).ok);
+assert.ok(checkRace({ icon: 'lolly', stop: 15, stars: 45 }).ok);
+assert.ok(checkRace({ icon: 'lolly', stop: 16, stars: 0 }).err);
+assert.ok(checkRace({ icon: 'lolly', stop: 3, stars: 46 }).err);
 assert.ok(checkRace({ icon: 'lolly', stop: 3, stars: -1 }).err);
 assert.ok(checkRace({ icon: 'lolly', stop: 1.5, stars: 1 }).err);
 
