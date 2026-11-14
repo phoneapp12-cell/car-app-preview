@@ -1370,9 +1370,9 @@ function mfChip() {
   c.innerHTML = MF === 'all' ? '' : `<button type="button" data-mfset="all" aria-label="Show videos and pictures">${o[1]} ${o[2]} <b>✕</b></button>`;
 }
 function mfSet(v) { MF = v; ls.set('mediaFilter', v); mfDrawer(false); try { draw(); scrollTo(0, 0); } catch (e) { } toast(MF_OPTS.find(x => x[0] === v)[2]); }
-// 1.9.166 Sugar Rush level 1: only Shane can play it for now (IBScores.isShane() from scores.js); everyone else sees coming soon
-function sugarOk() { try { return !!(window.IBScores && window.IBScores.isShane()); } catch (e) { return false; } }
-function sugarOpt() { return sugarOk() ? '<button type="button" class="mfopt" data-art="sugar"><span class="mfe">🍬</span><span>Play Sugar Rush</span></button>' : '<button type="button" class="mfopt" disabled aria-disabled="true"><span class="mfe">🍬</span><span>Sugar Rush · coming soon</span></button>'; }
+// 1.9.228 Sugar Rush is open to every family member (it was Shane-only from 1.9.166 to 1.9.227).
+function sugarOk() { return true; }
+function sugarOpt() { return '<button type="button" class="mfopt" data-art="sugar"><span class="mfe">🍬</span><span>Play Sugar Rush</span></button>'; }
 let GAMES_OPEN = false; // 1.9.146 Games sub-menu: play straight from the menu. 1.9.166 adds Scrabble
 function gameSub() {
   return `<button type="button" class="mfopt${GAMES_OPEN ? ' on' : ''}" data-gamesmenu="1" aria-expanded="${GAMES_OPEN}"><span class="mfe">🎮</span><span>Games · new</span><i>${GAMES_OPEN ? '▾' : '▸'}</i></button><div class="intsub"${GAMES_OPEN ? '' : ' hidden'}><button type="button" class="mfopt" data-art="tetris"><span class="mfe">🧱</span><span>Play Tetris</span></button><button type="button" class="mfopt" data-art="scrabble"><span class="mfe">🔤</span><span>Play Scrabble</span></button>${sugarOpt()}</div>`;
