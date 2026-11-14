@@ -308,7 +308,8 @@
   }
   function lastText(st) {
     const L = st.last; if (!L) return '';
-    const name = st.players[L.who].name;
+    if (L.kind === 'cancel') return (L.byName || 'Shane') + ' cancelled the game.';
+    const name = (st.players[L.who] && st.players[L.who].name) || 'Someone';
     if (L.kind === 'swap') return `${name} swapped ${L.n} tile${L.n === 1 ? '' : 's'}.`;
     if (L.kind === 'pass') return `${name} passed.`;
     if (L.kind === 'resign') return `${name} resigned.`;
@@ -403,6 +404,15 @@
     if (demoMember) return demoMember;
     try { const m = JSON.parse(store.get('mf.member') || 'null'); return m && m.id && m.tok && !m.pending ? m : null; } catch (e) { return null; }
   }
+  function isShane() {
+    const me = member();
+    if (!me) return false;
+    const first = String(me.name || '').trim().split(/\s+/)[0] || '';
+    if ((me.role === 'admin' || me.admin) && /^Shane$/i.test(first)) return true;
+    const S = root.IBScores;
+    if (S && S.isShane && S.who) { const w = S.who(); return !!(S.isShane(w) && w && w.admin); }
+    return false;
+  }
   function api(path, opt) {
     const me = member();
     if (!me) return Promise.reject(new Error('This phone needs its Info Book family link.'));
@@ -425,18 +435,20 @@
   function applyView(v) {
     onlineId = v.id;
     st = {
-      v: 1, mode: 'family', rev: v.rev, id: v.id, over: !!v.over, turnIsMe: !!v.yourTurn, scored: 1,
+      v: 1, mode: 'family', rev: v.rev, id: v.id, over: !!v.over, cancelled: !!v.cancelled, turnIsMe: !!v.yourTurn, scored: 1,
       board: (v.board || []).map(c => c ? { l: c.l, b: c.b ? 1 : 0 } : null),
       bag: new Array(v.bag | 0),
       players: (v.players || []).map(p => ({ name: p.name, score: p.score, rack: p.me ? (v.rack || []).slice() : [], me: !!p.me, left: p.left, resigned: !!p.resigned })),
-      turn: v.turn | 0, scoreless: v.scoreless || 0, winners: v.winners || [], out: v.out, last: v.last || null
+      turn: v.turn | 0, scoreless: v.scoreless || 0, winners: v.winners || [], out: v.out, last: v.last || null,
+      watch: !!v.watch, canCancel: !!v.canCancel
     };
   }
   function turnBanner() {
     const el = $('#yourturn'); if (!el) return;
     if (!st || st.mode !== 'family' || st.over) { el.hidden = true; return; }
     el.hidden = false;
-    if (st.turnIsMe) { el.textContent = 'Your turn'; el.classList.remove('wait'); }
+    if (st.watch) { el.textContent = 'Looking in'; el.classList.add('wait'); }
+    else if (st.turnIsMe) { el.textContent = 'Your turn'; el.classList.remove('wait'); }
     else { const p = st.players[st.turn]; el.textContent = 'Waiting for ' + (p ? p.name : 'the next person'); el.classList.add('wait'); }
   }
   function showFamilyAlert() {
@@ -530,12 +542,25 @@
         const label = (p.me ? 'You' : p.name) + ' ' + p.score + (p.resigned ? ' (out)' : '');
         return p.turn && !g.over ? '▶ ' + label : label;
       }).join(' · ');
-      const turn = g.over ? 'Finished' : g.yourTurn ? 'Your turn' : 'Waiting for ' + (g.turnName || 'the next person');
+      const turn = g.cancelled ? 'Cancelled' : g.over ? 'Finished' : g.yourTurn ? 'Your turn' : 'Waiting for ' + (g.turnName || 'the next person');
       const last = g.last ? '<small>' + esc(g.last) + '</small>' : '';
       return '<button type="button" class="' + (g.yourTurn && !g.over ? 'your' : '') + '" data-gid="' + esc(g.id) + '"><b>' + esc(turn) + '</b> · ' + esc(who) + last + '</button>';
     }).join('') : '<p class="help">No online games yet.</p>';
     status.classList.toggle('offline', false);
     status.textContent = others.length ? 'Tick 1 to 3 people, then tap Start game. Each of you plays on your own phone, whenever it suits you.' : 'It’s just you on the family list so far. Ask Shane to add someone in Info Book, then open Scrabble again.';
+    const allHead = $('#allgameshead'), allBox = $('#famall');
+    const all = (famList && famList.admin && Array.isArray(famList.all)) ? famList.all.filter(g => !g.over && !g.cancelled) : [];
+    if (allHead) allHead.hidden = !all.length;
+    if (allBox) {
+      allBox.hidden = !all.length;
+      allBox.innerHTML = all.length ? all.map(g => {
+        const who = (g.players || []).map(p => (p.me ? 'You' : p.name) + ' ' + p.score + (p.resigned ? ' (out)' : '')).join(' · ');
+        const turn = g.yourTurn ? 'Your turn' : 'Waiting for ' + (g.turnName || 'the next person');
+        const last = g.last ? '<small>' + esc(g.last) + '</small>' : '';
+        const armedC = armed === 'cancel:' + g.id;
+        return '<div class="allrow"><button type="button" data-gid="' + esc(g.id) + '"><b>' + esc(turn) + '</b> · ' + esc(who) + last + '</button><button type="button" class="cancelg" data-cancel="' + esc(g.id) + '">' + (armedC ? 'Cancel?' : 'Cancel') + '</button></div>';
+      }).join('') : '';
+    }
   }
   function loadFamily(force) {
     const me = member();
@@ -624,16 +649,18 @@
   }
   function canAct() {
     if (!st || st.over || busy) return false;
-    if (st.mode === 'family') return !!st.turnIsMe;
+    if (st.mode === 'family') return !!st.turnIsMe && !st.watch;
     return !st.players[st.turn].cpu && (st.mode === 'cpu' || revealed);
   }
   function used(k) { return pending.some(p => p.k === k); }
   function say(t, warn) { const m = $('#msg'); m.textContent = t || ''; m.classList.toggle('warn', !!warn); if (warn && !reduced) { m.classList.remove('nudge'); void m.offsetWidth; m.classList.add('nudge'); } }
   function arm(name, btn, text) {
-    if (armed === name) { armed = ''; clearTimeout(armTimer); return true; }
+    if (armed === name) { armed = ''; clearTimeout(armTimer); if (st) drawButtons(); else paintFamily(); return true; }
     armed = name; clearTimeout(armTimer);
-    armTimer = setTimeout(() => { armed = ''; drawButtons(); }, 4000);
-    say(text); drawButtons();
+    armTimer = setTimeout(() => { armed = ''; if (st) drawButtons(); else paintFamily(); }, 4000);
+    if (st) say(text);
+    else { const status = $('#famstatus'); if (status) { status.classList.toggle('offline', false); status.textContent = text; } }
+    if (st) drawButtons(); else paintFamily();
     return false;
   }
 
@@ -660,6 +687,7 @@
   }
   function drawRack() {
     const el = $('#rack');
+    if (st.mode === 'family' && st.watch && !st.over) { el.innerHTML = '<p class="hidden">You’re looking in as Shane. Players’ racks stay hidden.</p>'; return; }
     if (st.mode === 'pass' && !revealed && !st.over) { el.innerHTML = '<p class="hidden">Tiles are hidden until the next player taps Show.</p>'; return; }
     const rack = myRack();
     el.innerHTML = rack.map((l, k) => {
@@ -690,6 +718,13 @@
       rb.classList.toggle('show', show);
       rb.textContent = armed === 'resign' ? 'Resign?' : 'Resign';
       rb.disabled = !show || busy || !!swapPick;
+    }
+    const cb = $('#cancelbtn');
+    if (cb) {
+      const show = st.mode === 'family' && !st.over && !st.cancelled && (st.canCancel || isShane());
+      cb.classList.toggle('show', show);
+      cb.textContent = armed === 'cancel' ? 'Cancel?' : 'Cancel game';
+      cb.disabled = !show || busy;
     }
     const ds = $('#dirseg');
     if (ds) {
@@ -772,8 +807,17 @@
   }
   function showOver() {
     const rows = st.players.map((p, i) => ({ p, i })).sort((a, b) => b.p.score - a.p.score);
-    const win = st.winners.map(i => st.players[i].name);
-    $('#overtitle').textContent = win.length > 1 ? 'A tie: ' + win.join(' and ') : (st.players[st.winners[0]].cpu ? 'The computer wins' : win[0] + ' wins!');
+    if (st.cancelled) {
+      $('#overtitle').textContent = 'Cancelled';
+      $('#overnew').textContent = st.mode === 'family' ? 'Back to games' : 'New game';
+      $('#overlist').innerHTML = rows.map(x => `<li><span>${esc(x.p.name)}</span><strong>${x.p.score}</strong><small></small></li>`).join('');
+      overlay('#over', true);
+      const box = $('#overscores');
+      if (box) { box.hidden = false; box.innerHTML = '<p class="help">This game was cancelled, so it is not on the family scoreboard.</p>'; }
+      return;
+    }
+    const win = (st.winners || []).map(i => st.players[i] && st.players[i].name).filter(Boolean);
+    $('#overtitle').textContent = win.length > 1 ? 'A tie: ' + win.join(' and ') : (win.length && st.players[st.winners[0]] && st.players[st.winners[0]].cpu ? 'The computer wins' : (win[0] ? win[0] + ' wins!' : 'Game over'));
     $('#overnew').textContent = st.mode === 'family' ? 'Back to games' : 'New game';
     $('#overlist').innerHTML = rows.map(x => `<li><span>${esc(x.p.name)}</span><strong>${x.p.score}</strong><small>${x.p.resigned ? 'resigned' + (x.p.left ? ', −' + x.p.left + ' left in rack' : '') : (x.i === st.out ? 'used all tiles, +' + st.players.reduce((a, q, j) => a + (j === st.out ? 0 : (q.resigned ? 0 : q.left)), 0) : (x.p.left ? '−' + x.p.left + ' left in rack' : ''))}</small></li>`).join('');
     overlay('#over', true);
@@ -878,6 +922,33 @@
     else if (selected.includes(k)) selected = selected.filter(x => x !== k);
     else selected = selected.concat([k]);
     drawRack(); drawButtons(); hint();
+  }
+  function doCancel(id) {
+    const gid = id || onlineId;
+    if (!gid || (st && st.mode === 'family' && st.over)) return;
+    if (!(st && st.canCancel) && !isShane() && !(famList && famList.admin)) return;
+    if (demo) { say('This is a demo, so no game is cancelled.'); return; }
+    const key = id ? 'cancel:' + id : 'cancel';
+    if (!arm(key, null, 'Cancel this game for everyone?')) return;
+    busy = true; render();
+    const rev = (st && st.id === gid) ? st.rev : undefined;
+    const go = (r) => api('/scrabble/' + gid + '/cancel', { method: 'POST', body: JSON.stringify({ rev: r }) })
+      .then(v => {
+        busy = false; armed = '';
+        famList = null;
+        if (st && st.mode === 'family' && (st.id === gid || onlineId === gid)) openOnline(v);
+        else { loadFamily(true); say('The game was cancelled.'); }
+      })
+      .catch(e => {
+        busy = false; armed = '';
+        if (e && e.status === 409 && gid) {
+          return api('/scrabble/' + gid).then(v => go(v.rev)).catch(onOnlineErr);
+        }
+        onOnlineErr(e);
+        if (!st || st.id !== gid) loadFamily(true);
+      });
+    if (rev != null) go(rev);
+    else api('/scrabble/' + gid).then(v => go(v.rev)).catch(e => { busy = false; onOnlineErr(e); });
   }
   function doResign() {
     if (!st || st.over || busy || st.mode !== 'family') return;
@@ -988,7 +1059,7 @@
 
   function seedFamilyDemo() {
     demo = true;
-    demoMember = { id: 'm111111111111', tok: 'demo', name: 'Shane', pending: false };
+    demoMember = { id: 'm111111111111', tok: 'demo', name: 'Shane', role: 'admin', pending: false };
     famPeople = [
       { id: 'm111111111111', name: 'Shane' },
       { id: 'm222222222222', name: 'Sarah' },
@@ -1008,6 +1079,15 @@
       ]
     };
     famPick = ['m222222222222', 'm333333333333', 'm444444444444'];
+    famList.admin = true;
+    famList.all = [
+      famList.games[0],
+      { id: 'g3333333333333333', yourTurn: false, over: false, bag: 86, turnName: 'Sarah', last: 'Aranea played TO for 2.', mine: false, canCancel: true, players: [
+        { name: 'Sarah', score: 14, me: false, tiles: 7, turn: true },
+        { name: 'Aranea', score: 9, me: false, tiles: 7 }
+      ] },
+      famList.games[1]
+    ];
   }
   function demoSelect() {
     demoGame();
@@ -1017,6 +1097,16 @@
     for (let k = 0; k < rack.length && selected.length < 4; k++) if (rack[k] !== '?' && !used(k)) selected.push(k);
     placeDir = 'across';
     render();
+  }
+  function demoCancel() {
+    seedFamilyDemo();
+    famPick = [];
+    famList.games = [famList.games[0]];
+    famList.yourTurn = 1;
+    setupMode = 'family';
+    openSetup();
+    paintFamily();
+    showFamilyAlert();
   }
   function demoChallenge() {
     seedFamilyDemo();
@@ -1132,6 +1222,7 @@
     $('#passbtn').addEventListener('click', doPass);
     $('#newbtn').addEventListener('click', doNew);
     const resign = $('#resignbtn'); if (resign) resign.addEventListener('click', doResign);
+    const cancel = $('#cancelbtn'); if (cancel) cancel.addEventListener('click', () => doCancel());
     const dirseg = $('#dirseg'); if (dirseg) dirseg.addEventListener('click', e => { const b = e.target.closest('[data-dir]'); if (!b || !canAct()) return; placeDir = b.dataset.dir; drawButtons(); hint(); });
     $('#soundbtn').addEventListener('click', () => { soundOn = !soundOn; store.set(SKEY, soundOn ? 'on' : 'off'); drawButtons(); if (soundOn) sndPlace(); });
     $('#zoombtn').addEventListener('click', () => { zoom = !zoom; $('#boardwrap').classList.toggle('zoom', zoom); drawButtons(); zoomTo(); });
@@ -1144,6 +1235,13 @@
     $('#startbtn').addEventListener('click', () => { if (setupMode === 'family') startFamily(); else startGame(); });
     $('#fampeople').addEventListener('click', e => { const b = e.target.closest('button[data-mid]'); if (b) toggleFamPerson(b.dataset.mid); });
     $('#famgames').addEventListener('click', e => { const b = e.target.closest('[data-gid]'); if (b) openFamilyGame(b.dataset.gid); });
+    const famall = $('#famall');
+    if (famall) famall.addEventListener('click', e => {
+      const c = e.target.closest('[data-cancel]');
+      if (c) { e.preventDefault(); e.stopPropagation(); doCancel(c.getAttribute('data-cancel')); return; }
+      const b = e.target.closest('[data-gid]'); if (b) openFamilyGame(b.dataset.gid);
+    });
+
     $('#famalert').addEventListener('click', () => openFamilyGame($('#famalert').dataset.gid));
     { const sb = $('#scoresbtn'), gb = $('#gscoresbtn'); const go = () => root.IBScores && root.IBScores.open('scrabble'); if (sb) sb.addEventListener('click', go); if (gb) gb.addEventListener('click', go); }
     $('#contbtn').addEventListener('click', () => { const s = loadSaved(); if (s) resume(s); });
@@ -1160,6 +1258,7 @@
       if (/^#demo-challenge/.test(hash)) { demoChallenge(); return; }
       if (/^#demo-online/.test(hash)) { demoOnline(); return; }
       if (/^#demo-multi/.test(hash)) { demoMulti(); return; }
+      if (/^#demo-cancel/.test(hash)) { demoCancel(); return; }
       if (/^#demo/.test(hash)) { demoGame(); return; }
       const want = takeOpenId();
       if (want) { openFamilyGame(want); peekFamily(); return; }
@@ -1172,5 +1271,5 @@
     });
   }
   if (d.readyState === 'loading') d.addEventListener('DOMContentLoaded', boot); else boot();
-  root.Scrabble.ui = { seedChallenge: demoChallenge, seedOnline: demoOnline, seedSelect: demoSelect, seedMulti: demoMulti, layoutRun };
+  root.Scrabble.ui = { seedChallenge: demoChallenge, seedOnline: demoOnline, seedSelect: demoSelect, seedMulti: demoMulti, seedCancel: demoCancel, layoutRun };
 })(typeof self !== 'undefined' ? self : (typeof window !== 'undefined' ? window : globalThis));

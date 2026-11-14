@@ -258,13 +258,13 @@ function pack(g) {
     board: g.board, bag: g.bag,
     players: g.players.map(p => ({ mid: p.mid, score: p.score, rack: p.rack, left: p.left == null ? undefined : p.left, resigned: p.resigned ? 1 : undefined })),
     turn: g.turn, scoreless: g.scoreless, over: !!g.over, out: g.out == null ? null : g.out,
-    winners: g.winners || [], last: g.last || null, history: g.history || [], moves: g.moves || 0, scored: !!g.scored, resigned: g.resigned == null ? null : g.resigned
+    winners: g.winners || [], last: g.last || null, history: g.history || [], moves: g.moves || 0, scored: !!g.scored, resigned: g.resigned == null ? null : g.resigned, cancelled: g.cancelled ? 1 : undefined
   });
 }
 function unpack(row) {
   const s = JSON.parse(row.state);
   s.id = row.id; s.rev = row.rev; s.updated = row.updated; s.created = row.created;
-  s.over = !!s.over; s.winners = s.winners || []; s.players = (s.players || []).map(p => ({ ...p, resigned: !!p.resigned })); s.history = s.history || [];
+  s.over = !!s.over; s.cancelled = !!s.cancelled; s.winners = s.winners || []; s.players = (s.players || []).map(p => ({ ...p, resigned: !!p.resigned })); s.history = s.history || [];
   return s;
 }
 function loadGame(sql, id) {
@@ -273,7 +273,7 @@ function loadGame(sql, id) {
 }
 function saveGame(sql, g, now) {
   sql.exec(`UPDATE scrabble_games SET rev=?, status=?, turn_mid=?, state=?, updated=? WHERE id=?`,
-    g.rev, g.over ? 'done' : 'play', g.over ? null : g.players[g.turn].mid, pack(g), now, g.id);
+    g.rev, g.cancelled ? 'cancelled' : g.over ? 'done' : 'play', g.over ? null : g.players[g.turn].mid, pack(g), now, g.id);
 }
 function namesFor(sql, g) {
   const ids = g.players.map(p => p.mid);
@@ -295,7 +295,7 @@ function repair(sql, g) {
   return changed;
 }
 function recordScores(sql, g, now) {
-  if (!g.over || g.scored) return;
+  if (!g.over || g.scored || g.cancelled) return;
   g.players.forEach((p, i) => {
     const ref = 'scrabble:' + g.id + ':' + p.mid;
     if (rows(sql, `SELECT 1 x FROM scores WHERE ref=?`, ref)[0]) return;
@@ -305,19 +305,28 @@ function recordScores(sql, g, now) {
   });
   g.scored = true;
 }
-export function viewOf(g, meId, names) {
+function isShane(sql, me) {
+  const row = me && me.id ? rows(sql, `SELECT name, role FROM members WHERE id=? AND removed=0`, me.id)[0] : null;
+  if (!row || row.role !== 'admin') return false;
+  const first = String(row.name || '').trim().split(/\s+/)[0] || '';
+  return /^Shane$/i.test(first);
+}
+function canSee(sql, id, me) { return inGame(sql, id, me.id) || isShane(sql, me); }
+export function viewOf(g, meId, names, opts) {
   const mine = g.players.findIndex(p => p.mid === meId);
-  if (mine < 0) return null;
+  const watch = !!(opts && opts.watch && mine < 0);
+  if (mine < 0 && !watch) return null;
   const nm = i => names[g.players[i].mid] || 'Former member';
   return {
-    id: g.id, rev: g.rev, over: !!g.over,
-    yourTurn: !g.over && g.players[g.turn].mid === meId && !g.players[g.turn].resigned,
+    id: g.id, rev: g.rev, over: !!g.over, cancelled: !!g.cancelled,
+    yourTurn: !g.over && mine >= 0 && g.players[g.turn].mid === meId && !g.players[g.turn].resigned,
     bag: g.bag.length, scoreless: g.scoreless || 0, turn: g.turn,
     out: g.over ? g.out : null, winners: g.over ? g.winners.slice() : [],
-    winnerNames: g.over ? g.winners.map(nm) : [],
+    winnerNames: g.over && !g.cancelled ? g.winners.map(nm) : [],
     board: g.board, last: g.last || null, history: (g.history || []).slice(-30), updated: g.updated, created: g.created,
     lastText: lastLine(g, names),
-    rack: g.players[mine].rack.slice(),
+    rack: mine >= 0 ? g.players[mine].rack.slice() : [],
+    watch: watch || undefined, canCancel: !!(opts && opts.canCancel && !g.over && !g.cancelled),
     players: g.players.map((p, i) => ({
       name: names[p.mid] || 'Former member', score: p.score, tiles: p.rack.length,
       me: i === mine, turn: !g.over && i === g.turn && !p.resigned, resigned: !!p.resigned,
@@ -340,7 +349,8 @@ function turnNote(g, mid, names) {
 }
 function lastLine(g, names) {
   const L = g.last; if (!L) return '';
-  const name = names[g.players[L.who].mid] || 'Someone';
+  if (L.kind === 'cancel') return (L.byName || 'Shane') + ' cancelled the game.';
+  const name = (g.players[L.who] && names[g.players[L.who].mid]) || 'Someone';
   if (L.kind === 'swap') return `${name} swapped ${L.n} tile${L.n === 1 ? '' : 's'}.`;
   if (L.kind === 'pass') return `${name} passed.`;
   if (L.kind === 'resign') return `${name} resigned.`;
@@ -375,24 +385,62 @@ export function createGame(sql, me, ids, now, opts = {}) {
   return { status: 200, body: g };
 }
 
+function summarize(g, meId, names, canCancel) {
+  const v = viewOf(g, meId, names, { watch: true, canCancel: canCancel && !g.over && !g.cancelled });
+  return {
+    id: g.id, yourTurn: !!v.yourTurn, over: !!v.over, cancelled: !!v.cancelled, updated: g.updated, bag: v.bag,
+    turnName: v.over ? '' : (names[g.players[g.turn].mid] || 'Former member'),
+    last: lastLine(g, names), mine: v.players.some(p => p.me), canCancel: !!v.canCancel,
+    players: v.players.map(p => ({ name: p.name, score: p.score, me: p.me, tiles: p.tiles, turn: !!p.turn, resigned: !!p.resigned }))
+  };
+}
 function listGames(sql, me) {
   const recs = rows(sql, `SELECT g.id, g.rev, g.status, g.turn_mid, g.state, g.created, g.updated FROM scrabble_games g JOIN scrabble_seats s ON s.gid=g.id WHERE s.mid=? ORDER BY (g.status='play' AND g.turn_mid=?) DESC, (g.status='play') DESC, g.updated DESC LIMIT 30`, me.id, me.id);
   const games = [];
   for (const row of recs) {
     const g = unpack(row);
-    const names = namesFor(sql, g);
-    const v = viewOf(g, me.id, names);
-    games.push({
-      id: g.id, yourTurn: v.yourTurn, over: v.over, updated: g.updated, bag: v.bag,
-      turnName: v.over ? '' : (names[g.players[g.turn].mid] || 'Former member'),
-      last: lastLine(g, names),
-      players: v.players.map(p => ({ name: p.name, score: p.score, me: p.me, tiles: p.tiles, turn: !!p.turn, resigned: !!p.resigned }))
+    games.push(summarize(g, me.id, namesFor(sql, g), isShane(sql, me)));
+  }
+  const out = { yourTurn: games.filter(g => g.yourTurn).length, games };
+  if (isShane(sql, me)) {
+    out.admin = true;
+    const allRows = rows(sql, `SELECT id, rev, status, turn_mid, state, created, updated FROM scrabble_games WHERE status='play' ORDER BY updated DESC LIMIT 50`);
+    out.all = allRows.map(row => {
+      const g = unpack(row);
+      return summarize(g, me.id, namesFor(sql, g), true);
     });
   }
-  return { yourTurn: games.filter(g => g.yourTurn).length, games };
+  return out;
 }
 
-async function act(sql, me, id, kind, body, now, hooks) {
+async function cancelGame(sql, me, id, body, now, hooks) {
+  if (!isShane(sql, me)) return { status: 403, body: { err: 'Only Shane can cancel a game.' } };
+  const g = loadGame(sql, id);
+  if (!g) return { status: 404, body: { err: 'no such game' } };
+  if (g.over) return { status: 409, body: { err: 'The game is over.', rev: g.rev } };
+  if (!body || body.rev !== g.rev) return { status: 409, body: { err: 'The board has changed. Have another look.', rev: g.rev } };
+  const next = JSON.parse(JSON.stringify(g));
+  const row = rows(sql, `SELECT name FROM members WHERE id=?`, me.id)[0];
+  const first = String((me && me.name) || (row && row.name) || 'Shane').trim().split(/\s+/)[0] || 'Shane';
+  const who = next.players.findIndex(p => p.mid === me.id);
+  next.cancelled = true;
+  next.over = true;
+  next.winners = [];
+  next.out = null;
+  next.scored = true;
+  next.last = { kind: 'cancel', who: who < 0 ? 0 : who, byName: first };
+  pushHistory(next);
+  next.rev = g.rev + 1;
+  saveGame(sql, next, now);
+  const names = namesFor(sql, next);
+  const card = 'scrabble-' + next.id;
+  const text = first + ' cancelled the Scrabble game';
+  for (const p of next.players) if (p.mid !== me.id) await tell(hooks, p.mid, text, card);
+  return { status: 200, body: viewOf(next, me.id, names, { watch: true, canCancel: false }) };
+}
+
+async function act(
+sql, me, id, kind, body, now, hooks) {
   const g0 = loadGame(sql, id);
   if (!g0 || !inGame(sql, id, me.id)) return { status: 404, body: { err: 'no such game' } };
   let g = g0;
@@ -432,7 +480,7 @@ async function act(sql, me, id, kind, body, now, hooks) {
 
 /* Called from Family.fetch once the member token has been checked. null when the path is not /scrabble. */
 export async function scrabbleRoute(sql, me, p, m, url, readBody, now = Date.now(), hooks) {
-  const mm = /^\/scrabble(?:\/(g[0-9a-f]{16})(?:\/(play|pass|swap|resign))?)?$/.exec(p || '');
+  const mm = /^\/scrabble(?:\/(g[0-9a-f]{16})(?:\/(play|pass|swap|resign|cancel))?)?$/.exec(p || '');
   if (!mm) return null;
   if (!lex) return { status: 503, body: { err: 'The word list is not ready yet.' } };
   const id = mm[1], kind = mm[2];
@@ -462,6 +510,7 @@ export async function scrabbleRoute(sql, me, p, m, url, readBody, now = Date.now
   if (kind) {
     if (m !== 'POST') return { status: 405, body: { err: 'method' } };
     const b = await readBody();
+    if (kind === 'cancel') return cancelGame(sql, me, id, b, now, hooks);
     return act(sql, me, id, kind, b, now, hooks);
   }
   if (m === 'DELETE') {
@@ -472,10 +521,10 @@ export async function scrabbleRoute(sql, me, p, m, url, readBody, now = Date.now
   }
   if (m !== 'GET') return { status: 405, body: { err: 'method' } };
   let g = loadGame(sql, id);
-  if (!g || !inGame(sql, id, me.id)) return { status: 404, body: { err: 'no such game' } };
+  if (!g || !canSee(sql, id, me)) return { status: 404, body: { err: 'no such game' } };
   if (repair(sql, g)) { g.rev++; saveGame(sql, g, now); }
-  if (g.over && !g.scored) { recordScores(sql, g, now); saveGame(sql, g, now); }
-  return { status: 200, body: viewOf(g, me.id, namesFor(sql, g)) };
+  if (g.over && !g.scored && !g.cancelled) { recordScores(sql, g, now); saveGame(sql, g, now); }
+  return { status: 200, body: viewOf(g, me.id, namesFor(sql, g), { watch: isShane(sql, me), canCancel: isShane(sql, me) && !g.over && !g.cancelled }) };
 }
 
-export const _test = { idx, rackPoints, makeBag, lastLine, vsNames, turnNote, listNames, liveSeats };
+export const _test = { idx, rackPoints, makeBag, lastLine, vsNames, turnNote, listNames, liveSeats, isShane };

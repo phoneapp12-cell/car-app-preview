@@ -494,4 +494,91 @@ const alexView = await get(sql11, alex, '/scrabble/' + gid4b);
 assert.ok(!JSON.stringify(alexView.body).includes('"D"') || alexView.body.rack.includes('D') === false);
 assert.ok(!alexView.body.players.some(p => p.me === false && p.rack), 'other racks stay hidden');
 
+
+// Shane-only cancel: ends as Cancelled, no winner, scores not recorded, everyone else is told
+assert.equal(S.isShane(sql11, shane), true);
+assert.equal(S.isShane(sql11, sarah), false);
+assert.equal(S.isShane(sql11, { id: SARAH, name: 'Shane', role: 'admin' }), false, 'identity comes from the member record, not the request body');
+
+notes.length = 0;
+const sqlC = fresh();
+bindDict('cat\nto\nat\ndog\nqi\nax\n');
+const own = createGame(sqlC, shane, [SARAH], t, { order: [SHANE, SARAH], racks: ['CATXXXX', 'TOYYYYY'], bag: 'E'.repeat(86) });
+const gidC = own.body.id;
+r = await post(sqlC, shane, '/scrabble/' + gidC + '/play', { rev: 1, tiles: cat });
+assert.equal(r.status, 200, r.body.err);
+notes.length = 0;
+r = await post(sqlC, shane, '/scrabble/' + gidC + '/cancel', { rev: r.body.rev });
+assert.equal(r.status, 200, r.body.err);
+assert.equal(r.body.over, true);
+assert.equal(r.body.cancelled, true);
+assert.deepEqual(r.body.winners, []);
+assert.deepEqual(r.body.winnerNames, []);
+assert.equal(r.body.last.kind, 'cancel');
+assert.match(r.body.lastText, /Shane cancelled the game/);
+assert.ok(notes.some(n => n.mid === SARAH && n.text === 'Shane cancelled the Scrabble game'), JSON.stringify(notes));
+assert.ok(!notes.some(n => n.mid === SHANE));
+const scoredC = sqlC.db.prepare(`SELECT mid, score, won FROM scores WHERE game='scrabble' AND ref LIKE ?`).all('scrabble:' + gidC + '%');
+assert.equal(scoredC.length, 0, 'cancelled games are not recorded on the family scoreboard');
+const rowC = sqlC.db.prepare(`SELECT status FROM scrabble_games WHERE id=?`).get(gidC);
+assert.equal(rowC.status, 'cancelled');
+// a later GET still does not write scores
+const again = await get(sqlC, sarah, '/scrabble/' + gidC);
+assert.equal(again.body.cancelled, true);
+assert.equal(sqlC.db.prepare(`SELECT COUNT(*) n FROM scores WHERE ref LIKE ?`).get('scrabble:' + gidC + '%').n, 0);
+
+// Shane can cancel a game he is not in; Sarah cannot cancel one she is in
+notes.length = 0;
+const sqlC2 = fresh();
+const theirs = createGame(sqlC2, sarah, [ARANEA], t, { order: [SARAH, ARANEA], racks: ['CATXXXX', 'TOYYYYY'], bag: 'E'.repeat(86) });
+const gidO = theirs.body.id;
+assert.equal((await post(sqlC2, sarah, '/scrabble/' + gidO + '/cancel', { rev: 1 })).status, 403);
+assert.equal((await post(sqlC2, sarah, '/scrabble/' + gidO + '/cancel', { rev: 1 })).body.err, 'Only Shane can cancel a game.');
+assert.equal((await get(sqlC2, alex, '/scrabble/' + gidO)).status, 404);
+const watch = await get(sqlC2, shane, '/scrabble/' + gidO);
+assert.equal(watch.status, 200, 'Shane can open a family game he is not in');
+assert.equal(watch.body.watch, true);
+assert.equal(watch.body.canCancel, true);
+assert.deepEqual(watch.body.rack, []);
+assert.ok(!JSON.stringify(watch.body).includes('"C"') || watch.body.board && true);
+// racks of the seated players stay hidden from the watch view
+const sneakC = JSON.stringify(watch.body);
+assert.ok(!/"rack":\[[^\]]*C/.test(sneakC) && sneakC.includes('"rack":[]'), sneakC);
+r = await post(sqlC2, shane, '/scrabble/' + gidO + '/cancel', { rev: watch.body.rev });
+assert.equal(r.status, 200, r.body.err);
+assert.equal(r.body.cancelled, true);
+assert.equal(r.body.over, true);
+assert.ok(notes.some(n => n.mid === SARAH && n.text === 'Shane cancelled the Scrabble game'));
+assert.ok(notes.some(n => n.mid === ARANEA && n.text === 'Shane cancelled the Scrabble game'));
+assert.equal(sqlC2.db.prepare(`SELECT COUNT(*) n FROM scores WHERE ref LIKE ?`).get('scrabble:' + gidO + '%').n, 0);
+assert.equal((await post(sqlC2, shane, '/scrabble/' + gidO + '/cancel', { rev: r.body.rev })).status, 409, 'already cancelled');
+
+// All games list is only for Shane, and only active games
+const sqlC3 = fresh();
+const gMine = createGame(sqlC3, shane, [SARAH], t, { order: [SHANE, SARAH], racks: ['CATXXXX', 'TOYYYYY'], bag: 'E'.repeat(86) });
+const gTheirs = createGame(sqlC3, aranea, [ALEX], t, { order: [ARANEA, ALEX], racks: ['DOGZZZZ', 'QIWWWWW'], bag: 'E'.repeat(86) });
+const listShane = await get(sqlC3, shane, '/scrabble');
+assert.equal(listShane.body.admin, true);
+assert.ok(Array.isArray(listShane.body.all));
+assert.equal(listShane.body.all.length, 2);
+assert.ok(listShane.body.all.every(g => g.canCancel && !g.over));
+assert.ok(listShane.body.all.some(g => g.id === gTheirs.body.id && g.mine === false));
+assert.ok(listShane.body.all.some(g => g.id === gMine.body.id && g.mine === true));
+const listSarah = await get(sqlC3, sarah, '/scrabble');
+assert.equal(listSarah.body.admin, undefined);
+assert.equal(listSarah.body.all, undefined);
+assert.ok(listSarah.body.games.every(g => !g.canCancel));
+r = await post(sqlC3, shane, '/scrabble/' + gTheirs.body.id + '/cancel', { rev: 1 });
+assert.equal(r.status, 200, r.body.err);
+const listC3 = await get(sqlC3, shane, '/scrabble');
+assert.equal(listC3.body.all.length, 1);
+assert.equal(listC3.body.all[0].id, gMine.body.id);
+
+// a member who happens to be named Shane, but is not the admin, cannot cancel
+const SHANE2 = 'm555555555555';
+sqlC3.db.prepare(`INSERT INTO members (id,name,role,created,removed) VALUES (?,?,?,?,?)`).run(SHANE2, 'Shane', 'member', 9, 0);
+const notAdmin = { id: SHANE2, name: 'Shane', role: 'admin' };
+assert.equal(S.isShane(sqlC3, notAdmin), false);
+assert.equal((await post(sqlC3, notAdmin, '/scrabble/' + gMine.body.id + '/cancel', { rev: 1 })).status, 403);
+
 console.log('scrabble tests ok');

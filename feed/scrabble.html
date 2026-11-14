@@ -108,8 +108,12 @@
   .glist button small { display: block; font-weight: 400; font-size: 12px; color: rgba(255,255,255,.7); margin-top: 2px; }
   .picks button.challenge { min-height: 56px; font-size: 16px; }
   .offline { color: #fcd34d; }
-  #resignbtn { display: none; }
-  #resignbtn.show { display: inline-flex; }
+  #resignbtn, #cancelbtn { display: none; }
+  #resignbtn.show, #cancelbtn.show { display: inline-flex; }
+  #allgameshead { margin-top: 12px; }
+  .allrow { display: flex; gap: 8px; align-items: stretch; margin-bottom: 8px; }
+  .allrow [data-gid] { flex: 1; text-align: left; }
+  .allrow .cancelg { flex: 0 0 auto; min-width: 88px; align-self: stretch; }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
@@ -139,6 +143,8 @@
         <p id="setupturn" class="yourturn" hidden>Your turn</p>
         <p class="help" style="margin-top:0">Your games</p>
         <div id="famgames" class="glist"></div>
+        <p class="help" id="allgameshead" hidden>All games</p>
+        <div id="famall" class="glist" hidden></div>
         <p id="famstatus">Tick 1 to 3 people, then tap Start game. Each of you plays on your own phone, whenever it suits you.</p>
         <div id="fampeople" class="picks"></div>
       </div>
@@ -160,7 +166,7 @@
       <div id="rack" class="rack" aria-label="Your tiles"></div>
       <div class="seg dirseg" id="dirseg" hidden><button type="button" data-dir="one" class="on">One by one</button><button type="button" data-dir="across">Across →</button><button type="button" data-dir="down">Down ↓</button></div>
       <div class="acts"><button type="button" id="playbtn" class="pri">Play</button><button type="button" id="recallbtn">Clear</button><button type="button" id="shufbtn">Shuffle</button></div>
-      <div class="acts sm"><button type="button" id="swapbtn">Swap</button><button type="button" id="passbtn">Pass</button><button type="button" id="resignbtn">Resign</button><button type="button" id="zoombtn">Bigger</button><button type="button" id="soundbtn">Sound on</button><button type="button" id="newbtn">New game</button></div>
+      <div class="acts sm"><button type="button" id="swapbtn">Swap</button><button type="button" id="passbtn">Pass</button><button type="button" id="resignbtn">Resign</button><button type="button" id="cancelbtn">Cancel game</button><button type="button" id="zoombtn">Bigger</button><button type="button" id="soundbtn">Sound on</button><button type="button" id="newbtn">New game</button></div>
       <p class="credit">Tap several tiles in order (they get numbers), then tap squares to place them, or pick Across or Down and tap the first square. Clear takes them all back. TW triple word, DW double word, TL triple letter, DL double letter.</p>
     </div>
   </div>
