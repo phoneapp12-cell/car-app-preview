@@ -3604,11 +3604,9 @@ if (live) {
   const pal = tetGame.LOOKS[10].colors;
   assert.ok(pal.includes(mid.piece.color), 'the prop uses Snowy mountains colours');
   const reduced = tetGame.newAbseil();
-  reduced.phase = 'down';
-  reduced.people = [{ x: 10, y: 10 }];
-  tetGame.stepAbseil(reduced, 100, 390, 844, { reduce: true });
-  assert.strictEqual(reduced.phase, 'wait');
-  assert.strictEqual(reduced.people.length, 0, 'reduced motion skips the animation');
+  reduced.wait = 0;
+  tetGame.stepAbseil(reduced, 10, 390, 844, { reduce: true, pose: true, start: { t: 6 } });
+  assert.ok(reduced.phase === 'down' || reduced.people.length === 2, 'reduced motion still runs the climb, only gentler');
   assert.ok(src.includes('function drawAbseilClimber') && src.includes('helmet') || src.includes("helmet"));
   assert.ok(src.includes('stepAbseil(abseil') && src.includes('drawAbseil(c, abseil)'));
   assert.ok(!src.includes('lockPiece') || src.indexOf('function poseAbseil') > 0);
@@ -3645,6 +3643,7 @@ if (live) {
   // Stage rules key off the theme, not a frozen level number
   const food = tetGame.newGame({ level: 4, practice: true });
   assert.strictEqual(tetGame.themeFor(food.level), tetGame.FOOD_THEME);
+  food.lastCherry = false;
   assert.strictEqual(tetGame.takeNext(food, 0), tetGame.CHERRY_T, 'cherry bombs still follow the Food theme at its new level');
   const notFood = tetGame.newGame({ level: 12, practice: true });
   assert.notStrictEqual(tetGame.themeFor(notFood.level), tetGame.FOOD_THEME);
@@ -3697,4 +3696,153 @@ if (live) {
   assert.strictEqual(tetGame.THEMES[4].name, 'City');
   assert.strictEqual(tetGame.THEMES[12].name, 'Food');
   assert.strictEqual(tetGame.THEMES[6].name, 'Farmyard');
+}
+
+// 1.9.209 Sewers rats chew blocks, higher water, and Snowy mountains live grab
+{
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.deepStrictEqual(Array.from(tetGame.RAT_CHEW_GAP), [20, 40]);
+  assert.strictEqual(tetGame.SEWER_WATER_MIN, 0.15);
+  assert.strictEqual(tetGame.SEWER_WATER_MAX, 0.20);
+  assert.strictEqual(tetGame.sewerWaterFrac(90, 10), 0.15, 'water starts at 15% of the screen at the beginning of Sewers');
+  assert.strictEqual(tetGame.sewerWaterFrac(100, 10), 0.20, 'water rises to 20% after ten lines on Sewers');
+  assert.ok(tetGame.sewerWaterFrac(95, 10) > 0.15 && tetGame.sewerWaterFrac(95, 10) < 0.20);
+  assert.ok(Math.abs(tetGame.sewerWaterY(1000, 90, 10) - 850) < 1e-9);
+  assert.ok(Math.abs(tetGame.sewerWaterY(1000, 100, 10) - 800) < 1e-9);
+
+  const g = tetGame.newGame({ level: 10, practice: true });
+  g.board = tetGame.emptyBoard();
+  // A 3-high column and a surface step, plus a buried cell that must not be picked
+  for (let r = 17; r <= 19; r++) for (let c = 2; c <= 4; c++) g.board[r][c] = 1;
+  g.board[19][6] = 1;
+  const targets = tetGame.sewerChewTargets(g);
+  const keys = targets.map(t => t.c + ',' + t.r).sort();
+  assert.ok(keys.includes('2,17') && keys.includes('3,17') && keys.includes('4,17') && keys.includes('6,19'));
+  assert.ok(!keys.includes('3,18'), 'a cell boxed in on the top and both sides is not on the surface');
+  // Never touch the falling piece
+  g.piece = tetGame.spawn(4); // O, 2x2
+  g.piece.x = 5; g.piece.y = 17; // covers 5,17 6,17 5,18 6,18 — not the locked 5,19
+  // put the piece on top of 5,19? y=18 would cover 5,18 and 5,19
+  g.piece.y = 18;
+  const after = tetGame.sewerChewTargets(g).map(t => t.c + ',' + t.r);
+  assert.ok(!after.includes('5,19'), 'a cell under the falling piece is not a chew target');
+
+  // Chew one cell, column gravity like cherry bombs, can complete a line
+  const chew = tetGame.newGame({ level: 10, practice: true });
+  chew.board = tetGame.emptyBoard();
+  chew.slime = tetGame.emptySlime();
+  // Row 18 is one short (col 4). Col 4 has a slime block at row 16 that will fall into it.
+  for (let c = 0; c < 10; c++) if (c !== 4) chew.board[18][c] = 1;
+  chew.board[19][4] = 2;
+  chew.board[17][4] = 4;
+  chew.board[16][4] = 3;
+  chew.slime[16][4] = 1;
+  chew.piece = tetGame.spawn(1);
+  chew.piece.x = 0; chew.piece.y = 0;
+  const result = tetGame.applyRatChew(chew, 4, 16);
+  assert.ok(result && result.c === 4 && result.r === 16);
+  assert.strictEqual(chew.board[16][4], 0, 'the nibbled cell is gone');
+  assert.ok(result.cleared >= 1, 'settling the column can complete a line');
+  assert.strictEqual(chew.board[19][4], 2, 'the cell that was already on the floor stays at the bottom of the packed column after the line clears');
+
+  // One-at-a-time state machine and reduced motion still chews
+  const st = tetGame.newRatChew();
+  st.wait = 0;
+  const g2 = tetGame.newGame({ level: 10, practice: true });
+  g2.board = tetGame.emptyBoard();
+  g2.board[19][7] = 1;
+  g2.piece = tetGame.spawn(1); g2.piece.x = 0; g2.piece.y = 0;
+  tetGame.stepRatChew(st, g2, 0, { running: true, silent: true, reduce: true });
+  assert.strictEqual(st.phase, 'approach');
+  assert.strictEqual(st.col, 7); assert.strictEqual(st.row, 19);
+  // Mid-approach the cell is still there; after a long nibble it is gone
+  tetGame.stepRatChew(st, g2, 8000, { running: true, silent: true, reduce: true });
+  assert.ok(st.munched || st.phase === 'flee' || st.phase === 'wait', 'the chew completes even with reduced motion');
+  assert.strictEqual(g2.board[19][7], 0, 'the cell is removed after the nibble');
+
+  // Off-theme: no chew
+  const off = tetGame.newGame({ level: 8, practice: true });
+  off.board = tetGame.emptyBoard();
+  off.board[19][0] = 1;
+  const stOff = tetGame.stepRatChew(tetGame.newRatChew(), off, 50000, { running: true, silent: true });
+  assert.strictEqual(stOff.phase, 'wait');
+  assert.strictEqual(off.board[19][0], 1, 'rats do not chew off the Sewers stage');
+
+  const guide = tetGame.howToPlayHtml();
+  assert.ok(guide.includes('rat') && (guide.includes('nibbles') || guide.includes('nibble')));
+  assert.ok(guide.includes('abseil') || guide.includes('climbers'));
+  assert.ok(guide.includes('grab') && guide.includes('few columns'));
+  assert.ok(src.includes('playMunch') && src.includes('drawRatChew') && src.includes('applyRatChew'));
+
+  // Live abseil grab
+  assert.strictEqual(tetGame.ABSEIL_SAFE_ROWS, 2);
+  const snow = tetGame.newGame({ level: 8, practice: true });
+  snow.board = tetGame.emptyBoard();
+  snow.piece = tetGame.spawn(4); // O
+  snow.piece.x = 3; snow.piece.y = 4;
+  assert.ok(tetGame.pieceFallLeft(snow) > 10);
+  assert.ok(tetGame.abseilPieceSafe(snow));
+  const opts = tetGame.abseilShiftTargets(snow);
+  assert.ok(opts.length >= 1);
+  assert.ok(opts.every(x => x !== snow.piece.x && tetGame.abseilShiftOk(snow, x)));
+  // Too close to the stack: y near the floor
+  const low = tetGame.newGame({ level: 8, practice: true });
+  low.board = tetGame.emptyBoard();
+  for (let c = 0; c < 10; c++) low.board[19][c] = 1;
+  low.piece = tetGame.spawn(4);
+  low.piece.x = 3; low.piece.y = 16; // O covers 16-17, lands at 17 (one row of fall) — last couple of rows
+  assert.ok(tetGame.pieceFallLeft(low) < 2);
+  assert.ok(!tetGame.abseilPieceSafe(low), 'will not grab in the last couple of rows above the stack');
+  // Overlap is rejected
+  const blocked = tetGame.newGame({ level: 8, practice: true });
+  blocked.board = tetGame.emptyBoard();
+  blocked.piece = tetGame.spawn(4);
+  blocked.piece.x = 0; blocked.piece.y = 4;
+  assert.ok(!tetGame.abseilShiftOk(blocked, -1), 'never shifts into an overlapping / off-board position');
+
+  const live = tetGame.newGame({ level: 8, practice: true });
+  live.board = tetGame.emptyBoard();
+  live.piece = tetGame.spawn(4);
+  live.piece.x = 3; live.piece.y = 5;
+  const startX = live.piece.x;
+  const ast = tetGame.newAbseil();
+  tetGame.abseilStartLive(ast, 390, 844, live, {});
+  ast.targetX = startX + 3;
+  assert.strictEqual(ast.mode, 'live');
+  function tickAbseil(st, game, ms, reduce) {
+    const step = 50;
+    let left = ms;
+    while (left > 0) {
+      const d = Math.min(step, left);
+      tetGame.stepAbseil(st, d, 390, 844, { pose: true, game: game, running: true, reduce: !!reduce });
+      left -= d;
+    }
+  }
+  tickAbseil(ast, live, (2.8 + 0.8 + 1.4) * 1000, false);
+  assert.strictEqual(ast.phase, 'carry', ast.phase);
+  assert.ok(live.heldByAbseil, 'the live piece is held while they carry it');
+  assert.ok(live.piece.x !== startX, 'they carry the piece sideways');
+  tickAbseil(ast, live, 3000, false);
+  assert.ok(!live.heldByAbseil, 'they let go at the end');
+  assert.strictEqual(live.piece.x, ast.targetX);
+  assert.strictEqual(live.piece.y, 5, 'they do not drop it into the stack; it keeps its row and falls normally afterwards');
+
+  // Reduced motion still applies the same grab rules
+  const liveR = tetGame.newGame({ level: 8, practice: true });
+  liveR.board = tetGame.emptyBoard();
+  liveR.piece = tetGame.spawn(4);
+  liveR.piece.x = 2; liveR.piece.y = 5;
+  const astR = tetGame.newAbseil();
+  tetGame.abseilStartLive(astR, 390, 844, liveR, {});
+  astR.targetX = 5;
+  tickAbseil(astR, liveR, 8000, true);
+  assert.notStrictEqual(liveR.piece.x, 2, 'reduced motion still carries the live piece');
+  assert.strictEqual(liveR.piece.x, 5);
+
+  // Other stages, speeds and order unchanged
+  assert.strictEqual(tetGame.DROP_SLOW, 1.38);
+  assert.deepStrictEqual(Array.from(tetGame.howToPlayLevels()), ['Farmyard', 'Bush walk', 'Jeremiah was a bullfrog', 'Food', 'Beach', 'Ocean', 'New Zealand', 'Snowy mountains', 'City', 'Sewers', 'Fireworks', 'Night sky', 'Space travel', 'Triangles']);
+  assert.strictEqual(tetGame.themeFor(8), 10);
+  assert.strictEqual(tetGame.themeFor(10), tetGame.SEWER_THEME);
+  assert.ok(src.includes('prefers-reduced-motion'));
 }
