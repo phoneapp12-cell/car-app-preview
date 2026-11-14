@@ -1,6 +1,6 @@
-/* 1.9.147 Scrabble-style word game for Info Book. 1.9.214 adds family challenges over the
-   internet (each person on their own phone, taking a turn whenever it suits them) and
-   multi-select placement: pick several rack tiles, then place them in that order.
+/* 1.9.147 Scrabble-style word game for Info Book. Family challenges are 2 to 4 people
+   over the internet (each person on their own phone, taking a turn whenever it suits them).
+   Multi-select placement: pick several rack tiles, then place them in that order.
    The board of an online game is kept by the family service. Play the computer, or pass
    the phone round, still runs on this phone. No sign-in beyond the Info Book family link,
    and no network apart from the word list and (for a family game) the family service.
@@ -398,7 +398,7 @@
   // a game with people from the family list. Turns are taken whenever it suits each person.
   function offlineMsg() { return 'No internet just now. You can still play the computer or pass the phone, and your online games will be here when you’re back online.'; }
   const API = 'https://shane-my-feed-data.phoneapp12.workers.dev/api';
-  let onlineId = '', pollTimer = 0, famList = null, famPeople = null;
+  let onlineId = '', pollTimer = 0, famList = null, famPeople = null, famPick = [];
   function member() {
     if (demoMember) return demoMember;
     try { const m = JSON.parse(store.get('mf.member') || 'null'); return m && m.id && m.tok && !m.pending ? m : null; } catch (e) { return null; }
@@ -428,7 +428,7 @@
       v: 1, mode: 'family', rev: v.rev, id: v.id, over: !!v.over, turnIsMe: !!v.yourTurn, scored: 1,
       board: (v.board || []).map(c => c ? { l: c.l, b: c.b ? 1 : 0 } : null),
       bag: new Array(v.bag | 0),
-      players: (v.players || []).map(p => ({ name: p.name, score: p.score, rack: p.me ? (v.rack || []).slice() : [], me: !!p.me, left: p.left })),
+      players: (v.players || []).map(p => ({ name: p.name, score: p.score, rack: p.me ? (v.rack || []).slice() : [], me: !!p.me, left: p.left, resigned: !!p.resigned })),
       turn: v.turn | 0, scoreless: v.scoreless || 0, winners: v.winners || [], out: v.out, last: v.last || null
     };
   }
@@ -497,29 +497,45 @@
     if (!member() || demo) return;
     api('/scrabble').then(list => { famList = list; showFamilyAlert(); if (setupMode === 'family') paintFamily(); }).catch(() => { if (setupMode === 'family') { const status = $('#famstatus'); status.classList.add('offline'); status.textContent = offlineMsg(); } });
   }
+  function listNames(arr) {
+    const a = (arr || []).filter(Boolean);
+    if (!a.length) return '';
+    if (a.length === 1) return a[0];
+    if (a.length === 2) return a[0] + ' and ' + a[1];
+    return a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+  }
   function paintFamily() {
     const status = $('#famstatus'), people = $('#fampeople'), games = $('#famgames'), banner = $('#setupturn'), start = $('#startbtn');
     const me = member();
-    if (start) start.hidden = setupMode === 'family';
+    if (start) {
+      start.hidden = false;
+      const picked = famPick.map(id => ((famPeople || []).find(p => p.id === id) || {}).name).filter(Boolean);
+      start.textContent = picked.length ? 'Start game with ' + listNames(picked) : 'Start game';
+      start.disabled = setupMode === 'family' && !picked.length;
+    }
     if (!me) {
-      status.textContent = 'Challenging a family member needs this phone’s Info Book family link. Open Info Book from your invite, then come back.';
+      status.textContent = 'Challenging family members needs this phone’s Info Book family link. Open Info Book from your invite, then come back.';
       people.innerHTML = ''; games.innerHTML = ''; banner.hidden = true; return;
     }
     const list = famPeople || [];
     const others = list.filter(p => p.id !== me.id);
-    people.innerHTML = others.map(p => '<button type="button" class="challenge" data-mid="' + esc(p.id) + '">Challenge ' + esc(p.name) + '</button>').join('');
+    famPick = famPick.filter(id => others.some(p => p.id === id)).slice(0, 3);
+    people.innerHTML = others.map(p => '<button type="button" class="challenge' + (famPick.includes(p.id) ? ' on' : '') + '" data-mid="' + esc(p.id) + '" aria-pressed="' + (famPick.includes(p.id) ? 'true' : 'false') + '">' + esc(p.name) + '</button>').join('');
     const gs = (famList && famList.games) || [];
     const waiting = gs.filter(g => g.yourTurn && !g.over);
     banner.hidden = !waiting.length;
     if (waiting.length) banner.textContent = waiting.length > 1 ? 'Your turn · ' + waiting.length + ' games' : 'Your turn';
     games.innerHTML = gs.length ? gs.map(g => {
-      const who = (g.players || []).map(p => (p.me ? 'You' : p.name) + ' ' + p.score).join(' · ');
+      const who = (g.players || []).map(p => {
+        const label = (p.me ? 'You' : p.name) + ' ' + p.score + (p.resigned ? ' (out)' : '');
+        return p.turn && !g.over ? '▶ ' + label : label;
+      }).join(' · ');
       const turn = g.over ? 'Finished' : g.yourTurn ? 'Your turn' : 'Waiting for ' + (g.turnName || 'the next person');
       const last = g.last ? '<small>' + esc(g.last) + '</small>' : '';
       return '<button type="button" class="' + (g.yourTurn && !g.over ? 'your' : '') + '" data-gid="' + esc(g.id) + '"><b>' + esc(turn) + '</b> · ' + esc(who) + last + '</button>';
     }).join('') : '<p class="help">No online games yet.</p>';
     status.classList.toggle('offline', false);
-    status.textContent = others.length ? 'Tap a family member to challenge them over the internet. Each of you plays on your own phone, whenever it suits you.' : 'It’s just you on the family list so far. Ask Shane to add someone in Info Book, then open Scrabble again.';
+    status.textContent = others.length ? 'Tick 1 to 3 people, then tap Start game. Each of you plays on your own phone, whenever it suits you.' : 'It’s just you on the family list so far. Ask Shane to add someone in Info Book, then open Scrabble again.';
   }
   function loadFamily(force) {
     const me = member();
@@ -540,22 +556,25 @@
   function startFamily() {
     const me = member();
     if (!me) { $('#famstatus').textContent = 'This phone needs its Info Book family link.'; return; }
-    const ids = [...d.querySelectorAll('#fampeople button.on')].map(b => b.dataset.mid).filter(Boolean);
-    if (ids.filter(id => id !== me.id).length < 1) { $('#famstatus').textContent = 'Tap a family member to challenge them.'; return; }
-    challengePerson(ids.find(id => id !== me.id));
-  }
-  function challengePerson(id) {
-    const me = member();
-    if (!me || !id) return;
+    const ids = famPick.filter(id => id !== me.id).slice(0, 3);
+    if (!ids.length) { $('#famstatus').textContent = 'Tick 1 to 3 family members, then tap Start game.'; return; }
     if (demo) { say('This is a demo, so no real challenge is sent.'); return; }
     const status = $('#famstatus');
     status.textContent = 'Starting the game…';
-    api('/scrabble', { method: 'POST', body: JSON.stringify({ player: id }) }).then(v => {
-      famList = null; openOnline(v);
+    api('/scrabble', { method: 'POST', body: JSON.stringify({ players: ids }) }).then(v => {
+      famList = null; famPick = []; openOnline(v);
     }).catch(e => {
       status.classList.toggle('offline', /internet|offline|network|fetch|abort/i.test(e.message || ''));
       status.textContent = e.message || offlineMsg();
     });
+  }
+  function toggleFamPerson(id) {
+    if (!id) return;
+    const i = famPick.indexOf(id);
+    if (i >= 0) famPick.splice(i, 1);
+    else if (famPick.length >= 3) { $('#famstatus').textContent = 'You can challenge up to 3 other people in one game.'; return; }
+    else famPick.push(id);
+    paintFamily();
   }
   function takeOpenId() {
     let id = '';
@@ -619,7 +638,13 @@
   }
 
   function drawScores() {
-    $('#scores').innerHTML = st.players.map((p, i) => `<div class="pl${i === st.turn && !st.over ? ' on' : ''}"><span>${p.cpu ? '🤖 ' : ''}${esc(p.name)}</span><strong>${p.score}</strong></div>`).join('');
+    const n = st.players.length;
+    const box = $('#scores');
+    box.className = 'scores' + (n >= 3 ? ' n' + n : '');
+    box.innerHTML = st.players.map((p, i) => {
+      const on = i === st.turn && !st.over && !p.resigned;
+      return `<div class="pl${on ? ' on' : ''}${p.resigned ? ' out' : ''}"><span>${p.cpu ? '🤖 ' : ''}${esc(p.name)}${p.resigned ? ' · out' : ''}</span><strong>${p.score}</strong></div>`;
+    }).join('');
     $('#bagn').textContent = st.bag.length;
   }
   function drawBoard() {
@@ -659,7 +684,13 @@
     $('#passbtn').textContent = armed === 'pass' ? 'Pass?' : 'Pass';
     $('#passbtn').disabled = !act || !!swapPick;
     const rb = $('#resignbtn');
-    if (rb) { rb.classList.toggle('show', st.mode === 'family'); rb.textContent = armed === 'resign' ? 'Resign?' : 'Resign'; rb.disabled = !act || !!swapPick; }
+    if (rb) {
+      const mep = st.players.find(p => p.me);
+      const show = st.mode === 'family' && !st.over && mep && !mep.resigned;
+      rb.classList.toggle('show', show);
+      rb.textContent = armed === 'resign' ? 'Resign?' : 'Resign';
+      rb.disabled = !show || busy || !!swapPick;
+    }
     const ds = $('#dirseg');
     if (ds) {
       ds.hidden = !act || !!swapPick || !selected.length;
@@ -744,7 +775,7 @@
     const win = st.winners.map(i => st.players[i].name);
     $('#overtitle').textContent = win.length > 1 ? 'A tie: ' + win.join(' and ') : (st.players[st.winners[0]].cpu ? 'The computer wins' : win[0] + ' wins!');
     $('#overnew').textContent = st.mode === 'family' ? 'Back to games' : 'New game';
-    $('#overlist').innerHTML = rows.map(x => `<li><span>${esc(x.p.name)}</span><strong>${x.p.score}</strong><small>${x.i === st.out ? 'used all tiles, +' + st.players.reduce((a, q, j) => a + (j === st.out ? 0 : q.left), 0) : (x.p.left ? '−' + x.p.left + ' left in rack' : '')}</small></li>`).join('');
+    $('#overlist').innerHTML = rows.map(x => `<li><span>${esc(x.p.name)}</span><strong>${x.p.score}</strong><small>${x.p.resigned ? 'resigned' + (x.p.left ? ', −' + x.p.left + ' left in rack' : '') : (x.i === st.out ? 'used all tiles, +' + st.players.reduce((a, q, j) => a + (j === st.out ? 0 : (q.resigned ? 0 : q.left)), 0) : (x.p.left ? '−' + x.p.left + ' left in rack' : ''))}</small></li>`).join('');
     overlay('#over', true);
     overScores();
   }
@@ -849,8 +880,14 @@
     drawRack(); drawButtons(); hint();
   }
   function doResign() {
-    if (!canAct() || st.mode !== 'family') return;
-    if (!arm('resign', null, 'Tap Resign again to give up this game.')) return;
+    if (!st || st.over || busy || st.mode !== 'family') return;
+    const mep = st.players.find(p => p.me);
+    if (!mep || mep.resigned) return;
+    const live = st.players.filter(p => !p.resigned).length;
+    const copy = live > 2
+      ? 'Tap Resign again to leave this game. The others will carry on.'
+      : 'Tap Resign again to give up this game.';
+    if (!arm('resign', null, copy)) return;
     sendOnline('resign');
   }
   function doPlay() {
@@ -912,7 +949,8 @@
     $('#cpuopts').hidden = setupMode !== 'cpu';
     $('#passopts').hidden = setupMode !== 'pass';
     const fam = $('#famopts'); if (fam) fam.hidden = setupMode !== 'family';
-    const start = $('#startbtn'); if (start) start.hidden = setupMode === 'family';
+    const start = $('#startbtn');
+    if (start && setupMode !== 'family') { start.hidden = false; start.disabled = false; start.textContent = 'Start game'; }
     if (setupMode === 'family') loadFamily(false);
     const nm = names();
     const box = $('#namebox');
@@ -960,10 +998,16 @@
     famList = {
       yourTurn: 1,
       games: [
-        { id: 'g1111111111111111', yourTurn: true, over: false, bag: 72, turnName: 'Shane', last: 'Sarah played HOUSE for 18.', players: [{ name: 'Shane', score: 24, me: true, tiles: 7 }, { name: 'Sarah', score: 31, me: false, tiles: 7 }] },
-        { id: 'g2222222222222222', yourTurn: false, over: false, bag: 80, turnName: 'Aranea', last: 'You passed.', players: [{ name: 'Shane', score: 12, me: true, tiles: 7 }, { name: 'Aranea', score: 19, me: false, tiles: 7 }] }
+        { id: 'g1111111111111111', yourTurn: true, over: false, bag: 58, turnName: 'Shane', last: 'Alex played QI for 11.', players: [
+          { name: 'Shane', score: 42, me: true, tiles: 7, turn: true },
+          { name: 'Sarah', score: 31, me: false, tiles: 7 },
+          { name: 'Aranea', score: 27, me: false, tiles: 7 },
+          { name: 'Alex', score: 18, me: false, tiles: 7 }
+        ] },
+        { id: 'g2222222222222222', yourTurn: false, over: false, bag: 80, turnName: 'Aranea', last: 'You passed.', players: [{ name: 'Shane', score: 12, me: true, tiles: 7 }, { name: 'Aranea', score: 19, me: false, tiles: 7, turn: true }] }
       ]
     };
+    famPick = ['m222222222222', 'm333333333333', 'm444444444444'];
   }
   function demoSelect() {
     demoGame();
@@ -980,6 +1024,29 @@
     openSetup();
     paintFamily();
     showFamilyAlert();
+  }
+  function demoMulti() {
+    seedFamilyDemo();
+    const rand = rng(20261114);
+    st = newGame({ mode: 'cpu', level: 'clever', players: [{ name: 'Shane' }, { name: 'Sarah' }], rand });
+    for (let k = 0; k < 8 && !st.over; k++) { const r = cpuChoose(st, dict, rand); applyCpu(st, r.move, dict, rand); }
+    const board = st.board.slice();
+    const last = st.last;
+    openOnline({
+      id: 'g1111111111111111', rev: 12, over: false, yourTurn: true, bag: 58, scoreless: 0, turn: 0,
+      board, last, history: last ? [last] : [], lastText: lastText({ last, players: [{ name: 'Alex' }, { name: 'Shane' }] }),
+      rack: ['C', 'A', 'R', 'E', 'T', 'S', '?'],
+      players: [
+        { name: 'Shane', score: 42, tiles: 7, me: true, turn: true },
+        { name: 'Sarah', score: 31, tiles: 7, me: false, turn: false },
+        { name: 'Aranea', score: 27, tiles: 7, me: false, turn: false },
+        { name: 'Alex', score: 18, tiles: 7, me: false, turn: false }
+      ]
+    });
+    pending = [];
+    selected = [0, 1, 2, 3];
+    placeDir = 'across';
+    render();
   }
   function demoOnline() {
     seedFamilyDemo();
@@ -1075,7 +1142,7 @@
     d.querySelectorAll('[data-level]').forEach(b => b.addEventListener('click', () => { setupLevel = b.dataset.level; drawSetup(); }));
     d.querySelectorAll('[data-count]').forEach(b => b.addEventListener('click', () => { setupCount = +b.dataset.count; drawSetup(); }));
     $('#startbtn').addEventListener('click', () => { if (setupMode === 'family') startFamily(); else startGame(); });
-    $('#fampeople').addEventListener('click', e => { const b = e.target.closest('button[data-mid]'); if (b) challengePerson(b.dataset.mid); });
+    $('#fampeople').addEventListener('click', e => { const b = e.target.closest('button[data-mid]'); if (b) toggleFamPerson(b.dataset.mid); });
     $('#famgames').addEventListener('click', e => { const b = e.target.closest('[data-gid]'); if (b) openFamilyGame(b.dataset.gid); });
     $('#famalert').addEventListener('click', () => openFamilyGame($('#famalert').dataset.gid));
     { const sb = $('#scoresbtn'), gb = $('#gscoresbtn'); const go = () => root.IBScores && root.IBScores.open('scrabble'); if (sb) sb.addEventListener('click', go); if (gb) gb.addEventListener('click', go); }
@@ -1092,6 +1159,7 @@
       if (/^#demo-select/.test(hash)) { demoSelect(); return; }
       if (/^#demo-challenge/.test(hash)) { demoChallenge(); return; }
       if (/^#demo-online/.test(hash)) { demoOnline(); return; }
+      if (/^#demo-multi/.test(hash)) { demoMulti(); return; }
       if (/^#demo/.test(hash)) { demoGame(); return; }
       const want = takeOpenId();
       if (want) { openFamilyGame(want); peekFamily(); return; }
@@ -1104,5 +1172,5 @@
     });
   }
   if (d.readyState === 'loading') d.addEventListener('DOMContentLoaded', boot); else boot();
-  root.Scrabble.ui = { seedChallenge: demoChallenge, seedOnline: demoOnline, seedSelect: demoSelect, layoutRun };
+  root.Scrabble.ui = { seedChallenge: demoChallenge, seedOnline: demoOnline, seedSelect: demoSelect, seedMulti: demoMulti, layoutRun };
 })(typeof self !== 'undefined' ? self : (typeof window !== 'undefined' ? window : globalThis));

@@ -40,8 +40,13 @@
   .scores { flex: 1; display: flex; gap: 6px; min-width: 0; }
   .pl, .bagc { flex: 1 1 0; min-width: 0; background: rgba(0,0,0,.3); border: 1px solid rgba(255,255,255,.12); border-radius: 10px; padding: 5px 8px; }
   .pl.on { border-color: #22d3ee; background: rgba(34,211,238,.14); }
+  .pl.out { opacity: .55; }
   .pl span, .bagc span { display: block; font-size: 11px; color: rgba(255,255,255,.7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .pl strong, .bagc strong { display: block; font-size: 19px; line-height: 23px; font-variant-numeric: tabular-nums; }
+  .scores.n3, .scores.n4 { gap: 4px; }
+  .scores.n3 .pl, .scores.n4 .pl { padding: 4px 5px; }
+  .scores.n3 .pl span, .scores.n4 .pl span { font-size: 10px; }
+  .scores.n4 .pl strong, .scores.n3 .pl strong { font-size: 16px; line-height: 20px; }
   .bagc { flex: 0 0 54px; text-align: center; }
   .trophy { flex: 0 0 44px; padding: 0; font-size: 20px; } /* 1.9.149 family scoreboard */
   .ov { overflow: auto; }
@@ -123,7 +128,7 @@
       <div class="modes">
         <button type="button" data-mode="cpu"><b>🤖</b>Play the computer<small>Just you</small></button>
         <button type="button" data-mode="pass"><b>📱</b>Pass the phone<small>2 to 4 people</small></button>
-        <button type="button" data-mode="family" class="wide"><b>👨‍👩‍👧</b>Challenge a family member<small>Play over the internet, on your own phones</small></button>
+        <button type="button" data-mode="family" class="wide"><b>👨‍👩‍👧</b>Challenge a family member<small>1 to 3 other people, on your own phones</small></button>
       </div>
       <div class="opts" id="cpuopts">
         <label>Your name<input type="text" id="myname" maxlength="16" autocomplete="off" placeholder="You"></label>
@@ -134,7 +139,7 @@
         <p id="setupturn" class="yourturn" hidden>Your turn</p>
         <p class="help" style="margin-top:0">Your games</p>
         <div id="famgames" class="glist"></div>
-        <p id="famstatus">Challenge a family member. Each of you plays on your own phone, whenever it suits you.</p>
+        <p id="famstatus">Tick 1 to 3 people, then tap Start game. Each of you plays on your own phone, whenever it suits you.</p>
         <div id="fampeople" class="picks"></div>
       </div>
       <div class="opts" id="passopts" hidden>
