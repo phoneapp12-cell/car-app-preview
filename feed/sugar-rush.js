@@ -984,6 +984,15 @@
     }
     return best || findMove(st.board, st.mask);
   }
+  // Idle hint: after HINT_IDLE_MS with no input, point at the move that
+  // best helps the current objective (jelly, locks, icing, ingredients,
+  // collect, specials). Falls back to any valid move. The UI repeats the
+  // hand every HINT_REPEAT_MS until the player touches the board.
+  const HINT_IDLE_MS = 15000, HINT_REPEAT_MS = 3200;
+  function hintMoveFor(st) {
+    if (!st || st.over || st.tutorial) return null;
+    return bestMove(st);
+  }
   function tryBeat(lv, seeds) {
     let wins = 0;
     for (let s = 1; s <= seeds; s++) {
@@ -1324,11 +1333,11 @@
   }
   function racerFirst(name) { return String(name || 'Player').trim().split(/\s+/)[0] || 'Player'; }
 
-  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_STOPS, FUTURE_STOPS, stopForLevel, icingPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, goalCounts, cloneState, bestMove, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
+  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_STOPS, FUTURE_STOPS, stopForLevel, icingPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, goalCounts, cloneState, bestMove, hintMoveFor, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
     allowed: () => !!(root.IBScores && root.IBScores.isShane && root.IBScores.isShane()),
     SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL, XF,
     VOICE_FILES, VOICE_RANK, MEDIA_HASH, mediaUrl, gameTrack, attachSfxBus, playTone, playChime, playMovesWarnChime, playClip, voiceForStep,
-    SAYINGS, SAYING_COLORS, SAYING_VOICE, sayingKind, pickSaying, sayingColor, MOVES_WARN_AT, MOVES_WARN_MS,
+    SAYINGS, SAYING_COLORS, SAYING_VOICE, sayingKind, pickSaying, sayingColor, MOVES_WARN_AT, MOVES_WARN_MS, HINT_IDLE_MS, HINT_REPEAT_MS,
     SPARKLE_MIN_MS, SPARKLE_MAX_MS, SPARKLE_MAX, SPARKLE_MAX_REDUCE, SHIMMER_MS, sparkleCap, sparkleEase, shimmerAt, drawStarGlint, drawCandyShine };
 
   if (!root.document) return;
@@ -1751,17 +1760,19 @@
         const p = Math.min(1, (t - f.t0) / f.dur); ctx.strokeStyle = 'rgba(255,255,255,' + (0.8 * (1 - p)) + ')'; ctx.lineWidth = CS * .2 * (1 - p);
         ctx.beginPath(); ctx.arc(f.x, f.y, CS * (.4 + 1.3 * p), 0, Math.PI * 2); ctx.stroke();
       }
-      const hint = !busy && !st.over && t - lastAct > 6000 ? hintMove : null;
+      const hint = tickHint(t);
       const R = CS * .37;
+      if (hint) drawHintGlow(hint, t, true);
       for (const s of sprites.values()) {
         if (s.tw) { const p = Math.min(1, (t - s.tw.t0) / s.tw.dur), e = s.tw.ease(p); s.x = s.tw.fx + (s.tw.tx - s.tw.fx) * e; s.y = s.tw.fy + (s.tw.ty - s.tw.fy) * e; if (p >= 1) s.tw = null; }
         if (s.pop) { const p = Math.min(1, (t - s.pop) / (220 * SP)); s.sc = 1 + .25 * p; s.al = 1 - p; }
         if (s.grow) { const p = Math.min(1, (t - s.grow) / (260 * SP)); s.sc = .3 + .7 * easeOut(p); if (p >= 1) s.grow = 0; }
         if (s.y < -0.5) continue;
         let wob = 0;
-        if (hint && hint.some(h => h[0] === s.r && h[1] === s.c)) wob = Math.sin(t / 180) * .12;
+        if (hint && !reduce && hint.some(h => h[0] === s.r && h[1] === s.c)) wob = Math.sin(t / 180) * .12;
         drawSweet(s.t, s.x * CS + CS / 2, s.y * CS + CS / 2, R, s.sc, s.al, wob);
       }
+      if (hint) drawHintGlow(hint, t, false);
       const visible = new Map();
       for (const s of sprites.values()) {
         if (s.y < -0.5 || s.al < 0.35) continue;
@@ -1938,7 +1949,91 @@
     el.style.setProperty('--y2', p2[1] + 'px');
     el.hidden = false;
   }
+  let hintOn = false, hintHold = false;
+  function noteActivity() {
+    lastAct = now();
+    hideHintHand();
+    hintOn = false;
+    hintMove = null;
+  }
+  function boardIdle() {
+    if (!st || screen !== 'game' || st.over || st.tutorial || busy) return false;
+    if (tut && tut.active) return false;
+    if (crush && crush.active) return false;
+    const ban = $('goalban'); if (ban && !ban.hidden) return false;
+    const mw = $('moveswarn'); if (mw && !mw.hidden) return false;
+    const recap = $('tutrecap'); if (recap && !recap.hidden) return false;
+    for (const s of sprites.values()) if (s.tw || s.pop || s.grow) return false;
+    return true;
+  }
+  function hideHintHand() {
+    const el = $('hinthand');
+    if (el) { el.hidden = true; el.classList.remove('mid'); }
+  }
+  function placeHintHand(a, z, mid) {
+    const el = $('hinthand');
+    if (!el || !a || !z || reduce) { hideHintHand(); return; }
+    const b = cv.getBoundingClientRect();
+    const p = function (r, c) { return [b.left + (c + 0.5) * b.width / N, b.top + (r + 0.5) * b.height / N]; };
+    const p1 = p(a[0], a[1]), p2 = p(z[0], z[1]);
+    el.style.setProperty('--x1', p1[0] + 'px');
+    el.style.setProperty('--y1', p1[1] + 'px');
+    el.style.setProperty('--x2', p2[0] + 'px');
+    el.style.setProperty('--y2', p2[1] + 'px');
+    el.classList.toggle('mid', !!mid);
+    el.hidden = false;
+  }
+  function drawHintGlow(move, t, under) {
+    if (!move) return;
+    const pulse = reduce ? 1 : (0.7 + 0.3 * Math.sin((t || now()) / 280));
+    for (const p of move) {
+      const x = p[1] * CS, y = p[0] * CS;
+      ctx.save();
+      if (under) {
+        ctx.fillStyle = 'rgba(255, 215, 70, ' + (0.22 * pulse) + ')';
+        rr(x + 2, y + 2, CS - 4, CS - 4, CS * .2); ctx.fill();
+      } else {
+        ctx.shadowColor = 'rgba(255, 200, 40, ' + (0.9 * pulse) + ')';
+        ctx.shadowBlur = 16 * DPR;
+        ctx.strokeStyle = 'rgba(255, 214, 60, ' + (0.95 * pulse) + ')';
+        ctx.lineWidth = 4 * DPR;
+        rr(x + 3, y + 3, CS - 6, CS - 6, CS * .2); ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+  function tickHint(t) {
+    if (hintHold) {
+      if (hintMove && !reduce) placeHintHand(hintMove[0], hintMove[1], true);
+      return hintMove;
+    }
+    if (!boardIdle() || (t - lastAct) < HINT_IDLE_MS) {
+      if (hintOn) { hideHintHand(); hintOn = false; }
+      return null;
+    }
+    if (!hintMove) hintMove = hintMoveFor(st);
+    if (!hintMove) { hideHintHand(); hintOn = false; return null; }
+    if (!hintOn) {
+      hintOn = true;
+      if (!reduce) placeHintHand(hintMove[0], hintMove[1]);
+    }
+    return hintMove;
+  }
+  function showHint(opt) {
+    opt = opt || {};
+    if (!st) return null;
+    hintHold = !!opt.hold;
+    lastAct = now() - HINT_IDLE_MS - 50;
+    hintMove = hintMoveFor(st) || findMove(st.board, st.mask);
+    hintOn = !!hintMove;
+    if (hintOn && !reduce) placeHintHand(hintMove[0], hintMove[1], !!opt.mid);
+    else hideHintHand();
+    return hintMove && hintMove.map(function (p) { return p.slice(); });
+  }
   function hideTutUi() {
+    hideHintHand();
+    hintOn = false;
+    hintHold = false;
     if ($('tut')) $('tut').hidden = true;
     if ($('tuthand')) $('tuthand').hidden = true;
     if ($('tutnext')) $('tutnext').hidden = true;
@@ -2027,7 +2122,7 @@
     if (opt.jelly) st.jelly = parseDigits(opt.jelly);
     if (opt.tutorial) st.tutorial = true;
     sel = null; busy = false; lastAct = now();
-    crush = null; warned3 = false; hideMovesWarn(); lastSaying = ''; sayUntil = 0; hideSaying();
+    crush = null; warned3 = false; hintOn = false; hintHold = false; hintMove = null; hideHintHand(); hideMovesWarn(); lastSaying = ''; sayUntil = 0; hideSaying();
     fitCanvas(); syncAll(); hud();
     paintGoalStrip(lv, st);
     hintMove = opt.tutorial ? null : findMove(st.board, st.mask);
@@ -2459,7 +2554,7 @@
     }
     const At = st.board[a[0]][a[1]], Zt = st.board[z[0]][z[1]];
     if (!At || !Zt || isHole(At) || isHole(Zt)) return;
-    sel = null; busy = true; lastAct = now(); hintMove = null;
+    sel = null; busy = true; lastAct = now(); hintMove = null; hintOn = false; hideHintHand();
     const A = sprites.get(At.id), Z = sprites.get(Zt.id);
     const res = play(st, a, z);
     if (A) moveTo(A, z[0], z[1], 160); if (Z) moveTo(Z, a[0], a[1], 160);
@@ -2477,7 +2572,7 @@
       await wait(440);
     }
     hud();
-    hintMove = findMove(st.board, st.mask);
+    hintMove = null; hintOn = false; hideHintHand();
     busy = false; lastAct = now();
     if (tut && tut.active && tut.step && tut.step.kind === 'move') {
       await wait(500 * SP);
@@ -2627,7 +2722,7 @@
     st.over = true;
     st.crushing = true;
     busy = true;
-    hintMove = null;
+    hintMove = null; hintOn = false; hintHold = false; hideHintHand();
     sel = null;
     crush = { active: true, skip: false, fast: !!reduce, n: 0, from: st.lv.n };
     doc.body.classList.add('oncrush');
@@ -2798,7 +2893,7 @@
     if (!isOpen(st.mask, r, c) || isHole(st.board[r][c])) return null;
     return [r, c];
   }
-  cv.addEventListener('pointerdown', e => { unlockAudio(); if (crush && crush.active) { speedCrush(); e.preventDefault(); return; } const p = cellAt(e); if (!p) return; down = { p, x: e.clientX, y: e.clientY }; try { cv.setPointerCapture(e.pointerId); } catch (er) { } e.preventDefault(); });
+  cv.addEventListener('pointerdown', e => { unlockAudio(); noteActivity(); if (crush && crush.active) { speedCrush(); e.preventDefault(); return; } const p = cellAt(e); if (!p) return; down = { p, x: e.clientX, y: e.clientY }; try { cv.setPointerCapture(e.pointerId); } catch (er) { } e.preventDefault(); });
   cv.addEventListener('pointermove', e => {
     if (!down || busy) return;
     const dx = e.clientX - down.x, dy = e.clientY - down.y, cell = cv.getBoundingClientRect().width / N;
@@ -2813,7 +2908,7 @@
     if (sel && adj(sel, p)) attempt(sel, p);
     else if (sel && sel[0] === p[0] && sel[1] === p[1]) sel = null;
     else { sel = p; }
-    lastAct = now();
+    noteActivity();
   });
   cv.addEventListener('touchend', unlockAudio, { passive: true });
   cv.addEventListener('pointercancel', () => { down = null; });
@@ -2859,7 +2954,7 @@
   if ($('badgeov')) $('badgeov').addEventListener('click', e => {
     if (e.target === $('badgeov') || (e.target.closest && e.target.closest('[data-badge=close]'))) $('badgeov').hidden = true;
   });
-  doc.addEventListener('pointerdown', unlockAudio, { passive: true });
+  doc.addEventListener('pointerdown', function (e) { unlockAudio(); if (screen === 'game') noteActivity(); }, { passive: true });
   doc.addEventListener('pointerup', unlockAudio, { passive: true });
   doc.addEventListener('touchend', unlockAudio, { passive: true });
   doc.addEventListener('visibilitychange', () => {
@@ -2870,7 +2965,7 @@
     }
   });
   root.addEventListener('pagehide', () => { stopAllMusic(); if (ac) ac.close().catch(() => { }); });
-  root.addEventListener('resize', () => { fitCanvas(); if (tut && tut.active && tut.step && tut.step.move) placeTutHand(tut.step.move[0], tut.step.move[1]); });
+  root.addEventListener('resize', () => { fitCanvas(); if (tut && tut.active && tut.step && tut.step.move) placeTutHand(tut.step.move[0], tut.step.move[1]); if (hintOn && hintMove) placeHintHand(hintMove[0], hintMove[1], hintHold); });
 
   paintButtons();
   showMap();
@@ -2879,12 +2974,12 @@
   root.SugarRush.ui = {
     state: () => st, attempt, hud, paintGoalStrip, showEnd, showMap, scrollMapTo, openLevel, startLevel, showIntro, startTutorial, skipTutorial, finishTutorial, showTutStep, beginLevel, beginGoalFinish, showGoalBanner, celebrateOnMap, progress: () => prog, tutorial: () => tut, crush: () => crush,
     seedRace, syncRace, openIconPicker, setRaceOpen, requestCloseSugar, race: () => race,
-    say, chime, callout, unlockAudio, audio, showSaying, hideSaying, showMovesWarn, hideMovesWarn, maybeWarn3,
+    say, chime, callout, unlockAudio, audio, showSaying, hideSaying, showMovesWarn, hideMovesWarn, maybeWarn3, showHint, hideHintHand, noteActivity,
     clipsReady: () => Object.keys(VOICE_FILES).every(k => !!bufs[k]),
     setSound(on) { soundOn = !!on; ls.set('ib-sugar-sound', soundOn); paintButtons(); },
     setScore(n) { if (!st) return; st.score = n; st.moves = 0; st.over = true; st.won = goalsMet(st); st.stars = starsOf(st); hud(); },
     previewWin(opts) { opts = opts || {}; const n = opts.level || (st && st.lv && st.lv.n) || 2; if (!st || st.lv.n !== n) startLevel(n); st.score = opts.score || Math.max(st.lv.stars[2] || 0, 2400); st.moves = Math.max(st.moves, 1); st.won = true; st.over = true; st.stars = opts.stars || 3; if (opts.resetBadge) prog.badges[n - 1] = 0; winInfo = recordWin(st); hud(); showEnd(); },
-    view: () => ({ score: st && st.score, moves: st && st.moves, busy, soundOn, musicOn, screen, level: st && st.lv && st.lv.n, acState: ac && ac.state, sparkles: sparkles.length, hold: sparkleHoldT != null, warned3, lastSaying }),
+    view: () => ({ score: st && st.score, moves: st && st.moves, busy, soundOn, musicOn, screen, level: st && st.lv && st.lv.n, acState: ac && ac.state, sparkles: sparkles.length, hold: sparkleHoldT != null, warned3, lastSaying, hintOn, hintMove: hintMove && hintMove.map(function (p) { return p.slice(); }), lastAct }),
     musicState, playKind, wantKind, playEndSong, stopAllMusic, stopEnd, gameKind, setMusic,
     // Freeze a sparkling board for screenshots (settled pieces, mid-sweep, a few glints at peak).
     previewSparkle(opts) {

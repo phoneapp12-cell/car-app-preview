@@ -332,6 +332,21 @@
     #moveswarn .mw-sparks { display: none; }
   }
 
+
+  /* 1.9.215 Idle hint: wiggle, glow, and a repeating swipe hand after 15s */
+  .hinthand { position: fixed; left: 0; top: 0; z-index: 18; width: 64px; height: 64px; margin: 0; padding: 0; pointer-events: none; font-size: 52px; line-height: 1; transform: translate(calc(var(--x1, 0px) - 18px), calc(var(--y1, 0px) - 8px)) rotate(-20deg); filter: drop-shadow(0 2px 0 rgba(90,18,56,.2)); animation: hintswipe 3.2s ease-in-out infinite; }
+  .hinthand[hidden] { display: none !important; }
+  @keyframes hintswipe {
+    0%, 12% { transform: translate(calc(var(--x1, 0px) - 18px), calc(var(--y1, 0px) - 8px)) rotate(-20deg); opacity: 1; }
+    38%, 48% { transform: translate(calc(var(--x2, 0px) - 18px), calc(var(--y2, 0px) - 8px)) rotate(-20deg); opacity: 1; }
+    70% { transform: translate(calc(var(--x1, 0px) - 18px), calc(var(--y1, 0px) - 8px)) rotate(-20deg); opacity: 1; }
+    82%, 100% { transform: translate(calc(var(--x1, 0px) - 18px), calc(var(--y1, 0px) - 8px)) rotate(-20deg); opacity: 0.15; }
+  }
+  .hinthand.mid { animation-delay: -1.15s; animation-play-state: paused; opacity: 1; }
+  @media (prefers-reduced-motion: reduce) {
+    .hinthand { display: none !important; animation: none !important; }
+  }
+
 </style>
 </head>
 <body>
@@ -441,6 +456,8 @@
       <div class="tutbubble"><p id="tuttext"></p><button type="button" class="pri tutnext" id="tutnext" hidden>Next</button></div>
     </div>
   </div>
+
+  <div class="hinthand" id="hinthand" hidden aria-hidden="true">👆</div>
 
   <div id="saypop" class="saypop" hidden aria-hidden="true"></div>
   <div id="moveswarn" hidden aria-hidden="true">

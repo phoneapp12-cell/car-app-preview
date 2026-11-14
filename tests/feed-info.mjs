@@ -4211,3 +4211,46 @@ if (live) {
   assert.ok(html.includes('#moveswarn.reduce') || html.includes('prefers-reduced-motion'));
 }
 
+// 1.9.215 Sugar Rush idle hint: after 15s, glow and a swipe hand on the best objective move
+{
+  const SR = load('feed/sugar-rush.js').SugarRush;
+  const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
+  const html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
+  assert.strictEqual(SR.HINT_IDLE_MS, 15000);
+  assert.ok(SR.HINT_REPEAT_MS >= 2500 && SR.HINT_REPEAT_MS <= 4500);
+  assert.ok(html.includes('id="hinthand"') && html.includes('hintswipe'));
+  assert.ok(src.includes('function hintMoveFor') && src.includes('function tickHint') && src.includes('function drawHintGlow') && src.includes('noteActivity'));
+  assert.ok(src.includes('if (hint && !reduce && hint.some') , 'wiggle is skipped when motion is reduced');
+  assert.ok(html.includes('prefers-reduced-motion') && html.includes('.hinthand { display: none !important'));
+  const reduceBlock = html.slice(html.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
+  assert.ok(reduceBlock.includes('.hinthand'), 'reduced motion hides the hand and leaves the glow');
+  assert.ok(src.includes("cv.addEventListener('pointerdown'") && src.includes('noteActivity()'));
+  assert.ok(src.includes("if (tut && tut.active) return false") && src.includes('st.tutorial'));
+  assert.ok(src.includes("if (crush && crush.active) return false") && src.includes("goalban") && src.includes('moveswarn'));
+  const jelly = SR.newGame({ level: SR.LEVELS[2], seed: 1 });
+  const before = SR.jellyLeft(jelly);
+  const hint = SR.hintMoveFor(jelly);
+  assert.ok(hint && SR.validSwap(jelly.board, hint[0], hint[1], jelly.mask));
+  const after = SR.cloneState(jelly);
+  assert.ok(SR.play(after, hint[0], hint[1]).valid);
+  const hintDelta = before - SR.jellyLeft(after);
+  assert.ok(hintDelta > 0, 'the hint prefers a move that clears jelly');
+  // A weaker valid move exists that clears less (or no) jelly
+  let weaker = false;
+  for (let r = 0; r < 8 && !weaker; r++) for (let c = 0; c < 8 && !weaker; c++) {
+    const opts = [];
+    if (c + 1 < 8) opts.push([[r, c], [r, c + 1]]);
+    if (r + 1 < 8) opts.push([[r, c], [r + 1, c]]);
+    for (const m of opts) {
+      if (!SR.validSwap(jelly.board, m[0], m[1], jelly.mask)) continue;
+      const cl = SR.cloneState(jelly);
+      if (!SR.play(cl, m[0], m[1]).valid) continue;
+      if (before - SR.jellyLeft(cl) < hintDelta) { weaker = true; break; }
+    }
+  }
+  assert.ok(weaker, 'the hint is not just the first legal swap');
+  assert.strictEqual(SR.hintMoveFor(Object.assign(SR.cloneState(jelly), { tutorial: true })), null);
+  assert.strictEqual(SR.hintMoveFor(Object.assign(SR.cloneState(jelly), { over: true })), null);
+  assert.ok(!/candy crush/i.test(src + html), 'no Candy Crush names in the game');
+}
+
