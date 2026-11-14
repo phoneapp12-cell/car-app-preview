@@ -258,6 +258,48 @@
   .over-score { margin: 0 0 18px; font-size: 18px; color: rgba(255,255,255,.86); }
   .over-score strong { font-size: 28px; color: #fff; }
   #overagain { display: block; width: 100%; flex: none; min-height: 46px; }
+
+  /* 1.9.207 Always-reachable Exit Tetris. Clearly labelled, easy to tap. */
+  .exittetris {
+    flex: 1 1 120px;
+    min-height: 48px;
+    padding: 10px 16px;
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: .01em;
+    border: none;
+    border-radius: 12px;
+    background: #f4f4f5;
+    color: #111;
+    box-shadow: 0 1px 4px rgba(0,0,0,.25);
+  }
+  .headrow { display: flex; align-items: center; justify-content: flex-start; gap: 8px; flex-wrap: wrap; }
+  .headrow h1 { margin: 0; flex: 0 1 auto; min-width: 0; }
+  #exittetris-play { flex: 0 0 auto; min-width: 120px; min-height: 44px; font-size: 15px; }
+  #exittetris-x {
+    display: none;
+    position: fixed;
+    top: max(4px, env(safe-area-inset-top));
+    left: max(8px, env(safe-area-inset-left));
+    z-index: 21;
+    flex: none;
+    margin: 0;
+    min-height: 44px;
+    min-width: 112px;
+    font-size: 14px;
+    pointer-events: auto;
+  }
+  html.fs .headrow { padding: 6px 10px 0; }
+  html.fs .headrow h1 { padding: 0; font-size: 18px; }
+  html.fs-x .headrow { display: none !important; }
+  html.fs-x #exittetris-x { display: block !important; }
+  html.fs-x .xhud { left: max(128px, calc(env(safe-area-inset-left) + 118px)); }
+  #exittetris-start, #exittetris-over, #exittetris-pause, #exittetris-howto {
+    display: block; width: 100%; flex: none; margin-top: 8px;
+  }
+  #exittetris-start, #exittetris-over { margin-top: 12px; }
+  html.fs .exittetris, html.fs-x .exittetris { min-height: 44px; }
+
   html.fs .startov, html.fs-x .startov,
   html.fs .overov, html.fs-x .overov,
   html.fs .pauseov, html.fs-x .pauseov,
@@ -266,7 +308,10 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>Tetris <small id="practicelabel" class="practice" hidden>Practice</small></h1>
+    <div class="headrow">
+      <h1>Tetris <small id="practicelabel" class="practice" hidden>Practice</small></h1>
+      <button type="button" class="exittetris" id="exittetris-play">Exit Tetris</button>
+    </div>
     <p class="help">Tap the board to rotate, drag to move, flick down to drop, swipe up to hold. Keyboard: arrows, Space drops, C holds, P pauses, M toggles music.</p>
     <div class="stats">
       <div class="stat big"><span>Score</span><strong id="score">0</strong></div>
@@ -313,6 +358,7 @@
       <path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/>
     </svg>
   </button>
+  <button type="button" class="exittetris" id="exittetris-x">Exit Tetris</button>
 
   <div id="levelpick" class="lp" hidden role="dialog" aria-label="Choose level">
     <div class="lp-card">
@@ -328,6 +374,7 @@
       <h2>Tetris</h2>
       <button type="button" id="startbtn">Start</button>
       <button type="button" id="starthowto" class="wide">How to play</button>
+      <button type="button" class="exittetris" id="exittetris-start">Exit Tetris</button>
     </div>
   </div>
   <div id="overov" class="startov overov" hidden role="dialog" aria-modal="true" aria-label="Game over">
@@ -336,16 +383,19 @@
       <p class="over-score">Score <strong id="overscore">0</strong></p>
       <button type="button" id="overcontinue" data-act="continue">Continue</button>
       <button type="button" id="overagain" class="wide" data-act="restart">Play again</button>
+      <button type="button" class="exittetris" id="exittetris-over">Exit Tetris</button>
     </div>
   </div>
   <div id="pauseov" class="pauseov" hidden>
     <p>Paused</p>
     <button type="button" id="pauseresume">Resume</button>
     <button type="button" id="pausehowto" class="wide">How to play</button>
+    <button type="button" class="exittetris" id="exittetris-pause">Exit Tetris</button>
   </div>
   <div id="howto" class="lp" hidden role="dialog" aria-modal="true" aria-label="How to play">
     <div class="lp-card howto-card">
       <div id="howtobody"></div>
+      <button type="button" class="exittetris" id="exittetris-howto">Exit Tetris</button>
       <button type="button" id="howtoclose" class="wide">Close</button>
     </div>
   </div>

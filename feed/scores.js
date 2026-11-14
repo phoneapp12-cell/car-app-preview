@@ -187,5 +187,18 @@
     } catch (e) { return false; }
   }
   clearShaneLocalBestOnce();
-  root.IBScores = { fill, API, who, isShane, submit, load, open, close, localBests, nzDate, isOpen: () => !!cur, clearShaneLocalBestOnce, personalBests, uniqueBest, leaderRows, html };
+  // 1.9.207: one-time reset of everyone's local Tetris scores on first load, never again.
+  const TETRIS_SCORES_CLEAR_207 = 'ib-tetris-scores-cleared-1.9.207';
+  function clearTetrisScoresOnce207() {
+    try {
+      if (!root.localStorage) return false;
+      if (root.localStorage.getItem(TETRIS_SCORES_CLEAR_207)) return false;
+      root.localStorage.removeItem('tetris-best');
+      root.localStorage.removeItem('ib-scores-tetris');
+      root.localStorage.setItem(TETRIS_SCORES_CLEAR_207, '1');
+      return true;
+    } catch (e) { return false; }
+  }
+  clearTetrisScoresOnce207();
+  root.IBScores = { fill, API, who, isShane, submit, load, open, close, localBests, nzDate, isOpen: () => !!cur, clearShaneLocalBestOnce, clearTetrisScoresOnce207, TETRIS_SCORES_CLEAR_207, personalBests, uniqueBest, leaderRows, html };
 })(typeof window !== 'undefined' ? window : globalThis);
