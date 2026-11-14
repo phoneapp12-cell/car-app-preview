@@ -333,6 +333,179 @@
   }
 
 
+  /* 1.9.218 Presentation polish: themed scenes, candy-glass board, candy buttons, bounce-in screens,
+     the Sweet streak meter, boosters, the Sugar Crush finale, star fly-in, treasure chest and daily spin. */
+  .scene { display: none; position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; background: #9be7ff; }
+  body.ingame .scene { display: block; }
+  body.ingame .wrap { position: relative; z-index: 1; }
+  body.ingame .awning { position: relative; z-index: 2; }
+  .scene-in { position: absolute; left: 50%; bottom: 0; width: max(100vw, calc(100vh * 0.46209)); height: max(100vh, calc(100vw * 2.16410)); transform: translateX(-50%); }
+  .scene-art { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .scs { position: absolute; display: block; will-change: transform; }
+  .scs svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .scs.sc-emoji i { display: block; font-style: normal; font-size: 7vw; line-height: 1; }
+  .scs.sc-puff { aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle at 50% 50%, rgba(255,255,255,.85), rgba(255,255,255,.35) 45%, rgba(255,255,255,0) 70%); }
+  .scs.sc-beam { background: linear-gradient(90deg, rgba(255,244,160,.55), rgba(255,244,160,0)); clip-path: polygon(0 45%, 100% 0, 100% 100%, 0 55%); transform-origin: 0 50%; }
+  .scs.sc-fallbox { overflow: hidden; }
+  .scs .fallin { position: absolute; left: 0; right: 0; top: -100%; height: 200%; background: repeating-linear-gradient(180deg, rgba(255,255,255,0) 0 18px, rgba(255,255,255,.55) 18px 26px); animation: scfall 1.1s linear infinite; }
+  .sc-drift { animation: scdrift var(--d, 20s) ease-in-out var(--dl, 0s) infinite alternate; }
+  .sc-bob { animation: scbob var(--d, 3s) ease-in-out var(--dl, 0s) infinite alternate; }
+  .sc-float { animation: scfloat var(--d, 8s) ease-in-out var(--dl, 0s) infinite alternate; }
+  .sc-rise { animation: scrise var(--d, 5s) ease-out var(--dl, 0s) infinite; opacity: 0; }
+  .sc-spin { animation: scspin var(--d, 6s) linear var(--dl, 0s) infinite; }
+  .sc-twinkle { animation: sctwinkle var(--d, 2s) ease-in-out var(--dl, 0s) infinite alternate; }
+  .sc-pulse { animation: scpulse var(--d, 2.4s) ease-in-out var(--dl, 0s) infinite alternate; }
+  .sc-shoot { animation: scshoot var(--d, 7s) ease-in var(--dl, 0s) infinite; opacity: 0; }
+  @keyframes scdrift { from { transform: translateX(-26px); } to { transform: translateX(26px); } }
+  @keyframes scbob { from { transform: translateY(-4px) rotate(-2deg); } to { transform: translateY(4px) rotate(2deg); } }
+  @keyframes scfloat { from { transform: translateY(0); } to { transform: translateY(-30px); } }
+  @keyframes scrise { 0% { transform: translateY(0) scale(.5); opacity: 0; } 20% { opacity: .85; } 100% { transform: translateY(-150%) scale(1.5); opacity: 0; } }
+  @keyframes scspin { to { transform: rotate(360deg); } }
+  @keyframes sctwinkle { from { transform: scale(.6); opacity: .3; } to { transform: scale(1.2); opacity: 1; } }
+  @keyframes scpulse { from { opacity: .25; } to { opacity: .9; } }
+  @keyframes scshoot { 0%, 82% { transform: translate(0, 0); opacity: 0; } 86% { opacity: 1; } 100% { transform: translate(140%, 60%); opacity: 0; } }
+  @keyframes scfall { from { transform: translateY(0); } to { transform: translateY(26px); } }
+  body.ingame #game h1 { display: inline-block; padding: 3px 14px 4px; margin-bottom: 6px; border-radius: 16px; background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(255,236,246,.9)); border: 2px solid #ffb3d3; box-shadow: 0 3px 0 rgba(242,123,176,.55); }
+  body.ingame .goalstrip { background: rgba(255,255,255,.9); box-shadow: 0 3px 0 rgba(242,123,176,.35); }
+  body.ingame .stat { background: rgba(255,255,255,.88); box-shadow: 0 3px 0 rgba(242,123,176,.3); }
+  body.ingame .goal { background: rgba(255,255,255,.9); }
+  body.ingame .credit { display: table; margin: 10px auto 0; padding: 3px 10px; border-radius: 10px; background: rgba(255,255,255,.78); }
+  /* Glossy candy-glass board */
+  body.ingame .tray { position: relative; background: linear-gradient(180deg, rgba(255,255,255,.66), rgba(255,226,240,.5)); border: 3px solid rgba(255,255,255,.95); box-shadow: 0 0 0 3px #ff9cc6, 0 7px 0 3px #f27bb0, 0 16px 30px rgba(90,18,56,.3), inset 0 2px 0 rgba(255,255,255,.9), inset 0 -6px 14px rgba(255,140,190,.25); }
+  body.ingame .tray::before { content: ""; position: absolute; left: 10px; right: 10px; top: 3px; height: 9px; border-radius: 9px; background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(255,255,255,0)); pointer-events: none; }
+  body.ingame.sarah .tray { box-shadow: 0 0 0 3px #ff8ab8, 0 7px 0 3px #f06aa8, 0 16px 30px rgba(90,18,56,.3), inset 0 2px 0 rgba(255,255,255,.9); }
+  canvas#board { max-width: min(100%, calc(100dvh - 360px)); }
+  .tray.shk1 { animation: shk1 .32s ease-out; }
+  .tray.shk2 { animation: shk2 .46s ease-out; }
+  @keyframes shk1 { 0%, 100% { transform: none; } 20% { transform: translate(-3px, 1px); } 40% { transform: translate(3px, -1px); } 60% { transform: translate(-2px, 2px); } 80% { transform: translate(2px, -1px); } }
+  @keyframes shk2 { 0%, 100% { transform: none; } 12% { transform: translate(-6px, 2px) rotate(-.5deg); } 28% { transform: translate(6px, -3px) rotate(.5deg); } 44% { transform: translate(-5px, 3px) rotate(-.3deg); } 60% { transform: translate(4px, -2px); } 78% { transform: translate(-2px, 1px); } }
+  /* Candy-style buttons */
+  .acts button, .card button, .boosters button, .mapfoot button, .mapbar button, .tutnext, #goalskip, .spinbtn {
+    background: linear-gradient(180deg, #ffffff 0%, #fff0f7 52%, #ffdcec 100%);
+    border: 2px solid #ff9cc6;
+    box-shadow: 0 3px 0 #f27bb0, inset 0 2px 0 rgba(255,255,255,.95), inset 0 -3px 0 rgba(242,123,176,.16);
+    text-shadow: 0 1px 0 #fff;
+    transition: transform .08s ease-out, box-shadow .08s ease-out;
+  }
+  .acts button:active:not([disabled]), .card button:not(.introx):active:not([disabled]), .boosters button:active:not([disabled]), .mapfoot button:active, .mapbar button:active, .tutnext:active, .spinbtn:active { transform: translateY(2px); box-shadow: 0 1px 0 #f27bb0, inset 0 2px 0 rgba(255,255,255,.9); }
+  button.pri, .card button.pri, .tutnext.pri { position: relative; overflow: hidden; background: linear-gradient(180deg, #ff94c4 0%, #ff5a9f 48%, #e23d84 100%); border-color: #c92a6f; color: #fff; text-shadow: 0 1px 0 rgba(120,0,50,.4); box-shadow: 0 4px 0 #a81f5c, 0 6px 12px rgba(168,31,92,.25), inset 0 -4px 0 rgba(120,0,50,.16); }
+  button.pri::after { content: ""; position: absolute; left: 9%; right: 9%; top: 3px; height: 40%; border-radius: 999px; background: linear-gradient(180deg, rgba(255,255,255,.6), rgba(255,255,255,0)); pointer-events: none; }
+  button.pri:active:not([disabled]) { transform: translateY(2px); box-shadow: 0 2px 0 #a81f5c, inset 0 -3px 0 rgba(120,0,50,.16); }
+  #goalskip:active { transform: translateX(-50%) translateY(2px); }
+  /* Bounce-in cards and screens */
+  @keyframes pop { 0% { transform: scale(.55); opacity: 0; } 55% { transform: scale(1.06); opacity: 1; } 75% { transform: scale(.97); } 100% { transform: none; opacity: 1; } }
+  .card { animation: pop .48s cubic-bezier(.2,.9,.3,1.1); }
+  .scr-in { animation: scrin .5s cubic-bezier(.2,1.25,.4,1) backwards; }
+  @keyframes scrin { 0% { opacity: 0; transform: translateY(18px) scale(.94); } 100% { opacity: 1; transform: none; } }
+  /* Sweet streak meter */
+  .stats.three { grid-template-columns: 1fr 1.3fr 1fr; }
+  .stat.streak { position: relative; padding: 5px 9px; }
+  .stat.streak .shd { display: flex; align-items: baseline; justify-content: space-between; gap: 4px; }
+  .stat.streak .shd span { display: inline; }
+  .stat.streak b { font: 900 15px/1 ui-rounded, system-ui, sans-serif; color: #d6246e; font-variant-numeric: tabular-nums; }
+  .streakbar { height: 12px; margin-top: 6px; border-radius: 7px; background: rgba(255,194,220,.55); box-shadow: inset 0 1px 2px rgba(160,30,90,.2); overflow: hidden; }
+  .streakbar i { display: block; height: 100%; width: 0; border-radius: 7px; background: linear-gradient(90deg, #ff8ab8, #ffb347, #ffe066, #7ee0a8, #6ed0ff, #c77dff); background-size: 220% 100%; transition: width .35s ease-out; box-shadow: inset 0 2px 0 rgba(255,255,255,.55); }
+  .stat.streak.t2 { border-color: #ffb347; } .stat.streak.t3 { border-color: #c77dff; box-shadow: 0 0 0 2px rgba(199,125,255,.35); } .stat.streak.t4 { border-color: #ff4f9a; box-shadow: 0 0 0 3px rgba(255,79,154,.4), 0 0 14px rgba(255,180,0,.5); }
+  .stat.streak.t3 .streakbar i, .stat.streak.t4 .streakbar i { animation: streakshine 1.1s linear infinite; }
+  @keyframes streakshine { from { background-position: 0 0; } to { background-position: 220% 0; } }
+  .stat.streak.up { animation: streakup .55s cubic-bezier(.2,1.6,.4,1); }
+  @keyframes streakup { 0% { transform: scale(1); } 40% { transform: scale(1.14); } 100% { transform: scale(1); } }
+  .streakpop { position: absolute; left: 50%; top: -4px; z-index: 6; transform: translate(-50%, -100%); white-space: nowrap; pointer-events: none; padding: 4px 11px; border-radius: 999px; color: #fff; font: 900 14px/1.1 ui-rounded, system-ui, sans-serif; background: linear-gradient(180deg, #ff94c4, #e23d84); border: 2px solid #fff; box-shadow: 0 3px 0 #a81f5c; }
+  .streakpop.go { animation: streakpop 1.4s ease-out forwards; }
+  @keyframes streakpop { 0% { transform: translate(-50%, -60%) scale(.5); opacity: 0; } 18% { transform: translate(-50%, -110%) scale(1.12); opacity: 1; } 75% { transform: translate(-50%, -120%) scale(1); opacity: 1; } 100% { transform: translate(-50%, -150%) scale(1); opacity: 0; } }
+  /* Sayings grow bigger and brighter with the streak */
+  .saypop { white-space: normal; width: max-content; max-width: 92vw; }
+  .saypop.t1 { font-size: 44px; filter: drop-shadow(0 0 6px rgba(255,255,255,.9)); }
+  .saypop.t2 { font-size: 48px; filter: drop-shadow(0 0 10px rgba(255,236,140,.95)) saturate(1.2); }
+  .saypop.t3 { font-size: 52px; filter: drop-shadow(0 0 14px rgba(255,214,90,1)) saturate(1.35) brightness(1.06); }
+  .saypop.t4 { font-size: 56px; filter: drop-shadow(0 0 10px rgba(255,255,255,1)) drop-shadow(0 0 18px rgba(255,200,40,1)) saturate(1.5) brightness(1.08); }
+  @media (max-width: 400px) { .saypop.t1 { font-size: 35px; } .saypop.t2 { font-size: 38px; } .saypop.t3 { font-size: 41px; } .saypop.t4 { font-size: 44px; } }
+  /* Boosters */
+  .boosters { display: flex; gap: 8px; margin-top: 14px; }
+  .boosters button { position: relative; flex: 1 1 0; min-height: 50px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 4px 6px; border-radius: 18px; font-size: 13px; }
+  .boosters .bi { font-size: 22px; line-height: 1; }
+  .boosters .bn { position: absolute; top: -8px; right: -4px; min-width: 24px; height: 24px; padding: 0 5px; border-radius: 12px; background: linear-gradient(180deg, #ff94c4, #e23d84); color: #fff; font: 900 12px/20px ui-rounded, system-ui, sans-serif; border: 2px solid #fff; box-shadow: 0 2px 0 #a81f5c; text-shadow: none; }
+  .boosters button.zero .bn { background: #e6c7d6; box-shadow: none; }
+  .boosters button[disabled] { opacity: .55; }
+  .boosters button.on { border-color: #ffb400; background: linear-gradient(180deg, #fffbe6, #ffe9a8); box-shadow: 0 0 0 3px rgba(255,180,0,.6), 0 3px 0 #e0a020; animation: hlpulse 1.2s ease-in-out infinite; }
+  .boosters button.used { animation: boostused .5s cubic-bezier(.2,1.6,.4,1); }
+  @keyframes boostused { 0% { transform: scale(1); } 40% { transform: scale(1.15) rotate(-4deg); } 100% { transform: none; } }
+  .boosthint { margin: 8px 0 0; text-align: center; font: 800 13px/1.3 ui-rounded, system-ui, sans-serif; color: #8a2d5c; background: rgba(255,251,230,.95); border: 2px solid #ffd36a; border-radius: 12px; padding: 5px 10px; }
+  body.hammering canvas#board { cursor: crosshair; }
+  body.hammering .tray { box-shadow: 0 0 0 4px #ffb400, 0 7px 0 4px #e0a020, 0 16px 30px rgba(90,18,56,.3); }
+  body.ontut .boosters, body.oncrush .boosters { visibility: hidden; }
+  .movecount.tick { animation: cdbounce .45s ease-out; }
+  /* Sugar Crush finale */
+  .fxov { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 29; pointer-events: none; }
+  .fxov[hidden] { display: none !important; }
+  .crushban { position: fixed; left: 50%; top: 40%; z-index: 28; transform: translate(-50%, -50%); pointer-events: none; text-align: center; }
+  .crushban[hidden] { display: none !important; }
+  .crushban .cbw { display: grid; }
+  .crushban .cbw span { grid-area: 1 / 1; position: relative; display: block; white-space: nowrap; font: 900 60px/1 ui-rounded, "SF Pro Rounded", system-ui, sans-serif; letter-spacing: .02em; }
+  .crushban .cbo { color: #fff; -webkit-text-stroke: 14px #fff; filter: drop-shadow(0 6px 0 rgba(90,18,56,.35)) drop-shadow(0 12px 22px rgba(90,18,56,.3)); }
+  .crushban .cbf { background-image: linear-gradient(90deg, #ff2d55, #ff8c00, #ffd400, #3ce07a, #1aa7ff, #c026f0, #ff2d55); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .crushban.go .cbw { animation: crushin .7s cubic-bezier(.2,1.5,.4,1) both; }
+  .crushban.go .cbf { animation: mwshimmer 1.6s linear infinite; }
+  @keyframes crushin { 0% { transform: scale(.2) rotate(-10deg); opacity: 0; } 60% { transform: scale(1.15) rotate(3deg); opacity: 1; } 100% { transform: none; opacity: 1; } }
+  @media (max-width: 400px) { .crushban .cbw span { font-size: 52px; } .crushban .cbo { -webkit-text-stroke-width: 12px; } }
+  /* Star fly-in */
+  .stars span { display: inline-block; }
+  .stars .on.fly { animation: starfly .62s cubic-bezier(.2,1.3,.4,1) both; text-shadow: 0 2px 0 #c98e00, 0 0 14px rgba(255,200,40,.85); }
+  .stars span:nth-child(1) { --sx: -120px; } .stars span:nth-child(2) { --sx: 0px; } .stars span:nth-child(3) { --sx: 120px; }
+  @keyframes starfly { 0% { transform: translate(var(--sx, 0), -260px) scale(3) rotate(-220deg); opacity: 0; } 55% { opacity: 1; } 75% { transform: scale(1.35) rotate(10deg); } 100% { transform: none; opacity: 1; } }
+  /* Treasure chest */
+  .chest { position: relative; width: 120px; height: 96px; margin: 26px auto 4px; }
+  .chest[hidden] { display: none !important; }
+  .chest-rays { position: absolute; left: 50%; top: 46%; width: 220px; height: 220px; margin: -110px 0 0 -110px; border-radius: 50%; background: repeating-conic-gradient(rgba(255,214,90,.55) 0 12deg, rgba(255,214,90,0) 12deg 30deg); -webkit-mask: radial-gradient(circle, #000 30%, transparent 70%); mask: radial-gradient(circle, #000 30%, transparent 70%); opacity: 0; transform: scale(.4); transition: opacity .4s, transform .5s; pointer-events: none; }
+  .chest-box { position: absolute; left: 12px; right: 12px; bottom: 6px; height: 50px; border-radius: 6px 6px 12px 12px; background: linear-gradient(90deg, transparent 18%, #ffcf4a 18% 26%, transparent 26% 74%, #ffcf4a 74% 82%, transparent 82%), linear-gradient(180deg, #c4732f, #8a4518); border: 3px solid #6b3410; box-shadow: 0 5px 0 #5a2a0c, inset 0 3px 0 rgba(255,255,255,.25); }
+  .chest-box .lock { position: absolute; left: 50%; top: 6px; width: 18px; height: 20px; margin-left: -9px; border-radius: 4px 4px 8px 8px; background: radial-gradient(circle at 50% 40%, #6b3410 2.5px, transparent 3px), linear-gradient(180deg, #ffe58a, #e0a020); border: 2px solid #a86a0c; }
+  .chest-lid { position: absolute; left: 8px; right: 8px; bottom: 50px; height: 34px; border-radius: 48px 48px 6px 6px; background: linear-gradient(90deg, transparent 18%, #ffcf4a 18% 26%, transparent 26% 74%, #ffcf4a 74% 82%, transparent 82%), linear-gradient(180deg, #d98a40, #9a5220); border: 3px solid #6b3410; box-shadow: inset 0 4px 0 rgba(255,255,255,.3); transform-origin: 12% 100%; transition: transform .45s cubic-bezier(.2,1.6,.4,1); }
+  .chest-glow { position: absolute; left: 20px; right: 20px; bottom: 46px; height: 22px; border-radius: 50%; background: radial-gradient(ellipse, rgba(255,240,150,.95), rgba(255,200,60,0) 70%); opacity: 0; transition: opacity .3s; }
+  .chest.shake { animation: chestshake .55s ease-in-out; }
+  @keyframes chestshake { 0%, 100% { transform: none; } 15% { transform: rotate(-7deg); } 30% { transform: rotate(7deg); } 45% { transform: rotate(-6deg); } 60% { transform: rotate(5deg) scale(1.04); } 80% { transform: rotate(-2deg) scale(1.06); } }
+  .chest.open .chest-lid { transform: translate(-6px, -18px) rotate(-28deg); }
+  .chest.open .chest-rays { opacity: 1; transform: scale(1); animation: chestrays 8s linear infinite; }
+  .chest.open .chest-glow { opacity: 1; }
+  @keyframes chestrays { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .loot { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; min-height: 0; margin: 0 0 10px; }
+  .loot[hidden] { display: none !important; }
+  .lootchip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px 4px 6px; border-radius: 999px; background: linear-gradient(180deg, #fff, #fff2c4); border: 2px solid #ffcf4a; box-shadow: 0 2px 0 #e0a020; font: 900 13px/1.1 ui-rounded, system-ui, sans-serif; color: #7a4a00; opacity: 0; transform: translateY(18px) scale(.6); }
+  .lootchip i { font-style: normal; font-size: 18px; line-height: 1; }
+  .lootchip.b { background: linear-gradient(180deg, #fff, #ffe0ee); border-color: #ff8ab8; box-shadow: 0 2px 0 #f27bb0; color: #8a1f50; }
+  .loot.show .lootchip { animation: lootup .55s cubic-bezier(.2,1.5,.4,1) forwards; animation-delay: calc(var(--i, 0) * .16s); }
+  @keyframes lootup { 0% { opacity: 0; transform: translateY(26px) scale(.5); } 100% { opacity: 1; transform: none; } }
+  #morebtn { width: 100%; margin: 0 0 8px; }
+  /* Daily spin */
+  .mapfoot .spinbtn { flex: 0 0 auto; min-height: 34px; font-size: 12px; padding: 4px 10px; border-radius: 16px; }
+  .spinbtn.ready { border-color: #ffb400; background: linear-gradient(180deg, #fffbe6, #ffe08a); box-shadow: 0 3px 0 #e0a020, 0 0 0 0 rgba(255,180,0,.6); animation: spinready 1.6s ease-in-out infinite; }
+  @keyframes spinready { 0%, 100% { box-shadow: 0 3px 0 #e0a020, 0 0 0 0 rgba(255,180,0,.55); } 50% { box-shadow: 0 3px 0 #e0a020, 0 0 0 7px rgba(255,180,0,0); } }
+  .spincard { max-width: 360px; }
+  .spincard h2 { margin-bottom: 2px; }
+  .wheelwrap { position: relative; width: min(270px, 74vw); aspect-ratio: 1; margin: 10px auto 12px; }
+  .wheelwrap::before { content: ""; position: absolute; inset: -8px; border-radius: 50%; background: radial-gradient(circle, rgba(255,214,90,.55), rgba(255,214,90,0) 70%); }
+  #wheel { position: absolute; inset: 0; filter: drop-shadow(0 5px 0 #a81f5c) drop-shadow(0 10px 16px rgba(90,18,56,.25)); }
+  .wheelsvg { display: block; width: 100%; height: 100%; transform-origin: 50% 50%; }
+  .wheelptr { position: absolute; left: 50%; top: -14px; z-index: 2; width: 0; height: 0; margin-left: -15px; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 30px solid #ffcf4a; filter: drop-shadow(0 2px 0 #a86a0c); }
+  .wheelsvg .bulb0 { animation: bulbs 0.9s steps(1) infinite; } .wheelsvg .bulb1 { animation: bulbs 0.9s steps(1) -.45s infinite; }
+  @keyframes bulbs { 0% { fill: #fff6c2; } 50% { fill: #ffb400; } }
+  .spinwon { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 0 10px; padding: 8px 12px; border-radius: 16px; background: linear-gradient(180deg, #fffbe6, #ffe9a8); border: 2px solid #ffcf4a; color: #7a4a00; font-size: 17px; animation: pop .45s ease-out; }
+  .spinwon[hidden] { display: none !important; }
+  .spinwon .wonicon { font-size: 30px; }
+  .spininv { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; margin: 0 0 12px; }
+  .spininv span { display: inline-flex; align-items: center; gap: 3px; padding: 3px 9px; border-radius: 999px; background: #fff6fb; border: 2px solid #ffc2dc; font-size: 12px; font-weight: 800; color: #7a1f4c; }
+  .spininv i { font-style: normal; }
+  #spinbtn2 { width: 100%; min-height: 52px; font-size: 19px; margin-bottom: 8px; }
+  @media (orientation: landscape) and (max-height: 520px) {
+    .wheelwrap { width: min(200px, 40vh); }
+    .chest { transform: scale(.8); margin: -6px auto -4px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .scs, .scs .fallin, .tray.shk1, .tray.shk2, .crushban .cbw, .crushban .cbf, .stars .on.fly, .chest.shake, .chest.open .chest-rays, .loot.show .lootchip, .spinbtn.ready, .wheelsvg .bulb0, .wheelsvg .bulb1, .stat.streak.up, .streakpop.go, .scr-in, .card { animation: none !important; }
+    .lootchip { opacity: 1; transform: none; }
+    .sc-rise, .sc-shoot { opacity: .6; }
+    .wheelsvg { transition: none !important; }
+  }
+
   /* 1.9.215 Idle hint: wiggle, glow, and a repeating swipe hand after 15s */
   .hinthand { position: fixed; left: 0; top: 0; z-index: 18; width: 64px; height: 64px; margin: 0; padding: 0; pointer-events: none; font-size: 52px; line-height: 1; transform: translate(calc(var(--x1, 0px) - 18px), calc(var(--y1, 0px) - 8px)) rotate(-20deg); filter: drop-shadow(0 2px 0 rgba(90,18,56,.2)); animation: hintswipe 3.2s ease-in-out infinite; }
   .hinthand[hidden] { display: none !important; }
@@ -350,6 +523,7 @@
 </style>
 </head>
 <body>
+  <div class="scene" id="scene" aria-hidden="true"></div>
   <div class="awning" aria-hidden="true"></div>
   <div class="wrap">
     <div id="soon" class="soon" hidden>
@@ -386,6 +560,7 @@
         <footer class="mapfoot">
           <button type="button" id="badgebtn">Badges</button>
           <div class="minishelf" id="minishelf" aria-hidden="true"></div>
+          <button type="button" class="spinbtn" id="spinbtn">🎡 Daily spin</button>
           <button type="button" id="howtobtn">How to play</button>
         </footer>
       </div>
@@ -405,20 +580,27 @@
         <div class="movecount" id="movecount"><span>Moves left</span><strong id="moves">20</strong></div>
         <p class="help" id="help">Collect 20 cherry gumdrops · 20 moves</p>
       </div>
-      <div class="stats two">
+      <div class="stats two three">
         <div class="stat"><span>Score</span><strong id="score">0</strong></div>
+        <div class="stat streak t0" id="streak" aria-label="Sweet streak meter"><div class="shd"><span>Sweet streak</span><b id="streakx"></b></div><div class="streakbar"><i id="streakfill"></i></div><div class="streakpop" id="streakpop" hidden aria-hidden="true"></div></div>
         <div class="stat"><span>Best</span><strong id="best">0</strong></div>
       </div>
       <div class="obj" id="obj"></div>
       <div class="goal" id="starbars" aria-hidden="true"><div class="fill" id="fill"></div><span class="star" id="st0">★</span><span class="star" id="st1">★</span><span class="star" id="st2">★</span></div>
       <div class="tray"><canvas id="board" width="320" height="320" aria-label="Sugar Rush board"></canvas></div>
+      <div class="boosters" id="boosters" aria-label="Boosters">
+        <button type="button" data-boost="moves"><span class="bi" aria-hidden="true">🍬</span><span class="bl">+3 moves</span><b class="bn">0</b></button>
+        <button type="button" data-boost="hammer"><span class="bi" aria-hidden="true">🔨</span><span class="bl">Hammer</span><b class="bn">0</b></button>
+        <button type="button" data-boost="shuffle"><span class="bi" aria-hidden="true">🔀</span><span class="bl">Shuffle</span><b class="bn">0</b></button>
+      </div>
+      <p class="boosthint" id="boosthint" hidden></p>
       <div class="acts">
         <button type="button" id="soundbtn">🔉 Sound on</button>
         <button type="button" id="musicbtn">🎵 Music on</button>
         <button type="button" id="restartbtn">Restart</button>
         <button type="button" id="mapbtn">Levels</button>
       </div>
-      <p class="credit">4 in a line makes a striped sweet, an L or T makes a wrapped sweet, 5 in a line makes a sprinkle bomb.</p>
+      <p class="credit">4 in a line makes a striped sweet, an L or T makes a wrapped sweet, 5 in a line makes a sprinkle bomb. Boosters come from the daily spin and the treasure chest.</p>
     </div>
   </div>
 
@@ -467,6 +649,7 @@
       <span class="mw-sparks" aria-hidden="true"><i>✦</i><i>✧</i><i>✦</i><i>✧</i><i>✦</i><i>✦</i><i>✧</i></span>
     </div>
   </div>
+  <div id="crushban" class="crushban" hidden aria-hidden="true"><div class="cbw"><span class="cbo">Sugar Crush!</span><span class="cbf">Sugar Crush!</span></div></div>
   <div id="goalban" hidden>
     <div class="goalban-inner">Goal achieved!<em>Sugar crush!</em>
       <span class="goalsparks" aria-hidden="true"><i>✦</i><i>✦</i><i>✦</i><i>✦</i></span>
@@ -499,7 +682,10 @@
       <div class="pts" id="endscore"></div>
       <div id="endbadge" hidden></div>
       <div class="badgecap" id="endbadgecap" hidden></div>
+      <div class="chest" id="endchest" hidden aria-hidden="true"><div class="chest-rays"></div><div class="chest-glow"></div><div class="chest-box"><i class="lock"></i></div><div class="chest-lid"></div></div>
+      <div class="loot" id="endloot" hidden aria-live="polite"></div>
       <p id="endmsg"></p>
+      <button type="button" id="morebtn" class="pri" hidden>🍬 Keep going: +3 moves</button>
       <div class="row">
         <button type="button" id="againbtn">Try again</button>
         <button type="button" id="nextbtn" class="pri" hidden>Next level</button>
@@ -507,6 +693,18 @@
       <div class="acts" style="margin-top:8px">
         <button type="button" id="endmap">Levels</button>
       </div>
+    </div>
+  </div>
+
+  <div id="spin" class="ov" hidden role="dialog" aria-labelledby="spintitle">
+    <div class="card spincard">
+      <h2 id="spintitle">Daily spin</h2>
+      <p id="spinmsg">One free spin every day. Spin to win a booster!</p>
+      <div class="wheelwrap"><div class="wheelptr" aria-hidden="true"></div><div id="wheel"></div></div>
+      <div class="spinwon" id="spinwon" hidden aria-live="polite"></div>
+      <div class="spininv" id="spininv"></div>
+      <button type="button" class="pri" id="spinbtn2">Spin!</button>
+      <button type="button" data-spin="close">Close</button>
     </div>
   </div>
 
@@ -518,6 +716,7 @@
       <button type="button" data-iconpick="close">Close</button>
     </div>
   </div>
+  <canvas id="fxov" class="fxov" hidden aria-hidden="true"></canvas>
   <script src="scores.js?v=1.9.217"></script>
   <script src="sugar-rush.js?v=1.9.217"></script>
 </body>
