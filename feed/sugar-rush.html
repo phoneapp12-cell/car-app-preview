@@ -72,11 +72,13 @@
   @keyframes badgeIn { 0% { transform: scale(.2) rotate(-12deg); opacity: 0; } 60% { transform: scale(1.12) rotate(4deg); opacity: 1; } 100% { transform: none; } }
   .badgecap { font-size: 14px; font-weight: 800; color: #d6246e; margin: -4px 0 10px; }
   .introheart { font-size: 56px; margin: 4px 0 8px; }
-  /* 1.9.210 NZ candy map */
-  body.onmap { display: flex; flex-direction: column; min-height: 100dvh; height: 100dvh; padding: 8px 8px 12px; background: linear-gradient(180deg, #9be7ff 0%, #b8f3de 100%) fixed; }
-  body.onmap .wrap { max-width: none; width: 100%; flex: 1; display: flex; flex-direction: column; min-height: 0; }
-  #map { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-  .mapview { flex: 1 1 auto; min-height: 220px; overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-x pan-y; border-radius: 22px; border: 3px solid #fff; box-shadow: 0 6px 0 rgba(80,150,180,.18), 0 10px 24px rgba(40,90,120,.16); background: #9be7ff; }
+  /* 1.9.210 NZ candy map; 1.9.211 almost-full-screen map chrome */
+  body.onmap { display: block; min-height: 100dvh; height: 100dvh; height: 100svh; padding: 0; margin: 0; overflow: hidden; background: #9be7ff; }
+  body.onmap .awning { display: none; }
+  body.onmap .wrap { max-width: none; width: 100%; height: 100%; margin: 0; min-height: 0; }
+  body.onmap #map { position: absolute; inset: 0; display: block; min-height: 0; }
+  .mapwrap { position: absolute; inset: 0; }
+  .mapview { position: absolute; inset: 0; flex: none; min-height: 0; overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-x pan-y; border-radius: 0; border: 0; box-shadow: none; background: #9be7ff; }
   .mapstage { position: relative; width: 100%; min-width: 320px; }
   .mapstage svg.nzsvg { display: block; width: 100%; height: auto; }
   .stops { position: absolute; inset: 0; pointer-events: none; }
@@ -110,35 +112,38 @@
   @keyframes srbob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
   .stops .lv.here:not([disabled]) .pin { animation: herepulse 1.8s ease-in-out infinite; }
   .nzsvg .sr-bob { transform-box: fill-box; transform-origin: center; animation: srbob 3.6s ease-in-out infinite; }
-  @media (orientation: landscape) and (max-height: 520px) {
-    body.onmap { padding: 4px 8px 8px; }
-    body.onmap .awning { height: 8px; margin: -4px -8px 4px; }
-    #map h1 { font-size: 20px; }
-    #map .help { font-size: 12px; margin: 2px 0 6px; }
-    .shelf-t { margin: 4px 0; }
-    .shelf { padding: 6px; }
-    .badge { min-height: 48px; }
-    .badge i { width: 36px; height: 36px; font-size: 18px; }
-    .acts { margin-top: 8px; }
-    button { min-height: 40px; }
-  }
 
-  /* 1.9.210 Family race on the NZ map */
-  .mapwrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  .iconbtn { flex: 0 0 auto; min-height: 28px; font-size: 11px; padding: 2px 8px; white-space: nowrap; }
-  .raceboard { width: 100%; background: rgba(255,255,255,.94); border: 2px solid #ffb3d3; border-radius: 14px; padding: 5px 8px 5px; margin: 0 0 6px; box-shadow: 0 2px 0 rgba(242,123,176,.45); }
-  .racehd { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+  .mapbar { position: absolute; top: 0; left: 0; right: 0; z-index: 8; display: flex; align-items: center; gap: 4px; padding: calc(6px + env(safe-area-inset-top, 0px)) 6px 8px max(6px, env(safe-area-inset-left, 0px)); padding-right: max(6px, env(safe-area-inset-right, 0px)); background: linear-gradient(180deg, rgba(255,214,232,.94) 0%, rgba(255,214,232,.78) 62%, rgba(255,214,232,0) 100%); pointer-events: none; }
+  .mapbar > * { pointer-events: auto; }
+  .mapbar h1 { flex: 0 1 auto; min-width: 0; font-size: 16px; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mapbar h1 small { font-size: 11px; }
+  @media (max-width: 420px) { .mapbar h1 small { display: none; } }
+  .mapbar button { flex: 0 0 auto; min-height: 36px; min-width: 36px; padding: 4px 10px; font-size: 13px; border-radius: 18px; box-shadow: 0 2px 0 #f4a0c4; }
+  .iconbtn { white-space: nowrap; font-size: 11px; padding: 4px 8px; }
+  .mapbar button.off { opacity: .55; }
+  .mapfoot { position: absolute; left: 0; right: 0; bottom: 0; z-index: 7; display: flex; align-items: center; gap: 8px; padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px)); padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px)); background: linear-gradient(0deg, rgba(255,214,232,.94) 0%, rgba(255,214,232,.7) 60%, rgba(255,214,232,0) 100%); pointer-events: none; }
+  .mapfoot > * { pointer-events: auto; }
+  .mapfoot #badgebtn { flex: 0 0 auto; min-height: 34px; font-size: 12px; padding: 4px 10px; border-radius: 16px; }
+  .minishelf { display: flex; gap: 4px; align-items: center; flex: 1; min-width: 0; overflow: hidden; }
+  .minishelf i { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: #fff6f9; border: 1.5px dashed #efc2d4; font-style: normal; font-size: 14px; filter: grayscale(1) opacity(.35); }
+  .minishelf i.got { filter: none; border-style: solid; border-color: #ffb400; background: radial-gradient(circle at 35% 30%, #fff, #ffe9a8 55%, #ffd36a); }
+
+  .racechip { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 50px); right: max(8px, env(safe-area-inset-right, 0px)); z-index: 7; display: flex; align-items: center; gap: 4px; flex: none; min-height: 34px; padding: 3px 10px 3px 4px; border-radius: 999px; background: rgba(255,255,255,.94); border: 2px solid #ffb3d3; box-shadow: 0 2px 0 rgba(242,123,176,.45); font-size: 12px; font-weight: 800; color: #7a1f4c; }
+  .racechip .face { width: 22px; height: 22px; font-size: 13px; }
+  .racechip[hidden], .raceboard[hidden] { display: none !important; }
+  .raceboard { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 50px); right: max(8px, env(safe-area-inset-right, 0px)); z-index: 8; width: min(230px, calc(100% - 24px)); max-height: min(52dvh, 380px); overflow: auto; margin: 0; background: rgba(255,255,255,.96); border: 2px solid #ffb3d3; border-radius: 16px; padding: 8px; box-shadow: 0 4px 0 rgba(242,123,176,.45), 0 10px 22px rgba(90,18,56,.16); }
+  .racehd { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
   .raceboard h2 { margin: 0; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #b3487c; }
-  .raceboard ol { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; }
-  .raceboard li { display: flex; align-items: center; gap: 3px; flex: 0 0 auto; padding: 2px 7px 2px 4px; border-radius: 999px; background: #fff6fb; font-size: 11px; }
+  .raceboard ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .raceboard li { display: flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: 999px; background: #fff6fb; font-size: 12px; }
   .raceboard li.me { background: #fff3b0; box-shadow: 0 0 0 2px #ffb400; }
-  .raceboard .rk { font-weight: 900; color: #8a3a62; font-variant-numeric: tabular-nums; font-size: 10px; }
-  .raceboard li .face, .iconopt .face, .racer .face { display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: var(--ic, #ffe066); border: 2px solid #fff; box-shadow: 0 1px 0 rgba(90,18,56,.15); font-size: 12px; line-height: 1; }
-  .raceboard .who { font-weight: 800; color: #5a1238; white-space: nowrap; }
+  .raceboard .rk { font-weight: 900; color: #8a3a62; font-variant-numeric: tabular-nums; font-size: 11px; width: 1.1em; }
+  .raceboard li .face, .iconopt .face, .racer .face, .racechip .face { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: var(--ic, #ffe066); border: 2px solid #fff; box-shadow: 0 1px 0 rgba(90,18,56,.15); font-size: 13px; line-height: 1; }
+  .raceboard .who { font-weight: 800; color: #5a1238; white-space: nowrap; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .raceboard .who em { font-style: normal; font-weight: 700; color: #d6246e; font-size: 9px; }
   .raceboard .at { display: none; }
   .raceboard .rs { font-weight: 800; color: #c98e00; font-variant-numeric: tabular-nums; }
-  .raceboard .race-note { margin: 2px 0 0; font-size: 9px; line-height: 1.25; color: #8a3a62; }
+  .raceboard .race-note { margin: 6px 0 0; font-size: 10px; line-height: 1.25; color: #8a3a62; }
   .racers { position: absolute; inset: 0; pointer-events: none; z-index: 4; }
   .racer { position: absolute; display: flex; flex-direction: column; align-items: center; width: 44px; pointer-events: none; }
   .racer .face { width: 32px; height: 32px; font-size: 18px; border-width: 2.5px; box-shadow: 0 2px 0 rgba(90,18,56,.18), 0 3px 8px rgba(40,20,40,.2); }
@@ -151,10 +156,13 @@
   .iconopt .lab { font-size: 10px; font-weight: 800; color: #8a3a62; }
   .iconopt.on { border-color: #ffb400; background: #fff6d6; box-shadow: 0 0 0 2px rgba(255,180,0,.45); }
   .iconopt.taken { opacity: .55; }
+  .badgecard { width: 100%; max-width: 400px; text-align: left; }
   @media (orientation: landscape) and (max-height: 520px) {
-    .raceboard { padding: 3px 6px; margin-bottom: 4px; }
-    .iconbtn { min-height: 26px; font-size: 11px; }
+    .mapbar h1 { font-size: 16px; }
+    .mapbar button, .mapfoot #badgebtn, .racechip { min-height: 32px; }
+    .raceboard { max-height: min(70dvh, 280px); }
   }
+
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
@@ -168,31 +176,41 @@
     </div>
 
     <div id="map" hidden>
-      <div class="maphead">
-        <h1>Sugar Rush <small>New Zealand</small></h1>
-      </div>
-      <p class="help" id="maphelp">Follow the icing path down New Zealand, starting in Onerahi. Clear a level to unlock the next stop. Race the family south!</p>
-      <aside class="raceboard" id="raceboard" aria-label="Family race">
-        <div class="racehd">
-          <h2>🏁 Family race</h2>
-          <button type="button" class="iconbtn" id="pickicon">Pick your icon</button>
-        </div>
-        <ol id="racelist"></ol>
-        <p class="race-note" id="racenote" hidden>Just you on this phone (offline).</p>
-      </aside>
+      <p class="help" id="maphelp" hidden>Follow the icing path down New Zealand, starting in Onerahi. Clear a level to unlock the next stop. Race the family south!</p>
       <div class="mapwrap">
-      <div class="mapview" id="mapview">
-        <div class="mapstage" id="mapstage">
-          <div class="stops path" id="path"></div>
-          <div class="racers" id="racers"></div>
+        <div class="mapview" id="mapview">
+          <div class="mapstage" id="mapstage">
+            <div class="stops path" id="path"></div>
+            <div class="racers" id="racers"></div>
+          </div>
         </div>
+        <header class="mapbar" id="mapbar">
+          <button type="button" id="mapexit">Exit</button>
+          <h1>Sugar Rush <small>New Zealand</small></h1>
+          <button type="button" id="mapsound" aria-label="Sound">🔉</button>
+          <button type="button" id="mapmusic" aria-label="Music">🎵</button>
+          <button type="button" class="iconbtn" id="pickicon">Pick your icon</button>
+        </header>
+        <button type="button" class="racechip" id="racechip" aria-expanded="false" aria-controls="raceboard">🏁 Race</button>
+        <aside class="raceboard" id="raceboard" hidden aria-label="Family race">
+          <div class="racehd">
+            <h2>🏁 Family race</h2>
+            <button type="button" data-race="close">Close</button>
+          </div>
+          <ol id="racelist"></ol>
+          <p class="race-note" id="racenote" hidden>Just you on this phone (offline).</p>
+        </aside>
+        <footer class="mapfoot">
+          <button type="button" id="badgebtn">Badges</button>
+          <div class="minishelf" id="minishelf" aria-hidden="true"></div>
+        </footer>
       </div>
-      </div>
-      <div class="shelf-t">Badge shelf</div>
-      <div class="shelf" id="shelf"></div>
-      <div class="acts">
-        <button type="button" id="mapsound">🔉 Sound on</button>
-        <button type="button" id="mapmusic">🎵 Music on</button>
+      <div id="badgeov" class="ov" hidden role="dialog" aria-label="Badge shelf">
+        <div class="card badgecard">
+          <h2 class="shelf-t">Badge shelf</h2>
+          <div class="shelf" id="shelf"></div>
+          <button type="button" data-badge="close">Close</button>
+        </div>
       </div>
     </div>
 

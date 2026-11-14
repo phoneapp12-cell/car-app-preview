@@ -1345,12 +1345,25 @@
     root.requestAnimationFrame(frame);
   }
 
+
+  function setRaceOpen(on) {
+    const board = $('raceboard'), chip = $('racechip');
+    if (board) board.hidden = !on;
+    if (chip) { chip.hidden = !!on; chip.setAttribute('aria-expanded', on ? 'true' : 'false'); }
+  }
+  function requestCloseSugar() {
+    try { stopAllMusic(); } catch (e) { }
+    try {
+      if (root.parent && root.parent !== root) root.parent.postMessage({ type: 'ib-sugar-close' }, '*');
+    } catch (e) { }
+  }
+
   function paintButtons() {
     const s = soundOn ? '🔉 Sound on' : '🔇 Sound off', m = musicOn ? '🎵 Music on' : '🎵 Music off';
     if ($('soundbtn')) $('soundbtn').textContent = s;
     if ($('musicbtn')) $('musicbtn').textContent = m;
-    if ($('mapsound')) $('mapsound').textContent = s;
-    if ($('mapmusic')) $('mapmusic').textContent = m;
+    if ($('mapsound')) { $('mapsound').textContent = soundOn ? '🔉' : '🔇'; $('mapsound').setAttribute('aria-label', s); }
+    if ($('mapmusic')) { $('mapmusic').textContent = '🎵'; $('mapmusic').setAttribute('aria-label', m); $('mapmusic').classList.toggle('off', !musicOn); }
   }
   function objText(g) {
     if (!g || !g.lv) return '';
@@ -1438,7 +1451,18 @@
       note.hidden = !race.offline;
       note.textContent = race.offline ? 'Just you on this phone (offline).' : '';
     }
-    board.hidden = false;
+    const chip = $('racechip');
+    if (chip) {
+      const lead = rows[0];
+      const ic = lead && (raceIcon(lead.icon) || RACE_ICONS[0]);
+      if (lead && ic) {
+        chip.innerHTML = '<span class="face" style="--ic:' + ic.color + '">' + ic.emoji + '</span><span>🏁 ' + racerFirst(lead.name) + ' ' + (lead.stars || 0) + '★</span>';
+        chip.setAttribute('aria-label', 'Family race, ' + racerFirst(lead.name) + ' is in the lead with ' + (lead.stars || 0) + ' stars. Tap to open.');
+      } else {
+        chip.innerHTML = '🏁 Race';
+        chip.setAttribute('aria-label', 'Family race');
+      }
+    }
   }
   function applyRace(data, offline) {
     const self = myLocalRacer();
@@ -1593,12 +1617,21 @@
       path.appendChild(el);
     });
     shelf.innerHTML = '';
+    const mini = $('minishelf');
+    if (mini) mini.innerHTML = '';
     LEVELS.forEach((lv, i) => {
       const got = !!(prog.badges[i]);
       const el = doc.createElement('div');
       el.className = 'badge' + (got ? ' got' : '') + (lv.badge && lv.badge.special ? ' heart' : '');
       el.innerHTML = '<i>' + (got ? lv.badge.icon : '·') + '</i><b>' + (got ? lv.badge.name : 'Level ' + (i + 1)) + '</b>';
       shelf.appendChild(el);
+      if (mini && got && lv.badge) {
+        const d = doc.createElement('i');
+        d.className = 'got';
+        d.textContent = lv.badge.icon;
+        d.title = lv.badge.name;
+        mini.appendChild(d);
+      }
     });
     renderRacers();
     renderRaceBoard();
@@ -1851,6 +1884,15 @@
   if ($('iconpick')) $('iconpick').addEventListener('click', e => {
     if (e.target === $('iconpick') || (e.target.closest && e.target.closest('[data-iconpick=close]'))) $('iconpick').hidden = true;
   });
+  if ($('mapexit')) $('mapexit').addEventListener('click', () => { unlockAudio(); requestCloseSugar(); });
+  if ($('racechip')) $('racechip').addEventListener('click', () => { unlockAudio(); setRaceOpen(true); });
+  if ($('raceboard')) $('raceboard').addEventListener('click', e => {
+    if (e.target.closest && e.target.closest('[data-race=close]')) setRaceOpen(false);
+  });
+  if ($('badgebtn')) $('badgebtn').addEventListener('click', () => { unlockAudio(); if ($('badgeov')) $('badgeov').hidden = false; });
+  if ($('badgeov')) $('badgeov').addEventListener('click', e => {
+    if (e.target === $('badgeov') || (e.target.closest && e.target.closest('[data-badge=close]'))) $('badgeov').hidden = true;
+  });
   doc.addEventListener('pointerdown', unlockAudio, { passive: true });
   doc.addEventListener('pointerup', unlockAudio, { passive: true });
   doc.addEventListener('touchend', unlockAudio, { passive: true });
@@ -1870,7 +1912,7 @@
 
   root.SugarRush.ui = {
     state: () => st, attempt, showEnd, showMap, scrollMapTo, openLevel, startLevel, progress: () => prog,
-    seedRace, syncRace, openIconPicker, race: () => race,
+    seedRace, syncRace, openIconPicker, setRaceOpen, requestCloseSugar, race: () => race,
     say, chime, callout, unlockAudio, audio,
     clipsReady: () => Object.keys(VOICE_FILES).every(k => !!bufs[k]),
     setSound(on) { soundOn = !!on; ls.set('ib-sugar-sound', soundOn); paintButtons(); },
