@@ -47,6 +47,9 @@ export function scoresInit(sql) {
   try { sql.exec(`ALTER TABLE sugar_race ADD COLUMN wins INTEGER DEFAULT 0`); } catch (e) { }
   sql.exec(`CREATE TABLE IF NOT EXISTS sugar_race_event (id INTEGER PRIMARY KEY AUTOINCREMENT, stop INTEGER NOT NULL, members TEXT NOT NULL, prog TEXT NOT NULL, at INTEGER NOT NULL, ends INTEGER NOT NULL, done INTEGER NOT NULL DEFAULT 0, winner TEXT, why TEXT, fin INTEGER)`);
   sugarStopsOnce20261114(sql);
+  // 1.9.222 Sugar Rush lives: family gifts (one life per sender per recipient per NZ day) and "ask family" (once a day).
+  sql.exec(`CREATE TABLE IF NOT EXISTS sugar_life_gift (id INTEGER PRIMARY KEY AUTOINCREMENT, frm TEXT NOT NULL, too TEXT NOT NULL, day TEXT NOT NULL, at INTEGER NOT NULL, claimed INTEGER NOT NULL DEFAULT 0, UNIQUE (frm, too, day))`);
+  sql.exec(`CREATE TABLE IF NOT EXISTS sugar_life_ask (mid TEXT NOT NULL, day TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (mid, day))`);
   clearShaneTetrisOnce(sql);
   clearShaneTetrisOnce20261113(sql);
   clearAllTetrisOnce20261114(sql);
@@ -325,7 +328,68 @@ export function raceBoard(sql, me, now = Date.now(), notes = []) {
   return { status: 200, body: { me: me.name, racers, event: raceEventView(sql, me, now) }, notes };
 }
 
+/* ---- 1.9.222 Sugar Rush lives: the phone keeps its own 3-a-day count; the Worker only carries family gifts and asks. ---- */
+export const LIVES = { perDay: 3, giftPerDay: 1, askPerDay: 1 };
+export function nzDay(t = Date.now()) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(t));
+}
+// An opaque key for a family member (no member ids leave the Worker).
+export function lifeKey(mid) {
+  let h = 0x811c9dc5;
+  const s = 'sugar-life:' + mid;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h.toString(36);
+}
+const firstName = n => String(n || 'Someone').trim().split(/\s+/)[0] || 'Someone';
+function lifeFamily(sql, me) {
+  return rows(sql, `SELECT m.id, m.name, r.icon FROM members m LEFT JOIN sugar_race r ON r.mid=m.id WHERE m.removed=0 AND m.id != ? ORDER BY m.name ASC`, me.id);
+}
+export function livesView(sql, me, now = Date.now()) {
+  const day = nzDay(now);
+  const sent = new Set(rows(sql, `SELECT too FROM sugar_life_gift WHERE frm=? AND day=?`, me.id, day).map(r => r.too));
+  const family = lifeFamily(sql, me).map(r => ({ key: lifeKey(r.id), name: r.name, icon: r.icon || null, sent: sent.has(r.id) }));
+  const pending = rows(sql, `SELECT COUNT(*) n FROM sugar_life_gift WHERE too=? AND claimed=0`, me.id)[0].n || 0;
+  const asked = !!rows(sql, `SELECT 1 FROM sugar_life_ask WHERE mid=? AND day=?`, me.id, day)[0];
+  return { day, family, pending, asked };
+}
+export function livesPost(sql, me, b, now = Date.now()) {
+  const day = nzDay(now), notes = [];
+  const act = b && typeof b.act === 'string' ? b.act : '';
+  if (act === 'send') {
+    const key = typeof b.to === 'string' ? b.to : '';
+    const to = lifeFamily(sql, me).find(r => lifeKey(r.id) === key);
+    if (!to) return { status: 400, body: { err: 'no such player' } };
+    if (rows(sql, `SELECT 1 FROM sugar_life_gift WHERE frm=? AND too=? AND day=?`, me.id, to.id, day)[0])
+      return { status: 429, body: { err: 'already sent today', ...livesView(sql, me, now) } };
+    sql.exec(`INSERT INTO sugar_life_gift (frm, too, day, at) VALUES (?,?,?,?)`, me.id, to.id, day, now);
+    notes.push({ mid: to.id, text: `${firstName(me.name)} sent you a life ❤️`, card: 'sugar-lives' });
+    return { status: 200, body: { ok: 1, sent: firstName(to.name), ...livesView(sql, me, now) }, notes };
+  }
+  if (act === 'claim') {
+    const got = rows(sql, `SELECT g.id, m.name FROM sugar_life_gift g LEFT JOIN members m ON m.id=g.frm WHERE g.too=? AND g.claimed=0 ORDER BY g.at ASC`, me.id);
+    for (const g of got) sql.exec(`UPDATE sugar_life_gift SET claimed=? WHERE id=?`, now, g.id);
+    return { status: 200, body: { ok: 1, claimed: got.length, from: got.map(g => firstName(g.name)), ...livesView(sql, me, now) } };
+  }
+  if (act === 'ask') {
+    if (rows(sql, `SELECT 1 FROM sugar_life_ask WHERE mid=? AND day=?`, me.id, day)[0])
+      return { status: 429, body: { err: 'already asked today', ...livesView(sql, me, now) } };
+    sql.exec(`INSERT INTO sugar_life_ask (mid, day, at) VALUES (?,?,?)`, me.id, day, now);
+    for (const r of lifeFamily(sql, me)) notes.push({ mid: r.id, text: `${firstName(me.name)} is out of lives in Sugar Rush. Send a life ❤️`, card: 'sugar-lives' });
+    return { status: 200, body: { ok: 1, asked: true, told: notes.length, ...livesView(sql, me, now) }, notes };
+  }
+  return { status: 400, body: { err: 'bad act' } };
+}
+
 export async function scoresRoute(sql, me, p, m, url, readBody, now = Date.now(), hooks = null) {
+  if (p === '/sugar-lives') {
+    let r;
+    if (m === 'GET') r = { status: 200, body: livesView(sql, me, now) };
+    else if (m === 'POST') r = livesPost(sql, me, await readBody(), now);
+    else return { status: 405, body: { err: 'method' } };
+    // "Sarah sent you a life ❤️" and "out of lives" asks go out through the family notifications.
+    if (r.notes && r.notes.length && hooks && hooks.note) for (const n of r.notes) { try { await hooks.note(n.mid, n.text, n.card); } catch (e) { } }
+    return r;
+  }
   if (p === '/sugar-race') {
     let r;
     if (m === 'GET') r = raceBoard(sql, me, now);

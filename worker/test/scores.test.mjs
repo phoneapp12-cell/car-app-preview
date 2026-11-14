@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
-import { checkScore, tetrisMax, scoresInit, scoresRoute, addScore, board, RATE, RACE_ICONS, RACE_LIMITS, checkRace, saveRace, raceBoard, clearShaneTetrisOnce, CLEAR_SHANE_TETRIS_KEY, clearShaneTetrisOnce20261113, CLEAR_SHANE_TETRIS_KEY2, clearAllTetrisOnce20261114, CLEAR_ALL_TETRIS_KEY, RACE_STOP_IDS, sugarStopsOnce20261114, SUGAR_STOPS_KEY, expireRaces } from '../src/scores.js';
+import { checkScore, tetrisMax, scoresInit, scoresRoute, addScore, board, RATE, RACE_ICONS, RACE_LIMITS, checkRace, saveRace, raceBoard, clearShaneTetrisOnce, CLEAR_SHANE_TETRIS_KEY, clearShaneTetrisOnce20261113, CLEAR_SHANE_TETRIS_KEY2, clearAllTetrisOnce20261114, CLEAR_ALL_TETRIS_KEY, RACE_STOP_IDS, sugarStopsOnce20261114, SUGAR_STOPS_KEY, expireRaces, LIVES, nzDay, lifeKey } from '../src/scores.js';
 
 function stubSql() {
   const db = new DatabaseSync(':memory:');
@@ -352,6 +352,63 @@ assert.ok(fam.includes("this.rt.note(mid, 'sugar', text, card)"), 'race pushes g
   r = await scoresRoute(q3, { id: 'y', name: 'y' }, '/sugar-race', 'POST', new URL('https://x/'), async () => ({ icon: 'dog', stop: 4, stars: 9 }), T0 + 8 * 864e5);
   assert.equal(r.body.event, null);
   assert.ok(!JSON.stringify(r.body).includes('"x"'), 'no member ids in the race view');
+}
+
+// ---- 1.9.222 Sugar Rush lives: send a life (once a day per recipient), claim on next open, ask family
+{
+  const q = stubSql();
+  q.db.exec(`CREATE TABLE members (id TEXT PRIMARY KEY, name TEXT NOT NULL, role TEXT NOT NULL, tok TEXT, created INTEGER, seen INTEGER, removed INTEGER DEFAULT 0)`);
+  for (const [id, name, removed] of [['m1', 'Shane Jenkins', 0], ['m2', 'Sarah', 0], ['m3', 'Aranea', 0], ['m9', 'Gone', 1]]) q.db.prepare(`INSERT INTO members (id,name,role,created,removed) VALUES (?,?,?,?,?)`).run(id, name, 'member', 1, removed);
+  scoresInit(q);
+  const pushed = [];
+  const hooks = { note: async (mid, text, card) => { pushed.push({ mid, text, card }); } };
+  const S = { id: 'm1', name: 'Shane Jenkins' }, H = { id: 'm2', name: 'Sarah' }, A = { id: 'm3', name: 'Aranea' };
+  const T = Date.parse('2026-11-14T08:00:00Z'); // 9pm Saturday 14 Nov in Auckland
+  const get = (me, t) => scoresRoute(q, me, '/sugar-lives', 'GET', new URL('https://x/api/sugar-lives'), async () => ({}), t, hooks);
+  const post = (me, b, t) => scoresRoute(q, me, '/sugar-lives', 'POST', new URL('https://x/api/sugar-lives'), async () => b, t, hooks);
+  assert.equal(LIVES.perDay, 3);
+  assert.equal(nzDay(T), '2026-11-14');
+  assert.equal(nzDay(Date.parse('2026-11-14T11:30:00Z')), '2026-11-15', 'NZ midnight, not UTC');
+  let r = await get(H, T);
+  assert.deepEqual(r.body.family.map(f => f.name), ['Aranea', 'Shane Jenkins'], 'family list: not me, not removed members');
+  assert.ok(!JSON.stringify(r.body).includes('m1') && !JSON.stringify(r.body).includes('Gone'), 'no member ids');
+  assert.equal(r.body.pending, 0); assert.equal(r.body.asked, false);
+  const shaneKey = r.body.family.find(f => f.name === 'Shane Jenkins').key;
+  assert.equal(shaneKey, lifeKey('m1'));
+  // sending
+  r = await post(H, { act: 'send', to: shaneKey }, T);
+  assert.equal(r.status, 200); assert.equal(r.body.sent, 'Shane');
+  assert.deepEqual(pushed, [{ mid: 'm1', text: 'Sarah sent you a life ❤️', card: 'sugar-lives' }], 'the recipient gets a push');
+  assert.equal(r.body.family.find(f => f.key === shaneKey).sent, true);
+  assert.equal((await post(H, { act: 'send', to: lifeKey('m2') }, T)).status, 400, 'cannot send to yourself');
+  assert.equal((await post(H, { act: 'send', to: lifeKey('m9') }, T)).status, 400, 'cannot send to a removed member');
+  assert.equal((await post(H, { act: 'send', to: 'nope' }, T)).status, 400);
+  assert.equal((await post(H, { act: 'wat' }, T)).status, 400);
+  // the daily limit: once per day per recipient; a different recipient is fine; a new NZ day resets it
+  pushed.length = 0;
+  r = await post(H, { act: 'send', to: shaneKey }, T + 3600e3);
+  assert.equal(r.status, 429); assert.equal(r.body.err, 'already sent today'); assert.equal(pushed.length, 0);
+  assert.equal((await post(H, { act: 'send', to: lifeKey('m3') }, T + 60e3)).status, 200, 'another family member can still get one');
+  assert.equal((await post(A, { act: 'send', to: shaneKey }, T + 120e3)).status, 200, 'Aranea can send Shane one too');
+  const NEXT = Date.parse('2026-11-14T11:05:00Z'); // 12:05am Sunday in Auckland
+  assert.equal((await post(H, { act: 'send', to: shaneKey }, NEXT)).status, 200, 'a new NZ day, a new gift');
+  // claiming: Shane gets every pending gift once, on his next open
+  r = await get(S, NEXT + 1000);
+  assert.equal(r.body.pending, 3);
+  r = await post(S, { act: 'claim' }, NEXT + 2000);
+  assert.equal(r.body.claimed, 3); assert.deepEqual(r.body.from, ['Sarah', 'Aranea', 'Sarah']); assert.equal(r.body.pending, 0);
+  r = await post(S, { act: 'claim' }, NEXT + 3000);
+  assert.equal(r.body.claimed, 0, 'claimed only once');
+  assert.equal((await post(A, { act: 'claim' }, NEXT)).body.claimed, 1, 'Aranea claims the one from Sarah');
+  // ask family: notifies everyone else, once a day
+  pushed.length = 0;
+  r = await post(S, { act: 'ask' }, NEXT + 5000);
+  assert.equal(r.status, 200); assert.equal(r.body.told, 2); assert.equal(r.body.asked, true);
+  assert.deepEqual(pushed.map(p => p.mid).sort(), ['m2', 'm3']);
+  assert.ok(pushed.every(p => p.text === 'Shane is out of lives in Sugar Rush. Send a life ❤️'));
+  assert.equal((await post(S, { act: 'ask' }, NEXT + 6000)).status, 429, 'one ask a day');
+  assert.equal((await get(S, NEXT + 7000)).body.asked, true);
+  assert.equal((await scoresRoute(q, S, '/sugar-lives', 'PUT', new URL('https://x/'), async () => ({}), NEXT, hooks)).status, 405);
 }
 
 console.log('scores tests ok');

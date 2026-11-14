@@ -558,6 +558,8 @@
   .hardban.hard1 .hb-in { background: linear-gradient(180deg, #a65bff, #4d0f9c); box-shadow: 0 0 0 4px #e8d4ff, 0 8px 0 4px #2e0661, 0 0 50px rgba(160,80,255,.8); }
   .hardban.hard2 .hb-in { background: linear-gradient(180deg, #ff4040, #7a0014); box-shadow: 0 0 0 4px #ffd4d4, 0 8px 0 4px #48000c, 0 0 60px rgba(255,40,40,.85); }
   .hardban .flamecandy { font-size: 46px; }
+  .hardban .hb-in { box-sizing: border-box; max-width: calc(100% - 40px); }
+  .hardban.hard2 b { font-size: 30px; }
   .hardban b { font: 900 34px/1 ui-rounded, system-ui, sans-serif; letter-spacing: .05em; text-transform: uppercase; text-shadow: 0 3px 0 rgba(0,0,0,.4); }
   .hardban em { font: 800 15px/1.2 ui-rounded, system-ui, sans-serif; font-style: normal; opacity: .95; }
   @keyframes hbslam { 0% { transform: scale(2.4) rotate(-8deg); opacity: 0; } 60% { opacity: 1; } 100% { transform: none; opacity: 1; } }
@@ -572,8 +574,16 @@
     .flamecandy .fc-f, .hardban .hb-in, .stops .lv.hard1 .pin, .stops .lv.hard2 .pin { animation: none !important; }
   }
 
+  /* 1.9.222 Coming-soon cities: one-line labels beside a small dashed pin, so the Australia map stays readable. */
+  .stops .future-stop .meta { max-width: none; white-space: nowrap; }
+  .stops .future-stop.lab-left .meta { right: 28px; top: 3px; }
+  .stops .future-stop.lab-right .meta { left: 28px; top: 3px; }
+  .stops .future-stop .meta b, .stops .future-stop .meta em { display: inline; }
+  .stops .future-stop .meta em::before { content: ' · '; }
+  .stops .future-stop .meta, .stops .lv.kind-city .meta { background: rgba(255,255,255,.78); border-radius: 9px; padding: 1px 6px; box-shadow: 0 1px 3px rgba(122,31,76,.12); }
+  .stops .lv.kind-city .meta { max-width: 150px; }
   /* 1.9.222 Family race events. */
-  .racebar { position: absolute; left: 10px; right: 10px; top: 64px; z-index: 6; padding: 7px 10px 6px; border-radius: 16px; background: rgba(255,255,255,.94); border: 2px solid #ffb3d3; box-shadow: 0 4px 0 #f4a0c4, 0 8px 18px rgba(180,40,90,.18); font: 800 12px/1.2 ui-rounded, system-ui, sans-serif; color: #7a1f4c; }
+  .racebar { position: absolute; left: 10px; right: 10px; top: 100px; z-index: 6; padding: 7px 10px 6px; border-radius: 16px; background: rgba(255,255,255,.94); border: 2px solid #ffb3d3; box-shadow: 0 4px 0 #f4a0c4, 0 8px 18px rgba(180,40,90,.18); font: 800 12px/1.2 ui-rounded, system-ui, sans-serif; color: #7a1f4c; }
   .racebar[hidden] { display: none; }
   .racebar.inlevel { position: relative; left: auto; right: auto; top: auto; margin: 0 0 6px; }
   .racebar .rb-hd { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; margin-bottom: 3px; }
@@ -589,6 +599,15 @@
   .racebar .rb-icon { position: absolute; top: 50%; transform: translate(-50%, -50%); font-size: 18px; line-height: 1; filter: drop-shadow(0 1px 1px rgba(0,0,0,.25)); transition: left .6s ease; }
   .racebar .rb-n { text-align: right; }
   .racebar .rb-cup { position: absolute; right: -4px; top: -6px; font-size: 14px; }
+  .racebar.inlevel { padding: 4px 10px 12px; }
+  .racebar .rm { display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 8px; }
+  .racebar .rm-l { font-size: 15px; }
+  .racebar .rm-r { font-size: 12px; color: #c2185b; white-space: nowrap; }
+  .racebar .rm-track { position: relative; height: 8px; margin: 10px 12px 0; border-radius: 999px; background: linear-gradient(90deg, #ffe3ef, #ffb3d3); }
+  .racebar .rm-tick { position: absolute; top: -2px; width: 2px; height: 12px; margin-left: -1px; background: #fff; border-radius: 1px; }
+  .racebar .rm-tick em { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); font: 700 8px/1 ui-rounded, system-ui, sans-serif; font-style: normal; color: #a06080; }
+  .racebar .rm-icon { position: absolute; top: -9px; transform: translateX(-50%); font-size: 17px; line-height: 1; filter: drop-shadow(0 1px 1px rgba(0,0,0,.25)); transition: left .6s ease; }
+  .racebar .rm-icon.mine { z-index: 1; font-size: 19px; top: -11px; }
   .racebar.done { border-color: #ffd166; box-shadow: 0 4px 0 #e0b040, 0 8px 18px rgba(180,120,0,.2); }
   .raceov .racecard { position: relative; overflow: hidden; text-align: center; border: 3px solid #ff9cc6; }
   .raceov .rc-flags { font-size: 44px; line-height: 1; animation: rcwave 1s ease-in-out infinite alternate; transform-origin: 30% 90%; }
@@ -615,6 +634,36 @@
     .racebar .rb-fill, .racebar .rb-icon { transition: none; }
   }
 
+  /* 1.9.222 Lives: hearts counter, out-of-lives card, send-a-life panel. */
+  .hearts { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px 4px 8px; min-height: 0; border-radius: 999px; border: 2px solid #ffb3d3; background: rgba(255,255,255,.95); box-shadow: 0 3px 0 #f4a0c4; color: #c2185b; font: 900 15px/1 ui-rounded, system-ui, sans-serif; cursor: pointer; width: auto; }
+  .hearts i { font-style: normal; font-size: 16px; }
+  .hearts.out { border-color: #c9a0b3; color: #8a5a70; }
+  .hearts.onmap { position: absolute; left: 10px; top: 58px; z-index: 7; }
+  .hearts.inlevel { position: absolute; right: 20px; top: 22px; z-index: 3; }
+  body.ingame #game h1 { padding-right: 76px; }
+  #game { position: relative; }
+  .livesov .livescard { text-align: center; }
+  .livesov .lv-big { font-size: 54px; line-height: 1; }
+  .livesov.out .lv-big { animation: lvbeat 1.4s ease-in-out infinite; }
+  .livesov.gift .lv-big { animation: lvpop .6s cubic-bezier(.2,1.6,.4,1) both; }
+  .livesov h2 { margin: 6px 0; color: #c2185b; }
+  .livesov h3 { margin: 12px 0 0; color: #c2185b; font-size: 17px; }
+  .livesov .lv-sub, .livesov .lv-none { margin: 2px 0 6px; font-size: 12px; color: #8a4a6a; }
+  .livesov .lv-count { display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 10px auto 12px; padding: 8px 16px; width: max-content; border-radius: 16px; background: #fff0f6; border: 2px dashed #ff9cc6; }
+  .livesov .lv-count span { font: 800 12px/1 ui-rounded, system-ui, sans-serif; color: #8a4a6a; }
+  .livesov .lv-count b { font: 900 30px/1.1 ui-rounded, system-ui, sans-serif; color: #c2185b; font-variant-numeric: tabular-nums; }
+  .livesov .lv-plus { font: 900 34px/1 ui-rounded, system-ui, sans-serif; color: #e0245e; margin: 4px 0; }
+  .livesov .lv-msg { min-height: 1.2em; margin: 6px 0; font-size: 13px; color: #8a4a6a; }
+  .livesov .lv-hd { display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .livesov .lv-hearts { font: 900 20px/1 ui-rounded, system-ui, sans-serif; color: #c2185b; }
+  .livesov .lv-fam { list-style: none; padding: 0; margin: 6px 0; display: grid; gap: 6px; text-align: left; }
+  .livesov .lv-fam li { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 14px; background: #fff; border: 2px solid #ffd1e4; }
+  .livesov .lf-i { font-size: 22px; text-align: center; }
+  .livesov .lf-send { width: auto; min-height: 0; padding: 6px 12px; border-radius: 999px; font-size: 13px; }
+  .livesov .lf-send.sent { background: #f3f3f3; color: #8a8a8a; border-color: #ddd; box-shadow: none; }
+  @keyframes lvbeat { 0%, 100% { transform: scale(1); } 15% { transform: scale(1.12); } 30% { transform: scale(.96); } 45% { transform: scale(1.06); } }
+  @keyframes lvpop { from { transform: scale(.3); opacity: 0; } to { transform: none; opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .livesov .lv-big { animation: none !important; } }
   @media (prefers-reduced-motion: reduce) {
     .hinthand { display: none !important; animation: none !important; }
   }
@@ -647,6 +696,7 @@
           <button type="button" id="mapmusic" aria-label="Music">🎵</button>
           <button type="button" class="iconbtn" id="pickicon">Pick your icon</button>
         </header>
+        <button type="button" class="hearts onmap" id="maphearts" aria-label="Lives"><i aria-hidden="true">❤️</i><b>3</b></button>
         <div class="racebar" id="racebar" hidden role="status"></div>
         <button type="button" class="racechip" id="racechip" aria-expanded="false" aria-controls="raceboard">🏁 Race</button>
         <aside class="raceboard" id="raceboard" hidden aria-label="Family race">
@@ -674,6 +724,7 @@
     </div>
 
     <div id="game" hidden>
+      <button type="button" class="hearts inlevel" id="hearts2" aria-label="Lives"><i aria-hidden="true">❤️</i><b>3</b></button>
       <h1>Sugar Rush <small id="lvname">Level 1</small></h1>
       <div class="racebar inlevel" id="racebar2" hidden role="status"></div>
       <div class="goalstrip" id="goalstrip">
@@ -809,6 +860,10 @@
       <button type="button" class="pri" id="spinbtn2">Spin!</button>
       <button type="button" data-spin="close">Close</button>
     </div>
+  </div>
+
+  <div id="livesov" class="ov livesov" hidden role="dialog" aria-label="Lives">
+    <div class="card livescard" id="livescard"></div>
   </div>
 
   <div id="raceon" class="ov raceov" hidden role="dialog" aria-labelledby="raceontitle">

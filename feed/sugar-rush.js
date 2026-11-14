@@ -110,7 +110,7 @@
     { n: 16, name: 'Bluff Oyster Bay', target: 0, moves: 18, stars: [0, 2200, 4400], kinds: 6,
       ice: ['00000000', '00000000', '00000000', '00000000', '01200210', '00100100', '21011012', '00000000'],
       locks: ['00000000', '00000000', '00011000', '00000000', '00000000', '00000000', '00000000', '00000000'],
-      help: 'Crack open the 12 oyster shells (icing, some of it thick) and free the 2 locked jars by the signpost in 18 moves.',
+      help: 'Crack all 16 layers of oyster-shell icing (some shells are thick) and free the 2 locked jars by the signpost in 18 moves.',
       badge: { id: 'oyster', name: 'Bluff Oyster', icon: '🦪' } },
     // 1.9.220 Pacific Islands (levels 17-19 since 1.9.222).
     { n: 17, name: 'Rarotonga Lagoon', target: 0, moves: 28, stars: [0, 3300, 6600], kinds: 6, mask: ATOLL,
@@ -169,7 +169,7 @@
     { icon: '🎁', goal: 'Bring both ingredients down and clear the icing', detail: 'Guide both ingredients down the glacier and clear all the icing in 34 moves.', tip: 'Thick icing needs two hits. Clear a path under each ingredient.', mechanic: 'glacier' },
     { icon: '➿', goal: 'Free all the liquorice', detail: 'Free every liquorice-wrapped sweet in 28 moves.', tip: 'Include a wrapped sweet in a match to free it. If two moves in a row free none, the liquorice creeps onto a sweet next to it.', mechanic: 'liq' },
     { icon: '🎫', goal: 'Finish every objective', detail: 'Clear the jelly, pop the sugar bubbles and free the liquorice, with chocolate on the loose — all in 26 moves.', tip: 'The big finish. Hit the chocolate when you can, and never leave the liquorice alone for long.', mechanic: 'factory' },
-    { icon: '🦪', goal: 'Crack the oyster shells and free the jars', detail: 'Crack open the 12 oyster shells (icing, some of it thick) and free the 2 locked jars in 18 moves.', tip: 'Thick shells need two hits. Specials crack lots at once.', mechanic: 'oyster' },
+    { icon: '🦪', goal: 'Crack the oyster shells and free the jars', detail: 'Crack all 16 layers of oyster-shell icing (some shells are thick) and free the 2 locked jars in 18 moves.', tip: 'Thick shells need two hits. Specials crack lots at once.', mechanic: 'oyster' },
     { icon: '🌺', goal: 'Clear the reef jelly and pop the lagoon bubbles', detail: 'Clear the jelly reef at the top and bottom of the island and pop the 8 sugar bubbles in the lagoon in 28 moves.', tip: 'Bubbles touching each other pop together. Pop one in the middle of the lagoon and watch the rest follow.', mechanic: 'reef' },
     { icon: '🥥', goal: 'Bring both coconuts down to the beach', detail: 'Free the liquorice under the two coconuts, then bring both down to the bottom in 34 moves.', tip: 'The coconuts sit on liquorice. Free it first, then match underneath to drop them. Do not leave the liquorice alone for long.', mechanic: 'coconut' },
     { icon: '🐚', goal: 'Clear the jelly, free the jars and the liquorice', detail: 'Clear the jelly on both islands, free the 4 locked jars and free the liquorice in 34 moves.', tip: 'Two islands side by side. Free the liquorice early, then work the jelly on each beach.', mechanic: 'sunset' },
@@ -589,24 +589,26 @@
     { n: 18, x: 160, y: 1512, place: 'Tonga', kind: 'island', label: 'left' },
     { n: 19, x: 200, y: 1352, place: 'Samoa', kind: 'island', label: 'right' },
     // 1.9.222 Australia section: fly to Sydney, up to the Gold Coast, then across to Perth.
-    { n: 20, x: 353, y: 2063, place: 'Sydney', kind: 'city', label: 'left' },
+    { n: 20, x: 353, y: 2063, place: 'Sydney', kind: 'city', label: 'left', via: [{ x: 270, y: 1900 }, { x: 310, y: 2040 }] },
     { n: 21, x: 368, y: 2006, place: 'Gold Coast', kind: 'city', label: 'left' },
-    { n: 22, x: 49, y: 2041, place: 'Perth', kind: 'city', label: 'right' }
+    { n: 22, x: 49, y: 2041, place: 'Perth', kind: 'city', label: 'right', via: [{ x: 310, y: 1965 }] }
   ];
   // Coming soon: other Australian cities. Shown as markers only (no trail), so they never look like the route.
   const FUTURE_STOPS = [
-    { place: 'Melbourne', x: 299, y: 2108, label: 'left' },
-    { place: 'Brisbane', x: 366, y: 1962, label: 'left' },
-    { place: 'Adelaide', x: 244, y: 2072, label: 'left' },
+    { place: 'Melbourne', x: 299, y: 2113, label: 'left' },
+    { place: 'Brisbane', x: 372, y: 1940, label: 'left' },
+    { place: 'Adelaide', x: 244, y: 2066, label: 'left' },
     { place: 'Canberra', x: 328, y: 2088, label: 'left' },
-    { place: 'Hobart', x: 319, y: 2160, label: 'right' },
-    { place: 'Darwin', x: 177, y: 1830, label: 'right' },
-    { place: 'Cairns', x: 304, y: 1878, label: 'left' }
+    { place: 'Hobart', x: 319, y: 2160, label: 'left' },
+    { place: 'Darwin', x: 177, y: 1830, label: 'left' },
+    { place: 'Cairns', x: 306, y: 1874, label: 'left' }
   ];
   const LV_COUNT = 22;
   function stopForLevel(n) { return MAP_STOPS[(n | 0) - 1] || null; }
   function icingPath(pts) {
     if (!pts || pts.length < 2) return '';
+    // 1.9.222 A stop can name waypoints (via) the trail passes through on its way in, so it can avoid labels.
+    pts = pts.reduce(function (a, q, i) { if (i && q.via) q.via.forEach(function (v) { a.push(v); }); a.push(q); return a; }, []);
     const p = [pts[0]].concat(pts, [pts[pts.length - 1]]);
     let d = 'M ' + pts[0].x + ' ' + pts[0].y;
     for (let i = 1; i < p.length - 2; i++) {
@@ -703,7 +705,7 @@
       '<path d="M236 1930 C250 1918 270 1922 276 1936 C264 1944 246 1942 236 1930 Z" fill="#ffd9a8" opacity=".55"/>' +
       '<circle class="sr-bob" cx="380" cy="1860" r="6" fill="#ffb347" opacity=".5"/><circle class="sr-bob" cx="30" cy="2160" r="7" fill="#ff8ab8" opacity=".45"/>' +
       '</g>' +
-      planeAt(276, 1708, 168) + planeAt(208, 2022, -97) +
+      planeAt(250, 1700, 172) + planeAt(180, 2003, -106) +
       '<g class="sr-plane" transform="translate(219 1195) rotate(166)"><path d="M0 -14 L3 -4 L14 2 L14 5 L3 2 L2 10 L6 13 L6 15 L0 13 L-6 15 L-6 13 L-2 10 L-3 2 L-14 5 L-14 2 L-3 -4 Z" fill="#fff" stroke="#3d8bfd" stroke-width="1.5"/></g>' +
       '<path id="sr-future" d="' + future + '" fill="none" stroke="#ffb3d3" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 9" opacity=".7"/>' +
       '<path id="sr-path-wide" d="' + live + '" fill="none" stroke="url(#sr-icing)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>' +
@@ -3050,8 +3052,8 @@
             const reach = Math.min(1, p * 4.5), fade = p < .12 ? .6 + p * 3.3 : Math.max(0, 1 - (p - .12) / .88);
             const n = Math.max(1, Math.ceil((g.main.length - 1) * reach)), w = f.w || 1;
             ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-            ctx.strokeStyle = rgbaOf(f.col, .32 * fade); ctx.lineWidth = CS * .2 * w; strokePts(g.main, n);
-            ctx.strokeStyle = rgbaOf(f.col, .85 * fade); ctx.lineWidth = CS * .09 * w; strokePts(g.main, n);
+            ctx.strokeStyle = rgbaOf(f.col, .5 * fade); ctx.lineWidth = CS * .24 * w; strokePts(g.main, n);
+            ctx.strokeStyle = rgbaOf(f.col, 1 * fade); ctx.lineWidth = CS * .1 * w; strokePts(g.main, n);
             ctx.strokeStyle = 'rgba(255,255,255,' + (.95 * fade) + ')'; ctx.lineWidth = CS * .035 * w + .6; strokePts(g.main, n);
             if (n > g.bi) {
               ctx.strokeStyle = rgbaOf(f.col, .7 * fade); ctx.lineWidth = CS * .05 * w; strokePts(g.branch, 3);
@@ -3236,6 +3238,7 @@
     if (chip) { chip.hidden = !!on; chip.setAttribute('aria-expanded', on ? 'true' : 'false'); }
   }
   function requestCloseSugar() {
+    try { settleLife(); } catch (e) { }
     try { stopAllMusic(); } catch (e) { }
     try {
       if (root.parent && root.parent !== root) root.parent.postMessage({ type: 'ib-sugar-close' }, '*');
@@ -3244,6 +3247,131 @@
 
 
   let tut = null, crush = null;
+  /* ---- 1.9.222 Lives: 3 a day, refilled at NZ midnight (no timed regeneration). Losing or leaving a level part-way
+     costs one. Family members can send a life (the Worker carries it); gifted lives can go above 3. ---- */
+  const LIVES_PER_DAY = 3;
+  let livesDemo = false, livesTimer = 0, livesInfo = null;
+  function livesKey() { return 'ib-sugar-lives' + memberTag(); }
+  function lives() {
+    const day = nzDay();
+    let v = ls.get(livesKey(), null);
+    if (!v || typeof v !== 'object' || typeof v.n !== 'number') v = { day: day, n: LIVES_PER_DAY };
+    else if (v.day !== day) v = { day: day, n: Math.max(LIVES_PER_DAY, v.n | 0) }; // midnight top-up; gifted extras carry over
+    ls.set(livesKey(), v);
+    return Math.max(0, v.n | 0);
+  }
+  function setLives(n) { ls.set(livesKey(), { day: nzDay(), n: Math.max(0, n | 0) }); paintHearts(); }
+  function settleLife() {
+    if (!st || st.tutorial || st.won || st.lifeDone) return;
+    if (!(st.played || st.over)) return;
+    st.lifeDone = true;
+    setLives(lives() - 1);
+  }
+  function msToNzMidnight(t) {
+    t = t == null ? Date.now() : t;
+    try {
+      const parts = new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).formatToParts(new Date(t));
+      const g = function (k) { const x = parts.find(function (p) { return p.type === k; }); return x ? +x.value % 24 : 0; };
+      return Math.max(1000, ((23 - g('hour')) * 3600 + (59 - g('minute')) * 60 + (60 - g('second'))) * 1000);
+    } catch (e) { return 36e5; }
+  }
+  function countdownText(ms) {
+    const s = Math.ceil(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+    return h + ':' + String(m).padStart(2, '0') + ':' + String(x).padStart(2, '0');
+  }
+  function paintHearts() {
+    const n = lives();
+    ['maphearts', 'hearts2'].forEach(function (id) {
+      const el = $(id); if (!el) return;
+      el.innerHTML = (n ? '<i aria-hidden="true">❤️</i>' : '<i aria-hidden="true">💔</i>') + '<b>' + n + '</b>';
+      el.classList.toggle('out', !n);
+      el.setAttribute('aria-label', n + (n === 1 ? ' life' : ' lives') + ' left' + (n ? '' : '. New lives at midnight.'));
+    });
+  }
+  function livesApi() { const S = root.IBScores; return !livesDemo && S && S.who && S.who() && S.loadLives && S.postLives ? S : null; }
+  // On each open of the map: collect any lives the family has sent.
+  async function syncLives() {
+    const S = livesApi(); if (!S) return;
+    let info = null;
+    try { info = await S.loadLives(); } catch (e) { info = null; }
+    if (info) livesInfo = info;
+    if (!info || !info.pending) return;
+    let got = null;
+    try { got = await S.postLives({ act: 'claim' }); } catch (e) { got = null; }
+    if (got && got.claimed > 0) { livesInfo = got; setLives(lives() + got.claimed); showLives('gift', { claimed: got.claimed, from: got.from || [] }); }
+  }
+  function familyRows(info) {
+    const fam = (info && info.family) || [];
+    if (!fam.length) return '<p class="lv-none">Family members show up here once they have a family link.</p>';
+    return '<ul class="lv-fam">' + fam.map(function (f) {
+      const ic = raceIcon(f.icon);
+      return '<li><span class="lf-i" aria-hidden="true">' + (ic ? ic.emoji : '🙂') + '</span><b>' + racerFirst(f.name) + '</b>' +
+        '<button type="button" class="lf-send' + (f.sent ? ' sent' : '') + '" data-life-to="' + f.key + '"' + (f.sent ? ' disabled' : '') + '>' + (f.sent ? 'Sent today ✓' : 'Send ❤️') + '</button></li>';
+    }).join('') + '</ul>';
+  }
+  function showLives(mode, data) {
+    const ov = $('livesov'), card = $('livescard'); if (!ov || !card) return;
+    data = data || {};
+    clearInterval(livesTimer);
+    const n = lives(), info = data.info || livesInfo;
+    let html = '';
+    if (mode === 'out') {
+      html = '<div class="lv-big" aria-hidden="true">💔</div><h2>Out of lives</h2>' +
+        '<p>You have used today\'s lives. New lives arrive at midnight (NZ time), or ask the family to send you one.</p>' +
+        '<div class="lv-count"><span>New lives in</span><b id="livescount">' + countdownText(msToNzMidnight()) + '</b></div>' +
+        '<button type="button" class="pri" id="askbtn"' + (info && info.asked ? ' disabled' : '') + '>' + (info && info.asked ? 'Asked today ✓' : '🙏 Ask family for lives') + '</button>' +
+        '<p class="lv-msg" id="livesmsg" aria-live="polite">' + (data.msg || '') + '</p>' +
+        '<button type="button" data-lives="close">Back to map</button>';
+      ov.className = 'ov livesov out';
+    } else if (mode === 'gift') {
+      const from = data.from || [];
+      const who = from.length ? Array.from(new Set(from)).join(' and ') : 'The family';
+      html = '<div class="lv-big gift" aria-hidden="true">💝</div><h2>' + who + (from.length > 1 ? ' sent you lives!' : ' sent you a life!') + '</h2>' +
+        '<p class="lv-plus">+' + (data.claimed || 1) + ' ❤️</p><p>You now have ' + n + (n === 1 ? ' life' : ' lives') + '.</p>' +
+        '<button type="button" class="pri" data-lives="close">Thanks!</button>';
+      ov.className = 'ov livesov gift';
+    } else {
+      html = '<div class="lv-hd"><span class="lv-hearts">' + (n ? '❤️' : '💔') + ' <b>' + n + '</b></span><h2>Lives</h2></div>' +
+        '<p>' + LIVES_PER_DAY + ' lives every day, topped up at midnight. Losing or leaving a level uses one; tutorials and +3 moves never do.</p>' +
+        '<h3>Send a life</h3><p class="lv-sub">One life a day to each family member.</p>' + familyRows(info) +
+        (n ? '' : '<button type="button" class="pri" id="askbtn"' + (info && info.asked ? ' disabled' : '') + '>' + (info && info.asked ? 'Asked today ✓' : '🙏 Ask family for lives') + '</button>') +
+        '<p class="lv-msg" id="livesmsg" aria-live="polite">' + (data.msg || '') + '</p>' +
+        '<button type="button" data-lives="close">Close</button>';
+      ov.className = 'ov livesov send';
+    }
+    card.innerHTML = html;
+    ov.hidden = false;
+    if (mode === 'out') livesTimer = setInterval(function () {
+      const el = $('livescount'); if (!el || ov.hidden) { clearInterval(livesTimer); return; }
+      const ms = msToNzMidnight();
+      el.textContent = countdownText(ms);
+      if (lives() > 0) { clearInterval(livesTimer); ov.hidden = true; paintHearts(); }
+    }, 1000);
+  }
+  async function openLivesPanel() {
+    showLives('send');
+    const S = livesApi(); if (!S) return;
+    try { const info = await S.loadLives(); if (info) { livesInfo = info; if (!$('livesov').hidden && $('livesov').classList.contains('send')) showLives('send'); } } catch (e) { }
+  }
+  async function livesAction(btn) {
+    const msg = function (t) { const el = $('livesmsg'); if (el) el.textContent = t; };
+    if (livesDemo) { msg('Demo: nothing was sent.'); return; }
+    const S = livesApi();
+    if (!S) { msg('Sending and asking need this phone\'s family link.'); return; }
+    btn.disabled = true;
+    if (btn.id === 'askbtn') {
+      const r = await S.postLives({ act: 'ask' });
+      if (r && r.ok) { livesInfo = r; btn.textContent = 'Asked today ✓'; msg('Asked! We told ' + r.told + (r.told === 1 ? ' family member.' : ' family members.')); }
+      else if (r && r.err === 'already asked today') { btn.textContent = 'Asked today ✓'; msg('You already asked today.'); }
+      else { btn.disabled = false; msg('Could not reach the family just now. Try again soon.'); }
+      return;
+    }
+    const r = await S.postLives({ act: 'send', to: btn.dataset.lifeTo });
+    if (r && (r.ok || r.err === 'already sent today')) { if (r.family) livesInfo = r; btn.textContent = 'Sent today ✓'; btn.classList.add('sent'); msg(r.ok ? 'Sent! ' + r.sent + ' gets a life ❤️' : 'Already sent today.'); }
+    else { btn.disabled = false; msg('Could not send just now. Try again soon.'); }
+  }
+  // Test / screenshot helpers: never talk to the family backend.
+  function seedLives(n, info) { livesDemo = true; if (info) livesInfo = info; setLives(n); }
   function memberTag() {
     const me = root.IBScores && root.IBScores.who && root.IBScores.who();
     return (me && me.id) ? ':' + me.id : '';
@@ -3567,6 +3695,7 @@
     doc.body.classList.toggle('hard2', hard === 2);
     hideHardBan();
     if (hard && !opt.tutorial) showHardBan(hard);
+    paintHearts();
     $('lvname').textContent = 'Level ' + n + ' · ' + lv.name + (hard ? ' · ' + (hard === 2 ? 'Super Hard' : 'Hard') : '');
     paintGoalStrip(lv);
     st = newGame(opt.board ? { level: lv, board: fromRows(opt.board) } : { level: lv });
@@ -3778,7 +3907,7 @@
     }) : [];
     if (!racers.some(function (r) { return r.mine; })) racers.push(self);
     else racers = racers.map(function (r) { return r.mine ? Object.assign({}, r, self) : r; });
-    race = { racers: racers, offline: !!offline, mine: self, event: (!offline && data && data.event) || null };
+    race = { racers: racers, offline: !!offline, mine: self, event: raceDemo ? race.event : ((!offline && data && data.event) || null) };
     renderRacers();
     renderRaceBoard();
     renderRaceEvent(true);
@@ -3807,13 +3936,26 @@
       : '🏁 Race on! First to ' + goal + ' wins';
     return '<div class="rb-hd"><b>' + head + '</b>' + (ev.done ? '' : '<em>' + raceTimeLeft(ev) + '</em>') + '</div><ol>' + rows + '</ol>';
   }
+  // In a level: one shared 0-5 track with everyone's icon on it, so the board keeps its room.
+  function raceBarMini(ev) {
+    const goal = ev.goal || RACE_GOAL;
+    const pos = {};
+    const icons = ev.racers.map(function (r) {
+      const ic = raceIcon(r.icon) || RACE_ICONS[0], n = Math.min(goal, r.n), k = pos[n] = (pos[n] || 0) + 1;
+      return '<span class="rm-icon' + (r.mine ? ' mine' : '') + '" style="left:' + (n / goal * 100) + '%;margin-top:' + ((k - 1) * -9) + 'px" title="' + (r.mine ? 'You' : racerFirst(r.name)) + ' ' + n + '/' + goal + '">' + ic.emoji + '</span>';
+    }).join('');
+    const me = ev.racers.find(function (r) { return r.mine; });
+    return '<div class="rm"><b class="rm-l">' + (ev.done ? '🏆' : '🏁') + '</b><span class="rm-track">' +
+      Array.from({ length: goal + 1 }, function (_, k) { return '<i class="rm-tick" style="left:' + (k / goal * 100) + '%"><em>' + k + '</em></i>'; }).join('') + icons +
+      '</span><b class="rm-r">' + (me ? 'You ' + Math.min(goal, me.n) + '/' + goal : '') + '</b></div>';
+  }
   function renderRaceEvent(cards) {
     const ev = race.event;
     ['racebar', 'racebar2'].forEach(function (id) {
       const el = $(id); if (!el) return;
       el.hidden = !ev;
       el.classList.toggle('done', !!(ev && ev.done));
-      el.innerHTML = ev ? raceBarHtml(ev) : '';
+      el.innerHTML = ev ? (id === 'racebar2' ? raceBarMini(ev) : raceBarHtml(ev)) : '';
       el.setAttribute('aria-label', ev ? 'Family race: ' + ev.racers.map(function (r) { return (r.mine ? 'you' : racerFirst(r.name)) + ' ' + r.n + ' of ' + (ev.goal || RACE_GOAL); }).join(', ') : '');
     });
     if (!ev || !cards || screen === 'game') return;
@@ -3860,6 +4002,7 @@
   function seedRaceEvent(ev, opt) {
     raceDemo = true;
     race.event = ev || null;
+    if (ev && opt && opt.quiet) markRace(ev.done ? 'claimed' : 'seen', ev.id);
     renderRaceEvent(!(opt && opt.quiet));
   }
   // Local test / screenshot helper. Never talks to the family backend.
@@ -4078,6 +4221,7 @@
     return { target: target, top: view.scrollTop, left: view.scrollLeft };
   }
   function showMap(opts) {
+    settleLife();
     if (!(opts && opts.keepSong)) stopEnd();
     const wasScreen = screen;
     screen = 'map';
@@ -4094,6 +4238,7 @@
     if (fromGame && !(opts && opts.keepSong)) enterScreen($('map'));
     renderMap(); paintButtons(); paintSpinBtn();
     syncRace(true);
+    paintHearts(); syncLives();
     const scrollTo = opts && opts.scroll != null ? opts.scroll : Math.min(LV_COUNT, Math.max(1, prog.open));
     const behavior = (opts && opts.behavior) || (reduce ? 'auto' : 'smooth');
     const go = function () { scrollMapTo(scrollTo, { behavior: behavior }); };
@@ -4107,6 +4252,9 @@
     showIntro(n);
   }
   function startLevel(n) {
+    // 1.9.222 Lives: settle the level being left, then a level needs a life to start (tutorials never cost one).
+    settleLife();
+    if (lives() <= 0) { tut = null; hideTutUi(); showLives('out'); return; }
     tut = null;
     hideTutUi();
     bootLevel(n);
@@ -4130,6 +4278,7 @@
     sel = null; busy = true; lastAct = now(); hintMove = null; hintOn = false; hideHintHand();
     const A = sprites.get(At.id), Z = sprites.get(Zt.id);
     const res = play(st, a, z);
+    if (res && res.valid && !st.tutorial) st.played = true; // 1.9.222 a real move: leaving now costs a life
     if (A) moveTo(A, z[0], z[1], 160); if (Z) moveTo(Z, a[0], a[1], 160);
     await wait(170);
     if (!res.valid) { if (A) moveTo(A, a[0], a[1], 180); if (Z) moveTo(Z, z[0], z[1], 180); await wait(190); busy = false; return; }
@@ -4454,6 +4603,7 @@
     const took = takeBooster(inv(), 'moves');
     if (!took.ok) return;
     boosts = took.inv; saveBoosts();
+    st.played = true; // Keep going: +3 moves continues this level; no life is used unless it is finally lost or left
     $('end').hidden = true;
     stopEnd();
     st.over = false; st.won = false; st.stars = 0;
@@ -4982,6 +5132,13 @@
   if ($('iconpick')) $('iconpick').addEventListener('click', e => {
     if (e.target === $('iconpick') || (e.target.closest && e.target.closest('[data-iconpick=close]'))) $('iconpick').hidden = true;
   });
+  if ($('livesov')) $('livesov').addEventListener('click', e => {
+    const t = e.target;
+    if (t === $('livesov') || (t.closest && t.closest('[data-lives=close]'))) { $('livesov').hidden = true; clearInterval(livesTimer); if (screen !== 'map') showMap(); return; }
+    const b = t.closest && t.closest('#askbtn, [data-life-to]');
+    if (b && !b.disabled) { unlockAudio(); livesAction(b); }
+  });
+  ['maphearts', 'hearts2'].forEach(id => { if ($(id)) $(id).addEventListener('click', () => { unlockAudio(); if (screen === 'map') openLivesPanel(); else showLives(lives() ? 'send' : 'out'); }); });
   if ($('raceon')) $('raceon').addEventListener('click', e => {
     if (e.target === $('raceon') || e.target === $('raceonbtn')) $('raceon').hidden = true;
   });
@@ -5013,6 +5170,7 @@
 
   root.SugarRush.ui = {
     state: () => st, attempt, hud, paintGoalStrip, showEnd, showMap, scrollMapTo, openLevel, startLevel, showIntro, startTutorial, skipTutorial, finishTutorial, showTutStep, beginLevel, beginGoalFinish, showGoalBanner, celebrateOnMap, progress: () => prog, tutorial: () => tut, crush: () => crush,
+    seedLives, showLives, openLivesPanel, lives: () => lives(), settleLife, msToNzMidnight,
     seedRace, seedRaceEvent, showRaceOn, showRaceResult, racePrize, syncRace, openIconPicker, setRaceOpen, requestCloseSugar, race: () => race,
     say, chime, callout, unlockAudio, audio, showSaying, hideSaying, showMovesWarn, hideMovesWarn, maybeWarn3, showHint, hideHintHand, noteActivity,
     clipsReady: () => Object.keys(VOICE_FILES).every(k => !!bufs[k]),
@@ -5022,6 +5180,8 @@
     view: () => ({ score: st && st.score, moves: st && st.moves, busy, soundOn, musicOn, screen, level: st && st.lv && st.lv.n, acState: ac && ac.state, sparkles: sparkles.length, hold: sparkleHoldT != null, warned3, lastSaying, hintOn, hintMove: hintMove && hintMove.map(function (p) { return p.slice(); }), lastAct, streak: streakPts, streakTier: streakTier(streakPts), boosts: normBoosters(inv()), hammerMode, spinReady: spinReady(), overlay: ovp.length, scene: ($('scene') && $('scene').dataset.n) || '' }),
     useBoost, hammerSmash, keepGoing, openSpin, doSpin, closeSpin, spinReady, addStreak, paintScene, confetti, fireworks, stopOverlay, showCrushBan, hideCrushBan,
     setBoosters(v) { boosts = normBoosters(v); saveBoosts(); paintBoosters(); },
+    // Test / screenshot helper: start a level on a fixed board.
+    bootBoard(n, rows) { tut = null; hideTutUi(); bootLevel(n, { board: rows }); },
     holdOverlay(on) { ovHold = !!on; },
     musicState, playKind, wantKind, playEndSong, stopAllMusic, stopEnd, gameKind, setMusic,
     // Freeze a sparkling board for screenshots (settled pieces, mid-sweep, a few glints at peak).

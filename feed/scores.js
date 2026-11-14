@@ -55,6 +55,17 @@
   const load = game => call('/scores?game=' + encodeURIComponent(game));
   // 1.9.210 Sugar Rush family race (same family token as the scoreboard).
   const loadRace = () => call('/sugar-race');
+  // 1.9.222 Sugar Rush lives: family gifts and asks (the 3-a-day count stays on the phone).
+  const loadLives = () => call('/sugar-lives');
+  async function postLives(data) {
+    const me = who(); if (!me) return null;
+    try {
+      const ctl = root.AbortController ? new AbortController() : null; const tm = ctl && setTimeout(() => ctl.abort(), 7000);
+      const r = await root.fetch(API + '/sugar-lives', { method: 'POST', signal: ctl && ctl.signal, headers: { Authorization: 'Bearer ' + me.tok, 'Content-Type': 'application/json' }, body: JSON.stringify(data || {}) });
+      if (tm) clearTimeout(tm);
+      return await r.json().catch(() => null);
+    } catch (e) { return null; }
+  }
   async function saveRace(data) {
     const me = who(); if (!me) return null;
     try {
@@ -211,5 +222,5 @@
     } catch (e) { return false; }
   }
   clearTetrisScoresOnce207();
-  root.IBScores = { fill, API, who, isShane, submit, load, loadRace, saveRace, open, close, localBests, nzDate, isOpen: () => !!cur, clearShaneLocalBestOnce, clearTetrisScoresOnce207, TETRIS_SCORES_CLEAR_207, personalBests, uniqueBest, leaderRows, html };
+  root.IBScores = { fill, API, who, isShane, submit, load, loadRace, saveRace, loadLives, postLives, open, close, localBests, nzDate, isOpen: () => !!cur, clearShaneLocalBestOnce, clearTetrisScoresOnce207, TETRIS_SCORES_CLEAR_207, personalBests, uniqueBest, leaderRows, html };
 })(typeof window !== 'undefined' ? window : globalThis);
