@@ -6,6 +6,7 @@ import { dailyPoll } from './polls.js';
 import { dailyPrompt, nzDay } from './daily.js';
 import { BANK } from './trivia.js';
 import { EASY } from './trivia_easy.js';
+import { FRIEND_NOTES, shareVisible, sees } from './circle.js'; // 1.9.230 friends
 
 export const VAPID_PUBLIC = 'BGFa-WGEmSF-yZ-9PX6RjtuTc2SK7biQ95mUL--DgXy60LAB9cuWvi5D-Yy2kfZrZ-lNya048_1lv_JR9cKTcoU';
 export const TAGS = { dq: /^dq\d{8}$/ }; // photo-post tags; a '🔨 Reno' tag later is one more line here: reno: /^reno$/
@@ -217,6 +218,7 @@ export class Retain {
      everything else is batched to at most one push per ~30 minutes; quiet hours wait until they're over. */
   async note(mid, type, text, card = '', urgent = false) {
     if (!this.one(`SELECT endpoint FROM subs WHERE mid=?`, mid)) return;
+    if (!FRIEND_NOTES.has(type)) { const r = this.one(`SELECT role FROM members WHERE id=?`, mid); if (!r || r.role === 'friend') return; } // 1.9.230 family notices never go to friends
     const np = this.np(mid); if (!np[type]) return;
     const now = Date.now();
     let due = type === 'reply' ? now : Math.max(now, (np.last || 0) + BATCH_MS);
@@ -250,7 +252,7 @@ export class Retain {
   /* 1.9.8 📅 Sarah's appointments: Shane's phone reads them from My App's own storage and sends only title, date, time and
      place (never notes, costs or claims). Only the one person they belong to (and Shane) can read them. Shane can turn it off. */
   saCfg() { const r = this.one(`SELECT v FROM meta WHERE k='sappt'`); let c = {}; try { c = JSON.parse(r ? r.v : '{}') || {}; } catch (e) { }
-    const on = c.on !== 0, sar = this.all(`SELECT id FROM members WHERE removed=0 AND role!='admin' AND name LIKE 'Sarah%'`).filter(m => m.id);
+    const on = c.on !== 0, sar = this.all(`SELECT id FROM members WHERE removed=0 AND role!='admin' AND role!='friend' AND name LIKE 'Sarah%'`).filter(m => m.id);
     const tm = c.test && this.one(`SELECT id FROM members WHERE id=? AND removed=0 AND name LIKE 'Test %'`, c.test); // a temporary test recipient (admin testing only)
     return { on, mid: tm ? tm.id : sar.length === 1 ? sar[0].id : null, test: tm ? tm.id : null, last: c.last || 0, n: c.n || 0 }; }
   saSave(c) { this.sql.exec(`INSERT INTO meta (k,v) VALUES ('sappt',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v`, JSON.stringify({ on: c.on ? 1 : 0, test: c.test || null, last: c.last || 0, n: c.n || 0 })); }
@@ -284,9 +286,10 @@ export class Retain {
   cbLastVisit(mid) { const r = this.one(`SELECT MAX(day) d FROM visits WHERE mid=?`, mid); return r && r.d ? r.d : null; }
   cbTeaser(m, since, now = Date.now()) {
     const mine = this.all(`SELECT id FROM shares WHERE mid=? AND del=0 AND vis IS NULL AND priv!=1`, m.id).map(r => 'sh' + r.id);
-    const rep = mine.length ? this.all(`SELECT DISTINCT mm.name FROM comments c JOIN members mm ON mm.id=c.mid AND mm.removed=0 WHERE c.del=0 AND c.at>? AND c.mid!=? AND mm.name NOT LIKE 'Test %' AND c.card IN (${mine.map(() => '?').join(',')}) LIMIT 3`, since, m.id, ...mine).map(r => r.name) : [];
-    const ph = (this.one(`SELECT COUNT(*) n FROM shares s JOIN members mm ON mm.id=s.mid AND mm.removed=0 WHERE s.del=0 AND s.vis IS NULL AND s.priv=2 AND s.at>? AND s.mid!=? AND mm.name NOT LIKE 'Test %'`, since, m.id) || {}).n || 0;
-    const posts = (this.one(`SELECT COUNT(*) n FROM shares s JOIN members mm ON mm.id=s.mid AND mm.removed=0 WHERE s.del=0 AND s.vis IS NULL AND s.priv!=1 AND s.at>? AND s.mid!=? AND mm.name NOT LIKE 'Test %'`, since, m.id) || {}).n || 0;
+    // 1.9.230 family names and family posts only (a friend's comment counts on their own host's post)
+    const rep = mine.length ? this.all(`SELECT DISTINCT mm.name FROM comments c JOIN members mm ON mm.id=c.mid AND mm.removed=0 WHERE c.del=0 AND c.at>? AND c.mid!=? AND mm.name NOT LIKE 'Test %' AND (mm.role!='friend' OR mm.host=?) AND c.card IN (${mine.map(() => '?').join(',')}) LIMIT 3`, since, m.id, m.id, ...mine).map(r => r.name) : [];
+    const ph = (this.one(`SELECT COUNT(*) n FROM shares s JOIN members mm ON mm.id=s.mid AND mm.removed=0 WHERE s.del=0 AND s.vis IS NULL AND s.priv=2 AND COALESCE(s.aud,'fam')!='fr' AND mm.role!='friend' AND s.at>? AND s.mid!=? AND mm.name NOT LIKE 'Test %'`, since, m.id) || {}).n || 0;
+    const posts = (this.one(`SELECT COUNT(*) n FROM shares s JOIN members mm ON mm.id=s.mid AND mm.removed=0 WHERE s.del=0 AND s.vis IS NULL AND s.priv!=1 AND COALESCE(s.aud,'fam')!='fr' AND mm.role!='friend' AND s.at>? AND s.mid!=? AND mm.name NOT LIKE 'Test %'`, since, m.id) || {}).n || 0;
     const dp = dailyPrompt(nzDay(now)), first = String(m.name || '').split(' ')[0], bits = [];
     if (rep.length) bits.push(`${rep.length === 1 ? rep[0] : rep.slice(0, -1).join(', ') + ' and ' + rep[rep.length - 1]} commented on your post`);
     if (ph) bits.push(`${ph} family photo${ph === 1 ? '' : 's'} you haven’t seen yet`); else if (posts) bits.push(`${posts} new family post${posts === 1 ? '' : 's'}`);
@@ -298,7 +301,7 @@ export class Retain {
   async comeBack(now = Date.now(), force = null) {
     const hr = nzHour(now); if (!force && (hr < 17 || hr >= 19)) return [];
     const today = dnum(dayKey(now)), out = [];
-    const list = force ? this.all(`SELECT id, name FROM members WHERE id=? AND removed=0`, force) : this.all(`SELECT DISTINCT m.id, m.name FROM members m JOIN subs s ON s.mid=m.id WHERE m.removed=0 AND m.name NOT LIKE 'Test %'`);
+    const list = force ? this.all(`SELECT id, name FROM members WHERE id=? AND removed=0`, force) : this.all(`SELECT DISTINCT m.id, m.name FROM members m JOIN subs s ON s.mid=m.id WHERE m.removed=0 AND m.role!='friend' AND m.name NOT LIKE 'Test %'`);
     for (const m of list) {
       const lv = this.cbLastVisit(m.id); if (!lv) continue; // never joined
       const np = this.np(m.id); if (!np.comeback) continue;
@@ -319,7 +322,7 @@ export class Retain {
     const now = Date.now(), day = dayKey(now), hr = nzHour(now); if (hr >= 19 && hr < 22) await this.streakNudge(now); try { await this.comeBack(now); } catch (e) { } try { await this.wxPoll(now); } catch (e) { } try { await this.npPoll(now); } catch (e) { } try { await this.evNotes(now); } catch (e) { } try { await this.apNotes(now); } catch (e) { } if (hr < 8) return { wait: 1 };
     const done = this.one(`SELECT v FROM meta WHERE k='drop'`); if (done && done.v === day) return { done: day };
     this.sql.exec(`INSERT INTO meta (k,v) VALUES ('drop',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v`, day);
-    const members = this.all(`SELECT id,name FROM members WHERE removed=0`), dp = dailyPrompt(nzDay(now)), pl = dailyPoll(nzDay(now));
+    const members = this.all(`SELECT id,name FROM members WHERE removed=0 AND role!='friend'`), dp = dailyPrompt(nzDay(now)), pl = dailyPoll(nzDay(now));
     for (const m of members) await this.note(m.id, 'daily', '📊 Today’s family poll: ' + pl.q + (dp.type === 'photo' ? ' · 📸 Photo challenge: ' + dp.text : ''), pl.key);
     for (const x of this.upcoming(now)) if (x.days === 0 || x.days === 7) for (const m of members) if (m.id !== x.mid) await this.note(m.id, 'dates', x.days === 0 ? `${x.kind === 'bday' ? '🎂' : '🎉'} Today: ${x.title}!` : `${x.kind === 'bday' ? '🎂' : '📅'} ${x.title} is a week away`, 'date' + x.id);
     await this.carNotes(now);
@@ -462,7 +465,7 @@ export class Retain {
     this.sql.exec(`INSERT INTO meta (k,v) VALUES ('bf191',?) ON CONFLICT(k) DO NOTHING`, String(Date.now()));
   }
   streaks(meId) { // the family streaks card: everyone's current and best streak
-    return this.all(`SELECT id, name FROM members WHERE removed=0`).map(m => { const s = this.streak(m.id); return { mid: m.id, name: m.name, cur: s.cur, best: s.best, today: s.today, me: m.id === meId }; }).sort((a, b) => b.cur - a.cur || b.best - a.best || a.name.localeCompare(b.name));
+    return this.all(`SELECT id, name FROM members WHERE removed=0 AND role!='friend'`).map(m => { const s = this.streak(m.id); return { mid: m.id, name: m.name, cur: s.cur, best: s.best, today: s.today, me: m.id === meId }; }).sort((a, b) => b.cur - a.cur || b.best - a.best || a.name.localeCompare(b.name));
   }
   async streakNudge(now) { // gentle, opt-in: about 7pm NZ, once a day, only if a 2+ day streak would break tonight
     const day = dayKey(now), done = this.one(`SELECT v FROM meta WHERE k='snudge'`); if (done && done.v === day) return;
@@ -518,7 +521,7 @@ export class Retain {
     if (p === '/comeback/test' && m === 'POST') { if (!admin) return J({ err: 'admin only' }, 403); const b = await body(), t = this.one(`SELECT id FROM members WHERE id=? AND removed=0 AND name LIKE 'Test %'`, String(b.mid || '')); if (!t) return J({ err: 'test members only' }, 400); return J({ sent: await this.comeBack(now, t.id), regular: (b.dry ? null : null) }); }
     if (p === '/visit/award' && m === 'POST') { this.sql.exec(`UPDATE sbonus SET shown=1 WHERE mid=?`, me.id); return J({ ok: 1 }); }
     if (p === '/profile') {
-      const id = u.searchParams.get('id') || me.id, who = this.one(`SELECT id,name,pron,pshow FROM members WHERE id=? AND removed=0`, id); if (!who) return J({ err: 'no such member' }, 404);
+      const id = u.searchParams.get('id') || me.id, who = this.one(`SELECT id,name,role,host,pron,pshow FROM members WHERE id=? AND removed=0`, id); if (!who || !sees(me, who) || (me.role === 'friend' && who.id !== me.id)) return J({ err: 'no such member' }, 404); // 1.9.230 friends: their own profile only
       const b = this.badges(id), out = { id: who.id, name: who.name, ...b }; if (id === me.id) { out.pron = who.pron || null; out.pshow = !!who.pshow; } else if (who.pshow && who.pron) out.pron = who.pron; // 1.9.15
       if (id === me.id) out.birthday = this.one(`SELECT id,m,d,y FROM dates WHERE mid=? AND kind='bday' AND del=0`, me.id);
       return J(out);
@@ -533,10 +536,10 @@ export class Retain {
     }
     if (p === '/daily') {
       const dp = dailyPrompt(nzDay(now)), cm = this.all(`SELECT DISTINCT c.mid, m.name FROM comments c JOIN members m ON m.id=c.mid AND m.removed=0 WHERE c.card=? AND c.del=0`, dp.key);
-      const ph = this.all(`SELECT s.id, s.mid, m.name, s.snap, s.at FROM shares s JOIN members m ON m.id=s.mid AND m.removed=0 WHERE s.tag=? AND s.del=0 AND s.vis IS NULL ORDER BY s.at DESC`, dp.key);
+      const ph = this.all(`SELECT s.id, s.mid, m.name, s.snap, s.at FROM shares s JOIN members m ON m.id=s.mid AND m.removed=0 WHERE s.tag=? AND s.del=0 AND s.vis IS NULL AND s.aud IS NULL AND m.role!='friend' ORDER BY s.at DESC`, dp.key);
       const who = new Map(); for (const r of [...cm, ...ph]) who.set(r.mid, r.name);
       // 1.9.20 the photo answers themselves (name, caption, photo ids – pictures still need the member's token to load)
-      const pics = ph.map(r => { let x = {}; try { x = JSON.parse(r.snap || '{}'); } catch (e) { } return { card: 'sh' + r.id, mid: r.mid, name: r.name, me: r.mid === me.id, t: String(x.t || '').slice(0, 300), photos: (x.photos || []).slice(0, 4), at: r.at, likes: this.f.reactsOf ? this.f.reactsOf('sh' + r.id, 'love') : [], nc: (this.one(`SELECT COUNT(*) n FROM comments WHERE card=? AND del=0`, 'sh' + r.id) || {}).n || 0 }; });
+      const pics = ph.map(r => { let x = {}; try { x = JSON.parse(r.snap || '{}'); } catch (e) { } return { card: 'sh' + r.id, mid: r.mid, name: r.name, me: r.mid === me.id, t: String(x.t || '').slice(0, 300), photos: (x.photos || []).slice(0, 4), at: r.at, likes: this.f.reactsOf ? this.f.reactsOf('sh' + r.id, 'love', me) : [], nc: (this.one(`SELECT COUNT(*) n FROM comments WHERE card=? AND del=0`, 'sh' + r.id) || {}).n || 0 }; });
       return J({ ...dp, answered: [...who].map(([mid, name]) => ({ mid, name, me: mid === me.id })), posts: ph.map(r => 'sh' + r.id), pics });
     }
     if (p === '/trivia' && m === 'GET') {
@@ -560,8 +563,8 @@ export class Retain {
       const back = [D(7, 'A week ago'), D(dnum(today) - dnum(monthAgo(today)), 'A month ago'), D(dnum(today) - dnum(String(+today.slice(0, 4) - 1) + today.slice(4)), 'A year ago')];
       for (const [k, lab] of back) {
         const t0 = Date.parse(`${k.slice(0, 4)}-${k.slice(4, 6)}-${k.slice(6, 8)}T00:00:00+13:00`) - 2 * 36e5, t1 = t0 + 864e5 + 4 * 36e5; // that NZ day (± a couple of hours for daylight saving)
-        for (const r of this.all(`SELECT s.id, s.mid, m.name, s.orig, s.snap, s.priv, s.at FROM shares s LEFT JOIN members m ON m.id=s.mid WHERE s.del=0 AND s.priv IN (0,2) AND s.at>=? AND s.at<? ORDER BY s.at LIMIT 6`, t0, t1))
-          if (dayKey(r.at) === k) out.push({ when: lab, day: k, id: r.id, card: r.priv ? 'sh' + r.id : r.orig, name: r.name || 'Former member', snap: JSON.parse(r.snap), up: r.priv === 2, at: r.at });
+        for (const r of this.all(`SELECT s.id, s.mid, m.name, s.orig, s.snap, s.priv, s.at, s.vis, s.aud, s.circ FROM shares s LEFT JOIN members m ON m.id=s.mid WHERE s.del=0 AND s.priv IN (0,2) AND s.at>=? AND s.at<? ORDER BY s.at LIMIT 12`, t0, t1))
+          if (dayKey(r.at) === k && shareVisible(me, r)) /* 1.9.230 */ out.push({ when: lab, day: k, id: r.id, card: r.priv ? 'sh' + r.id : r.orig, name: r.name || 'Former member', snap: JSON.parse(r.snap), up: r.priv === 2, at: r.at });
       }
       return J(out);
     }
@@ -638,7 +641,7 @@ export class Retain {
       if (!admin) return J({ err: 'admin only' }, 403);
       const b = await body(), plate = PLATE(b.plate); if (!plate) return J({ err: 'plate needed' }, 400);
       if (!b.mid) { this.sql.exec(`DELETE FROM carshare WHERE plate=?`, plate); return J({ ok: 1, plate, mid: null }); }
-      const t = this.one(`SELECT id FROM members WHERE id=? AND removed=0 AND role!='admin'`, String(b.mid)); if (!t) return J({ err: 'no such member' }, 404);
+      const t = this.one(`SELECT id FROM members WHERE id=? AND removed=0 AND role!='admin' AND role!='friend'`, String(b.mid)); if (!t) return J({ err: 'no such member' }, 404);
       this.sql.exec(`INSERT INTO carshare (plate,mid,by,at) VALUES (?,?,?,0) ON CONFLICT(plate) DO UPDATE SET mid=excluded.mid`, plate, t.id, me.id);
       this.sql.exec(`DELETE FROM meta WHERE k='relaycars'`); await this.carsFromRelay().catch(() => { });
       return J({ ok: 1, plate, mid: t.id });

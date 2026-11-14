@@ -1668,10 +1668,16 @@ if (live) {
   assert.ok(ex.includes('function textSheet') && ex.includes('function textPost') && ex.includes("fam('/shares/text'"), 'composer posts to /shares/text');
   assert.ok(ex.includes('maxlength="${TX_MAX}"') || ex.includes('maxlength="1000"'), 'composer caps length at 1000');
   assert.ok(ex.includes('TX_MAX = 1000') && ex.includes("unsafe({ t: text })"), 'client uses 1000-char max and the unsafe() filter');
-  assert.ok(ex.includes('Just some people') && ex.includes('name="lkto"'), 'composer reuses the Just for recipient picker');
+  assert.ok(fam.includes('Just some people') && fam.includes('name = \'lkto\'') && ex.includes('${audPicker()}'), 'composer reuses the Just for recipient picker (1.9.230: audPicker in family.js)');
+  // 1.9.230 🤝 friends: audience picker (Family default / Friends / Both), join screen, invites, Shane's People page; the server enforces it
+  assert.ok(fam.includes('value="all" checked> 👨‍👩‍👧 Family') && fam.includes('value="fr"> 🤝 My friends') && fam.includes('value="both"> 🌏 Both'), 'family audience picker, Family first and default');
+  assert.ok(ex.includes("aud: A.aud") && fam.includes("aud: A.aud"), 'text, link and photo posts send the audience');
+  assert.ok(fam.includes("?friend=") && fam.includes("FAM_API + '/join'") && fam.includes("fam('/friends/invite'") && fam.includes("fam('/admin/people'"), 'friend join, invites and People admin wired up');
+  assert.ok(fam.includes("const IS_FRIEND = FAM_ON && MEMBER.role === 'friend'") && ex.includes('if (IS_FRIEND) { try {'), 'friends skip the family-only fetches');
+  assert.ok(wrk.includes("if (isFriend(me) && !friendMay(p, m)) return J({ err: 'not for friends' }, 403)"), 'worker default-denies friends');
   assert.ok(app.includes("i.kind === 'text'") && app.includes('card shared words') && app.includes('wdbody'), 'All/Family card renderer has a words card');
   assert.ok(html.includes('.card.words') && html.includes('.wdbody'), 'words cards have their own soft-card style');
-  assert.ok(wrk.includes("p === '/shares/text'") && wrk.includes('priv,at,vis) VALUES (?,?,?,?,4,?,?)'), 'Worker accepts kind text via POST /shares/text (priv 4)');
+  assert.ok(wrk.includes("p === '/shares/text'") && wrk.includes('priv,at,vis,aud,circ) VALUES (?,?,?,?,4,?,?,?,?)'), 'Worker accepts kind text via POST /shares/text (priv 4)');
   assert.ok(wrk.includes('text: r.priv === 4') && wrk.includes('isUnsafe({ t: text })') && wrk.includes('MAX_TEXT'), 'Worker GET flags text posts and runs the unsafe filter');
   assert.ok(wrk.includes('blockedWhy(text)'), 'Worker also blocks sport and money wording on words posts');
   // Pictures only may drop text cards; the normal All feed and Family tab must still show them

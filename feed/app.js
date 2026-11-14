@@ -7,7 +7,7 @@ const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App 
 const TOPICS = [
   ['all', 'All', '✨', '#7c3aed', '#ec4899'],
   ['life', 'For You', '📌', '#0f766e', '#2563eb'],
-  ['family', 'Family', '💬', '#be185d', '#7c3aed'], // 1.7.0: shared by the family, and what they're talking about (members only)
+  ['family', typeof IS_FRIEND !== 'undefined' && IS_FRIEND ? 'Friends' : 'Family', '💬', '#be185d', '#7c3aed'], // 1.7.0: shared by the family, and what they're talking about (members only)
   ['election', 'Election 2026', '🗳️', '#1d4ed8', '#b91c1c'], // 1.6.0: until election night (7 Nov 2026), then it goes by itself
   ['sitcoms', 'Sitcoms', '😂', '#f59e0b', '#ef4444'],
   ['garden', 'Gardening', '🌱', '#16a34a', '#65a30d'],

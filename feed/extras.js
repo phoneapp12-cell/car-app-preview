@@ -14,6 +14,7 @@ const ICON = '🎂';
 /* ---- load everything (members only), refreshed with the family data ---- */
 async function xLoad(force) {
   if (!FAM_ON || (!force && Date.now() - X.got < 60e3)) return; X.got = Date.now();
+  if (IS_FRIEND) { try { const [prof, push] = await Promise.all([fam('/profile').catch(() => null), fam('/push/prefs').catch(() => null)]); if (prof) X.prof = prof; if (push) X.push = push; if (prof && prof.streak) stChip(prof.streak); } catch (e) { } return; } // 1.9.230 friends: no family cards (the server says no anyway)
   const g = (p, d) => fam(p).catch(() => d);
   const [daily, poll, mems, dates, cars, prof, push, streaks, reno, wx, sap] = await Promise.all([g('/daily', null), g('/poll', null), g('/memories', []), g('/dates', { list: [] }), g('/cars', { cars: [] }), g('/profile', null), g('/push/prefs', null), g('/streaks', { list: [] }), g('/reno', { reno: null }), g('/weather', { list: [] }), g('/sappts', { list: [] })]);
   const pw = await g('/power', { list: [] }); X.pwr = (pw && pw.list) || []; X.pwrAt = (pw && pw.checked) || 0;
@@ -130,8 +131,8 @@ function installBanner(redo) {
   const ANDR = /Android/i.test(navigator.userAgent), tok = MEMBER && MEMBER.tok ? '?invite=' + encodeURIComponent(MEMBER.tok) : '';
   const CHROME = 'intent://' + location.host + location.pathname.replace(/[^/]*$/, '') + tok + '#Intent;scheme=https;package=com.android.chrome;end';
   const body = k === 'inapp' ? `<b>Open Info Book in Chrome or Safari first</b><p>Messenger and Facebook open links in their own little browser, where Info Book can’t be installed or send notifications.</p><ol><li>Tap <b>⋯</b> (top right) → <b>Open in Chrome</b> / <b>Open in Safari</b> – or copy your link and paste it there.</li><li>Then install it from there.</li></ol><div class="xbtns">${ANDR ? `<a class="btn pri" id="instchrome" href="${CHROME}">🌐 Open in Chrome</a>` : ''}<button class="btn${ANDR ? '' : ' pri'}" id="instcopy">📋 Copy my link</button><button class="btn" id="instlater">Later</button></div><small class="sst">Your link keeps you signed in – don’t share it with anyone else.</small>`
-    : k === 'ios' ? `<b>Add Info Book to your Home Screen</b><p>It opens full screen like an app, and can send family notifications.</p><ol class="iost"><li>Tap the <b>Share</b> button ${SHARE_SVG} at the bottom of Safari.</li><li>Scroll down and tap <b>Add to Home Screen</b> <span class="plus">＋</span>.</li><li>Tap <b>Add</b>, then open <b>Info Book</b> from your Home Screen.</li></ol><div class="xbtns"><button class="btn" id="instlater">Later</button></div>`
-    : k === 'android' ? `<b>Install Info Book</b><p>One tap – it goes on your home screen, opens like an app and can send family notifications.</p><div class="xbtns"><button class="btn pri" id="instgo">📲 Install Info Book</button><button class="btn" id="instlater">Later</button></div>`
+    : k === 'ios' ? `<b>Add Info Book to your Home Screen</b><p>It opens full screen like an app, and can send ${typeof IS_FRIEND !== 'undefined' && IS_FRIEND ? 'notifications from your friends' : 'family notifications'}.</p><ol class="iost"><li>Tap the <b>Share</b> button ${SHARE_SVG} at the bottom of Safari.</li><li>Scroll down and tap <b>Add to Home Screen</b> <span class="plus">＋</span>.</li><li>Tap <b>Add</b>, then open <b>Info Book</b> from your Home Screen.</li></ol><div class="xbtns"><button class="btn" id="instlater">Later</button></div>`
+    : k === 'android' ? `<b>Install Info Book</b><p>One tap – it goes on your home screen, opens like an app and can send ${typeof IS_FRIEND !== 'undefined' && IS_FRIEND ? 'notifications from your friends' : 'family notifications'}.</p><div class="xbtns"><button class="btn pri" id="instgo">📲 Install Info Book</button><button class="btn" id="instlater">Later</button></div>`
     : `<b>Install Info Book</b><p>Tap the <b>⋮</b> menu in Chrome → <b>Install app</b> (or <b>Add to Home screen</b>). It then opens like an app and can send notifications.</p><div class="xbtns"><button class="btn" id="instlater">Later</button></div>`;
   const sec = `<section id="instb" class="instb ${k}${POP ? ' instpop' : ''}" role="region" aria-label="Install Info Book"><div class="ic"><img src="icons/icon-192.png" width="44" height="44" alt=""></div><div class="tx">${POP ? '<p class="instwel">👋 Welcome to Info Book!</p>' : ''}${body}</div></section>`;
   if (POP) document.body.insertAdjacentHTML('beforeend', `<div id="instwrap" class="instwrap">${sec}</div>`);
@@ -163,7 +164,7 @@ window.pins = function () {
   // 1.9.98 Shane: power cuts only as tiles in the stories row, never as feed cards
   if (pl.length === 1) out.push({ id: 'pw:' + pl[0].id, x: 'pwr', o: pl[0], topic: 'family', t: 'Planned power cut' });
   else if (pl.length) out.push({ id: 'pw-planned', x: 'pwrl', list: pl.slice(0, 8), topic: 'family', t: 'Planned power cuts' });
-  if (FAM_ON) {
+  if (FAM_ON && !IS_FRIEND) {
     for (const c of X.cars) if (c.car && c.mid === MEMBER.id) out.push({ id: 'car:' + c.plate, x: 'car', c: c.car, at: c.at, topic: 'family' });
     for (const d of X.dates) if (d.days <= (d.kind === 'bday' ? 7 : 14) && !(VOTES['date' + d.id] && VOTES['date' + d.id].v < 0)) out.push({ id: 'date' + d.id + '-' + new Date().getFullYear(), x: 'date', d, topic: 'family', t: (d.kind === 'bday' ? '🎂 ' : '🎉 ') + d.title, sn: 'Family dates' });
     if (X.poll && X.poll.q) out.push({ id: X.poll.key, x: 'poll', p: X.poll, topic: 'family', t: '📊 ' + X.poll.q, sn: 'Family poll' }); // 1.9.63 polls replace trivia
@@ -175,7 +176,7 @@ window.pins = function () {
 const baseDrawFamily = drawFamily;
 window.drawFamily = function () {
   baseDrawFamily();
-  if (!FAM_ON) return;
+  if (!FAM_ON || IS_FRIEND) return;
   const m = $('#feed'), first = m.querySelector('.load');
   const extra = [X.poll && X.poll.q && { id: X.poll.key, x: 'poll', p: X.poll, topic: 'family', t: '📊 ' + X.poll.q, sn: 'Family poll' }, X.daily && X.daily.type === 'photo' && { id: X.daily.key, x: 'daily', q: X.daily, topic: 'family', t: X.daily.text, sn: 'Daily question' }, X.streaks.length && { id: 'streaks', x: 'streaks', topic: 'family' }, ...memItems()].filter(Boolean); order = extra.concat(order);
   if (extra.length && first) { first.insertAdjacentHTML('afterend', extra.map(i => window.card(i)).join('')); fillFamPhotos(); famCounts(extra.filter(i => !i.x || i.x === 'daily')); }
@@ -326,7 +327,7 @@ async function profileSheet(id) {
   $('#sheetin').innerHTML = `<h2>${mine ? 'You' : esc(p.name)}${!mine && p.pron ? ` <small class="prn">${esc(PRON_LABEL[p.pron] || '')}</small>` : ''}</h2>
     <div class="streak"><span class="fl">🔥</span><div><b>${s.cur}-day streak</b><small>Best: ${s.best} · ${s.total} days opened${s.cur ? '' : ' · open Info Book tomorrow to start a new streak'}<br>${s.freezeLeft ? '🧊 Streak freeze ready this week (covers one missed day)' : '🧊 This week’s streak freeze is used'}${s.next ? ` · next milestone ${s.next} days` : ''}</small></div></div>
     <h3>Badges · ${got.length} of ${p.badges.length}</h3><div class="badges">${p.badges.map(b => `<div class="badge${b.got ? ' got' : ''}" title="${esc(b.d)}"><span>${b.e}</span><b>${esc(b.n)}</b><small>${esc(b.d)}</small></div>`).join('')}</div>
-    ${mine ? `<h3>🎂 My birthday (optional)</h3><p class="sst">Shown to the family as a countdown card two weeks before, and a celebration card on the day. The year is optional (it shows the age they turn).</p>
+    ${mine && !IS_FRIEND ? `<h3>🎂 My birthday (optional)</h3><p class="sst">Shown to the family as a countdown card two weeks before, and a celebration card on the day. The year is optional (it shows the age they turn).</p>
     <div class="bdf"><select id="bdd" aria-label="Day">${['<option value="">Day</option>', ...Array.from({ length: 31 }, (_, k) => `<option${bd && bd.d === k + 1 ? ' selected' : ''}>${k + 1}</option>`)].join('')}</select><select id="bdm" aria-label="Month">${['<option value="">Month</option>', ...['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m, k) => `<option value="${k + 1}"${bd && bd.m === k + 1 ? ' selected' : ''}>${m}</option>`)].join('')}</select><input id="bdy" inputmode="numeric" maxlength="4" placeholder="Year" value="${bd && bd.y ? bd.y : ''}" aria-label="Year (optional)"><button class="btn pri" id="bdsave">Save</button>${bd ? `<button class="btn" data-datedel="${bd.id}">Remove</button>` : ''}</div>
     <h3>🗣️ My pronouns (optional)</h3><p class="sst">Only used so the app and Info Bot word things right. Not set = they/them. Nobody sees them unless you turn on showing them.</p>
     <div class="row"><span>Pronouns</span><select id="mypron">${PRON_OPTS.map(([k, l]) => `<option value="${k}"${(p.pron || '') === k ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
@@ -600,7 +601,7 @@ if (FEED && tab === 'all') { try { draw(); } catch (e) { } } // 1.9.30 the first
 const WGR_AREA = /whang[aā]rei|kamo|onerahi|tikipunga|kensington|maunu|morningside|raumanga|otangarei|regent|parahaki|riverside|town basin|hundertwasser|forum north|tutuk[aā]k[aā]|ngunguru|matapouri|ruak[aā]k[aā]|waip[uū]\b|one tree point|marsden|hikurangi|parua bay|pataua|maungakaramea|maungatapere|portland|glenbervie|whareora|whananaki|oakleigh|tamaterau|mckinnon/i;
 const INT = { mine: new Map(), who: {}, got: 0 }, INT_META = {};
 async function intLoad(force) {
-  if (!FAM_ON || (!force && Date.now() - INT.got < 60e3)) return; INT.got = Date.now();
+  if (!FAM_ON || IS_FRIEND || (!force && Date.now() - INT.got < 60e3)) return; INT.got = Date.now();
   try { const r = await fam('/interest'); INT.mine = new Map((r.mine || []).map(x => [x.eid, x])); INT.who = r.who || {}; if ((tab === 'all' && scrollY < 300) || tab === 'family') draw(); } catch (e) { }
 }
 setTimeout(() => intLoad(true), 1200);
@@ -615,7 +616,7 @@ function intLine(id) {
 }
 function intBar(i, ev) { // ⭐ Interested toggle + who's interested (family only)
   const id = String(i.id); INT_META[id] = { id, t: i.t, ev: ev || i.ev || 0, url: i.url || '', img: i.img || '', where: evVenue(i.s) || i.where || '', topic: i.topic || '' };
-  if (!FAM_ON) return '';
+  if (!FAM_ON || IS_FRIEND) return '';
   const on = INT.mine.has(id);
   return `<div class="intbar"><button class="intb${on ? ' on' : ''}" data-int="${esc(id)}" aria-pressed="${on}">${on ? '⭐ Interested' : '☆ Interested'}</button>${intLine(id)}</div>`;
 }
@@ -834,11 +835,11 @@ function textSheet() {
   if (!FAM_ON) { toast('Join the family in Info Book first'); return; }
   const people = (FAM_PEOPLE || []).filter(p => p.id !== MEMBER.id);
   $('#sheet').classList.add('on');
-  $('#sheetin').innerHTML = `<h2>✏️ Write a post</h2><p class="sst">A few words for the family. No photo needed.</p>
+  $('#sheetin').innerHTML = `<h2>✏️ Write a post</h2><p class="sst">A few words for ${famWord()}. No photo needed.</p>
     <textarea id="txbody" rows="6" maxlength="${TX_MAX}" placeholder="What’s on your mind?" aria-label="Your post"></textarea>
     <p class="sst" id="txlen"><span id="txcc">0</span> / ${TX_MAX}</p>
-    <h3>Who sees it?</h3><div class="lkto"><label><input type="radio" name="lkto" value="all" checked> 👨‍👩‍👧 The whole family</label><label><input type="radio" name="lkto" value="some"> 🔒 Just some people</label></div>
-    <div id="lkppl" class="sgx" hidden>${people.map(p => `<button class="chip" data-lkp="${esc(p.id)}">${esc(p.name)}</button>`).join('') || '<p class="sst">Nobody else has joined yet.</p>'}</div>
+    ${audPicker()}
+    <div id="lkppl" class="sgx" hidden>${people.map(p => `<button class="chip" data-lkp="${esc(p.id)}">${p.friend && !IS_FRIEND ? '🤝 ' : ''}${esc(p.name)}</button>`).join('') || '<p class="sst">Nobody else has joined yet.</p>'}</div>
     <div class="xbtns"><button class="btn pri" id="txpost" disabled>Post</button><button class="btn" data-close>Cancel</button></div>`;
   const ta = $('#txbody'); if (ta) setTimeout(() => ta.focus(), 50);
   txReady();
@@ -855,12 +856,12 @@ async function textPost() {
   if (!text) { toast('Write a few words first'); return; }
   if (text.length > TX_MAX) { toast('Keep it under ' + TX_MAX + ' characters'); return; }
   if (typeof unsafe === 'function' && unsafe({ t: text })) { toast('Please keep it family-friendly'); return; }
-  const some = (document.querySelector('input[name="lkto"]:checked') || {}).value === 'some', to = some ? [...document.querySelectorAll('[data-lkp].on')].map(b => b.dataset.lkp) : [];
+  const A = audRead(), some = A.some, to = some ? [...document.querySelectorAll('[data-lkp].on')].map(b => b.dataset.lkp) : [];
   if (some && !to.length) { toast('Pick who should see it'); return; }
   const btn = $('#txpost'); btn.disabled = true; btn.textContent = 'Posting…';
   try {
-    await fam('/shares/text', { method: 'POST', body: JSON.stringify({ text, to }) });
-    $('#sheet').classList.remove('on'); toast(some ? '🔒 Posted for ' + to.length + (to.length === 1 ? ' person' : ' people') : '✏️ Posted to the family');
+    await fam('/shares/text', { method: 'POST', body: JSON.stringify({ text, to, ...(A.aud && !some ? { aud: A.aud } : {}) }) });
+    $('#sheet').classList.remove('on'); toast(some ? '🔒 Posted for ' + to.length + (to.length === 1 ? ' person' : ' people') : '✏️ Posted to ' + A.who);
     await loadShares(); if (typeof tab !== 'undefined' && tab !== 'family') { const b = document.querySelector('[data-tab="family"]'); if (b) b.click(); }
   } catch (e) { btn.disabled = false; btn.textContent = 'Post'; toast(e.message); }
 }
@@ -877,8 +878,8 @@ function linkSheet(pre) {
     <div class="lkin"><textarea id="lkurl" rows="2" placeholder="Paste a link…" aria-label="Link to share">${esc(pre || '')}</textarea>${navigator.clipboard && navigator.clipboard.readText ? '<button class="btn" id="lkpaste">📋 Paste</button>' : ''}</div>
     <div id="lkpv" class="lkpv"></div>
     <textarea id="lkcap" rows="2" maxlength="300" placeholder="Say something about it (optional)" aria-label="Your comment"></textarea>
-    <h3>Who sees it?</h3><div class="lkto"><label><input type="radio" name="lkto" value="all" checked> 👨‍👩‍👧 The whole family</label><label><input type="radio" name="lkto" value="some"> 🔒 Just some people</label></div>
-    <div id="lkppl" class="sgx" hidden>${people.map(p => `<button class="chip" data-lkp="${esc(p.id)}">${esc(p.name)}</button>`).join('') || '<p class="sst">Nobody else has joined yet.</p>'}</div>
+    ${audPicker()}
+    <div id="lkppl" class="sgx" hidden>${people.map(p => `<button class="chip" data-lkp="${esc(p.id)}">${p.friend && !IS_FRIEND ? '🤝 ' : ''}${esc(p.name)}</button>`).join('') || '<p class="sst">Nobody else has joined yet.</p>'}</div>
     <div class="xbtns"><button class="btn pri" id="lkpost" disabled>Share</button><button class="btn" data-close>Cancel</button></div>`;
   if (pre) linkPreview();
 }
@@ -925,13 +926,13 @@ function lkMine() {
 }
 async function linkPost() {
   if (!LS || !LS.pv) return;
-  const some = (document.querySelector('input[name="lkto"]:checked') || {}).value === 'some', to = some ? [...document.querySelectorAll('[data-lkp].on')].map(b => b.dataset.lkp) : [];
+  const A = audRead(), some = A.some, to = some ? [...document.querySelectorAll('[data-lkp].on')].map(b => b.dataset.lkp) : [];
   if (some && !to.length) { toast('Pick who should see it'); return; }
   const d = (($('#lkdesc') || {}).value || '').trim();
   const btn = $('#lkpost'); btn.disabled = true; btn.textContent = 'Sharing…';
   try {
-    const r = await fam('/shares/link', { method: 'POST', body: JSON.stringify({ url: LS.pv.url, caption: ($('#lkcap') || {}).value || '', desc: d === (LS.pv.desc || '') ? '' : d, img: LS.photo ? '' : LS.img, photo: LS.photo || 0, to }) });
-    $('#sheet').classList.remove('on'); toast(r.dup ? 'You shared that one already' : some ? '🔒 Shared with ' + to.length + (to.length === 1 ? ' person' : ' people') : '🔗 Shared with the family');
+    const r = await fam('/shares/link', { method: 'POST', body: JSON.stringify({ url: LS.pv.url, caption: ($('#lkcap') || {}).value || '', desc: d === (LS.pv.desc || '') ? '' : d, img: LS.photo ? '' : LS.img, photo: LS.photo || 0, to, ...(A.aud && !some ? { aud: A.aud } : {}) }) });
+    $('#sheet').classList.remove('on'); toast(r.dup ? 'You shared that one already' : some ? '🔒 Shared with ' + to.length + (to.length === 1 ? ' person' : ' people') : '🔗 Shared with ' + A.who);
     await loadShares(); if (typeof tab !== 'undefined' && tab !== 'family') { const b = document.querySelector('[data-tab="family"]'); if (b) b.click(); }
   } catch (e) { btn.disabled = false; btn.textContent = 'Share'; toast(e.message); lkReady(); }
 }

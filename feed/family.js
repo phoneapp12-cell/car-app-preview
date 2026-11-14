@@ -20,9 +20,15 @@ function mine(cap) { const n = myName(); return n ? n + '’s' : (cap ? 'Your' :
   }
   if (inv) { try { sessionStorage.setItem('ibFromInvite', '1'); } catch (e) { } } // 1.9.104 opened from an invite link: install pop-up straight away
   if (inv) { q.delete('invite'); history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash); }
+  // 1.9.230 ?friend=… : a one-time friend invite (kept for this visit only, then the join screen asks for their name)
+  const fr = q.get('friend');
+  if (fr && /^[\w-]{30,80}$/.test(fr)) { try { sessionStorage.setItem('ibFriendCode', fr); } catch (e) { } }
+  if (fr) { q.delete('friend'); history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash); }
 })();
 const FAM_ON = !!(MEMBER && MEMBER.id && !MEMBER.pending);
 const IS_ADMIN = FAM_ON && MEMBER.role === 'admin';
+const IS_FRIEND = FAM_ON && MEMBER.role === 'friend'; // 1.9.230 a friend: sees their friends circle, never the family's things
+const famWord = () => IS_FRIEND ? 'your friends' : 'the family';
 // Shane's own My App things are only read when this phone is his: no family member set up (as before 1.7.0) or his admin link.
 const PRIVATE_OK = !MEMBER || IS_ADMIN;
 const LS_PREFIX = MEMBER && MEMBER.id && MEMBER.role !== 'admin' ? 'mf.m.' + MEMBER.id + '.' : 'mf.';
@@ -46,11 +52,14 @@ const canShareLife = x => IS_ADMIN && x && SHARE_BOARDS.has(x.cat) && !LIFE_MONE
 
 /* ---- start-up ---- */
 async function famInit() {
+  let fcode = ''; try { fcode = sessionStorage.getItem('ibFriendCode') || ''; } catch (e) { }
+  if (fcode && !MEMBER) { joinSheet(fcode); return; } // 1.9.230 a friend invite
+  if (fcode && MEMBER) { try { sessionStorage.removeItem('ibFriendCode'); } catch (e) { } setTimeout(() => toast('Info Book is already set up on this phone'), 1500); }
   if (!MEMBER) { if (STANDALONE && !ls.get('noLink', false)) pasteLink(); return; }
   if (MEMBER.pending) {
     try {
       const me = await fam('/me');
-      const next = { tok: MEMBER.tok, id: me.id, name: me.name, role: me.role };
+      const next = { tok: MEMBER.tok, id: me.id, name: me.name, role: me.role, ...(me.friend ? { host: me.host || '' } : {}) };
       localStorage.setItem('mf.member', JSON.stringify(next));
       // 1.9.82: only one pending→ready reload per token (avoids open-time restart loops)
       const key = 'ibPendRel:' + MEMBER.tok.slice(0, 12);
@@ -98,7 +107,7 @@ function onboarding() {
   const sel = new Set(PICK || [...DEFAULT_ON, ...ls.get('addsPre', [])]);
   $('#sheetin').innerHTML = `<h2>Kia ora ${esc(MEMBER.name)} 👋</h2>
     <p>This is your own Info Book: photos, videos and stories from public sources, picked for you. Tap what you’re into (you can change it any time in ⚙️). Your 👍 and 👎 only change your own feed.</p>
-    <p>💬 You can comment on posts and 🔁 share them with the family. Only people Shane has invited can see those.</p>
+    <p>${IS_FRIEND ? `💬 You can comment on posts and share with your friends circle: ${esc(MEMBER.host || 'the person who invited you')} and their friends. Only they can see those.` : '💬 You can comment on posts and 🔁 share them with the family. Only people Shane has invited can see those.'}</p>
     <div class="obg">${list.map(t => `<button class="obt${sel.has(t[0]) ? ' on' : ''}" data-pick="${t[0]}" style="--c1:${t[3]};--c2:${t[4]}"><span>${t[2]}</span>${esc(t[1])}</button>`).join('')}</div>
     <p class="mute" style="font-size:.85rem">No sport, no bills or money stuff. Ever.</p>
     <button class="btn pri" id="obgo">Start my feed</button>${installBox()}`;
@@ -141,7 +150,7 @@ function drawFamily() {
   const m = $('#feed'), sh = sharesFor('family');
   setTimeout(() => { if (tab === 'family') { ls.set('likeSeen', Date.now()); document.querySelectorAll('.chip[data-tab="family"] .dot').forEach(d => d.remove()); } }, 2500);
   order = sh; shown = 0;
-  m.innerHTML = `<div class="upbs"><button class="btn pri upb" data-upload>📷 Share a photo</button><button class="btn pri upb" data-sharelink>🔗 Share a link</button><button class="btn pri upb" data-sharetext>✏️ Write a post</button></div><div class="load" style="padding-top:0">💬 Shared in the family · only people Shane invited can see this</div>` + (sh.length ? '' : '<div class="empty">Nothing shared yet. Write a post, share a photo, or tap 🔁 on any post to share it with the family.</div>');
+  m.innerHTML = `<div class="upbs"><button class="btn pri upb" data-upload>📷 Share a photo</button><button class="btn pri upb" data-sharelink>🔗 Share a link</button><button class="btn pri upb" data-sharetext>✏️ Write a post</button></div><div class="load" style="padding-top:0">${IS_FRIEND ? `🤝 Shared in your friends circle · only ${esc(MEMBER.host || 'your host')} and their friends can see this` : '💬 Shared in the family · only people Shane invited can see this'}</div>` + (sh.length ? '' : `<div class="empty">Nothing shared yet. Write a post, share a photo, or tap 🔁 on any post to share it with ${famWord()}.</div>`);
   more();
   fam('/recent').then(r => { // cards people have talked about, that aren't reposts
     const have = new Set(sh.map(i => i.id)), talk = r.filter(x => !have.has(x.card) && x.snap && x.snap.t).slice(0, 20).map(x => ({ id: x.card, ...x.snap, kind: x.snap.img ? 'photo' : 'news', at: x.last, topic: TOPIC[x.snap.topic] ? x.snap.topic : 'family' }));
@@ -163,9 +172,9 @@ async function shareCard(id, isLife) {
     const i = order.find(x => x.id === id) || (FEED.items || []).find(x => x.id === id); if (!isPublicCard(i)) { toast('That one stays private'); return; }
     snap = { t: i.t, s: i.s, url: i.url, img: i.img, vid: i.vid, sn: i.sn, topic: i.topic, src: i.src, kind: i.kind, ev: i.ev };
   }
-  const caption = prompt('Add a short note for the family? (optional)', '');
+  const caption = prompt('Add a short note for ' + famWord() + '? (optional)', '');
   if (caption === null) return;
-  try { const r = await fam('/shares', { method: 'POST', body: JSON.stringify({ orig: id, priv, snap, caption }) }); toast(r.dup ? 'Already shared' : '🔁 Shared with the family'); await loadShares(); }
+  try { const r = await fam('/shares', { method: 'POST', body: JSON.stringify({ orig: id, priv, snap, caption }) }); toast(r.dup ? 'Already shared' : '🔁 Shared with ' + famWord()); await loadShares(); }
   catch (e) { toast(e.message); }
 }
 async function unshare(sid, up, text) {
@@ -181,8 +190,14 @@ function famBar(i) {
   return lk + `<button class="fb" data-cmt="${esc(i.id)}" aria-label="Comments">💬<span class="cc">${n || ''}</span>${fresh ? '<i class="dot"></i>' : ''}</button>${i.kind === 'upload' || i.kind === 'text' || (i._share && (i._share.link || i._share.text)) ? '' : `<button class="fb" data-share="${esc(i.id)}" aria-label="Share with the family">🔁</button>`}`;
 }
 function famLifeBar(x) { return canShareLife(x) ? `<button class="fb" data-share-life="${esc(x.id)}" aria-label="Share with the family">🔁</button>` : ''; }
+function audBadge(s) { // 1.9.230 who a post is for, and a friend's posts marked as such
+  const a = s.aud === 'fr' ? '🤝 Friends' : s.aud === 'both' ? '👨‍👩‍👧 + 🤝 Family & friends' : '';
+  return (s.friend && !IS_FRIEND && !s.mine ? '<small class="shaud fr">🤝 Friend</small>' : '') + (a && !IS_FRIEND ? `<small class="shaud">${a}</small>` : '');
+}
 function shareHead(i) {
   const s = i._share; if (!s) return '';
+  const h = shareHead0(i, s); return h.replace('</div>', audBadge(s) + '</div>'); }
+function shareHead0(i, s) {
   if (s.up) return `<div class="shby">📷 Photo from <b>${esc(s.name)}</b> · ${esc(nzTime(s.at))}${s.mine || IS_ADMIN ? `<button class="mini" data-unshare="${s.id}" data-up="1">Delete</button>` : ''}</div>`;
   if (s.text || i.kind === 'text') {
     const del = s.mine || IS_ADMIN ? `<button class="mini" data-unshare="${s.id}" data-text="1">Delete</button>` : '';
@@ -313,18 +328,99 @@ function pasteLink() { // an installed app with no family link yet (an iPhone Ho
 function famSettings() {
   const inst = installBox();
   if (!FAM_ON) return inst;
-  if (!IS_ADMIN) return `<h2 style="margin-top:4px">👪 Family</h2><p>You’re in Shane’s private family network as <b>${esc(MEMBER.name)}</b>. Comments and shares are only seen by the family.</p>
+  if (IS_FRIEND) return `<h2 style="margin-top:4px">🤝 Friends</h2><p>You’re in Info Book as <b>${esc(MEMBER.name)}</b>, a friend of ${esc(MEMBER.host || 'the person who invited you')}. Your posts, comments and games are shared with your friends circle: ${esc(MEMBER.host || 'them')} and their other friends. Family posts stay private to the family.</p>
+    <div id="frlist" class="famlist">Loading…</div>
     <button class="btn pri" data-upload>📷 Share a photo</button> <button class="btn" id="obre">Change what I’m into</button><button class="btn" id="famleave">Leave on this phone</button>` + inst;
+  if (!IS_ADMIN) return `<h2 style="margin-top:4px">👪 Family</h2><p>You’re in Shane’s private family network as <b>${esc(MEMBER.name)}</b>. Comments and shares are only seen by the family.</p>
+    <button class="btn pri" data-upload>📷 Share a photo</button> <button class="btn" id="obre">Change what I’m into</button><button class="btn" id="famleave">Leave on this phone</button>` + friendsBox() + inst;
   return `<h2 style="margin-top:4px">👪 Family</h2><p>Invite people to their own Info Book. Each gets a private link: it opens their own feed (their own interests, nothing of yours) and lets them comment and share with the family. Making a new link stops the old one.</p>
     <div id="famlist" class="famlist">Loading…</div>
     <div class="famadd"><input id="famname" maxlength="40" placeholder="Name, e.g. Aranea" aria-label="Name"><button class="btn pri" id="famaddb">Add & make link</button></div>
-    <div id="famlink"></div><p><button class="btn pri" data-upload>📷 Share a photo</button></p><p class="sst">Family photos are kept privately in the data service (only people with a link can see them), shrunk on the phone and with location data removed. You and whoever posted a photo can delete it.</p>` + inst;
+    <div id="famlink"></div><p><button class="btn pri" data-upload>📷 Share a photo</button></p><p class="sst">Family photos are kept privately in the data service (only people with a link can see them), shrunk on the phone and with location data removed. You and whoever posted a photo can delete it.</p>` + friendsBox() + inst;
 }
+/* ---- 1.9.230 🤝 Friends: any family member invites friends (one-time link, 7 days). Friends see their own circle (the
+   person who invited them and that person's other friends), never family posts, names or family cards. The server
+   enforces all of it. Shane has 👥 People: everyone, their group, joined and last seen, and Remove. ---- */
+function friendsBox() {
+  return `<h2 style="margin-top:18px">🤝 Friends</h2><p>Invite a friend to their own Info Book. They see posts you send to <b>Friends</b> or <b>Both</b>, and can play games with you and your other friends. They never see family posts, family members or family cards.</p>
+    <div class="famadd"><input id="frname" maxlength="40" placeholder="Their name (just for you), e.g. Jo" aria-label="Friend’s name"><button class="btn pri" id="frinv">Make invite link</button></div>
+    <div id="frlink"></div><div id="frlist" class="famlist">Loading…</div>${typeof IS_SHANE !== 'undefined' && IS_SHANE() ? '<p><button class="btn pri" id="ppl">👥 People: everyone in Info Book</button></p>' : ''}`;
+}
+const IS_SHANE = () => IS_ADMIN && (/\bShane\b/i.test(MEMBER.name || '') || !!MEMBER.shane);
+const shortDay = ms => ms ? new Date(ms).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Pacific/Auckland' }) : '';
+async function frList() {
+  const el = $('#frlist'); if (!el) return;
+  try {
+    const r = await fam('/friends');
+    if (r.friend) { el.innerHTML = `<div class="row"><span>🏠 ${esc((r.host || {}).name || 'Your host')}<small class="sst">invited you</small></span><span></span></div>` + (r.circle || []).map(x => `<div class="row"><span>🤝 ${esc(x.name)}<small class="sst">friend since ${esc(shortDay(x.created))}</small></span><span></span></div>`).join('') || ''; return; }
+    el.innerHTML = (r.friends || []).map(x => `<div class="row"><span>🤝 ${esc(x.name)}<small class="sst">joined ${esc(shortDay(x.created))} · ${x.seen ? 'last here ' + esc(ago(x.seen)) + ' ago' : 'not back yet'}</small></span><span></span></div>`).join('')
+      + (r.invites || []).map(x => `<div class="row"><span>✉️ ${esc(x.label || 'Invite')}<small class="sst">waiting · link works until ${esc(shortDay(x.exp))}</small></span><span><button class="mini" data-frrev="${esc(x.id)}">Cancel</button></span></div>`).join('')
+      || '<p class="sst">No friends yet.</p>';
+  } catch (e) { el.textContent = e.message; }
+}
+function inviteLink(code) { return location.origin + location.pathname.replace(/[^/]*$/, '') + '?friend=' + code; }
+function showInvite(r) {
+  const link = inviteLink(r.code), who = r.label || 'your friend';
+  $('#frlink').innerHTML = `<div class="famlnk"><b>Invite link${r.label ? ' for ' + esc(r.label) : ''}</b><p>Send it to ${esc(who)} yourself. It works once and stops working on ${esc(shortDay(r.exp))}.</p><input readonly value="${esc(link)}" aria-label="Invite link"><button class="btn pri" data-copy="${esc(link)}">Copy link</button>${navigator.share ? ` <button class="btn" data-frshare="${esc(link)}">Share…</button>` : ''}</div>`;
+}
+function audPicker(name = 'lkto', some = true) { // who sees a post: Family (default), Friends, Both, or chosen people
+  const mine = (FAM_PEOPLE || []).filter(p => p.mine).length;
+  if (IS_FRIEND) return `<h3>Who sees it?</h3><div class="lkto"><label><input type="radio" name="${name}" value="fr" checked> 🤝 My friends circle</label>${some ? `<label><input type="radio" name="${name}" value="some"> 🔒 Just some people</label>` : ''}</div>`;
+  return `<h3>Who sees it?</h3><div class="lkto aud3"><label><input type="radio" name="${name}" value="all" checked> 👨‍👩‍👧 Family</label><label><input type="radio" name="${name}" value="fr"> 🤝 My friends</label><label><input type="radio" name="${name}" value="both"> 🌏 Both</label>${some ? `<label><input type="radio" name="${name}" value="some"> 🔒 Just some people</label>` : ''}</div>`
+    + `<p class="sst audh">${mine ? `Friends means your ${mine} friend${mine === 1 ? '' : 's'}. Family never see posts sent only to friends.` : 'You haven’t invited any friends yet (⚙️ → Friends), so Friends and Both reach just the family for now.'}</p>`;
+}
+function audRead(name = 'lkto') {
+  const v = (document.querySelector(`input[name="${name}"]:checked`) || {}).value || (IS_FRIEND ? 'fr' : 'all');
+  if (IS_FRIEND) return { some: v === 'some', aud: null, who: v === 'some' ? 'the people you picked' : 'your friends' };
+  return { some: v === 'some', aud: v === 'fr' ? 'fr' : v === 'both' ? 'both' : null, who: v === 'fr' ? 'your friends' : v === 'both' ? 'family and friends' : v === 'some' ? 'the people you picked' : 'the family' };
+}
+async function joinSheet(code) {
+  $('#sheet').classList.add('on', 'ob'); $('#sheetin').innerHTML = '<h2>Kia ora 👋</h2><p>Checking your invite…</p>';
+  let info = null; try { const r = await fetch(FAM_API + '/join?code=' + encodeURIComponent(code)); info = await r.json(); } catch (e) { info = { err: 'Couldn’t reach Info Book. Check your connection and open the link again.' }; }
+  if (!info || !info.ok) { try { sessionStorage.removeItem('ibFriendCode'); } catch (e) { } $('#sheetin').innerHTML = `<h2>Kia ora 👋</h2><p>${esc((info && info.err) || 'This invite link has expired or been used. Ask for a new one.')}</p><button class="btn" id="jclose">OK</button>`; return; }
+  $('#sheetin').innerHTML = `<h2>Kia ora 👋</h2><p><b>${esc(info.host)}</b> has invited you to Info Book as a friend.</p>
+    <p>You get your own feed of photos, videos and stories from public sources, plus posts and games (Tetris, Scrabble and Sugar Rush) with ${esc(info.host)} and their other friends. No sport, no bills or money stuff.</p>
+    <label class="sst" for="jname">Your name (shown to ${esc(info.host)} and their friends)</label><input id="jname" class="plink" maxlength="40" autocomplete="name" placeholder="Your name">
+    <button class="btn pri" id="jgo" data-code="${esc(code)}">Join Info Book</button><p class="sst">This link works once.</p>`;
+  setTimeout(() => { const i = $('#jname'); if (i) i.focus(); }, 60);
+}
+async function joinGo(b) {
+  const name = (($('#jname') || {}).value || '').trim(); if (!name) { toast('Type your name first'); return; }
+  b.disabled = true; b.textContent = 'Joining…';
+  try {
+    const r = await fetch(FAM_API + '/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: b.dataset.code, name }) });
+    const j = await r.json().catch(() => ({})); if (!r.ok || !j.token) throw new Error(j.err || 'That didn’t work – try again');
+    try { sessionStorage.removeItem('ibFriendCode'); sessionStorage.setItem('ibFromInvite', '1'); } catch (e) { }
+    localStorage.setItem('mf.member', JSON.stringify({ tok: j.token, pending: 1 })); location.reload();
+  } catch (e) { b.disabled = false; b.textContent = 'Join Info Book'; toast(e.message); }
+}
+async function peopleSheet() { // Shane only (the server checks too)
+  $('#sheet').classList.add('on'); $('#sheetin').innerHTML = '<h2>👥 People</h2><p>Loading…</p>';
+  let r; try { r = await fam('/admin/people'); } catch (e) { $('#sheetin').innerHTML = `<h2>👥 People</h2><p>${esc(e.message)}</p><button class="btn" data-close>Close</button>`; return; }
+  const P = r.people || [], fam0 = P.filter(p => p.group === 'family'), fr = P.filter(p => p.group === 'friend');
+  const row = p => `<div class="row pplr"><span>${p.group === 'family' ? (p.admin ? '⭐' : '👤') : '🤝'} <b>${esc(p.name)}</b><small class="sst">${p.group === 'family' ? 'Family' : 'Friend of ' + esc(p.host ? p.host.name : '?') + (p.host && p.host.removed ? ' (removed)' : '')} · joined ${esc(shortDay(p.joined))} · ${p.me ? 'you' : p.seen ? 'last seen ' + esc(ago(p.seen)) + ' ago' : 'not seen yet'}</small></span><span>${p.me ? '' : `<button class="mini warn" data-pplrm="${esc(p.id)}" data-n="${esc(p.name)}" data-g="${p.group}">Remove</button>`}</span></div>`;
+  $('#sheetin').innerHTML = `<h2>👥 People</h2><p class="sst">Everyone in Info Book and which group they’re in. Only you can see this page. Remove takes someone out straight away: their link stops working${fr.length ? ', and a friend’s posts and comments are hidden' : ''}.</p>
+    <h3>👨‍👩‍👧 Family · ${fam0.length}</h3><div class="famlist">${fam0.map(row).join('')}</div>
+    <h3>🤝 Friends · ${fr.length}</h3><div class="famlist">${fr.map(row).join('') || '<p class="sst">No friends yet.</p>'}</div>
+    <h3>✉️ Invites waiting · ${(r.invites || []).length}</h3><div class="famlist">${(r.invites || []).map(x => `<div class="row"><span>✉️ ${esc(x.label || 'Invite')}<small class="sst">from ${esc(x.host)} · works until ${esc(shortDay(x.exp))}</small></span><span><button class="mini" data-frrev="${esc(x.id)}" data-ppl="1">Revoke</button></span></div>`).join('') || '<p class="sst">None.</p>'}</div>
+    <button class="btn" data-close>Close</button>`;
+}
+document.addEventListener('click', async e => {
+  const t = e.target; if (!t || !t.closest) return;
+  if (t.id === 'jgo') { e.stopPropagation(); joinGo(t); return; }
+  if (t.id === 'jclose') { $('#sheet').classList.remove('on', 'ob'); return; }
+  if (t.id === 'frinv') { const n = ($('#frname') || {}).value || ''; t.disabled = true; try { const r = await fam('/friends/invite', { method: 'POST', body: JSON.stringify({ name: n.trim() }) }); $('#frname').value = ''; showInvite(r); frList(); } catch (er) { toast(er.message); } t.disabled = false; return; }
+  const fs = t.closest('[data-frshare]'); if (fs) { try { await navigator.share({ title: 'Info Book', text: 'Join me on Info Book', url: fs.dataset.frshare }); } catch (er) { } return; }
+  const rv = t.closest('[data-frrev]'); if (rv) { if (!confirm('Cancel this invite? The link stops working.')) return; try { await fam('/friends/invite/' + rv.dataset.frrev, { method: 'DELETE' }); toast('Invite cancelled'); if (rv.dataset.ppl) peopleSheet(); else frList(); } catch (er) { toast(er.message); } return; }
+  if (t.id === 'ppl') { peopleSheet(); return; }
+  const rm = t.closest('[data-pplrm]'); if (rm) { if (!confirm(`Remove ${rm.dataset.n} from Info Book? Their link stops working straight away${rm.dataset.g === 'friend' ? ' and their posts and comments are hidden' : ''}. This can’t be undone.`)) return; try { await fam('/admin/people/' + rm.dataset.pplrm, { method: 'DELETE' }); toast(rm.dataset.n + ' removed'); peopleSheet(); } catch (er) { toast(er.message); } return; }
+});
 async function famList() {
+  frList(); // 1.9.230
   const el = $('#famlist'); if (!el) return;
   try {
     const list = await fam('/members');
-    el.innerHTML = list.map(x => `<div class="row"><span>${x.role === 'admin' ? '⭐' : '👤'} ${esc(x.name)}<small class="sst">${x.role === 'admin' ? 'you · admin' : x.seen ? 'last here ' + esc(ago(x.seen)) + ' ago' : 'hasn’t opened it yet'}</small></span><span>${x.role === 'admin' ? '' : `<button class="mini" data-famtok="${x.id}" data-n="${esc(x.name)}">New link</button> <button class="mini" data-famdel="${x.id}" data-n="${esc(x.name)}">Remove</button>`}</span></div>`).join('');
+    el.innerHTML = list.filter(x => x.role !== 'friend').map(x => `<div class="row"><span>${x.role === 'admin' ? '⭐' : '👤'} ${esc(x.name)}<small class="sst">${x.role === 'admin' ? 'you · admin' : x.seen ? 'last here ' + esc(ago(x.seen)) + ' ago' : 'hasn’t opened it yet'}</small></span><span>${x.role === 'admin' ? '' : `<button class="mini" data-famtok="${x.id}" data-n="${esc(x.name)}">New link</button> <button class="mini" data-famdel="${x.id}" data-n="${esc(x.name)}">Remove</button>`}</span></div>`).join('');
   } catch (e) { el.textContent = e.message; }
 }
 function showLink(name, token) {
@@ -406,9 +502,10 @@ async function prepPhotos(files) {
   if (!files.length) return;
   document.querySelector('#upbox')?.remove();
   const box = document.createElement('div'); box.id = 'upbox'; box.className = 'upbox';
-  box.innerHTML = `<div class="upin"><h2>📷 Share with the family</h2><div class="upth">Getting your photos ready…</div>
+  box.innerHTML = `<div class="upin"><h2>📷 Share ${IS_FRIEND ? 'with your friends' : 'a photo'}</h2><div class="upth">Getting your photos ready…</div>
     <textarea id="upcap" maxlength="300" rows="2" placeholder="Say something about it (optional)"></textarea>
-    <p class="sst">Only your family sees this. Location data is removed.</p>
+    ${UP_TAG ? '' : audPicker('upaud', false)}
+    <p class="sst">Only the people you pick see this. Location data is removed.</p>
     <div class="uprow"><button class="btn" id="upx">Cancel</button><button class="btn pri" id="upgo" disabled>Post</button></div></div>`;
   document.body.append(box);
   UP = [];
@@ -428,8 +525,9 @@ async function postPhotos() {
       const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.err || 'Upload failed');
       PHOTO_URL.set(String(j.id), p.url); ids.push(j.id);
     }
-    await fam('/shares?photos', { method: 'POST', body: JSON.stringify({ photos: ids, caption, ...(UP_TAG ? { tag: UP_TAG } : {}) }) }); UP_TAG = ''; if (typeof xAfterPost === 'function') xAfterPost();
-    $('#upbox').remove(); UP = []; $('#sheet').classList.remove('on'); toast('📷 Shared with the family');
+    const A = UP_TAG ? { aud: null } : audRead('upaud');
+    await fam('/shares?photos', { method: 'POST', body: JSON.stringify({ photos: ids, caption, ...(A.aud ? { aud: A.aud } : {}), ...(UP_TAG ? { tag: UP_TAG } : {}) }) }); UP_TAG = ''; if (typeof xAfterPost === 'function') xAfterPost();
+    $('#upbox').remove(); UP = []; $('#sheet').classList.remove('on'); toast('📷 Shared with ' + A.who);
     tab = 'family'; ls.set('tab', tab); await loadShares(); draw();
   } catch (e) { toast(e.message); b.disabled = false; b.textContent = 'Post'; }
 }

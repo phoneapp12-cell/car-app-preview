@@ -11,6 +11,8 @@ import { preview, blockedWhy, findUrl, safeUrl, stockPics } from './preview.js';
 import { scoresInit, scoresRoute, clearShaneTetrisOnce, clearShaneTetrisOnce20261113, clearAllTetrisOnce20261114, sugarStopsOnce20261114 } from './scores.js'; // 1.9.149 family scoreboard; 12–14 Nov 2026 one-off Tetris clears
 import { scrabbleInit, scrabbleRoute, bindDict } from './scrabble.js'; // 1.9.214 family Scrabble online challenges
 import lexicon from './lexicon.js';
+import { isFriend, isFam, sees, seeRows, seeIds, memberRow, shareVisible, friendMay, FAMILY_CARD, INVITE_MS, FRIENDS_PER_HOST, MAX_MEMBERS, MAX_FAMILY } from './circle.js'; // 1.9.230 friends
+import { isShane } from './scrabble.js';
 
 const ORIGINS = /^https:\/\/([a-z0-9]+\.)?shane-my-app\.pages\.dev$|^http:\/\/localhost:\d+$/;
 const PRIVATE_ID = /:|^tip\d/;                        // Shane's own cards (life:, app:, ph:, you:) and the app's tips: never commentable
@@ -66,6 +68,10 @@ export class Family extends DurableObject {
     try { this.sql.exec(`ALTER TABLE members ADD COLUMN ver TEXT`); } catch (e) { } // 1.8.2
     try { this.sql.exec(`ALTER TABLE shares ADD COLUMN vis TEXT`); } catch (e) { } // 1.9.16 link shares for chosen people: ',mid,mid,' (null = whole family)
     try { this.sql.exec(`ALTER TABLE members ADD COLUMN pron TEXT`); } catch (e) { } try { this.sql.exec(`ALTER TABLE members ADD COLUMN pshow INTEGER DEFAULT 0`); } catch (e) { } // 1.9.15 pronouns (optional; not set = they)
+    try { this.sql.exec(`ALTER TABLE members ADD COLUMN host TEXT`); } catch (e) { } // 1.9.230 a friend's host (the family member who invited them)
+    try { this.sql.exec(`ALTER TABLE shares ADD COLUMN aud TEXT`); } catch (e) { } // 1.9.230 audience: null/'fam' family, 'fr' friends circle, 'both'
+    try { this.sql.exec(`ALTER TABLE shares ADD COLUMN circ TEXT`); } catch (e) { } // 1.9.230 whose friends circle ('fr' / 'both')
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS finv (id TEXT PRIMARY KEY, code TEXT NOT NULL UNIQUE, host TEXT NOT NULL, label TEXT, created INTEGER NOT NULL, exp INTEGER NOT NULL, used INTEGER, mid TEXT, revoked INTEGER DEFAULT 0)`); // 1.9.230 friend invites (code kept as a SHA-256 hash)
     scoresInit(this.sql); // 1.9.149 game scores (Tetris, Scrabble)
     scrabbleInit(this.sql); // 1.9.214 family Scrabble games, in this same database
     bindDict(lexicon);
@@ -90,9 +96,44 @@ export class Family extends DurableObject {
   }
   one(q, ...a) { return this.sql.exec(q, ...a).toArray()[0] || null; }
   all(q, ...a) { return this.sql.exec(q, ...a).toArray(); }
-  canSee(card, mid) { // 1.9.16 a share for chosen people is only visible (and commentable/likeable) by them and the sharer
-    if (!/^sh\d+$/.test(card || '')) return true;
-    const r = this.one(`SELECT mid, vis FROM shares WHERE id=?`, +card.slice(2)); return !r || !r.vis || r.mid === mid || r.vis.includes(',' + mid + ',');
+  canSee(card, me) { // 1.9.16 a share for chosen people is only visible (and commentable/likeable) by them and the sharer; 1.9.230 audiences
+    if (typeof me === 'string') me = memberRow(this.sql, me);
+    if (!me) return false;
+    if (!/^sh\d+$/.test(card || '')) return !(isFriend(me) && FAMILY_CARD.test(String(card || ''))); // family-only cards (reno, poll, daily question …)
+    const r = this.one(`SELECT mid, vis, aud, circ FROM shares WHERE id=?`, +card.slice(2)); if (!r) return !isFriend(me);
+    return shareVisible(me, r);
+  }
+  seesMid(me, mid, cache) { // 1.9.230 can this member see that person (comments, reactions, names)?
+    if (mid === me.id) return true;
+    if (mid === BOT_ID) return !isFriend(me); // Info Bot replies can quote family threads: family only
+    if (cache && mid in cache) return cache[mid];
+    const v = sees(me, memberRow(this.sql, mid)); if (cache) cache[mid] = v; return v;
+  }
+  // 1.9.230 who should hear about a new post: everyone (active) who can see it, except the poster
+  audienceOf(s) { return this.all(`SELECT id, name, role, host FROM members WHERE removed=0 AND id!=?`, s.mid).filter(r => shareVisible(r, s)); }
+  // 1.9.230 a post's audience from what the poster asked for: family members pick Family (default), Friends or Both;
+  // a friend always posts to their circle. Chosen people (to) must be people the poster can see.
+  audFor(me, b) {
+    if (isFriend(me)) return { aud: 'fr', circ: me.host };
+    const a = b && (b.aud === 'fr' || b.aud === 'friends') ? 'fr' : b && b.aud === 'both' ? 'both' : null;
+    return { aud: a, circ: a ? me.id : null };
+  }
+  visFor(me, b) { // ',id,id,' for chosen people, null for none, or { err }
+    const to = Array.isArray(b && b.to) ? [...new Set(b.to.map(String))].slice(0, 20) : [];
+    if (!to.length) return null;
+    const can = seeIds(this.sql, me), ok = to.filter(x => x !== me.id && can.has(x));
+    if (!ok.length) return { err: 'Pick at least one person' };
+    return ',' + [me.id, ...ok].join(',') + ',';
+  }
+  /* 1.9.230 hide a removed friend's posts and comments (and their friend invites); a family member's posts stay as before */
+  hideFriend(id) {
+    this.sql.exec(`UPDATE shares SET del=1, snap='{}' WHERE mid=? AND del=0`, id); this.sql.exec(`DELETE FROM photos WHERE mid=?`, id);
+    this.sql.exec(`UPDATE comments SET del=1, text='' WHERE mid=? AND del=0`, id); this.sql.exec(`DELETE FROM clikes WHERE mid=?`, id);
+  }
+  removeMember(t) { // t: { id, role } – the token stops working straight away (removed=1, tok=NULL)
+    this.sql.exec(`UPDATE members SET removed=1, tok=NULL WHERE id=?`, t.id); this.sql.exec(`DELETE FROM prefs WHERE mid=?`, t.id); this.sql.exec(`DELETE FROM reacts WHERE mid=?`, t.id); this.sql.exec(`DELETE FROM subs WHERE mid=?`, t.id); this.sql.exec(`DELETE FROM notes WHERE mid=?`, t.id);
+    this.sql.exec(`UPDATE finv SET revoked=1 WHERE host=? AND used IS NULL`, t.id); // their unused friend invites stop working too
+    if (t.role === 'friend') this.hideFriend(t.id);
   }
   botReact(what, id, text = '', p = 0.4) { // 1.9.61 🤖 Info Bot sometimes reacts too (never to its own, never sport/money)
     try {
@@ -102,7 +143,7 @@ export class Family extends DurableObject {
       else this.sql.exec(`INSERT OR IGNORE INTO clikes (cid,mid,at,emo) VALUES (?,?,?,?)`, id, BOT_ID, Date.now() + 1, emo === 'love' ? null : emo);
     } catch (e) { }
   }
-  reactsOf(card, kind) { return this.all(`SELECT l.mid, CASE WHEN l.mid='bot:info' THEN '🤖 Info Bot' ELSE m.name END name, l.at, l.emo FROM reacts l LEFT JOIN members m ON m.id=l.mid WHERE l.card=? AND l.kind=? AND (m.removed=0 OR l.mid='bot:info') ORDER BY l.at`, card, kind); }
+  reactsOf(card, kind, me) { const c = {}; return this.all(`SELECT l.mid, CASE WHEN l.mid='bot:info' THEN '🤖 Info Bot' ELSE m.name END name, l.at, l.emo FROM reacts l LEFT JOIN members m ON m.id=l.mid WHERE l.card=? AND l.kind=? AND (m.removed=0 OR l.mid='bot:info') ORDER BY l.at`, card, kind).filter(r => !me || r.mid === BOT_ID || this.seesMid(me, r.mid, c)); } // 1.9.230 only people this member can see
 
   /* 1.9.18 🔗 a link's public preview + Info Bot's short description + a picture, kept 30 minutes so typing, the preview
      and posting don't cost extra fetches or AI calls */
@@ -128,8 +169,8 @@ export class Family extends DurableObject {
     return pv;
   }
   thread(card, me) { // a card's comments as this member may see them (Info Bot hidden if they muted it)
-    const hideBot = this.bot.muted(me.id), rows = this.all(`SELECT c.id, c.mid, m.name, CASE WHEN m.pshow=1 THEN m.pron END pron, c.text, c.at FROM comments c LEFT JOIN members m ON m.id=c.mid WHERE c.card=? AND c.del=0 ORDER BY c.at LIMIT 200`, card).filter(r => !(hideBot && r.mid === BOT_ID));
-    const lk = {}; if (rows.length) for (const l of this.all(`SELECT l.cid, l.mid, CASE WHEN l.mid='bot:info' THEN '🤖 Info Bot' ELSE m.name END name, l.at, l.emo FROM clikes l LEFT JOIN members m ON m.id=l.mid WHERE (m.removed=0 OR l.mid='bot:info') AND l.cid IN (${rows.map(() => '?').join(',')}) ORDER BY l.at`, ...rows.map(r => r.id))) (lk[l.cid] ||= []).push({ mid: l.mid, name: l.name, at: l.at, emo: l.emo || undefined });
+    const hideBot = this.bot.muted(me.id), sc = {}, rows = this.all(`SELECT c.id, c.mid, m.name, CASE WHEN m.pshow=1 THEN m.pron END pron, c.text, c.at FROM comments c LEFT JOIN members m ON m.id=c.mid WHERE c.card=? AND c.del=0 ORDER BY c.at LIMIT 200`, card).filter(r => !(hideBot && r.mid === BOT_ID) && this.seesMid(me, r.mid, sc)); // 1.9.230 only comments from people this member can see
+    const lk = {}; if (rows.length) for (const l of this.all(`SELECT l.cid, l.mid, CASE WHEN l.mid='bot:info' THEN '🤖 Info Bot' ELSE m.name END name, l.at, l.emo FROM clikes l LEFT JOIN members m ON m.id=l.mid WHERE (m.removed=0 OR l.mid='bot:info') AND l.cid IN (${rows.map(() => '?').join(',')}) ORDER BY l.at`, ...rows.map(r => r.id))) if (l.mid === BOT_ID || this.seesMid(me, l.mid, sc)) (lk[l.cid] ||= []).push({ mid: l.mid, name: l.name, at: l.at, emo: l.emo || undefined });
     return rows.map(r => ({ ...r, name: r.mid === BOT_ID ? BOT_NAME : r.name || 'Former member', bot: r.mid === BOT_ID ? 1 : 0, mine: r.mid === me.id, likes: lk[r.id] || [] }));
   }
   async fetch(req) {
@@ -166,25 +207,82 @@ export class Family extends DurableObject {
     }
     if (p === '/tick') { if (!this.env.SEED_KEY || req.headers.get('X-Seed-Key') !== this.env.SEED_KEY) return J({ err: 'no' }, 403); return J(await this.rt.tick()); } // 1.9.0 from the cron
 
+    if (p === '/join') { // 1.9.230 a friend opens an invite link: no token yet, the invite code is the key (single use, 7 days)
+      if (m === 'GET') { // what the join screen shows: who invited them (first name only) and whether the link still works
+        const iv = this.one(`SELECT f.exp, f.used, f.revoked, h.name, h.removed FROM finv f LEFT JOIN members h ON h.id=f.host WHERE f.code=?`, await sha(String(u.searchParams.get('code') || '')));
+        if (!iv || iv.revoked || iv.used || iv.exp < Date.now() || iv.removed || !iv.name) return J({ ok: 0, err: 'This invite link has expired or been used. Ask for a new one.' }, 404);
+        return J({ ok: 1, host: String(iv.name).trim().split(/\s+/)[0], exp: iv.exp });
+      }
+      if (m !== 'POST') return J({ err: 'method' }, 405);
+      const b = await body(), code = String(b.code || ''), name = clean(b.name, 40), now = Date.now();
+      if (code.length < 20 || code.length > 80) return J({ err: 'This invite link has expired or been used. Ask for a new one.' }, 404);
+      if (!name) return J({ err: 'Type your name first' }, 400);
+      if (isUnsafe({ t: name })) return J({ err: 'Please pick another name' }, 400);
+      const iv = this.one(`SELECT id, host, exp, used, revoked FROM finv WHERE code=?`, await sha(code));
+      const host = iv && this.one(`SELECT id, role FROM members WHERE id=? AND removed=0`, iv.host);
+      if (!iv || iv.revoked || iv.used || iv.exp < now || !host || !isFam(host)) return J({ err: 'This invite link has expired or been used. Ask for a new one.' }, 404);
+      if ((this.one(`SELECT COUNT(*) n FROM members WHERE removed=0`) || {}).n >= MAX_MEMBERS) return J({ err: 'Info Book is full right now. Ask Shane.' }, 400);
+      const tok = newToken(), id = newId(), th = await sha(tok); let ok = false;
+      this.ctx.storage.transactionSync(() => { // no await in here, so two taps on the same link can't both join
+        if (this.one(`SELECT 1 x FROM finv WHERE id=? AND used IS NULL AND revoked=0`, iv.id)) {
+          this.sql.exec(`INSERT INTO members (id,name,role,tok,created,host) VALUES (?,?,?,?,?,?)`, id, name, 'friend', th, now, host.id);
+          this.sql.exec(`UPDATE finv SET used=?, mid=? WHERE id=?`, now, id, iv.id); ok = true;
+        }
+      });
+      if (!ok) return J({ err: 'This invite link has expired or been used. Ask for a new one.' }, 404);
+      try { await this.rt.note(host.id, 'mine', `🤝 ${name} joined Info Book as your friend`, 'friends'); } catch (e) { }
+      return J({ id, name, role: 'friend', token: tok });
+    }
     const auth = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
     if (auth.length < 30) return J({ err: 'not a member' }, 401);
-    const me = this.one(`SELECT id,name,role,seen,ver FROM members WHERE tok=? AND removed=0`, await sha(auth));
+    const me = this.one(`SELECT id,name,role,host,seen,ver FROM members WHERE tok=? AND removed=0 AND tok IS NOT NULL`, await sha(auth));
     if (!me) return J({ err: 'not a member' }, 401);
     const now = Date.now(), ver = clean(req.headers.get('X-App-Version'), 12); // 1.8.2: last seen to ~2 min, and which app version they're on
     if (!me.seen || now - me.seen > 2 * 60e3 || (ver && ver !== me.ver)) this.sql.exec(`UPDATE members SET seen=?, ver=COALESCE(NULLIF(?,''),ver) WHERE id=?`, now, ver, me.id);
     const admin = me.role === 'admin';
+    if (isFriend(me) && !friendMay(p, m)) return J({ err: 'not for friends' }, 403); // 1.9.230 default deny: friends only reach what's listed in circle.js
 
-    if (p === '/me') return J({ id: me.id, name: me.name, role: me.role });
-    if (p === '/people') return J(this.all(`SELECT id,name,role FROM members WHERE removed=0 ORDER BY created`));
+    if (p === '/me') { const o = { id: me.id, name: me.name, role: me.role }; if (isFriend(me)) { const h = this.one(`SELECT name FROM members WHERE id=?`, me.host); o.friend = 1; o.host = h ? String(h.name).trim().split(/\s+/)[0] : ''; } if (isShane(this.sql, me)) o.shane = 1; return J(o); }
+    if (p === '/people') return J(seeRows(this.sql, me).map(r => isFriend(r) ? { id: r.id, name: r.name, role: 'friend', friend: 1, mine: r.host === me.id ? 1 : 0 } : { id: r.id, name: r.name, role: r.role })); // 1.9.230 only people this member can see
+    // ---- 1.9.230 friends: family members invite friends; Shane sees everyone and can remove anyone
+    if (p === '/friends' && m === 'GET') { // my friends (family) or my circle (friend), and my unused invites
+      if (isFriend(me)) { const h = this.one(`SELECT id, name FROM members WHERE id=? AND removed=0`, me.host); return J({ friend: 1, host: h ? { name: h.name } : null, circle: this.all(`SELECT id, name, created FROM members WHERE removed=0 AND role='friend' AND host=? AND id!=? ORDER BY created`, me.host, me.id) }); }
+      return J({ friends: this.all(`SELECT id, name, created, seen FROM members WHERE removed=0 AND role='friend' AND host=? ORDER BY created`, me.id), invites: this.all(`SELECT id, label, created, exp FROM finv WHERE host=? AND used IS NULL AND revoked=0 AND exp>? ORDER BY created DESC`, me.id, now) });
+    }
+    if (p === '/friends/invite' && m === 'POST') { // a family member makes a one-time invite link (7 days)
+      if (!isFam(me)) return J({ err: 'not for friends' }, 403);
+      const b = await body(), label = clean(b.name || b.label, 40);
+      if ((this.one(`SELECT COUNT(*) n FROM members WHERE removed=0 AND role='friend' AND host=?`, me.id) || {}).n >= FRIENDS_PER_HOST) return J({ err: `That’s ${FRIENDS_PER_HOST} friends already` }, 400);
+      if ((this.one(`SELECT COUNT(*) n FROM finv WHERE host=? AND used IS NULL AND revoked=0 AND exp>?`, me.id, now) || {}).n >= 10) return J({ err: 'You have 10 invites waiting already – cancel one first' }, 400);
+      if ((this.one(`SELECT COUNT(*) n FROM finv WHERE host=? AND created>?`, me.id, now - 864e5) || {}).n >= 20) return J({ err: 'That’s plenty of invites for today' }, 429);
+      const code = newToken(), id = 'i' + newId().slice(1), exp = now + INVITE_MS;
+      this.sql.exec(`INSERT INTO finv (id,code,host,label,created,exp) VALUES (?,?,?,?,?,?)`, id, await sha(code), me.id, label || null, now, exp);
+      return J({ id, code, exp, label });
+    }
+    mm0: { const im = p.match(/^\/friends\/invite\/(i[0-9a-f]{12})$/); if (!im || m !== 'DELETE') break mm0; // cancel my own unused invite (Shane: anyone's)
+      const iv = this.one(`SELECT id, host FROM finv WHERE id=? AND used IS NULL`, im[1]); if (!iv) return J({ err: 'gone' }, 404);
+      if (iv.host !== me.id && !isShane(this.sql, me)) return J({ err: 'only your own' }, 403);
+      this.sql.exec(`UPDATE finv SET revoked=1 WHERE id=?`, iv.id); return J({ ok: 1 }); }
+    if (p === '/admin/people' && m === 'GET') { // Shane only: everyone, their group, joined and last seen, and pending invites
+      if (!isShane(this.sql, me)) return J({ err: 'Shane only' }, 403);
+      const all = this.all(`SELECT id, name, role, host, created, seen FROM members WHERE removed=0 ORDER BY created`), nm = {}; for (const r of this.all(`SELECT id, name, removed FROM members`)) nm[r.id] = r;
+      return J({ people: all.map(r => ({ id: r.id, name: r.name, group: isFriend(r) ? 'friend' : 'family', admin: r.role === 'admin' ? 1 : 0, host: isFriend(r) ? { id: r.host, name: (nm[r.host] || {}).name || 'Former member', removed: !!(nm[r.host] || {}).removed } : null, joined: r.created, seen: r.seen || null, me: r.id === me.id ? 1 : 0 })),
+        invites: this.all(`SELECT id, host, label, created, exp FROM finv WHERE used IS NULL AND revoked=0 AND exp>? ORDER BY created DESC`, now).map(r => ({ id: r.id, label: r.label || '', created: r.created, exp: r.exp, host: (nm[r.host] || {}).name || 'Former member' })) });
+    }
+    mm0b: { const am = p.match(/^\/admin\/people\/(m[0-9a-f]{12})$/); if (!am || m !== 'DELETE') break mm0b; // Shane removes anyone (family or friend)
+      if (!isShane(this.sql, me)) return J({ err: 'Shane only' }, 403);
+      const t = this.one(`SELECT id, role FROM members WHERE id=? AND removed=0`, am[1]); if (!t) return J({ err: 'no such member' }, 404);
+      if (t.id === me.id) return J({ err: 'you can’t remove yourself' }, 400);
+      this.removeMember(t); return J({ ok: 1 }); }
     { const r = await scoresRoute(this.sql, me, p, m, u, body, now, { note: (mid, text, card) => this.rt.note(mid, 'sugar', text, card) }); if (r) return J(r.body, r.status); } // 1.9.149 family scoreboard; 1.9.222 race events push via family notifications
     { const r = await scrabbleRoute(this.sql, me, p, m, u, body, now, { note: (mid, text, card) => this.rt.note(mid, 'scrabble', text, card) }); if (r) return J(r.body, r.status); } // 1.9.214 family Scrabble
 
     // ---- admin: members and their invite links
-    if (p === '/members' && m === 'GET') { if (!admin) return J({ err: 'admin only' }, 403); return J(this.all(`SELECT m.id,m.name,m.role,m.created,m.seen,m.ver,m.pron,m.pshow,p.age,p.stage,p.sugg,p.sit FROM members m LEFT JOIN mprof p ON p.mid=m.id WHERE m.removed=0 ORDER BY m.created`)); }
+    if (p === '/members' && m === 'GET') { if (!admin) return J({ err: 'admin only' }, 403); return J(this.all(`SELECT m.id,m.name,m.role,m.host,m.created,m.seen,m.ver,m.pron,m.pshow,p.age,p.stage,p.sugg,p.sit FROM members m LEFT JOIN mprof p ON p.mid=m.id WHERE m.removed=0 ORDER BY m.created`)); }
     if (p === '/members' && m === 'POST') {
       if (!admin) return J({ err: 'admin only' }, 403);
       const b = await body(), name = clean(b.name, 40); if (!name) return J({ err: 'name needed' }, 400);
-      if ((this.one(`SELECT COUNT(*) n FROM members WHERE removed=0`) || {}).n >= 30) return J({ err: 'too many members' }, 400);
+      if ((this.one(`SELECT COUNT(*) n FROM members WHERE removed=0 AND role!='friend'`) || {}).n >= MAX_FAMILY) return J({ err: 'too many members' }, 400);
       const tok = newToken(), id = newId();
       this.sql.exec(`INSERT INTO members (id,name,role,tok,created) VALUES (?,?,?,?,?)`, id, name, 'member', await sha(tok), now);
       return J({ id, name, token: tok });
@@ -211,7 +309,7 @@ export class Family extends DurableObject {
       if (mm[2] === '/pron' && m === 'PUT') { const b = await body(), v = ['she', 'he', 'they'].includes(b.pron) ? b.pron : null; this.sql.exec(`UPDATE members SET pron=? WHERE id=?`, v, t.id); return J({ ok: 1, pron: v }); } // 1.9.15 Shane sets someone's pronouns (wording only)
       if (mm[2] === '/unseen' && m === 'POST') { this.sql.exec(`UPDATE members SET seen=NULL, ver=NULL WHERE id=?`, t.id); try { this.sql.exec(`DELETE FROM visits WHERE mid=? AND day=?`, t.id, new Date().toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' }).replace(/-/g, '')); } catch (e) { } return J({ ok: 1 }); } // undo a "seen" (and the streak day) caused by checking their link
       if (mm[2] === '/token' && m === 'POST') { const tok = newToken(); this.sql.exec(`UPDATE members SET tok=? WHERE id=?`, await sha(tok), t.id); return J({ id: t.id, token: tok }); } // new link; the old one stops working
-      if (!mm[2] && m === 'DELETE') { if (t.id === me.id) return J({ err: 'you can’t remove yourself' }, 400); this.sql.exec(`UPDATE members SET removed=1, tok=NULL WHERE id=?`, t.id); this.sql.exec(`DELETE FROM prefs WHERE mid=?`, t.id); this.sql.exec(`DELETE FROM reacts WHERE mid=?`, t.id); this.sql.exec(`DELETE FROM subs WHERE mid=?`, t.id); this.sql.exec(`DELETE FROM notes WHERE mid=?`, t.id); return J({ ok: 1 }); }
+      if (!mm[2] && m === 'DELETE') { if (t.id === me.id) return J({ err: 'you can’t remove yourself' }, 400); this.removeMember(t); return J({ ok: 1 }); }
     }
     if (p === '/purge' && m === 'POST') { // admin: wipe a removed member's comments too (used for test members)
       if (!admin) return J({ err: 'admin only' }, 403);
@@ -224,9 +322,9 @@ export class Family extends DurableObject {
       const ids = (u.searchParams.get('ids') || '').split(',').filter(x => x && x.length <= 64).slice(0, 80);
       const out = {}; if (!ids.length) return J(out);
       const tail = Math.min(3, +u.searchParams.get('last') || 0); // 1.9.19 the latest few comments too, so threads show open without a tap
-      for (const r of this.all(`SELECT card, COUNT(*) n, MAX(at) last FROM comments WHERE del=0 AND card IN (${ids.map(() => '?').join(',')}) GROUP BY card`, ...ids)) if (this.canSee(r.card, me.id)) {
-        if (!tail) { out[r.card] = [r.n, r.last]; continue; }
-        const th = this.thread(r.card, me); if (th.length) out[r.card] = [th.length, r.last, th.slice(-tail)];
+      for (const r of this.all(`SELECT card, COUNT(*) n, MAX(at) last FROM comments WHERE del=0 AND card IN (${ids.map(() => '?').join(',')}) GROUP BY card`, ...ids)) if (this.canSee(r.card, me)) {
+        const th = this.thread(r.card, me); if (!th.length) continue; // 1.9.230 counted from the comments this member can see
+        out[r.card] = tail ? [th.length, th[th.length - 1].at, th.slice(-tail)] : [th.length, th[th.length - 1].at];
       }
       return J(out);
     }
@@ -236,12 +334,12 @@ export class Family extends DurableObject {
       this.sql.exec(`UPDATE members SET pron=?, pshow=? WHERE id=?`, v, sh, me.id); return J({ ok: 1, pron: v, show: !!sh });
     }
     if (p === '/comments' && m === 'GET') {
-      const card = String(u.searchParams.get('card') || '').slice(0, 64); if (!this.canSee(card, me.id)) return J([]);
+      const card = String(u.searchParams.get('card') || '').slice(0, 64); if (!this.canSee(card, me)) return J([]);
       return J(this.thread(card, me));
     }
     if (p === '/comments' && m === 'POST') {
       const b = await body(), card = clean(b.card, 64), text = clean(b.text, MAX_TEXT + 1);
-      if (!card || PRIVATE_ID.test(card) || !this.canSee(card, me.id)) return J({ err: 'comments are only for public cards' }, 400);
+      if (!card || PRIVATE_ID.test(card) || !this.canSee(card, me)) return J({ err: 'comments are only for public cards' }, 400);
       if (!text) return J({ err: 'empty' }, 400);
       if (isUnsafe({ t: text })) return J({ err: 'please keep it family-friendly' }, 400);
       if (text.length > MAX_TEXT) return J({ err: `keep it under ${MAX_TEXT} characters` }, 400);
@@ -251,17 +349,17 @@ export class Family extends DurableObject {
       const cid = this.one(`SELECT last_insert_rowid() id`).id;
       try { // 1.9.0 tell the post's owner, and anyone else already talking there (a direct reply goes straight away)
         const owner = /^sh\d+$/.test(card) ? (this.one(`SELECT mid FROM shares WHERE id=? AND del=0`, +card.slice(2)) || {}).mid : (this.one(`SELECT mid FROM shares WHERE orig=? AND del=0 ORDER BY at LIMIT 1`, card) || {}).mid;
-        const short = text.length > 70 ? text.slice(0, 68) + '…' : text, sent = new Set([me.id]);
-        if (owner && !sent.has(owner)) { sent.add(owner); await this.rt.note(owner, 'mine', `💬 ${me.name} on your post: “${short}”`, card); }
-        for (const r of this.all(`SELECT DISTINCT mid FROM comments WHERE card=? AND del=0 AND id<?`, card, cid)) if (!sent.has(r.mid)) { sent.add(r.mid); await this.rt.note(r.mid, 'reply', `↩️ ${me.name} replied: “${short}”`, card); }
+        const short = text.length > 70 ? text.slice(0, 68) + '…' : text, sent = new Set([me.id]), sc = {};
+        if (owner && !sent.has(owner) && this.seesMid(me, owner, sc)) { sent.add(owner); await this.rt.note(owner, 'mine', `💬 ${me.name} on your post: “${short}”`, card); } // 1.9.230 only people who can see each other
+        for (const r of this.all(`SELECT DISTINCT mid FROM comments WHERE card=? AND del=0 AND id<?`, card, cid)) if (!sent.has(r.mid) && r.mid !== BOT_ID && this.seesMid(me, r.mid, sc)) { sent.add(r.mid); await this.rt.note(r.mid, 'reply', `↩️ ${me.name} replied: “${short}”`, card); }
       } catch (e) { }
-      try { await this.bot.consider(me, card, cid, text, now); } catch (e) { } // 1.9.12 🤖 sometimes answers
+      if (!isFriend(me)) try { await this.bot.consider(me, card, cid, text, now); } catch (e) { } // 1.9.12 🤖 sometimes answers (1.9.230 family threads only)
       if (!this.bot.muted(me.id)) this.botReact('comment', cid, text, 0.35);
       return J({ id: cid, at: now });
     }
     mm = p.match(/^\/comments\/(\d+)\/like$/);
     if (mm && m === 'POST') { // 1.9.14 ❤️ a comment (any comment on a public card, Info Bot's too); everyone in the family sees who
-      const c = this.one(`SELECT id, mid, card, text FROM comments WHERE id=? AND del=0`, +mm[1]); if (!c || PRIVATE_ID.test(c.card) || !this.canSee(c.card, me.id)) return J({ err: 'that comment is gone' }, 404);
+      const c = this.one(`SELECT id, mid, card, text FROM comments WHERE id=? AND del=0`, +mm[1]); if (!c || PRIVATE_ID.test(c.card) || !this.canSee(c.card, me) || !this.seesMid(me, c.mid)) return J({ err: 'that comment is gone' }, 404);
       const b = await body(), hadR = this.one(`SELECT at, emo FROM clikes WHERE cid=? AND mid=?`, c.id, me.id), had = !!hadR, want = typeof b.on === 'boolean' ? b.on : true, emo = EMO[b.emo] && b.emo !== 'love' ? b.emo : null;
       if (want && had && (hadR.emo || null) !== emo) this.sql.exec(`UPDATE clikes SET emo=?, at=? WHERE cid=? AND mid=?`, emo, now, c.id, me.id); else
       if (want && !had) {
@@ -269,7 +367,7 @@ export class Family extends DurableObject {
         this.sql.exec(`INSERT OR IGNORE INTO clikes (cid,mid,at,emo) VALUES (?,?,?,?)`, c.id, me.id, now, emo);
         if (c.mid !== me.id && c.mid !== BOT_ID) { const short = c.text.length > 50 ? c.text.slice(0, 48) + '…' : c.text; try { await this.rt.note(c.mid, 'mine', `${EMO[emo || 'love'][0]} ${me.name} ${EMO[emo || 'love'][1]} your comment: “${short}”`, c.card); } catch (e) { } }
       } else if (!want && had) this.sql.exec(`DELETE FROM clikes WHERE cid=? AND mid=?`, c.id, me.id);
-      return J({ id: c.id, likes: this.all(`SELECT l.mid, CASE WHEN l.mid='bot:info' THEN '🤖 Info Bot' ELSE m.name END name, l.at, l.emo FROM clikes l LEFT JOIN members m ON m.id=l.mid WHERE (m.removed=0 OR l.mid='bot:info') AND l.cid=? ORDER BY l.at`, c.id) });
+      const lc = {}; return J({ id: c.id, likes: this.all(`SELECT l.mid, CASE WHEN l.mid='bot:info' THEN '🤖 Info Bot' ELSE m.name END name, l.at, l.emo FROM clikes l LEFT JOIN members m ON m.id=l.mid WHERE (m.removed=0 OR l.mid='bot:info') AND l.cid=? ORDER BY l.at`, c.id).filter(l => l.mid === BOT_ID || this.seesMid(me, l.mid, lc)) });
     }
     mm = p.match(/^\/comments\/(\d+)$/);
     if (mm && m === 'DELETE') {
@@ -284,29 +382,35 @@ export class Family extends DurableObject {
     if (p === '/aibot/try' && m === 'POST') { if (!admin) return J({ err: 'admin only' }, 403); const b = await body(); const out = {}; for (const md of (b.models || []).slice(0, 4)) { try { out[md] = await this.bot.reply({ cid: +b.cid, card: String(b.card), dry: 1 }, now, md); } catch (e) { out[md] = 'ERR ' + e.message; } } return J(out); } // admin testing: draft replies, nothing saved
     if (p === '/aibot/kick' && m === 'POST') { if (!admin) return J({ err: 'admin only' }, 403); this.sql.exec(`UPDATE aiq SET due=?`, now); await this.bot.run(now + 1); try { await this.rt.flush(); } catch (e) { } return J({ ok: 1, usage: this.bot.usage() }); } // testing: answer the queued ones now
     if (p === '/recent') { // cards the family has talked about lately, newest first (for the 💬 Family tab)
-      return J(this.all(`SELECT card, COUNT(*) n, MAX(at) last, MAX(snap) snap FROM comments WHERE del=0 AND mid!='bot:info' AND at>? GROUP BY card ORDER BY last DESC LIMIT 40`, now - 60 * 864e5).filter(r => this.canSee(r.card, me.id)).map(r => ({ card: r.card, n: r.n, last: r.last, snap: JSON.parse(r.snap || '{}') })));
+      const can = seeIds(this.sql, me), by = new Map(); // 1.9.230 only comments from people this member can see
+      for (const r of this.all(`SELECT card, mid, at, snap FROM comments WHERE del=0 AND mid!='bot:info' AND at>? ORDER BY at DESC LIMIT 3000`, now - 60 * 864e5)) {
+        if (!can.has(r.mid)) continue; const x = by.get(r.card); if (x) { x.n++; if (!x.snap && r.snap) x.snap = r.snap; } else by.set(r.card, { card: r.card, n: 1, last: r.at, snap: r.snap });
+      }
+      return J([...by.values()].filter(r => this.canSee(r.card, me)).slice(0, 40).map(r => ({ card: r.card, n: r.n, last: r.last, snap: JSON.parse(r.snap || '{}') })));
     }
 
     // ---- reposts: a card shared with the family ("Shared by …"), shown to everyone whatever their interests
     if (p === '/shares' && m === 'GET') {
-      return J(this.all(`SELECT s.id, s.mid, m.name, s.orig, s.snap, s.caption, s.priv, s.at, s.tag, s.vis FROM shares s LEFT JOIN members m ON m.id=s.mid WHERE s.del=0 AND s.at>? AND (s.vis IS NULL OR s.mid=? OR instr(s.vis, ?) > 0) ORDER BY s.at DESC LIMIT 80`, now - 90 * 864e5, me.id, ',' + me.id + ',')
-        .map(r => { const card = r.priv ? 'sh' + r.id : r.orig; return { id: r.id, mid: r.mid, name: r.name || 'Former member', orig: r.orig, card, snap: JSON.parse(r.snap), caption: r.caption || '', priv: !!r.priv, up: r.priv === 2, link: r.priv === 3, text: r.priv === 4, to: r.vis ? r.vis.split(',').filter(x => x && x !== r.mid).map(x => (x === me.id ? 'You' : (this.one(`SELECT name FROM members WHERE id=?`, x) || {}).name)).filter(Boolean) : null, tag: r.tag || '', at: r.at, mine: r.mid === me.id, likes: this.reactsOf(card, 'love'), ups: this.reactsOf(card, 'up'), nc: (this.one(`SELECT COUNT(*) n FROM comments WHERE card=? AND del=0`, card) || {}).n || 0 }; }));
+      const sc = {}; // 1.9.230 audiences: only posts this member may see, and only names they may see
+      return J(this.all(`SELECT s.id, s.mid, m.name, m.role mrole, s.orig, s.snap, s.caption, s.priv, s.at, s.tag, s.vis, s.aud, s.circ FROM shares s LEFT JOIN members m ON m.id=s.mid WHERE s.del=0 AND s.at>? AND (s.vis IS NULL OR s.mid=? OR instr(s.vis, ?) > 0) ORDER BY s.at DESC LIMIT 160`, now - 90 * 864e5, me.id, ',' + me.id + ',')
+        .filter(r => shareVisible(me, r) && (!isFriend(me) || r.priv !== 1)).slice(0, 80)
+        .map(r => { const card = r.priv ? 'sh' + r.id : r.orig; return { id: r.id, mid: r.mid, name: r.name || 'Former member', friend: r.mrole === 'friend' ? 1 : 0, orig: r.orig, card, snap: JSON.parse(r.snap), caption: r.caption || '', priv: !!r.priv, up: r.priv === 2, link: r.priv === 3, text: r.priv === 4, aud: r.vis ? 'pick' : r.aud || 'fam', to: r.vis ? r.vis.split(',').filter(x => x && x !== r.mid && this.seesMid(me, x, sc)).map(x => (x === me.id ? 'You' : (this.one(`SELECT name FROM members WHERE id=?`, x) || {}).name)).filter(Boolean) : null, tag: r.tag || '', at: r.at, mine: r.mid === me.id, likes: this.reactsOf(card, 'love', me), ups: this.reactsOf(card, 'up', me), nc: this.thread(card, me).length }; }));
     }
     if (p === '/popular') { // 1.8.1 what the family has ❤️/👍'd in the last 4 days (ids, names, kind, time) – feeds everyone's ranking
       const rows = this.all(`SELECT l.card, l.kind, l.at, l.mid, m.name, l.emo FROM reacts l JOIN members m ON m.id=l.mid AND m.removed=0 WHERE l.at>? ORDER BY l.at DESC LIMIT 800`, now - 4 * 864e5), out = {};
-      for (const r of rows) if (this.canSee(r.card, me.id) && !(r.kind === 'love' && NEUTRAL_EMO.has(r.emo))) (out[r.card] = out[r.card] || []).push([r.mid, r.name, r.kind === 'love' ? 2 : 1, r.at]); // 1.9.42 😠/😐 don't boost
+      const sc = {}, cc = {}; for (const r of rows) if (this.seesMid(me, r.mid, sc) && (r.card in cc ? cc[r.card] : (cc[r.card] = this.canSee(r.card, me))) && !(r.kind === 'love' && NEUTRAL_EMO.has(r.emo))) (out[r.card] = out[r.card] || []).push([r.mid, r.name, r.kind === 'love' ? 2 : 1, r.at]); // 1.9.42 😠/😐 don't boost; 1.9.230 only people this member can see
       return J({ at: now, pop: out });
     }
     if (p === '/likes' && m === 'GET') { // 1.8.6 who ❤️/👍'd some public cards (the pinned specials)
       const out = {};
-      for (const c of (u.searchParams.get('cards') || '').split(',').slice(0, 10)) { const card = clean(c, 120); if (/^[\w.-]{2,80}$/.test(card) && !PRIVATE_ID.test(card) && this.canSee(card, me.id)) out[card] = { likes: this.reactsOf(card, 'love'), ups: this.reactsOf(card, 'up') }; }
+      for (const c of (u.searchParams.get('cards') || '').split(',').slice(0, 10)) { const card = clean(c, 120); if (/^[\w.-]{2,80}$/.test(card) && !PRIVATE_ID.test(card) && this.canSee(card, me)) out[card] = { likes: this.reactsOf(card, 'love', me), ups: this.reactsOf(card, 'up', me) }; }
       return J({ rx: out });
     }
     if (p === '/likes' && m === 'POST') { // 1.8.1 ❤️ and 👍 on anything in the family network: everyone in the family sees how many and who
       const b = await body(), card = clean(b.card, 120), kinds = b.kind === 'none' ? ['love', 'up'] : [b.kind === 'up' ? 'up' : 'love'];
       // a family post (sh…) must still be there; any other card must be a public feed card id (never Shane's own life:/app:/ph:/you: cards)
       const sh = /^sh\d+$/.test(card) ? this.one(`SELECT id FROM shares WHERE id=? AND del=0 AND priv>0`, +card.slice(2)) : /^[\w.-]{2,80}$/.test(card) && !PRIVATE_ID.test(card);
-      if (!sh || !this.canSee(card, me.id)) return J({ err: 'that post is gone' }, 404);
+      if (!sh || !this.canSee(card, me)) return J({ err: 'that post is gone' }, 404);
       const emo = EMO[b.emo] && b.emo !== 'love' ? b.emo : null; // 1.9.42 one reaction per person: another emoji switches it
       for (const kind of kinds) {
         const hadR = this.one(`SELECT at, emo FROM reacts WHERE card=? AND mid=? AND kind=?`, card, me.id, kind), had = !!hadR;
@@ -314,9 +418,9 @@ export class Family extends DurableObject {
         const want = b.kind === 'none' ? false : typeof b.on === 'boolean' ? b.on : true; // 1.9.33 never an implicit toggle: a repeat tap can't undo or add // 'none' = a private 👎: takes back their ❤️/👍
         if (want === had) continue;
         if (want && (this.one(`SELECT COUNT(*) n FROM reacts WHERE mid=? AND at>?`, me.id, now - RATE_MS) || {}).n >= 60) return J({ err: 'slow down a little' }, 429);
-        if (want) { this.sql.exec(`INSERT OR IGNORE INTO reacts (card,mid,kind,at,emo) VALUES (?,?,?,?,?)`, card, me.id, kind, now, kind === 'love' ? emo : null); try { const ow = /^sh\d+$/.test(card) ? (this.one(`SELECT mid FROM shares WHERE id=?`, +card.slice(2)) || {}).mid : null; if (ow && ow !== me.id) await this.rt.note(ow, 'mine', kind === 'love' ? `${EMO[emo || 'love'][0]} ${me.name} ${EMO[emo || 'love'][1]} your post` : `👍 ${me.name} liked your post`, card); } catch (e) { } } else this.sql.exec(`DELETE FROM reacts WHERE card=? AND mid=? AND kind=?`, card, me.id, kind);
+        if (want) { this.sql.exec(`INSERT OR IGNORE INTO reacts (card,mid,kind,at,emo) VALUES (?,?,?,?,?)`, card, me.id, kind, now, kind === 'love' ? emo : null); try { const ow = /^sh\d+$/.test(card) ? (this.one(`SELECT mid FROM shares WHERE id=?`, +card.slice(2)) || {}).mid : null; if (ow && ow !== me.id && this.seesMid(me, ow)) await this.rt.note(ow, 'mine', kind === 'love' ? `${EMO[emo || 'love'][0]} ${me.name} ${EMO[emo || 'love'][1]} your post` : `👍 ${me.name} liked your post`, card); } catch (e) { } } else this.sql.exec(`DELETE FROM reacts WHERE card=? AND mid=? AND kind=?`, card, me.id, kind);
       }
-      return J({ likes: this.reactsOf(card, 'love'), ups: this.reactsOf(card, 'up') });
+      return J({ likes: this.reactsOf(card, 'love', me), ups: this.reactsOf(card, 'up', me) });
     }
     if (p === '/photos' && m === 'POST') { // one picture (raw JPEG body); becomes visible once it's attached to a post
       if (+(req.headers.get('Content-Length') || 0) > PH_MAX) return J({ err: 'that photo is too big' }, 413);
@@ -332,14 +436,14 @@ export class Family extends DurableObject {
     }
     mm = p.match(/^\/photos\/(\d+)$/);
     if (mm && m === 'GET') {
-      const r = this.one(`SELECT ph.mid, ph.post, ph.data FROM photos ph LEFT JOIN shares s ON s.id=ph.post WHERE ph.id=? AND ((ph.post IS NOT NULL AND s.del=0 AND (s.vis IS NULL OR instr(s.vis, ',' || ? || ',') > 0)) OR (ph.post IS NULL AND ph.mid=?))`, +mm[1], me.id, me.id);
-      if (!r) return J({ err: 'gone' }, 404);
+      const r = this.one(`SELECT ph.mid, ph.post, ph.data, s.mid smid, s.vis, s.aud, s.circ FROM photos ph LEFT JOIN shares s ON s.id=ph.post WHERE ph.id=? AND ((ph.post IS NOT NULL AND s.del=0) OR (ph.post IS NULL AND ph.mid=?))`, +mm[1], me.id);
+      if (!r || (r.post != null && !shareVisible(me, { mid: r.smid, vis: r.vis, aud: r.aud, circ: r.circ }))) return J({ err: 'gone' }, 404); // 1.9.230 same audience as the post
       return new Response(r.data, { headers: { 'Content-Type': 'image/jpeg', 'X-Content-Type-Options': 'nosniff' } });
     }
     if (p === '/shares' && m === 'POST' && u.searchParams.get('photos') !== null) { // a post of the member's own photos
       const b = await body(), ids = [...new Set((b.photos || []).map(x => +x).filter(Boolean))];
       if (!ids.length || ids.length > PH_POST) return J({ err: `1–${PH_POST} photos per post` }, 400);
-      const caption = clean(b.caption, 300), tag = clean(b.tag, 20), tagOk = !tag || Object.values(TAGS).some(re => re.test(tag));
+      const caption = clean(b.caption, 300), A = this.audFor(me, b), tag = A.aud ? '' : clean(b.tag, 20), tagOk = !tag || Object.values(TAGS).some(re => re.test(tag)); // 1.9.230 the daily photo challenge is a family thing
       if (!tagOk) return J({ err: 'unknown tag' }, 400);
       if (isUnsafe({ t: caption })) return J({ err: 'please keep it family-friendly' }, 400);
       const mine = this.all(`SELECT id,w,h FROM photos WHERE mid=? AND post IS NULL AND id IN (${ids.map(() => '?').join(',')})`, me.id, ...ids);
@@ -347,9 +451,9 @@ export class Family extends DurableObject {
       if ((this.one(`SELECT COUNT(*) n FROM shares WHERE mid=? AND at>?`, me.id, now - RATE_MS) || {}).n >= RATE_N) return J({ err: 'slow down a little' }, 429);
       const snap = { t: caption, photos: ids.map(id => { const x = mine.find(y => y.id === id); return { id, w: x.w, h: x.h }; }), topic: 'family', kind: 'upload', sn: me.name };
       if (tag) snap.tag = tag;
-      this.sql.exec(`INSERT INTO shares (mid,orig,snap,caption,priv,at,tag) VALUES (?,?,?,?,2,?,?)`, me.id, 'up' + now, JSON.stringify(snap), '', now, tag || null);
+      this.sql.exec(`INSERT INTO shares (mid,orig,snap,caption,priv,at,tag,aud,circ) VALUES (?,?,?,?,2,?,?,?,?)`, me.id, 'up' + now, JSON.stringify(snap), '', now, tag || null, A.aud, A.circ);
       const sid = this.one(`SELECT last_insert_rowid() id`).id;
-      try { for (const r of this.all(`SELECT id FROM members WHERE removed=0 AND id!=?`, me.id)) await this.rt.note(r.id, 'photo', `📷 ${me.name} posted ${ids.length > 1 ? ids.length + ' photos' : 'a photo'}${caption ? ': “' + caption.slice(0, 60) + '”' : ''}`, 'sh' + sid); } catch (e) { }
+      try { for (const r of this.audienceOf({ mid: me.id, vis: null, ...A })) await this.rt.note(r.id, 'photo', `📷 ${me.name} posted ${ids.length > 1 ? ids.length + ' photos' : 'a photo'}${caption ? ': “' + caption.slice(0, 60) + '”' : ''}`, 'sh' + sid); } catch (e) { }
       this.sql.exec(`UPDATE photos SET post=? WHERE mid=? AND id IN (${ids.map(() => '?').join(',')})`, sid, me.id, ...ids);
       if (!this.bot.muted(me.id)) this.botReact('photo', 'sh' + sid, caption, 0.7);
       return J({ id: sid, at: now });
@@ -389,16 +493,15 @@ export class Family extends DurableObject {
       else { const want = clean(b.img, 500); img = want && (want === pv.img || want === pv.brand || /^https:\/\/(upload|thumb)\.wikimedia\.org\//.test(want)) ? want : pv.img; }
       if (!img && !photos) img = pv.brand || 'https://shane-my-app.pages.dev/feed/img/share-web.svg'; // 1.9.37 never blocked for want of a picture
       if (!img && !photos) return J({ needPic: 1, err: 'Pick a picture for it – tap “Another picture” or “Use my photo”.' }, 400);
-      let vis = null; const to = Array.isArray(b.to) ? [...new Set(b.to.map(String))] : [];
-      if (to.length) { const ok = this.all(`SELECT id FROM members WHERE removed=0 AND id IN (${to.map(() => '?').join(',')})`, ...to.slice(0, 20)).map(r => r.id).filter(x => x !== me.id); if (!ok.length) return J({ err: 'Pick at least one person' }, 400); vis = ',' + [me.id, ...ok].join(',') + ','; }
+      const vis = this.visFor(me, b), A = this.audFor(me, b); if (vis && vis.err) return J({ err: vis.err }, 400); // 1.9.230 only people the poster can see
       const dup = this.one(`SELECT id FROM shares WHERE mid=? AND orig=? AND del=0 AND at>?`, me.id, 'ln:' + pv.url.slice(0, 110), now - 864e5); if (dup) return J({ id: dup.id, dup: 1 });
       const snap = { t: pv.t, s: desc || (caption ? '' : `Shared from ${pv.site}`), url: pv.url, img, sn: pv.site, topic: 'family', src: 'family', kind: 'link', plat: pv.plat, auto: !clean(b.desc, 300) && !!pv.sum ? 1 : 0 };
       if (pv.vid && /^[\w-]{11}$/.test(pv.vid)) snap.vid = pv.vid; // ▶️ plays in the card
       if (photos) snap.photos = photos;
-      this.sql.exec(`INSERT INTO shares (mid,orig,snap,caption,priv,at,vis) VALUES (?,?,?,?,3,?,?)`, me.id, 'ln:' + pv.url.slice(0, 110), JSON.stringify(snap), caption, now, vis);
+      this.sql.exec(`INSERT INTO shares (mid,orig,snap,caption,priv,at,vis,aud,circ) VALUES (?,?,?,?,3,?,?,?,?)`, me.id, 'ln:' + pv.url.slice(0, 110), JSON.stringify(snap), caption, now, vis, A.aud, A.circ);
       const sid = this.one(`SELECT last_insert_rowid() id`).id;
       if (photos) this.sql.exec(`UPDATE photos SET post=? WHERE id=?`, sid, photos[0].id);
-      try { const who = vis ? this.all(`SELECT id FROM members WHERE removed=0 AND instr(?, ',' || id || ',') > 0 AND id!=?`, vis, me.id) : this.all(`SELECT id FROM members WHERE removed=0 AND id!=?`, me.id); for (const r of who) await this.rt.note(r.id, 'photo', `🔗 ${me.name} shared${vis ? ' with you' : ''}: ${caption ? '“' + caption.slice(0, 50) + '” – ' : ''}${pv.t.slice(0, 60)}`, 'sh' + sid); } catch (e) { }
+      try { const who = this.audienceOf({ mid: me.id, vis, ...A }); for (const r of who) await this.rt.note(r.id, 'photo', `🔗 ${me.name} shared${vis ? ' with you' : ''}: ${caption ? '“' + caption.slice(0, 50) + '” – ' : ''}${pv.t.slice(0, 60)}`, 'sh' + sid); } catch (e) { }
       return J({ id: sid, at: now, card: 'sh' + sid, snap });
     }
 
@@ -409,12 +512,11 @@ export class Family extends DurableObject {
       if (isUnsafe({ t: text })) return J({ err: 'please keep it family-friendly' }, 400);
       const why = blockedWhy(text); if (why) return J({ blocked: why, err: BLOCK_MSG[why] }, 400);
       if ((this.one(`SELECT COUNT(*) n FROM shares WHERE mid=? AND at>?`, me.id, now - RATE_MS) || {}).n >= RATE_N) return J({ err: 'slow down a little' }, 429);
-      let vis = null; const to = Array.isArray(b.to) ? [...new Set(b.to.map(String))] : [];
-      if (to.length) { const ok = this.all(`SELECT id FROM members WHERE removed=0 AND id IN (${to.map(() => '?').join(',')})`, ...to.slice(0, 20)).map(r => r.id).filter(x => x !== me.id); if (!ok.length) return J({ err: 'Pick at least one person' }, 400); vis = ',' + [me.id, ...ok].join(',') + ','; }
+      const vis = this.visFor(me, b), A = this.audFor(me, b); if (vis && vis.err) return J({ err: vis.err }, 400); // 1.9.230
       const snap = { t: text, s: '', topic: 'family', src: 'family', kind: 'text', sn: me.name };
-      this.sql.exec(`INSERT INTO shares (mid,orig,snap,caption,priv,at,vis) VALUES (?,?,?,?,4,?,?)`, me.id, 'tx' + now, JSON.stringify(snap), '', now, vis);
+      this.sql.exec(`INSERT INTO shares (mid,orig,snap,caption,priv,at,vis,aud,circ) VALUES (?,?,?,?,4,?,?,?,?)`, me.id, 'tx' + now, JSON.stringify(snap), '', now, vis, A.aud, A.circ);
       const sid = this.one(`SELECT last_insert_rowid() id`).id;
-      try { const who = vis ? this.all(`SELECT id FROM members WHERE removed=0 AND instr(?, ',' || id || ',') > 0 AND id!=?`, vis, me.id) : this.all(`SELECT id FROM members WHERE removed=0 AND id!=?`, me.id); const short = text.length > 70 ? text.slice(0, 68) + '…' : text; for (const r of who) await this.rt.note(r.id, 'photo', `✏️ ${me.name} wrote${vis ? ' to you' : ''}: “${short}”`, 'sh' + sid); } catch (e) { }
+      try { const who = this.audienceOf({ mid: me.id, vis, ...A }); const short = text.length > 70 ? text.slice(0, 68) + '…' : text; for (const r of who) await this.rt.note(r.id, 'photo', `✏️ ${me.name} wrote${vis ? ' to you' : ''}: “${short}”`, 'sh' + sid); } catch (e) { }
       if (!this.bot.muted(me.id)) this.botReact('comment', 'sh' + sid, text, 0.4);
       return J({ id: sid, at: now, card: 'sh' + sid, snap });
     }
@@ -429,7 +531,9 @@ export class Family extends DurableObject {
       if (/\$\s?\d|\b(bills?|payments?|invoices?|mortgage|loan|debt|bank)\b/i.test(snap.t + ' ' + snap.s)) return J({ err: 'money things are never shared' }, 400);
       if ((this.one(`SELECT COUNT(*) n FROM shares WHERE mid=? AND at>?`, me.id, now - RATE_MS) || {}).n >= RATE_N) return J({ err: 'slow down a little' }, 429);
       const dup = this.one(`SELECT id FROM shares WHERE mid=? AND orig=? AND del=0`, me.id, orig); if (dup) return J({ id: dup.id, dup: 1 });
-      this.sql.exec(`INSERT INTO shares (mid,orig,snap,caption,priv,at) VALUES (?,?,?,?,?,?)`, me.id, orig, JSON.stringify(snap), clean(b.caption, 200), priv ? 1 : 0, now);
+      if (isFriend(me) && FAMILY_CARD.test(orig)) return J({ err: 'bad card' }, 400);
+      const A = priv ? { aud: null, circ: null } : this.audFor(me, b); // 1.9.230 Shane's own boards stay family-only
+      this.sql.exec(`INSERT INTO shares (mid,orig,snap,caption,priv,at,aud,circ) VALUES (?,?,?,?,?,?,?,?)`, me.id, orig, JSON.stringify(snap), clean(b.caption, 200), priv ? 1 : 0, now, A.aud, A.circ);
       return J({ id: this.one(`SELECT last_insert_rowid() id`).id, at: now });
     }
     mm = p.match(/^\/shares\/(\d+)$/);
