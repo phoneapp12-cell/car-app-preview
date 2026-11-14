@@ -1340,7 +1340,7 @@ if (live) {
   const SR = load('feed/sugar-rush.js').SugarRush;
   assert.strictEqual(SR.gameTrack(1), 'sugar-rush-l1.mp3');
   assert.strictEqual(SR.gameTrack(2), 'sugar-rush-l2.mp3');
-  for (let n = 3; n <= 10; n++) assert.strictEqual(SR.gameTrack(n), 'sugar-rush-music.mp3', 'level ' + n + ' keeps the usual track');
+  for (let n = 3; n <= 7; n++) assert.strictEqual(SR.gameTrack(n), 'sugar-rush-music.mp3', 'level ' + n + ' keeps the usual track'); // 1.9.224: Shane's songs from level 8
   const url = SR.mediaUrl('sugar-rush-l1.mp3');
   assert.strictEqual(url, 'sugar-rush-l1-3fd00f38.mp3');
   assert.ok(fs.existsSync('feed/' + url));
@@ -1515,7 +1515,7 @@ if (live) {
   const SR = load('feed/sugar-rush.js').SugarRush;
   assert.strictEqual(SR.gameTrack(1), 'sugar-rush-l1.mp3', 'level 1 keeps its song');
   assert.strictEqual(SR.gameTrack(2), 'sugar-rush-l2.mp3');
-  for (let n = 3; n <= 10; n++) assert.strictEqual(SR.gameTrack(n), 'sugar-rush-music.mp3', 'level ' + n + ' keeps the usual track');
+  for (let n = 3; n <= 7; n++) assert.strictEqual(SR.gameTrack(n), 'sugar-rush-music.mp3', 'level ' + n + ' keeps the usual track'); // 1.9.224: Shane's songs from level 8
   const url = SR.mediaUrl('sugar-rush-l2.mp3');
   assert.strictEqual(url, 'sugar-rush-l2-34c4b4be.mp3');
   assert.ok(fs.existsSync('feed/' + url));
@@ -4638,5 +4638,27 @@ console.log('1.9.223 hourly lives ok');
   assert.ok(src.includes("loading[kind] = get(file).catch(e => { if (mp3 !== file && MEDIA_HASH[mp3]) return get(mp3); throw e; })"), 'mp3 fallback');
 }
 console.log('1.9.223 voice and song slots ok');
+
+// 1.9.224 Shane's three songs on the later levels, by mood; levels 1 and 2 keep their music, 3-7 keep our tune.
+{
+  const SR = load('feed/sugar-rush.js').SugarRush;
+  const sha8 = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex').slice(0, 8);
+  const sw = fs.readFileSync('feed/sw.js', 'utf8');
+  assert.strictEqual(SR.gameTrack(1), 'sugar-rush-l1.mp3'); assert.strictEqual(SR.gameTrack(2), 'sugar-rush-l2.mp3');
+  for (let n = 3; n <= 7; n++) assert.strictEqual(SR.gameTrack(n), 'sugar-rush-music.mp3');
+  for (const n of [13, 15, 19, 22]) assert.strictEqual(SR.gameTrack(n), 'sugar-rush-travel.m4a', 'Hard ' + n);
+  for (const n of [17, 18]) assert.strictEqual(SR.gameTrack(n), 'sugar-rush-kiss.m4a', 'Pacific ' + n);
+  for (const n of [8, 9, 10, 11, 12, 14, 16, 20, 21]) assert.strictEqual(SR.gameTrack(n), 'sugar-rush-song.m4a', 'level ' + n);
+  for (const k of ['travel', 'kiss', 'song']) for (const e of ['m4a', 'mp3']) {
+    const f = 'sugar-rush-' + k + '.' + e, url = SR.mediaUrl(f);
+    assert.strictEqual(url, 'sugar-rush-' + k + '-' + sha8('feed/' + url) + '.' + e, 'hash ' + f);
+    assert.strictEqual(SR.MEDIA_HASH[f], sha8('feed/' + url));
+    const size = fs.statSync('feed/' + url).size;
+    assert.ok(size > 1.5e6 && size < 3.5e6, f + ' is ~96 kbps, not the 4-5 MB original');
+  }
+  assert.ok(sw.includes('/\\.m4a$/i.test(u.pathname)'), 'SW leaves m4a range requests to the browser too');
+}
+console.log('1.9.224 songs ok');
+
 
 

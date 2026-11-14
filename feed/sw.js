@@ -13,7 +13,7 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(n => n.startsWith(CACHE) && n !== CACHE + VERSION).map(n => caches.delete(n))))); });
 self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
-  if (e.request.method !== 'GET' || u.origin !== location.origin || /\.mp3$/i.test(u.pathname)) return; // music streams with range requests, so leave it to the browser // feed data and pictures go straight to the network
+  if (e.request.method !== 'GET' || u.origin !== location.origin || /\.mp3$/i.test(u.pathname) || /\.m4a$/i.test(u.pathname)) return; // music streams with range requests, so leave it to the browser // feed data and pictures go straight to the network
   // 1.9.166 Always fetch game scripts as this VERSION (and with cache: 'reload') so a cached
   // tetris.html that still says src="tetris.js" cannot keep playing from an old tetris.js.
   // Game pages (pretty URLs /feed/tetris, /feed/sugar-rush, /feed/scrabble) also reload.
