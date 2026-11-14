@@ -5,6 +5,7 @@
    and the game ends when someone uses their last tile with an empty bag, or after 6 scoreless turns
    (a pass or a swap). Words are checked straight away. There is no challenge step.
    Other players' racks and the bag order are never sent out. */
+import { sees } from './circle.js'; // 1.9.230 friends play with their own circle
 import { scoresInit } from './scores.js';
 
 export const N = 15, MID = 7, RACK = 7, BINGO = 50, OPEN_CAP = 8, SEATS_MIN = 2, SEATS_MAX = 4;
@@ -305,7 +306,7 @@ function recordScores(sql, g, now) {
   });
   g.scored = true;
 }
-function isShane(sql, me) {
+export function isShane(sql, me) {
   const row = me && me.id ? rows(sql, `SELECT name, role FROM members WHERE id=? AND removed=0`, me.id)[0] : null;
   if (!row || row.role !== 'admin') return false;
   const name = String(row.name || '').trim();
@@ -371,8 +372,10 @@ function inGame(sql, id, mid) { return !!rows(sql, `SELECT 1 x FROM scrabble_sea
 export function createGame(sql, me, ids, now, opts = {}) {
   const want = [...new Set([me.id, ...(Array.isArray(ids) ? ids : []).map(x => String(x || ''))])].filter(id => /^m[0-9a-f]{12}$/.test(id));
   if (want.length < SEATS_MIN || want.length > SEATS_MAX) return { status: 400, body: { err: 'Pick 1 to 3 family members, besides you. A game is 2 to 4 people.' } };
-  const found = rows(sql, `SELECT id FROM members WHERE removed=0 AND id IN (${want.map(() => '?').join(',')})`, ...want).map(r => r.id);
+  const foundRows = rows(sql, `SELECT * FROM members WHERE removed=0 AND id IN (${want.map(() => '?').join(',')})`, ...want), found = foundRows.map(r => r.id);
   if (found.length !== want.length) return { status: 400, body: { err: 'Pick people from the family list.' } };
+  // 1.9.230 everyone at the table must be able to see each other (friends play with their own circle)
+  for (const a of foundRows) for (const b of foundRows) if (!sees(a, b)) return { status: 400, body: { err: 'Friends can only play with their own friends circle. Pick people who are all in the same group.' } };
   const open = (rows(sql, `SELECT COUNT(*) n FROM scrabble_games g JOIN scrabble_seats s ON s.gid=g.id WHERE s.mid=? AND g.status='play'`, me.id)[0] || {}).n || 0;
   if (Number(open) >= OPEN_CAP && !opts.order) return { status: 400, body: { err: 'You already have 8 games on the go. Finish one before starting another.' } };
   const order = Array.isArray(opts.order) && opts.order.length === want.length ? opts.order.slice() : seatOrder(want);

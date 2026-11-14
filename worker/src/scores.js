@@ -1,6 +1,8 @@
 /* 1.9.149 Family scoreboard for Info Book games (Tetris, Scrabble). Lives in the Family Durable Object's SQLite, next to
    members, so a score always belongs to the member whose token sent it: the name shown is that member's name from the
    server, never one typed into the game. Bounds are generous for real play and refuse made-up numbers. */
+// 1.9.230 friends: boards, races and lives only show people in this member's group (see circle.js)
+import { gameIds, seeRows, raceGroup, memberRow, sees } from './circle.js';
 export const GAMES = ['tetris', 'scrabble'];
 export const LIMITS = { tetrisScore: 9999999, tetrisLines: 9999, scrabbleScore: 1500 };
 export const RATE = { gapMs: 15e3, perDay: 60 }; // a game takes longer than 15 seconds; 60 games a day per member per game is plenty
@@ -39,7 +41,10 @@ export const LEGACY_220_ISLANDS = { 16: 17, 17: 18, 18: 19 };
 // 1.9.222 Family race events: 2+ players at the same stop start a race; first to win 5 levels wins; 48 hours max.
 export const RACE_EVENT = { goal: 5, ms: 48 * 36e5, activeMs: 7 * 864e5, showMs: 72 * 36e5 };
 
+const meRow = (sql, me) => (me && me.role ? me : memberRow(sql, me && me.id)) || { id: me && me.id, role: 'member' };
+const inList = ids => [...ids].map(() => '?').join(',') || "''";
 export function scoresInit(sql) {
+  try { sql.exec(`ALTER TABLE members ADD COLUMN host TEXT`); } catch (e) { } // 1.9.230 (also added by the Family object)
   sql.exec(`CREATE TABLE IF NOT EXISTS scores (id INTEGER PRIMARY KEY AUTOINCREMENT, game TEXT NOT NULL, mid TEXT NOT NULL, score INTEGER NOT NULL, lines INTEGER, level INTEGER, won INTEGER, opp TEXT, at INTEGER NOT NULL);
     CREATE INDEX IF NOT EXISTS s_game ON scores(game, score DESC);
     CREATE INDEX IF NOT EXISTS s_mid ON scores(mid, game, at);`);
@@ -151,15 +156,17 @@ export function addScore(sql, me, body, now = Date.now()) {
   if ((last.n || 0) >= RATE.perDay) return { status: 429, body: { err: 'too many today' } };
   sql.exec(`INSERT INTO scores (game,mid,score,lines,level,won,opp,at) VALUES (?,?,?,?,?,?,?,?)`, s.game, me.id, s.score, s.lines, s.level, s.won, s.opp, now);
   const best = (rows(sql, `SELECT MAX(score) b FROM scores WHERE mid=? AND game=?`, me.id, s.game)[0] || {}).b || 0;
-  const rank = (rows(sql, `SELECT COUNT(*) n FROM scores s JOIN members m ON m.id=s.mid AND m.removed=0 WHERE s.game=? AND s.score > ?`, s.game, s.score)[0] || {}).n + 1;
+  const ids = gameIds(sql, meRow(sql, me));
+  const rank = (rows(sql, `SELECT COUNT(*) n FROM scores s JOIN members m ON m.id=s.mid AND m.removed=0 WHERE s.game=? AND s.score > ? AND s.mid IN (${inList(ids)})`, s.game, s.score, ...ids)[0] || {}).n + 1;
   return { status: 200, body: { ok: 1, rank, best, newBest: best === s.score } };
 }
 
 export function board(sql, me, game) {
   if (!GAMES.includes(game)) return { status: 400, body: { err: 'unknown game' } };
-  const top = rows(sql, `SELECT s.mid, m.name, s.score, s.lines, s.level, s.won, s.opp, s.at FROM scores s JOIN members m ON m.id=s.mid AND m.removed=0 WHERE s.game=? ORDER BY s.score DESC, s.at ASC LIMIT 10`, game)
+  const ids = gameIds(sql, meRow(sql, me));
+  const top = rows(sql, `SELECT s.mid, m.name, s.score, s.lines, s.level, s.won, s.opp, s.at FROM scores s JOIN members m ON m.id=s.mid AND m.removed=0 WHERE s.game=? AND s.mid IN (${inList(ids)}) ORDER BY s.score DESC, s.at ASC LIMIT 10`, game, ...ids)
     .map(r => ({ name: r.name, score: r.score, at: r.at, lines: r.lines ?? undefined, level: r.level ?? undefined, won: r.won == null ? undefined : !!r.won, opp: r.opp || undefined, mine: r.mid === me.id }));
-  const best = rows(sql, `SELECT s.mid, m.name, MAX(s.score) score, COUNT(*) games, SUM(CASE WHEN s.won=1 AND s.opp='computer' THEN 1 ELSE 0 END) wcpu, SUM(CASE WHEN s.won=1 AND s.opp='family' THEN 1 ELSE 0 END) wfam FROM scores s JOIN members m ON m.id=s.mid AND m.removed=0 WHERE s.game=? GROUP BY s.mid ORDER BY score DESC`, game)
+  const best = rows(sql, `SELECT s.mid, m.name, MAX(s.score) score, COUNT(*) games, SUM(CASE WHEN s.won=1 AND s.opp='computer' THEN 1 ELSE 0 END) wcpu, SUM(CASE WHEN s.won=1 AND s.opp='family' THEN 1 ELSE 0 END) wfam FROM scores s JOIN members m ON m.id=s.mid AND m.removed=0 WHERE s.game=? AND s.mid IN (${inList(ids)}) GROUP BY s.mid ORDER BY score DESC`, game, ...ids)
     .map(r => {
       const at = (rows(sql, `SELECT MIN(at) at FROM scores WHERE mid=? AND game=? AND score=?`, r.mid, game, r.score)[0] || {}).at;
       const o = { name: r.name, score: r.score, at, games: r.games, mine: r.mid === me.id };
@@ -251,8 +258,9 @@ export function expireRaces(sql, now = Date.now(), notes = []) {
 export function maybeStartRace(sql, mid, now = Date.now(), notes = []) {
   const me = rows(sql, `SELECT r.stop FROM sugar_race r JOIN members m ON m.id=r.mid AND m.removed=0 WHERE r.mid=?`, mid)[0];
   if (!me || activeEventFor(sql, mid)) return null;
-  const here = rows(sql, `SELECT r.mid, r.at FROM sugar_race r JOIN members m ON m.id=r.mid AND m.removed=0 WHERE r.stop=? AND r.at > ? ORDER BY r.at ASC`, me.stop, now - RACE_EVENT.activeMs)
-    .map(r => r.mid).filter(m => m === mid || !activeEventFor(sql, m));
+  const grp = raceGroup(memberRow(sql, mid)); // 1.9.230 the family races the family; a host's friends race each other
+  const here = rows(sql, `SELECT r.mid, r.at, m.role, m.host FROM sugar_race r JOIN members m ON m.id=r.mid AND m.removed=0 WHERE r.stop=? AND r.at > ? ORDER BY r.at ASC`, me.stop, now - RACE_EVENT.activeMs)
+    .filter(r => raceGroup(r) === grp).map(r => r.mid).filter(m => m === mid || !activeEventFor(sql, m));
   if (here.length < 2 || !here.includes(mid)) return null;
   const prog = {}; for (const m of here) prog[m] = { n: 0, t: 0 };
   sql.exec(`INSERT INTO sugar_race_event (stop, members, prog, at, ends) VALUES (?,?,?,?,?)`, me.stop, JSON.stringify(here), JSON.stringify(prog), now, now + RACE_EVENT.ms);
@@ -285,8 +293,11 @@ export function raceEventView(sql, me, now = Date.now()) {
   return { id: e.id, stop: e.stop, at: e.at, ends: e.ends, goal: RACE_EVENT.goal, done: !!e.done, why: e.why || null, won: !!e.done && e.winner === me.id, winner: e.done ? ((info[e.winner] && info[e.winner].name) || 'Someone') : null, racers };
 }
 
+// 1.9.230 an icon only clashes with someone who can appear on the same race board
+function clashes(sql, a, bid) { const b = memberRow(sql, bid); if (!a || !b) return true; return gameIds(sql, a).has(b.id) || gameIds(sql, b).has(a.id); }
 function suggestedIcon(sql, mid, want) {
-  const taken = new Set(rows(sql, `SELECT icon FROM sugar_race WHERE mid != ?`, mid).map(r => r.icon));
+  const a = memberRow(sql, mid);
+  const taken = new Set(rows(sql, `SELECT icon, mid FROM sugar_race WHERE mid != ?`, mid).filter(r => clashes(sql, a, r.mid)).map(r => r.icon));
   if (want && !taken.has(want)) return want;
   for (const id of RACE_ICONS) if (!taken.has(id)) return id;
   return want || RACE_ICONS[0];
@@ -299,7 +310,7 @@ export function saveRace(sql, me, body, now = Date.now()) {
     return { status: 200, body: { ok: 1, icon: prev.icon, stop: prev.stop, stars: prev.stars } };
   const today = rows(sql, `SELECT COUNT(*) n FROM sugar_race WHERE mid=? AND at > ?`, me.id, now - 864e5)[0] || {};
   // upserts rewrite one row, so the "per day" cap is only a flood brake on first-time inserts; updates are always allowed after the short gap
-  const owner = rows(sql, `SELECT mid FROM sugar_race WHERE icon=? AND mid != ?`, c.ok.icon, me.id)[0];
+  const owner = rows(sql, `SELECT mid FROM sugar_race WHERE icon=? AND mid != ?`, c.ok.icon, me.id).find(r => clashes(sql, memberRow(sql, me.id), r.mid));
   if (owner) {
     const suggested = suggestedIcon(sql, me.id, null);
     return { status: 409, body: { err: 'icon taken', suggested } };
@@ -323,7 +334,8 @@ export function saveRace(sql, me, body, now = Date.now()) {
 
 export function raceBoard(sql, me, now = Date.now(), notes = []) {
   expireRaces(sql, now, notes);
-  const racers = rows(sql, `SELECT r.mid, m.name, r.icon, r.stop, r.stars, r.at FROM sugar_race r JOIN members m ON m.id=r.mid AND m.removed=0 ORDER BY r.stop DESC, r.stars DESC, m.name ASC`)
+  const ids = gameIds(sql, meRow(sql, me));
+  const racers = rows(sql, `SELECT r.mid, m.name, r.icon, r.stop, r.stars, r.at FROM sugar_race r JOIN members m ON m.id=r.mid AND m.removed=0 WHERE r.mid IN (${inList(ids)}) ORDER BY r.stop DESC, r.stars DESC, m.name ASC`, ...ids)
     .map(r => ({ name: r.name, icon: r.icon, stop: r.stop, stars: r.stars, at: r.at, mine: r.mid === me.id }));
   return { status: 200, body: { me: me.name, racers, event: raceEventView(sql, me, now) }, notes };
 }
@@ -341,8 +353,9 @@ export function lifeKey(mid) {
   return h.toString(36);
 }
 const firstName = n => String(n || 'Someone').trim().split(/\s+/)[0] || 'Someone';
-function lifeFamily(sql, me) {
-  return rows(sql, `SELECT m.id, m.name, r.icon FROM members m LEFT JOIN sugar_race r ON r.mid=m.id WHERE m.removed=0 AND m.id != ? ORDER BY m.name ASC`, me.id);
+function lifeFamily(sql, me) { // 1.9.230 people this member can see (family: the family and their own friends; a friend: their circle)
+  const can = new Set(seeRows(sql, meRow(sql, me)).map(r => r.id));
+  return rows(sql, `SELECT m.id, m.name, r.icon FROM members m LEFT JOIN sugar_race r ON r.mid=m.id WHERE m.removed=0 AND m.id != ? ORDER BY m.name ASC`, me.id).filter(r => can.has(r.id));
 }
 export function livesView(sql, me, now = Date.now()) {
   const day = nzDay(now);

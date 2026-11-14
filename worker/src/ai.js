@@ -52,7 +52,7 @@ export class InfoBot {
   log(n, tin, tout, skip) { this.f.sql.exec(`INSERT INTO ailog (day,n,tin,tout,skip) VALUES (?,?,?,?,?) ON CONFLICT(day) DO UPDATE SET n=n+excluded.n, tin=tin+excluded.tin, tout=tout+excluded.tout, skip=skip+excluded.skip`, nzDay(Date.now()), n, tin, tout, skip); }
   async reply(q, now, model) {
     const c = this.cfg(); if (!c.on || this.usage().n >= DAY_CAP) return;
-    const thread = this.f.all(`SELECT c.id, c.mid, m.name, m.pron, c.text, c.at, c.snap FROM comments c LEFT JOIN members m ON m.id=c.mid WHERE c.card=? AND c.del=0 ORDER BY c.at DESC LIMIT 12`, q.card).reverse();
+    const thread = this.f.all(`SELECT c.id, c.mid, m.name, m.pron, c.text, c.at, c.snap FROM comments c LEFT JOIN members m ON m.id=c.mid WHERE c.card=? AND c.del=0 AND (m.role IS NULL OR m.role!='friend') ORDER BY c.at DESC LIMIT 12`, q.card).reverse(); // 1.9.230 friends' comments never go into a family reply
     const target = thread.find(x => x.id === q.cid); if (!target || target.mid === BOT_ID) return;
     let snap = {}; for (const x of thread) { try { const s = JSON.parse(x.snap || '{}'); if (s && s.t) snap = s; } catch (e) { } }
     const fw = n => String(n || 'Someone').trim().split(/\s+/)[0], cnt = {}; for (const x of thread) if (x.mid !== BOT_ID) cnt[fw(x.name)] = (cnt[fw(x.name)] || new Set()).add(x.mid);
