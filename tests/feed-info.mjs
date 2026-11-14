@@ -965,7 +965,7 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   assert.strictEqual(SR.voiceForStep({ popped: [{}, {}, {}], made: [], fired: [{ s: 'b' }], bomb: true, cascade: 1 }, 1), 'succulent');
   assert.strictEqual(SR.voiceForStep({ popped: Array(12).fill({}), made: [], fired: [], cascade: 1 }, 1), 'succulent');
   assert.strictEqual(SR.voiceForStep({ popped: [{}, {}, {}], made: [], fired: [], cascade: 5 }, 5), 'succulent');
-  assert.ok(srJs.includes("if (won) cheer(") && srJs.includes('function chime') && srJs.includes('function say'));
+  assert.ok(srJs.includes("if (won) candySfx('win'") && srJs.includes('function chime') && srJs.includes('function say'));
   assert.ok(srJs.includes('duckMusicBrief') && srJs.includes('linearRampToValueAtTime(1, t0 + dur + 0.22)'));
   assert.ok(SR.LEVELS.length === 22 && SR.LEVELS[1].name === "Sarah's Sweet Spot");
   assert.ok(SR.LEVELS[1].theme === 'sarah' && SR.LEVELS[1].badge && SR.LEVELS[1].badge.special);
@@ -4627,7 +4627,7 @@ console.log('1.9.223 hourly lives ok');
   assert.ok(src.includes("if (!text || !soundOn || !voiceOn || (doc && doc.hidden)) return 0;"), 'respects Sound and Voice');
   assert.ok(src.includes('duckMusicBrief(Math.min(2.6, c.dur))') && src.includes('duckMusicBrief(Math.min(2.4, est));'));
   assert.ok(src.includes("ls.get('ib-sugar-voice', true)") && html.includes('id="voicebtn"'));
-  assert.ok(src.includes('if (word && !canSpeak() && !clipsReady()) say(word);'), 'old word clips only where speech and saying clips are missing');
+  assert.ok(src.includes('if (kind && sayBig(kind) && word && voiceOn && !canSpeak() && !clipsReady()) say(word);'), 'old word clips only for major lines, where speech and saying clips are missing');
   assert.ok(!/say\('(great|sweetas|awesome)'\)/.test(src));
   // Song slots: levels 1-7 keep our tunes; Shane's songs by mood from level 8; nothing changes until a file is listed.
   assert.strictEqual(SR.SONG_FROM, 8);
@@ -4665,13 +4665,13 @@ console.log('1.9.224 songs ok');
   const SR = load('feed/sugar-rush.js').SugarRush;
   const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
   const sha8 = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex').slice(0, 8);
-  const pool = new Set(); for (const k in SR.SAYINGS) SR.SAYINGS[k].forEach(x => pool.add(x));
-  assert.ok(pool.has('Sweet as!') && pool.has('Cherry on top!'));
+  const pool = new Set(); for (const k of SR.SAY_BIG) SR.SAYINGS[k].forEach(x => pool.add(x)); // 1.9.229 major lines only
+  assert.ok(pool.has('Lolly bomb!') && pool.has('Stripe-tastic!') && !SR.SAY_CLIPS['Cherry on top!']);
   for (const t of pool) { const c = SR.SAY_CLIPS[t]; assert.ok(c && c.length === 4 && c.every(x => x >= 0) && c[1] > 0.2 && c[1] < 2.4 && c[3] > 0.2 && c[3] < 2.4, 'clips for ' + t); }
   for (const t of ['Goal achieved!', 'Sugar Crush!', 'Voice on!']) assert.ok(SR.SAY_CLIPS[t], t);
   // Clips sit in order without overlapping, inside each sprite.
   for (const [i, j] of [[0, 1], [2, 3]]) { const xs = Object.values(SR.SAY_CLIPS).map(c => [c[i], c[i] + c[j]]).sort((a, b) => a[0] - b[0]); for (let k = 1; k < xs.length; k++) assert.ok(xs[k][0] - xs[k - 1][1] >= 0.2, 'gap'); }
-  assert.deepStrictEqual(JSON.parse(JSON.stringify(SR.sayClip('Cherry on top!', 'm'))), { start: SR.SAY_CLIPS['Cherry on top!'][2], dur: SR.SAY_CLIPS['Cherry on top!'][3] });
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(SR.sayClip('Lolly bomb!', 'm'))), { start: SR.SAY_CLIPS['Lolly bomb!'][2], dur: SR.SAY_CLIPS['Lolly bomb!'][3] });
   assert.strictEqual(SR.sayClip('Nope', 'f'), null);
   assert.strictEqual(SR.nextSayVoice('f', 0.1), 'm'); assert.strictEqual(SR.nextSayVoice('m', 0.1), 'f'); assert.strictEqual(SR.nextSayVoice('f', 0.9), 'f');
   let flips = 0, last = null; for (let k = 0; k < 400; k++) { const g = SR.nextSayVoice(last, (k * 0.6180339887) % 1); if (last && g !== last) flips++; last = g; }
@@ -4695,8 +4695,9 @@ console.log('1.9.225 male and female sayings ok');
   const SR = load('feed/sugar-rush.js').SugarRush;
   const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
   // Every line that can show on screen has a clip in both voices, under the exact key speakLine looks up.
-  const shown = new Set(); for (const k in SR.SAYINGS) SR.SAYINGS[k].forEach(x => shown.add(x)); SR.STREAK_NAMES.filter(Boolean).forEach(x => shown.add(x));
-  ['Goal achieved!', 'Sugar Crush!', 'Voice on!'].forEach(x => shown.add(x));
+  // 1.9.229: every SPOKEN line (the major ones) has a clip; minor sayings are sounds now.
+  const shown = new Set(); for (const k of SR.SAY_BIG) SR.SAYINGS[k].forEach(x => shown.add(x)); SR.STREAK_NAMES.filter(Boolean).forEach(x => shown.add(x));
+  ['Goal achieved!', 'Sugar Crush!', 'Voice on!', SR.hardLine(1), SR.hardLine(2)].forEach(x => shown.add(x));
   for (const t of shown) { const c = SR.SAY_CLIPS[t]; assert.ok(c, 'clip for ' + t); assert.ok(c[1] >= 0.6 && c[3] >= 0.6, 'padded with a reverb tail: ' + t); }
   assert.strictEqual(Object.keys(SR.SAY_CLIPS).length, shown.size, 'no stray clips');
   // No skipping left in the voice path; display pacing follows the spoken length.
@@ -4718,10 +4719,10 @@ console.log('1.9.226 every saying spoken ok');
   for (const k of ['combo', 'bomb', 'wrap', 'stripe']) assert.ok(SR.sayBig(k), k);
   for (const k of ['cascade', 'jelly', 'gumdrop', 'lemon', 'ice', 'bub']) assert.ok(!SR.sayBig(k), k);
   for (const t in SR.SAY_CLIPS) { const c = SR.SAY_CLIPS[t]; assert.ok(c[1] >= 1.0 && c[3] >= 1.0 && c[1] < 2.6 && c[3] < 2.6, 'room tail kept: ' + t); }
-  assert.ok(src.includes("'sugar-rush-say-f.m4a': '26b115df'") && src.includes("'sugar-rush-say-m.m4a': '3a94c931'"));
+  assert.ok(src.includes("'sugar-rush-say-f.m4a': 'a4d17597'") && src.includes("'sugar-rush-say-m.m4a': '33cd967e'")); // 1.9.229 major-only sprites
   // Shown and spoken together: the display happens inside the gate, only when the voice says it (or voice is off).
   assert.ok(src.includes('return sayGate(text, big, () => paintSaying(text, kind)) ? text : null;'));
-  assert.ok(src.includes("if (live && !sayFree() && (!big || sayPending)) return null; // a minor line in the rest: not shown, so never silent"));
+  assert.ok(src.includes("if (!sayFree() && sayPending) return null;"), 'a major line in the rest with one already waiting is not shown, so never silent');
   assert.ok(src.includes('if (!big || sayPending) return false;') && src.includes('sayPendTimer = setTimeout(flushSay, Math.max(0, sayFreeAt - now()));'), 'big lines wait, queue of one');
   assert.ok(src.includes("lastSaying = ''; sayUntil = 0; clearSayQueue(); hideSaying();"), 'queue cleared on a new level');
   assert.ok(/function cheer\(text, word\) \{\s*if \(sayPendTimer\) clearTimeout\(sayPendTimer\); sayPendTimer = 0; sayPending = null;/.test(src), 'banner lines always said');
@@ -4754,6 +4755,44 @@ console.log('1.9.227 echo and 3 s pace ok');
   assert.ok(cr.x < 80 && cr.y < 140 && ec.x > 340 && cp.y > wel.y && sp.y > 1050 && sp.y < 1180 && [cr, ec, cp, sp].every(p => p.x > 0 && p.x < SR.MAP_W), 'projection matches real coastline points');
   console.log('1.9.227 real map geography ok');
   console.log('1.9.228 Sarah in Onerahi ok');
+}
+
+// 1.9.229 Only major moments are spoken; minor sayings keep their text but play varied candy sounds at normal pace.
+{
+  const SR = load('feed/sugar-rush.js').SugarRush;
+  const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
+  const minor = ['cascade', 'jelly', 'locks', 'ice', 'ings', 'choco', 'gumdrop', 'lemon', 'comeback', 'bub', 'liq'];
+  for (const k of minor) for (const t of SR.SAYINGS[k]) assert.ok(!SR.SAY_CLIPS[t], 'minor line not recorded: ' + t);
+  for (const t of ['Hard level!', 'Super Hard level!', 'Goal achieved!', 'Sugar Crush!', 'Sweet streak!']) assert.ok(SR.SAY_CLIPS[t], 'major line recorded: ' + t);
+  // Setting off a single stripe or wrapped sweet is a major moment too.
+  assert.strictEqual(SR.sayingKind({ popped: [{}, {}, {}], made: [], fired: [{ s: 'row' }], cascade: 1 }, 1), 'stripe');
+  assert.strictEqual(SR.sayingKind({ popped: [{}, {}, {}], made: [], fired: [{ s: 'w' }], cascade: 2 }, 2), 'wrap');
+  // Candy sounds: soft waveforms, 400-800 Hz fundamentals, styles never repeat twice running, arps grow with the chain.
+  let r = 0.37; const rnd = () => (r = (r * 9301 + 49297) % 233280 / 233280);
+  for (const k of minor.concat(['win'])) {
+    let last = '';
+    for (let c = 1; c <= 6; c++) {
+      const p = SR.candySfxPlan(k, c, rnd, last);
+      assert.ok(p.notes.length >= 2 && p.notes.length <= 9, k + ' notes');
+      assert.ok(p.notes.every(n => n.f >= 400 && n.f <= SR.SFX_MAX_HZ && (n.type === 'sine' || n.type === 'triangle') && n.dur <= 0.4 && n.vol > 0 && n.vol < 0.2), k + ' soft');
+      assert.ok(Math.max(...p.notes.map(n => n.t + n.dur)) < 0.75, k + ' short');
+      if (SR.CANDY_STYLES[k].length > 1 && last) assert.notStrictEqual(p.style, last, k + ' not repetitive');
+      last = p.style;
+    }
+  }
+  const arp = c => SR.candySfxPlan('win', c, () => 0.2).notes.length;
+  assert.ok(arp(1) === 3 && arp(3) === 5 && arp(6) === 8 && arp(20) === 8, 'arpeggio scales with chain size');
+  const a = SR.candySfxPlan('win', 3, () => 0.2).notes; assert.ok(a[1].f > a[0].f && a[2].f > a[1].f, 'rising');
+  // Pacing: minor lines are not held to the spoken rest; spoken majors keep it. Voice toggle only affects major lines.
+  assert.ok(src.includes('if (!big || !live) {\n      candySfx(kind, chain);\n      if (t < sayUntil || sayPending) return null;'), 'minor: sound always, text at normal pace');
+  assert.ok(src.includes('return sayGate(text, big, () => paintSaying(text, kind)) ? text : null;') && SR.SAY_REST_MS === 3000);
+  assert.ok(src.includes("if (won) candySfx('win', 6);") && !/if \(won\) cheer\(/.test(src), 'win line is a sound');
+  assert.ok(src.includes('cheer(hardLine(h));') && SR.hardLine(2) === 'Super Hard level!', 'Hard level start is said');
+  assert.ok(src.includes("cheer('Goal achieved!', 'yay');") && src.includes("cheer('Sugar Crush!', 'succulent');"));
+  assert.ok(src.includes('function runAudio(fn) {\n    if (!soundOn || !audio()) return;'), 'Sound toggle silences the candy sounds too');
+  assert.ok(!/type = '(square|sawtooth)'|'square'\)|'sawtooth'\)/.test(src));
+  for (const g of ['f', 'm']) for (const e of ['m4a', 'mp3']) { const f = 'sugar-rush-say-' + g + '.' + e, size = fs.statSync('feed/' + SR.mediaUrl(f)).size; assert.ok(size > 1.5e5 && size < 4e5, f + ' smaller: major lines only'); }
+  console.log('1.9.229 major-only voice, candy sounds ok');
 }
 
 
