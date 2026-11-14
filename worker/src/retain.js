@@ -9,8 +9,8 @@ import { EASY } from './trivia_easy.js';
 
 export const VAPID_PUBLIC = 'BGFa-WGEmSF-yZ-9PX6RjtuTc2SK7biQ95mUL--DgXy60LAB9cuWvi5D-Yy2kfZrZ-lNya048_1lv_JR9cKTcoU';
 export const TAGS = { dq: /^dq\d{8}$/ }; // photo-post tags; a '🔨 Reno' tag later is one more line here: reno: /^reno$/
-export const NOTE_TYPES = ['mine', 'reply', 'photo', 'daily', 'dates', 'streak', 'weather', 'event', 'appt', 'alerts', 'comeback', 'scrabble'];
-const DEF_NP = { mine: 1, reply: 1, photo: 1, daily: 1, dates: 1, streak: 0, weather: 0, event: 1, appt: 1, alerts: 1, comeback: 1, scrabble: 1, qFrom: 22, qTo: 7 }; // 1.9.18 alerts = ⚠️ orange/red Whangārei warnings + ⚡ unplanned outages (on by default) // event = reminders for events you tapped ⭐ Interested on // weather = red-warning alerts, opt-in // the streak reminder is opt-in // 1.9.214 scrabble = your turn in a family game, on by default, still waits for quiet hours
+export const NOTE_TYPES = ['mine', 'reply', 'photo', 'daily', 'dates', 'streak', 'weather', 'event', 'appt', 'alerts', 'comeback', 'scrabble', 'sugar'];
+const DEF_NP = { mine: 1, reply: 1, photo: 1, daily: 1, dates: 1, streak: 0, weather: 0, event: 1, appt: 1, alerts: 1, comeback: 1, scrabble: 1, sugar: 1, qFrom: 22, qTo: 7 }; // 1.9.18 alerts = ⚠️ orange/red Whangārei warnings + ⚡ unplanned outages (on by default) // event = reminders for events you tapped ⭐ Interested on // weather = red-warning alerts, opt-in // the streak reminder is opt-in // 1.9.214 scrabble = your turn in a family game, on by default, still waits for quiet hours
 const BATCH_MS = 30 * 60e3;
 
 export const STAGES = { // what each life stage suggests (topics to offer + the interests inside them) and the soft ranking nudge

@@ -967,7 +967,7 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   assert.strictEqual(SR.voiceForStep({ popped: [{}, {}, {}], made: [], fired: [], cascade: 5 }, 5), 'succulent');
   assert.ok(srJs.includes("if (won) say('yay')") && srJs.includes('function chime') && srJs.includes('function say'));
   assert.ok(srJs.includes('duckMusicBrief') && srJs.includes('linearRampToValueAtTime(1, t0 + dur + 0.22)'));
-  assert.ok(SR.LEVELS.length === 18 && SR.LEVELS[1].name === "Sarah's Sweet Spot");
+  assert.ok(SR.LEVELS.length === 22 && SR.LEVELS[1].name === "Sarah's Sweet Spot");
   assert.ok(SR.LEVELS[1].theme === 'sarah' && SR.LEVELS[1].badge && SR.LEVELS[1].badge.special);
   assert.ok(SR.LEVELS[1].intro && /Sarah, Shane's partner/.test(SR.LEVELS[1].intro.body));
   assert.ok(SR.LEVELS.every(lv => lv.badge && lv.badge.icon && lv.badge.name));
@@ -3857,15 +3857,15 @@ if (live) {
   const SR = load('feed/sugar-rush.js').SugarRush;
   const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
   const html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
-  assert.strictEqual(SR.LEVELS.length, 18);
+  assert.strictEqual(SR.LEVELS.length, 22);
   assert.strictEqual(SR.LEVELS[1].name, "Sarah's Sweet Spot");
   assert.strictEqual(SR.LEVELS[1].badge.icon, '💖');
   assert.strictEqual(SR.LEVELS[1].badge.name, "Sarah's Heart");
-  assert.strictEqual(SR.MAP_STOPS.length, 18);
+  assert.strictEqual(SR.MAP_STOPS.length, 22);
   assert.strictEqual(SR.MAP_W, 400);
   assert.ok(SR.MAP_H > 1000, 'the map is tall enough to scroll south');
   const places = SR.MAP_STOPS.map(s => s.place);
-  assert.deepStrictEqual(Array.from(places), ['Onerahi', "Sarah's House", 'Whangārei', 'Auckland Post Office', 'Hamilton', 'Rotorua', 'Taupō Station', 'Napier', 'Wellington', 'Nelson', 'Kaikōura', 'Christchurch', 'Franz Josef', 'Queenstown', 'Dunedin', 'Rarotonga', 'Tonga', 'Samoa']);
+  assert.deepStrictEqual(Array.from(places), ['Onerahi', "Sarah's House", 'Whangārei', 'Auckland Post Office', 'Hamilton', 'Rotorua', 'Taupō Station', 'Napier', 'Wellington', 'Nelson', 'Kaikōura', 'Christchurch', 'Franz Josef', 'Queenstown', 'Dunedin', 'Bluff', 'Rarotonga', 'Tonga', 'Samoa', 'Sydney', 'Gold Coast', 'Perth']);
   assert.strictEqual(SR.stopForLevel(2).kind, 'house');
   assert.strictEqual(SR.stopForLevel(2).place, "Sarah's House");
   assert.strictEqual(SR.stopForLevel(4).kind, 'post');
@@ -3873,7 +3873,7 @@ if (live) {
   assert.strictEqual(SR.stopForLevel(7).kind, 'station');
   assert.ok(SR.stopForLevel(7).place.toLowerCase().includes('station') || SR.stopForLevel(7).place.includes('Taupō'));
   const future = SR.FUTURE_STOPS.map(s => s.place);
-  assert.ok(future.includes('Sydney') && places.includes('Christchurch') && places.includes('Queenstown') && places.includes('Dunedin'));
+  assert.ok(future.includes('Melbourne') && places.includes('Christchurch') && places.includes('Queenstown') && places.includes('Dunedin'));
   assert.ok(SR.MAP_STOPS.every((a, i) => i === 0 || SR.MAP_STOPS[i].y >= SR.MAP_STOPS[0].y - 40), 'the journey starts up north');
   assert.ok(SR.stopForLevel(15).y < SR.FUTURE_STOPS[0].y, 'future stops lie further south');
   const path = SR.icingPath(SR.MAP_STOPS);
@@ -3944,7 +3944,7 @@ if (live) {
   const play = fs.readFileSync('feed/play.js', 'utf8');
   const idx = fs.readFileSync('feed/index.html', 'utf8');
   const SR = load('feed/sugar-rush.js').SugarRush;
-  assert.strictEqual(SR.LEVELS.length, 18);
+  assert.strictEqual(SR.LEVELS.length, 22);
   assert.strictEqual(SR.LEVELS[1].name, "Sarah's Sweet Spot");
   assert.ok(html.includes('id="mapbar"') && html.includes('id="mapexit"') && html.includes('Exit'));
   assert.ok(html.includes('id="racechip"') && html.includes('id="pickicon"') && html.includes('Pick your icon'));
@@ -3967,9 +3967,9 @@ if (live) {
   const SR = load('feed/sugar-rush.js').SugarRush;
   const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
   const html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
-  assert.strictEqual(SR.LEVELS.length, 18);
+  assert.strictEqual(SR.LEVELS.length, 22);
   assert.ok(SR.LEVELS[1].intro && /Sarah, Shane's partner/.test(SR.LEVELS[1].intro.body));
-  assert.strictEqual(SR.LEVEL_INTROS.length, 18);
+  assert.strictEqual(SR.LEVEL_INTROS.length, 22);
   assert.strictEqual(SR.LEVELS[0].target, 0);
   assert.strictEqual(SR.LEVELS[0].moves, 20);
   const lines = {
@@ -4064,7 +4064,7 @@ if (live) {
   const SR = load('feed/sugar-rush.js').SugarRush;
   const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
   const html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
-  assert.strictEqual(SR.LEVELS.length, 18);
+  assert.strictEqual(SR.LEVELS.length, 22);
   assert.ok(SR.LEVELS[1].intro && /Sarah, Shane's partner/.test(SR.LEVELS[1].intro.body));
   assert.ok(SR.TUTORIALS[1] && SR.TUTORIALS[1] === SR.TUTORIAL_STEPS);
   assert.strictEqual(SR.tutorialFor(1), SR.TUTORIAL_STEPS);
@@ -4375,8 +4375,8 @@ if (live) {
   const SR = load('feed/sugar-rush.js').SugarRush;
   const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
   const html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
-  assert.strictEqual(SR.LEVELS.length, 18);
-  assert.strictEqual(SR.LV_COUNT, 18);
+  assert.strictEqual(SR.LEVELS.length, 22);
+  assert.strictEqual(SR.LV_COUNT, 22);
   const names = SR.LEVELS.slice(10, 15).map(l => l.name);
   assert.deepStrictEqual(Array.from(names), ['Whale Watch', 'Garden City', 'Glacier Run', 'Liquorice Gondola', 'The Chocolate Factory']);
   // Every goal is an objective; score only sets stars.
@@ -4444,7 +4444,7 @@ if (live) {
   assert.ok(SR.MAP_STOPS.every(s => s.x > 20 && s.x < SR.MAP_W - 20 && s.y < SR.MAP_H));
   assert.strictEqual(SR.raceStop({ open: 15 }), 15);
   assert.ok(!/Math\.min\(10,/.test(src) && !/< 10\)/.test(src.slice(src.indexOf('function recordWin'))), 'no level count hardcoded to 10');
-  assert.ok(src.includes('while (open < LV_COUNT && (stars[open - 1] || 0) > 0) open++;'), 'players who finished Nelson or Dunedin can go on');
+  assert.ok(src.includes('while (open < LV_COUNT && (m.stars[open - 1] || 0) > 0) open++;'), 'players who finished Nelson or Dunedin can go on');
   // Scenes, previews and styles.
   for (const n of [11, 12, 13, 14, 15]) assert.ok(SR.sceneSprites(n).includes('class="scs '));
   assert.deepStrictEqual(Array.from(SR.SCENES.slice(10, 15).map(s => s.id)), ['kaikoura', 'christchurch', 'franzjosef', 'queenstown', 'dunedin']);
@@ -4454,23 +4454,21 @@ if (live) {
 }
 console.log('1.9.219 sugar levels ok');
 
-// 1.9.220 Sugar Rush Pacific Islands: Rarotonga, Tonga and Samoa as levels 16-18.
+// 1.9.220 Sugar Rush Pacific Islands: Rarotonga, Tonga and Samoa (levels 17-19 from 1.9.222, when Bluff became 16).
 {
   const SR = load('feed/sugar-rush.js').SugarRush;
   const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
   const html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
-  assert.strictEqual(SR.LEVELS.length, 18);
-  assert.strictEqual(SR.LV_COUNT, 18);
-  assert.deepStrictEqual(Array.from(SR.LEVELS.slice(15).map(l => l.name)), ['Rarotonga Lagoon', 'Tongan Coconut Coast', 'Samoan Sunset']);
-  assert.deepStrictEqual(Array.from(SR.MAP_STOPS.slice(15).map(s => s.place)), ['Rarotonga', 'Tonga', 'Samoa']);
-  assert.ok(SR.MAP_STOPS.slice(15).every(s => s.kind === 'island' && s.y > 1236 && s.y < 1684), 'island stops sit in the Pacific Islands section');
-  assert.deepStrictEqual(Array.from(SR.FUTURE_STOPS.map(s => s.place)), ['Sydney']);
-  assert.strictEqual(SR.raceStop({ open: 18 }), 18);
-  assert.strictEqual(SR.raceStop({ open: 99 }), 18);
+  assert.strictEqual(SR.LEVELS.length, 22);
+  assert.strictEqual(SR.LV_COUNT, 22);
+  assert.deepStrictEqual(Array.from(SR.LEVELS.slice(16, 19).map(l => l.name)), ['Rarotonga Lagoon', 'Tongan Coconut Coast', 'Samoan Sunset']);
+  assert.deepStrictEqual(Array.from(SR.MAP_STOPS.slice(16, 19).map(s => s.place)), ['Rarotonga', 'Tonga', 'Samoa']);
+  assert.ok(SR.MAP_STOPS.slice(16, 19).every(s => s.kind === 'island' && s.y > 1236 && s.y < 1684), 'island stops sit in the Pacific Islands section');
+  assert.ok(!SR.FUTURE_STOPS.some(s => s.place === 'Sydney'), 'Sydney is a real stop now');
   const svg = SR.nzMapSvg();
   assert.ok(svg.includes('Pacific Islands') && svg.includes('sr-pacific') && svg.includes('sr-plane'));
   assert.ok(src.includes("stop.kind === 'island' ? '🌴'"));
-  for (const lv of SR.LEVELS.slice(15)) {
+  for (const lv of SR.LEVELS.slice(16, 19)) {
     assert.ok(!lv.target, 'level ' + lv.n + ' has no score target');
     assert.ok(lv.jelly || lv.bub || lv.ings || lv.liq || lv.locks, 'level ' + lv.n + ' has an objective');
     assert.ok(lv.badge && lv.badge.icon && lv.badge.name);
@@ -4483,10 +4481,86 @@ console.log('1.9.219 sugar levels ok');
     assert.ok(sc.id && SR.sceneSprites(lv.n).includes('sc-sway'), 'tropical scene ' + lv.n + ' has swaying palms');
     assert.ok(!/rugby|football|cricket|netball|stadium/i.test(SR.sceneSvg(lv.n) + SR.sceneSprites(lv.n)), 'no sport');
   }
-  assert.deepStrictEqual(Array.from(SR.LEVELS.slice(15).map(l => l.badge.name)), ['Hibiscus Flower', 'Coconut', 'Sunset Shell']);
-  assert.deepStrictEqual(Array.from(SR.SCENES.slice(15).map(s => s.id)), ['rarotonga', 'tonga', 'samoa']);
-  assert.strictEqual(SR.goalCounts(SR.LEVELS[16]).find(g => g.kind === 'ings').icon, '🥥');
+  assert.deepStrictEqual(Array.from(SR.LEVELS.slice(16, 19).map(l => l.badge.name)), ['Hibiscus Flower', 'Coconut', 'Sunset Shell']);
+  assert.deepStrictEqual(Array.from(SR.SCENES.slice(16, 19).map(s => s.id)), ['rarotonga', 'tonga', 'samoa']);
+  assert.strictEqual(SR.goalCounts(SR.LEVELS[17]).find(g => g.kind === 'ings').icon, '🥥');
   assert.ok(html.includes('@keyframes scsway'));
   assert.ok(!/candy crush/i.test(src + html), 'no Candy Crush names in the game');
 }
 console.log('1.9.220 pacific levels ok');
+
+// 1.9.222 Sugar Rush: Bluff, then Australia (Sydney, Gold Coast, Perth); Hard levels; lightning; family race events.
+{
+  const SR = load('feed/sugar-rush.js').SugarRush;
+  const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
+  const html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
+  assert.strictEqual(SR.LEVELS.length, 22);
+  assert.strictEqual(SR.LV_COUNT, 22);
+  assert.deepStrictEqual(Array.from(SR.MAP_STOPS.slice(14).map(s => s.place)), ['Dunedin', 'Bluff', 'Rarotonga', 'Tonga', 'Samoa', 'Sydney', 'Gold Coast', 'Perth']);
+  assert.ok(SR.MAP_STOPS.every((s, i) => s.n === i + 1 && SR.LEVELS[i].n === i + 1), 'stops and levels are numbered in route order');
+  assert.deepStrictEqual(Array.from(SR.LEVELS.slice(15).map(l => l.name)), ['Bluff Oyster Bay', 'Rarotonga Lagoon', 'Tongan Coconut Coast', 'Samoan Sunset', 'Sydney Harbour Lights', 'Gold Coast Sweet Surf', 'Swan River Sunset']);
+  assert.deepStrictEqual(Array.from(SR.FUTURE_STOPS.map(s => s.place)).sort(), ['Adelaide', 'Brisbane', 'Cairns', 'Canberra', 'Darwin', 'Hobart', 'Melbourne']);
+  assert.ok(SR.MAP_STOPS.slice(19).every(s => s.y > 1800 && s.y < SR.MAP_H) && SR.FUTURE_STOPS.every(s => s.y > 1800 && s.y < SR.MAP_H), 'Australia sits below the Pacific section');
+  assert.ok(SR.MAP_STOPS.concat(SR.FUTURE_STOPS).every(s => s.x > 20 && s.x < SR.MAP_W - 20));
+  const svg = SR.nzMapSvg();
+  assert.ok(svg.includes('sr-aus') && svg.includes('>Australia<') && (svg.match(/class="sr-plane"/g) || []).length >= 3, 'Australia section with planes');
+  assert.ok(!svg.includes('id="sr-future" d="M'), 'coming-soon cities have no trail');
+  assert.strictEqual(SR.raceStop({ open: 99 }), 22);
+  // Level ids: progress follows the level, not its number.
+  const ids = SR.levelIds();
+  assert.strictEqual(new Set(ids).size, 22);
+  assert.deepStrictEqual(Array.from(ids.slice(15)), ['oyster', 'hibiscus', 'coconut', 'shell', 'opera', 'wave', 'swan']);
+  const old = [3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 2, 1, 2, 1, 2, 3, 1, 2];
+  const m = SR.migrateProg({ open: 18, stars: old, best: old.map(x => x * 1000), badges: old.map(x => x ? 1 : 0), wins: 40 });
+  assert.deepStrictEqual(Array.from(m.stars.slice(14)), [2, 0, 3, 1, 2, 0, 0, 0], '1.9.220 island stars move to 17-19; Bluff starts fresh');
+  assert.strictEqual(m.best[16], 3000); assert.strictEqual(m.badges[18], 1); assert.strictEqual(m.badges[15], 0);
+  assert.strictEqual(m.open, 19, 'the open stop (Samoa) follows its id');
+  assert.strictEqual(m.wins, 40);
+  assert.deepStrictEqual(Array.from(SR.migrateProg(m).stars), Array.from(m.stars), 'migrating twice changes nothing');
+  assert.deepStrictEqual(Array.from(SR.migrateProg({ open: 15, stars: old.slice(0, 15) }).stars.slice(0, 15)), old.slice(0, 15), '1-15 never moved');
+  assert.ok(src.includes("ls.get('ib-sugar-layout', 0) >= 222") && src.includes("prog.ids = levelIds()"), 'tutorial marks move once; saves carry ids');
+  assert.ok(src.includes('sid: stopId(self.stop)'), 'race posts name the stop by level id');
+  // New levels: objectives, goal cards, scenes, badges, winnable.
+  for (const lv of SR.LEVELS.slice(15)) {
+    assert.ok(!lv.target, 'level ' + lv.n + ' has no score target');
+    assert.ok(lv.badge && lv.badge.icon && lv.badge.name);
+    assert.ok(SR.goalCounts(lv).length >= 1, 'level ' + lv.n + ' goal card');
+    const intro = SR.LEVEL_INTROS[lv.n - 1];
+    assert.ok(intro && intro.detail.includes(lv.moves + ' moves') && !/score|points/i.test(intro.goal), 'intro ' + lv.n);
+    assert.ok(SR.tutorialFor(lv.n) && SR.tutorialFor(lv.n)[0].kind === 'recap', 'recap ' + lv.n);
+    assert.ok(SR.tryBeat(lv, 16) >= 2, 'level ' + lv.n + ' is winnable');
+    assert.ok(!/rugby|football|cricket|netball|stadium|surfboard race/i.test(SR.sceneSvg(lv.n) + SR.sceneSprites(lv.n)), 'no sport ' + lv.n);
+  }
+  assert.deepStrictEqual(Array.from(SR.SCENES.slice(15).map(s => s.id)), ['bluff', 'rarotonga', 'tonga', 'samoa', 'sydney', 'goldcoast', 'perth']);
+  assert.deepStrictEqual(Array.from([16, 20, 21, 22].map(n => SR.LEVELS[n - 1].badge.name)), ['Bluff Oyster', 'Opera House Sail', 'Golden Wave', 'Black Swan']);
+  assert.ok(SR.sceneSvg(16).includes('SYDNEY') && SR.sceneSvg(20).length > 500 && SR.sceneSvg(22).length > 500);
+  // Hard and Super Hard levels.
+  assert.deepStrictEqual(Array.from(SR.LEVELS.filter(l => l.hard === 1).map(l => l.n)), [13, 15, 19]);
+  assert.deepStrictEqual(Array.from(SR.LEVELS.filter(l => l.hard === 2).map(l => l.n)), [22]);
+  assert.strictEqual(SR.chestReward(13, 2, 0, true).n, 2, 'Hard: an extra booster');
+  assert.strictEqual(SR.chestReward(22, 1, 0, true).n, 3, 'Super Hard: two extra');
+  assert.strictEqual(SR.chestReward(12, 2, 0, true).n, 1);
+  assert.ok(src.includes('function showHardBan') && src.includes('function playHardSting') && src.includes('function hardWinLine'));
+  assert.ok(html.includes('id="hardban"') && html.includes('id="introhard"') && html.includes('body.ingame.hard2 .tray') && html.includes('@keyframes hardglow2'));
+  assert.ok(src.includes('fc-f">🔥') && !/💀|☠/.test(src + html), 'flaming candy, no skulls');
+  // Lightning.
+  assert.ok(src.includes("type: 'bolt'") && src.includes('function boltPath') && src.includes('function playZap') && src.includes('await lightning(s)'));
+  assert.ok(/if \(reduce\) \{\s*\/\/ Reduced motion: a simple highlight/.test(src), 'reduced motion: highlight, no bolts');
+  // Race events.
+  assert.ok(html.includes('id="racebar"') && html.includes('id="racebar2"') && html.includes('id="raceon"'));
+  assert.ok(src.includes('function seedRaceEvent') && src.includes("if (!raceDemo) playSting()"));
+  // Lives: 3 a day, NZ midnight top-up, losing or leaving part-way costs one, tutorials and +3 moves never do, family gifts.
+  assert.ok(src.includes('const LIVES_PER_DAY = 3;') && src.includes("v = { day: day, n: Math.max(LIVES_PER_DAY, v.n | 0) }"), 'midnight top-up keeps gifted extras');
+  assert.ok(/function settleLife\(\) \{\s*if \(!st \|\| st\.tutorial \|\| st\.won \|\| st\.lifeDone\) return;/.test(src), 'tutorials and wins never cost a life');
+  assert.ok(src.includes('if (lives() <= 0) { tut = null; hideTutUi(); showLives(\'out\'); return; }'), 'no lives, no level');
+  assert.ok(src.includes('st.played = true; // Keep going'), '+3 moves keeps going on the same life');
+  assert.ok(src.includes("timeZone: 'Pacific/Auckland', hour: '2-digit'") && src.includes('function countdownText'));
+  assert.ok(src.includes("S.postLives({ act: 'claim' })") && src.includes("S.postLives({ act: 'ask' })") && src.includes("S.postLives({ act: 'send', to: btn.dataset.lifeTo })"));
+  assert.ok(html.includes('id="maphearts"') && html.includes('id="hearts2"') && html.includes('id="livesov"'));
+  const scoresJs = fs.readFileSync('feed/scores.js', 'utf8');
+  assert.ok(scoresJs.includes("const loadLives = () => call('/sugar-lives');") && scoresJs.includes('loadLives, postLives,'));
+  assert.ok(!/'(square|sawtooth)'/.test(src));
+  assert.ok(!/candy crush/i.test(src + html), 'no Candy Crush names in the game');
+}
+console.log('1.9.222 bluff, australia, hard, lightning and race ok');
+

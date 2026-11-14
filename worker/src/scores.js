@@ -31,13 +31,25 @@ export function checkScore(b) {
 }
 
 export const RACE_ICONS = ['lolly','cupcake','donut','cherry','icecream','cookie','kiwi','cat','dog','bunny','unicorn','car','train','bike','rocket','star','bear','bee','butterfly','boat'];
-export const RACE_LIMITS = { stop: 18, stars: 54, gapMs: 1000, perDay: 300 }; // 1.9.220 Sugar Rush has 18 stops (Dunedin, then Rarotonga, Tonga and Samoa).
+export const RACE_LIMITS = { stop: 22, stars: 66, gapMs: 1000, perDay: 300, wins: 1e6 }; // 1.9.222 Sugar Rush has 22 stops (Bluff, the Pacific Islands, then Sydney, Gold Coast and Perth).
+// 1.9.222 Each stop's stable level id (the level's badge id), in map order. The client sends `sid` so the race follows the level, not its number.
+export const RACE_STOP_IDS = ['shop', 'sarah', 'jelly', 'lock', 'icing', 'double', 'down', 'choco', 'path', 'night', 'whale', 'tram', 'glacier', 'gondola', 'ticket', 'oyster', 'hibiscus', 'coconut', 'shell', 'opera', 'wave', 'swan'];
+// 1.9.220 numbered the islands 16-18; from 1.9.222 they are 17-19 (Bluff is 16).
+export const LEGACY_220_ISLANDS = { 16: 17, 17: 18, 18: 19 };
+// 1.9.222 Family race events: 2+ players at the same stop start a race; first to win 5 levels wins; 48 hours max.
+export const RACE_EVENT = { goal: 5, ms: 48 * 36e5, activeMs: 7 * 864e5, showMs: 72 * 36e5 };
 
 export function scoresInit(sql) {
   sql.exec(`CREATE TABLE IF NOT EXISTS scores (id INTEGER PRIMARY KEY AUTOINCREMENT, game TEXT NOT NULL, mid TEXT NOT NULL, score INTEGER NOT NULL, lines INTEGER, level INTEGER, won INTEGER, opp TEXT, at INTEGER NOT NULL);
     CREATE INDEX IF NOT EXISTS s_game ON scores(game, score DESC);
     CREATE INDEX IF NOT EXISTS s_mid ON scores(mid, game, at);`);
   sql.exec(`CREATE TABLE IF NOT EXISTS sugar_race (mid TEXT PRIMARY KEY, icon TEXT NOT NULL, stop INTEGER NOT NULL, stars INTEGER NOT NULL, at INTEGER NOT NULL)`);
+  try { sql.exec(`ALTER TABLE sugar_race ADD COLUMN wins INTEGER DEFAULT 0`); } catch (e) { }
+  sql.exec(`CREATE TABLE IF NOT EXISTS sugar_race_event (id INTEGER PRIMARY KEY AUTOINCREMENT, stop INTEGER NOT NULL, members TEXT NOT NULL, prog TEXT NOT NULL, at INTEGER NOT NULL, ends INTEGER NOT NULL, done INTEGER NOT NULL DEFAULT 0, winner TEXT, why TEXT, fin INTEGER)`);
+  sugarStopsOnce20261114(sql);
+  // 1.9.222 Sugar Rush lives: family gifts (one life per sender per recipient per NZ day) and "ask family" (once a day).
+  sql.exec(`CREATE TABLE IF NOT EXISTS sugar_life_gift (id INTEGER PRIMARY KEY AUTOINCREMENT, frm TEXT NOT NULL, too TEXT NOT NULL, day TEXT NOT NULL, at INTEGER NOT NULL, claimed INTEGER NOT NULL DEFAULT 0, UNIQUE (frm, too, day))`);
+  sql.exec(`CREATE TABLE IF NOT EXISTS sugar_life_ask (mid TEXT NOT NULL, day TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (mid, day))`);
   clearShaneTetrisOnce(sql);
   clearShaneTetrisOnce20261113(sql);
   clearAllTetrisOnce20261114(sql);
@@ -157,6 +169,22 @@ export function board(sql, me, game) {
   return { status: 200, body: { game, me: me.name, top, best } };
 }
 
+/* 1.9.222 One-off: race rows saved by 1.9.220 at stops 16-18 (the islands) move to 17-19, so nobody
+   loses their place when Bluff becomes stop 16. Guarded by a meta flag so it runs exactly once. */
+export const SUGAR_STOPS_KEY = 'sugar_stops_222_20261114';
+export function sugarStopsOnce20261114(sql) {
+  try {
+    sql.exec(`CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT)`);
+    if (rows(sql, `SELECT v FROM meta WHERE k=?`, SUGAR_STOPS_KEY)[0]) return { already: true };
+    const moved = rows(sql, `SELECT mid, stop FROM sugar_race WHERE stop BETWEEN 16 AND 18`);
+    sql.exec(`UPDATE sugar_race SET stop = stop + 1 WHERE stop BETWEEN 16 AND 18`);
+    sql.exec(`INSERT OR REPLACE INTO meta (k,v) VALUES (?,?)`, SUGAR_STOPS_KEY, JSON.stringify({ at: Date.now(), n: moved.length, moved }));
+    return { n: moved.length };
+  } catch (e) {
+    return { err: 'pending' };
+  }
+}
+
 /* Called from Family.fetch once the member's token has been checked. Returns null for paths that aren't /scores. */
 export function checkRace(b) {
   if (!b || typeof b !== 'object') return { err: 'bad race' };
@@ -164,7 +192,97 @@ export function checkRace(b) {
   if (!RACE_ICONS.includes(icon)) return { err: 'bad icon' };
   if (!isInt(b.stop, 1, RACE_LIMITS.stop)) return { err: 'bad stop' };
   if (!isInt(b.stars, 0, RACE_LIMITS.stars)) return { err: 'bad stars' };
-  return { ok: { icon, stop: b.stop, stars: b.stars } };
+  let stop = b.stop;
+  if (b.sid !== undefined) {
+    // 1.9.222+ clients name their stop's level: trust the id over the number.
+    const i = RACE_STOP_IDS.indexOf(typeof b.sid === 'string' ? b.sid : '');
+    if (i < 0) return { err: 'bad sid' };
+    stop = i + 1;
+  } else if (LEGACY_220_ISLANDS[stop]) {
+    stop = LEGACY_220_ISLANDS[stop]; // a 1.9.220 phone still counting the islands as 16-18
+  }
+  const wins = b.wins === undefined ? null : b.wins;
+  if (wins !== null && !isInt(wins, 0, RACE_LIMITS.wins)) return { err: 'bad wins' };
+  const lw = b.lw === undefined ? null : b.lw;
+  if (lw !== null && !isInt(lw, 1, RACE_LIMITS.stop)) return { err: 'bad lw' };
+  return { ok: { icon, stop, stars: b.stars, wins, lw } };
+}
+
+/* ---- 1.9.222 race events ---- */
+const pj = (t, d) => { try { return JSON.parse(t); } catch (e) { return d; } };
+function evRow(r) { return r && { ...r, members: pj(r.members, []), prog: pj(r.prog, {}) }; }
+function activeEventFor(sql, mid) {
+  for (const r of rows(sql, `SELECT * FROM sugar_race_event WHERE done=0 ORDER BY id DESC`)) { const e = evRow(r); if (e.members.includes(mid)) return e; }
+  return null;
+}
+function leaderOf(e) {
+  // most wins; a tie goes to whoever got there first
+  let best = null;
+  for (const mid of e.members) {
+    const p = e.prog[mid] || { n: 0, t: 0 };
+    if (!best || p.n > best.n || (p.n === best.n && p.n > 0 && (p.t || 0) < (best.t || 0))) best = { mid, n: p.n, t: p.t || 0 };
+  }
+  return best && best.n > 0 ? best.mid : null; // nobody won a level: no winner
+}
+function namesOf(sql, mids) {
+  const out = {};
+  for (const r of rows(sql, `SELECT id, name FROM members`)) out[r.id] = r.name;
+  return mids.map(m => out[m] || 'Someone');
+}
+function finishEvent(sql, e, winner, why, now, notes) {
+  sql.exec(`UPDATE sugar_race_event SET done=1, winner=?, why=?, fin=? WHERE id=?`, winner, why, now, e.id);
+  const [wn] = namesOf(sql, [winner]);
+  for (const mid of e.members) {
+    const text = !winner ? `🏁 Sugar Rush race over: time ran out before anyone won a level. Better luck next race!` : mid === winner
+      ? (why === 'timeout' ? `🏆 Sugar Rush race over: time's up and you were in front. You win!` : `🏆 You won the Sugar Rush race! Come and collect your prize.`)
+      : `🏁 Sugar Rush race over: ${wn} won${why === 'timeout' ? ' (time ran out)' : ''}. You get a consolation prize!`;
+    notes.push({ mid, text, card: 'sugar-race-' + e.id });
+  }
+}
+// Time out any race that has run past 48 hours: the leader wins.
+export function expireRaces(sql, now = Date.now(), notes = []) {
+  for (const r of rows(sql, `SELECT * FROM sugar_race_event WHERE done=0 AND ends <= ?`, now)) {
+    const e = evRow(r);
+    finishEvent(sql, e, leaderOf(e), 'timeout', now, notes);
+  }
+  return notes;
+}
+// Start a race when 2+ recently active players share a stop and none of them is already racing.
+export function maybeStartRace(sql, mid, now = Date.now(), notes = []) {
+  const me = rows(sql, `SELECT r.stop FROM sugar_race r JOIN members m ON m.id=r.mid AND m.removed=0 WHERE r.mid=?`, mid)[0];
+  if (!me || activeEventFor(sql, mid)) return null;
+  const here = rows(sql, `SELECT r.mid, r.at FROM sugar_race r JOIN members m ON m.id=r.mid AND m.removed=0 WHERE r.stop=? AND r.at > ? ORDER BY r.at ASC`, me.stop, now - RACE_EVENT.activeMs)
+    .map(r => r.mid).filter(m => m === mid || !activeEventFor(sql, m));
+  if (here.length < 2 || !here.includes(mid)) return null;
+  const prog = {}; for (const m of here) prog[m] = { n: 0, t: 0 };
+  sql.exec(`INSERT INTO sugar_race_event (stop, members, prog, at, ends) VALUES (?,?,?,?,?)`, me.stop, JSON.stringify(here), JSON.stringify(prog), now, now + RACE_EVENT.ms);
+  const id = rows(sql, `SELECT MAX(id) id FROM sugar_race_event`)[0].id;
+  const names = namesOf(sql, here);
+  for (let i = 0; i < here.length; i++) {
+    const others = names.filter((_, j) => j !== i);
+    notes.push({ mid: here[i], text: `🏁 Race on! You vs ${others.join(', ')} in Sugar Rush. First to win ${RACE_EVENT.goal} levels wins a prize!`, card: 'sugar-race-' + id });
+  }
+  return id;
+}
+// A win on the race stop or beyond counts toward the race (replaying easy early levels doesn't).
+export function raceWin(sql, mid, lw, now = Date.now(), notes = []) {
+  const e = activeEventFor(sql, mid); if (!e || !lw || lw < e.stop) return null;
+  const p = e.prog[mid] || { n: 0, t: 0 };
+  p.n = Math.min(RACE_EVENT.goal, p.n + 1); p.t = now; e.prog[mid] = p;
+  sql.exec(`UPDATE sugar_race_event SET prog=? WHERE id=?`, JSON.stringify(e.prog), e.id);
+  if (p.n >= RACE_EVENT.goal) finishEvent(sql, e, mid, 'win', now, notes);
+  return p.n;
+}
+export function raceEventView(sql, me, now = Date.now()) {
+  let e = activeEventFor(sql, me.id);
+  if (!e) {
+    for (const r of rows(sql, `SELECT * FROM sugar_race_event WHERE done=1 AND fin > ? ORDER BY fin DESC`, now - RACE_EVENT.showMs)) { const x = evRow(r); if (x.members.includes(me.id)) { e = x; break; } }
+  }
+  if (!e) return null;
+  const info = {};
+  for (const r of rows(sql, `SELECT r.mid, r.icon, m.name FROM sugar_race r JOIN members m ON m.id=r.mid`)) info[r.mid] = r;
+  const racers = e.members.map(mid => ({ name: (info[mid] && info[mid].name) || 'Someone', icon: (info[mid] && info[mid].icon) || 'star', n: (e.prog[mid] || {}).n || 0, mine: mid === me.id, winner: !!e.done && mid === e.winner }));
+  return { id: e.id, stop: e.stop, at: e.at, ends: e.ends, goal: RACE_EVENT.goal, done: !!e.done, why: e.why || null, won: !!e.done && e.winner === me.id, winner: e.done ? ((info[e.winner] && info[e.winner].name) || 'Someone') : null, racers };
 }
 
 function suggestedIcon(sql, mid, want) {
@@ -188,25 +306,98 @@ export function saveRace(sql, me, body, now = Date.now()) {
   }
   const stop = Math.max(c.ok.stop, prev ? prev.stop : 0);
   const stars = Math.max(c.ok.stars, prev ? prev.stars : 0);
-  if (prev) sql.exec(`UPDATE sugar_race SET icon=?, stop=?, stars=?, at=? WHERE mid=?`, c.ok.icon, stop, stars, now, me.id);
+  const prevWins = prev ? (rows(sql, `SELECT wins FROM sugar_race WHERE mid=?`, me.id)[0] || {}).wins || 0 : 0;
+  const wins = c.ok.wins === null ? prevWins : Math.max(prevWins, c.ok.wins);
+  if (prev) sql.exec(`UPDATE sugar_race SET icon=?, stop=?, stars=?, at=?, wins=? WHERE mid=?`, c.ok.icon, stop, stars, now, wins, me.id);
   else {
     if ((today.n || 0) >= RACE_LIMITS.perDay) return { status: 429, body: { err: 'too many today' } };
-    sql.exec(`INSERT INTO sugar_race (mid, icon, stop, stars, at) VALUES (?,?,?,?,?)`, me.id, c.ok.icon, stop, stars, now);
+    sql.exec(`INSERT INTO sugar_race (mid, icon, stop, stars, at, wins) VALUES (?,?,?,?,?,?)`, me.id, c.ok.icon, stop, stars, now, wins);
   }
-  return { status: 200, body: { ok: 1, icon: c.ok.icon, stop, stars } };
+  // 1.9.222 race events: time-outs first, then this post's win (if it's new), then maybe a new race at the stop.
+  const notes = [];
+  expireRaces(sql, now, notes);
+  if (prev && c.ok.wins !== null && c.ok.wins > prevWins && c.ok.lw) raceWin(sql, me.id, c.ok.lw, now, notes);
+  maybeStartRace(sql, me.id, now, notes);
+  return { status: 200, body: { ok: 1, icon: c.ok.icon, stop, stars, event: raceEventView(sql, me, now) }, notes };
 }
 
-export function raceBoard(sql, me) {
+export function raceBoard(sql, me, now = Date.now(), notes = []) {
+  expireRaces(sql, now, notes);
   const racers = rows(sql, `SELECT r.mid, m.name, r.icon, r.stop, r.stars, r.at FROM sugar_race r JOIN members m ON m.id=r.mid AND m.removed=0 ORDER BY r.stop DESC, r.stars DESC, m.name ASC`)
     .map(r => ({ name: r.name, icon: r.icon, stop: r.stop, stars: r.stars, at: r.at, mine: r.mid === me.id }));
-  return { status: 200, body: { me: me.name, racers } };
+  return { status: 200, body: { me: me.name, racers, event: raceEventView(sql, me, now) }, notes };
 }
 
-export async function scoresRoute(sql, me, p, m, url, readBody, now = Date.now()) {
+/* ---- 1.9.222 Sugar Rush lives: the phone keeps its own 3-a-day count; the Worker only carries family gifts and asks. ---- */
+export const LIVES = { perDay: 3, giftPerDay: 1, askPerDay: 1 };
+export function nzDay(t = Date.now()) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(t));
+}
+// An opaque key for a family member (no member ids leave the Worker).
+export function lifeKey(mid) {
+  let h = 0x811c9dc5;
+  const s = 'sugar-life:' + mid;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h.toString(36);
+}
+const firstName = n => String(n || 'Someone').trim().split(/\s+/)[0] || 'Someone';
+function lifeFamily(sql, me) {
+  return rows(sql, `SELECT m.id, m.name, r.icon FROM members m LEFT JOIN sugar_race r ON r.mid=m.id WHERE m.removed=0 AND m.id != ? ORDER BY m.name ASC`, me.id);
+}
+export function livesView(sql, me, now = Date.now()) {
+  const day = nzDay(now);
+  const sent = new Set(rows(sql, `SELECT too FROM sugar_life_gift WHERE frm=? AND day=?`, me.id, day).map(r => r.too));
+  const family = lifeFamily(sql, me).map(r => ({ key: lifeKey(r.id), name: r.name, icon: r.icon || null, sent: sent.has(r.id) }));
+  const pending = rows(sql, `SELECT COUNT(*) n FROM sugar_life_gift WHERE too=? AND claimed=0`, me.id)[0].n || 0;
+  const asked = !!rows(sql, `SELECT 1 FROM sugar_life_ask WHERE mid=? AND day=?`, me.id, day)[0];
+  return { day, family, pending, asked };
+}
+export function livesPost(sql, me, b, now = Date.now()) {
+  const day = nzDay(now), notes = [];
+  const act = b && typeof b.act === 'string' ? b.act : '';
+  if (act === 'send') {
+    const key = typeof b.to === 'string' ? b.to : '';
+    const to = lifeFamily(sql, me).find(r => lifeKey(r.id) === key);
+    if (!to) return { status: 400, body: { err: 'no such player' } };
+    if (rows(sql, `SELECT 1 FROM sugar_life_gift WHERE frm=? AND too=? AND day=?`, me.id, to.id, day)[0])
+      return { status: 429, body: { err: 'already sent today', ...livesView(sql, me, now) } };
+    sql.exec(`INSERT INTO sugar_life_gift (frm, too, day, at) VALUES (?,?,?,?)`, me.id, to.id, day, now);
+    notes.push({ mid: to.id, text: `${firstName(me.name)} sent you a life ❤️`, card: 'sugar-lives' });
+    return { status: 200, body: { ok: 1, sent: firstName(to.name), ...livesView(sql, me, now) }, notes };
+  }
+  if (act === 'claim') {
+    const got = rows(sql, `SELECT g.id, m.name FROM sugar_life_gift g LEFT JOIN members m ON m.id=g.frm WHERE g.too=? AND g.claimed=0 ORDER BY g.at ASC`, me.id);
+    for (const g of got) sql.exec(`UPDATE sugar_life_gift SET claimed=? WHERE id=?`, now, g.id);
+    return { status: 200, body: { ok: 1, claimed: got.length, from: got.map(g => firstName(g.name)), ...livesView(sql, me, now) } };
+  }
+  if (act === 'ask') {
+    if (rows(sql, `SELECT 1 FROM sugar_life_ask WHERE mid=? AND day=?`, me.id, day)[0])
+      return { status: 429, body: { err: 'already asked today', ...livesView(sql, me, now) } };
+    sql.exec(`INSERT INTO sugar_life_ask (mid, day, at) VALUES (?,?,?)`, me.id, day, now);
+    for (const r of lifeFamily(sql, me)) notes.push({ mid: r.id, text: `${firstName(me.name)} is out of lives in Sugar Rush. Send a life ❤️`, card: 'sugar-lives' });
+    return { status: 200, body: { ok: 1, asked: true, told: notes.length, ...livesView(sql, me, now) }, notes };
+  }
+  return { status: 400, body: { err: 'bad act' } };
+}
+
+export async function scoresRoute(sql, me, p, m, url, readBody, now = Date.now(), hooks = null) {
+  if (p === '/sugar-lives') {
+    let r;
+    if (m === 'GET') r = { status: 200, body: livesView(sql, me, now) };
+    else if (m === 'POST') r = livesPost(sql, me, await readBody(), now);
+    else return { status: 405, body: { err: 'method' } };
+    // "Sarah sent you a life ❤️" and "out of lives" asks go out through the family notifications.
+    if (r.notes && r.notes.length && hooks && hooks.note) for (const n of r.notes) { try { await hooks.note(n.mid, n.text, n.card); } catch (e) { } }
+    return r;
+  }
   if (p === '/sugar-race') {
-    if (m === 'GET') return raceBoard(sql, me);
-    if (m === 'POST') return saveRace(sql, me, await readBody(), now);
-    return { status: 405, body: { err: 'method' } };
+    let r;
+    if (m === 'GET') r = raceBoard(sql, me, now);
+    else if (m === 'POST') r = saveRace(sql, me, await readBody(), now);
+    else return { status: 405, body: { err: 'method' } };
+    // 1.9.222 "Race on!" and race results go out through the family notifications.
+    if (r.notes && r.notes.length && hooks && hooks.note) for (const n of r.notes) { try { await hooks.note(n.mid, n.text, n.card); } catch (e) { } }
+    return r;
   }
   if (p !== '/scores') return null;
   if (m === 'GET') return board(sql, me, url.searchParams.get('game'));

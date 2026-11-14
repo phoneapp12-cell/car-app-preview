@@ -8,7 +8,7 @@ import { Retain, nudgeFor, TAGS } from './retain.js';
 import { InfoBot, BOT_ID, BOT_NAME, AI_MODEL } from './ai.js';
 import { paywallUrl, paywallHtml } from './paywall.js';
 import { preview, blockedWhy, findUrl, safeUrl, stockPics } from './preview.js';
-import { scoresInit, scoresRoute, clearShaneTetrisOnce, clearShaneTetrisOnce20261113, clearAllTetrisOnce20261114 } from './scores.js'; // 1.9.149 family scoreboard; 12–14 Nov 2026 one-off Tetris clears
+import { scoresInit, scoresRoute, clearShaneTetrisOnce, clearShaneTetrisOnce20261113, clearAllTetrisOnce20261114, sugarStopsOnce20261114 } from './scores.js'; // 1.9.149 family scoreboard; 12–14 Nov 2026 one-off Tetris clears
 import { scrabbleInit, scrabbleRoute, bindDict } from './scrabble.js'; // 1.9.214 family Scrabble online challenges
 import lexicon from './lexicon.js';
 
@@ -139,6 +139,7 @@ export class Family extends DurableObject {
     try { clearShaneTetrisOnce(this.sql); } catch (e) { } // 12 Nov 2026 one-off: Shane's Tetris rows, once
     try { clearShaneTetrisOnce20261113(this.sql); } catch (e) { } // 13 Nov 2026 one-off: Shane's Tetris rows again, once
     try { clearAllTetrisOnce20261114(this.sql); } catch (e) { } // 14 Nov 2026 one-off: everyone's Tetris rows, once
+    try { sugarStopsOnce20261114(this.sql); } catch (e) { } // 1.9.222 one-off: race stops 16-18 move to 17-19 (Bluff is 16)
 
     if (p === '/bootstrap') { // first admin only (needs the service's secret key); does nothing once an admin exists
       if (!this.env.SEED_KEY || u.searchParams.get('key') !== this.env.SEED_KEY) return J({ err: 'no' }, 403);
@@ -175,7 +176,7 @@ export class Family extends DurableObject {
 
     if (p === '/me') return J({ id: me.id, name: me.name, role: me.role });
     if (p === '/people') return J(this.all(`SELECT id,name,role FROM members WHERE removed=0 ORDER BY created`));
-    { const r = await scoresRoute(this.sql, me, p, m, u, body, now); if (r) return J(r.body, r.status); } // 1.9.149 family scoreboard
+    { const r = await scoresRoute(this.sql, me, p, m, u, body, now, { note: (mid, text, card) => this.rt.note(mid, 'sugar', text, card) }); if (r) return J(r.body, r.status); } // 1.9.149 family scoreboard; 1.9.222 race events push via family notifications
     { const r = await scrabbleRoute(this.sql, me, p, m, u, body, now, { note: (mid, text, card) => this.rt.note(mid, 'scrabble', text, card) }); if (r) return J(r.body, r.status); } // 1.9.214 family Scrabble
 
     // ---- admin: members and their invite links

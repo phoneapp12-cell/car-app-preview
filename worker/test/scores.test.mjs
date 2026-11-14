@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
-import { checkScore, tetrisMax, scoresInit, scoresRoute, addScore, board, RATE, RACE_ICONS, RACE_LIMITS, checkRace, saveRace, raceBoard, clearShaneTetrisOnce, CLEAR_SHANE_TETRIS_KEY, clearShaneTetrisOnce20261113, CLEAR_SHANE_TETRIS_KEY2, clearAllTetrisOnce20261114, CLEAR_ALL_TETRIS_KEY } from '../src/scores.js';
+import { checkScore, tetrisMax, scoresInit, scoresRoute, addScore, board, RATE, RACE_ICONS, RACE_LIMITS, checkRace, saveRace, raceBoard, clearShaneTetrisOnce, CLEAR_SHANE_TETRIS_KEY, clearShaneTetrisOnce20261113, CLEAR_SHANE_TETRIS_KEY2, clearAllTetrisOnce20261114, CLEAR_ALL_TETRIS_KEY, RACE_STOP_IDS, sugarStopsOnce20261114, SUGAR_STOPS_KEY, expireRaces, LIVES, nzDay, lifeKey } from '../src/scores.js';
 
 function stubSql() {
   const db = new DatabaseSync(':memory:');
@@ -193,12 +193,14 @@ assert.ok(checkRace({ icon: 'spaceship', stop: 5, stars: 9 }).err, 'unknown icon
 assert.ok(checkRace({ icon: 'lolly', stop: 0, stars: 0 }).err);
 // 1.9.219 Levels 11-15: the race now runs to stop 15 (Dunedin) with up to 45 stars.
 // 1.9.220 Pacific Islands: stops 16-18 (Rarotonga, Tonga, Samoa), up to 54 stars.
-assert.deepEqual(RACE_LIMITS, { stop: 18, stars: 54, gapMs: 1000, perDay: 300 });
+// 1.9.222 Bluff + Australia: 22 stops, up to 66 stars.
+assert.deepEqual(RACE_LIMITS, { stop: 22, stars: 66, gapMs: 1000, perDay: 300, wins: 1e6 });
 assert.ok(checkRace({ icon: 'lolly', stop: 11, stars: 31 }).ok);
 assert.ok(checkRace({ icon: 'lolly', stop: 15, stars: 45 }).ok);
 assert.ok(checkRace({ icon: 'lolly', stop: 18, stars: 54 }).ok);
-assert.ok(checkRace({ icon: 'lolly', stop: 19, stars: 0 }).err);
-assert.ok(checkRace({ icon: 'lolly', stop: 3, stars: 55 }).err);
+assert.ok(checkRace({ icon: 'lolly', stop: 22, stars: 66 }).ok);
+assert.ok(checkRace({ icon: 'lolly', stop: 23, stars: 0 }).err);
+assert.ok(checkRace({ icon: 'lolly', stop: 3, stars: 67 }).err);
 assert.ok(checkRace({ icon: 'lolly', stop: 3, stars: -1 }).err);
 assert.ok(checkRace({ icon: 'lolly', stop: 1.5, stars: 1 }).err);
 
@@ -231,6 +233,183 @@ rr = await racePost(shane, { icon: 'rocket', stop: 7, stars: 12 }, 6000);
 assert.equal(rr.body.icon, 'rocket'); assert.equal(rr.body.stop, 7);
 assert.equal((await raceGet(shane)).body.racers.find(x => x.mine).icon, 'rocket');
 assert.equal((await scoresRoute(sqlR, shane, '/sugar-race', 'PUT', new URL('https://x/api/sugar-race'), async () => ({}), 7000)).status, 405);
+
+
+// ---- 1.9.222 stops follow the level id, not its number
+assert.equal(RACE_STOP_IDS.length, 22);
+assert.equal(new Set(RACE_STOP_IDS).size, 22, 'level ids are unique');
+assert.deepEqual(RACE_STOP_IDS.slice(15), ['oyster', 'hibiscus', 'coconut', 'shell', 'opera', 'wave', 'swan']);
+assert.equal(checkRace({ icon: 'lolly', stop: 16, stars: 40, sid: 'oyster' }).ok.stop, 16, 'Bluff is stop 16');
+assert.equal(checkRace({ icon: 'lolly', stop: 17, stars: 40, sid: 'hibiscus' }).ok.stop, 17);
+assert.equal(checkRace({ icon: 'lolly', stop: 3, stars: 40, sid: 'swan' }).ok.stop, 22, 'the id wins over a wrong number');
+assert.ok(checkRace({ icon: 'lolly', stop: 3, stars: 4, sid: 'nope' }).err);
+assert.equal(checkRace({ icon: 'lolly', stop: 16, stars: 40 }).ok.stop, 17, 'a 1.9.220 phone at Rarotonga (16) lands on 17');
+assert.equal(checkRace({ icon: 'lolly', stop: 18, stars: 50 }).ok.stop, 19, 'a 1.9.220 phone at Samoa (18) lands on 19');
+assert.equal(checkRace({ icon: 'lolly', stop: 15, stars: 40 }).ok.stop, 15, '1-15 never moved');
+assert.ok(checkRace({ icon: 'lolly', stop: 3, stars: 4, wins: -1 }).err);
+// one-off migration of saved race rows 16-18 -> 17-19, exactly once
+{
+  const q = stubSql();
+  q.db.exec(`CREATE TABLE sugar_race (mid TEXT PRIMARY KEY, icon TEXT NOT NULL, stop INTEGER NOT NULL, stars INTEGER NOT NULL, at INTEGER NOT NULL)`);
+  for (const [mid, icon, stop] of [['a', 'lolly', 15], ['b', 'kiwi', 16], ['c', 'cat', 17], ['d', 'dog', 18]]) q.db.prepare(`INSERT INTO sugar_race VALUES (?,?,?,?,?)`).run(mid, icon, stop, 30, 1);
+  q.db.exec(`CREATE TABLE members (id TEXT PRIMARY KEY, name TEXT NOT NULL, role TEXT NOT NULL, tok TEXT, created INTEGER, seen INTEGER, removed INTEGER DEFAULT 0)`);
+  q.db.exec(`CREATE TABLE scores (id INTEGER PRIMARY KEY AUTOINCREMENT, mid TEXT, game TEXT, score INTEGER, lines INTEGER, level INTEGER, won INTEGER, opp TEXT, at INTEGER)`);
+  scoresInit(q);
+  assert.deepEqual(q.db.prepare(`SELECT mid, stop FROM sugar_race ORDER BY mid`).all().map(r => [r.mid, r.stop]), [['a', 15], ['b', 17], ['c', 18], ['d', 19]]);
+  assert.ok(sugarStopsOnce20261114(q).already, 'second run is a no-op');
+  scoresInit(q);
+  assert.deepEqual(q.db.prepare(`SELECT stop FROM sugar_race ORDER BY mid`).all().map(r => r.stop), [15, 17, 18, 19], 'not moved twice');
+  assert.ok(q.db.prepare(`SELECT v FROM meta WHERE k=?`).get(SUGAR_STOPS_KEY));
+}
+assert.ok(fam.includes('sugarStopsOnce20261114(this.sql)'));
+assert.ok(fam.includes("this.rt.note(mid, 'sugar', text, card)"), 'race pushes go through the family notifications');
+
+// ---- 1.9.222 family race events: start, progress, win, timeout
+{
+  const q = stubSql();
+  q.db.exec(`CREATE TABLE members (id TEXT PRIMARY KEY, name TEXT NOT NULL, role TEXT NOT NULL, tok TEXT, created INTEGER, seen INTEGER, removed INTEGER DEFAULT 0)`);
+  for (const [id, name] of [['m1', 'Shane'], ['m2', 'Sarah'], ['m3', 'Aranea'], ['m4', 'Nana'], ['m5', 'Pop']]) q.db.prepare(`INSERT INTO members (id,name,role,created,removed) VALUES (?,?,?,?,0)`).run(id, name, 'member', 1);
+  scoresInit(q);
+  const pushed = [];
+  const hooks = { note: async (mid, text, card) => { pushed.push({ mid, text, card }); } };
+  const T0 = 1_800_000_000_000;
+  const post = (me, b, t) => scoresRoute(q, me, '/sugar-race', 'POST', new URL('https://x/api/sugar-race'), async () => b, t, hooks);
+  const get = (me, t) => scoresRoute(q, me, '/sugar-race', 'GET', new URL('https://x/api/sugar-race'), async () => ({}), t, hooks);
+  const S = { id: 'm1', name: 'Shane' }, H = { id: 'm2', name: 'Sarah' }, A = { id: 'm3', name: 'Aranea' }, N = { id: 'm4', name: 'Nana' }, P = { id: 'm5', name: 'Pop' };
+  // start: one player alone at a stop is no race; a second arrival starts one for both
+  let r = await post(S, { icon: 'lolly', stop: 20, stars: 50, sid: 'opera', wins: 30 }, T0);
+  assert.equal(r.body.event, null);
+  r = await post(H, { icon: 'cupcake', stop: 20, stars: 48, sid: 'opera', wins: 25 }, T0 + 1000);
+  assert.ok(r.body.event && !r.body.event.done, 'Race on!');
+  assert.equal(r.body.event.stop, 20); assert.equal(r.body.event.goal, 5);
+  assert.deepEqual(r.body.event.racers.map(x => [x.name, x.icon, x.n]).sort(), [['Sarah', 'cupcake', 0], ['Shane', 'lolly', 0]]);
+  assert.equal(r.body.event.ends - r.body.event.at, 48 * 36e5);
+  assert.deepEqual(pushed.map(p => p.mid).sort(), ['m1', 'm2'], 'both racers get a push');
+  assert.ok(pushed.every(p => /^🏁 Race on!/.test(p.text) && p.card === 'sugar-race-' + r.body.event.id));
+  assert.ok(pushed.find(p => p.mid === 'm1').text.includes('Sarah') && pushed.find(p => p.mid === 'm2').text.includes('Shane'), 'the push lists the racers');
+  const raceId = r.body.event.id;
+  // no mid-race joins: a later arrival at the same stop isn't added, and no second race starts around the racers
+  pushed.length = 0;
+  r = await post(A, { icon: 'kiwi', stop: 20, stars: 45, sid: 'opera', wins: 20 }, T0 + 2000);
+  assert.equal(r.body.event, null, 'Aranea is not added mid-race');
+  assert.equal(pushed.length, 0);
+  assert.equal(q.db.prepare(`SELECT COUNT(*) n FROM sugar_race_event WHERE done=0`).get().n, 1, 'one active race for the group');
+  // progress: only new wins on the race stop or beyond count
+  r = await post(S, { icon: 'lolly', stop: 21, stars: 52, sid: 'wave', wins: 31, lw: 20 }, T0 + 10_000);
+  assert.equal(r.body.event.racers.find(x => x.mine).n, 1);
+  r = await post(S, { icon: 'lolly', stop: 21, stars: 52, sid: 'wave', wins: 32, lw: 3 }, T0 + 20_000);
+  assert.equal(r.body.event.racers.find(x => x.mine).n, 1, 'replaying an early level does not count');
+  r = await post(S, { icon: 'lolly', stop: 21, stars: 52, sid: 'wave', wins: 32, lw: 21 }, T0 + 30_000);
+  assert.equal(r.body.event.racers.find(x => x.mine).n, 1, 'a repeat post with no new win does not count');
+  r = await post(H, { icon: 'cupcake', stop: 21, stars: 50, sid: 'wave', wins: 26, lw: 20 }, T0 + 40_000);
+  assert.deepEqual(r.body.event.racers.map(x => [x.name, x.n]).sort(), [['Sarah', 1], ['Shane', 1]]);
+  r = await get(N, T0 + 41_000);
+  assert.equal(r.body.event, null, 'non-racers see no race card');
+  // win: first to 5
+  for (let k = 0; k < 3; k++) r = await post(S, { icon: 'lolly', stop: 22, stars: 55, sid: 'swan', wins: 33 + k, lw: 21 }, T0 + 50_000 + k * 2000);
+  assert.equal(r.body.event.racers.find(x => x.mine).n, 4); assert.equal(r.body.event.done, false);
+  pushed.length = 0;
+  r = await post(S, { icon: 'lolly', stop: 22, stars: 58, sid: 'swan', wins: 36, lw: 22 }, T0 + 60_000);
+  assert.equal(r.body.event.done, true); assert.equal(r.body.event.won, true); assert.equal(r.body.event.winner, 'Shane'); assert.equal(r.body.event.why, 'win');
+  assert.ok(pushed.find(p => p.mid === 'm1' && /You won/.test(p.text)));
+  assert.ok(pushed.find(p => p.mid === 'm2' && /Shane won/.test(p.text) && /consolation/.test(p.text)));
+  r = await get(H, T0 + 61_000);
+  assert.equal(r.body.event.id, raceId); assert.equal(r.body.event.done, true); assert.equal(r.body.event.won, false, 'Sarah sees the result');
+  r = await get(H, T0 + 61_000 + 73 * 36e5);
+  assert.equal(r.body.event, null, 'finished races drop off after 3 days');
+  // timeout: Pop and Nana race, nobody reaches 5 in 48 hours, the leader wins
+  pushed.length = 0;
+  const T1 = T0 + 100 * 36e5;
+  await post(P, { icon: 'bear', stop: 9, stars: 20, sid: 'path', wins: 20 }, T1);
+  r = await post(N, { icon: 'bee', stop: 9, stars: 18, sid: 'path', wins: 10 }, T1 + 1000);
+  assert.ok(r.body.event && r.body.event.racers.length === 2);
+  await post(N, { icon: 'bee', stop: 10, stars: 20, sid: 'night', wins: 11, lw: 9 }, T1 + 5000);
+  await post(P, { icon: 'bear', stop: 10, stars: 22, sid: 'night', wins: 21, lw: 9 }, T1 + 6000);
+  await post(P, { icon: 'bear', stop: 11, stars: 24, sid: 'whale', wins: 22, lw: 10 }, T1 + 7000);
+  r = await get(N, T1 + 47 * 36e5);
+  assert.equal(r.body.event.done, false, 'still on at 47 hours');
+  pushed.length = 0;
+  r = await get(N, T1 + 1000 + 48 * 36e5);
+  assert.equal(r.body.event.done, true); assert.equal(r.body.event.why, 'timeout'); assert.equal(r.body.event.winner, 'Pop');
+  assert.ok(pushed.find(p => p.mid === 'm5' && /time's up/.test(p.text)));
+  assert.ok(pushed.find(p => p.mid === 'm4' && /Pop won \(time ran out\)/.test(p.text)));
+  // nobody winning a level before the timeout means no winner
+  const q2 = stubSql();
+  q2.db.exec(`CREATE TABLE members (id TEXT PRIMARY KEY, name TEXT NOT NULL, role TEXT NOT NULL, tok TEXT, created INTEGER, seen INTEGER, removed INTEGER DEFAULT 0)`);
+  for (const [id, name] of [['x', 'X'], ['y', 'Y']]) q2.db.prepare(`INSERT INTO members (id,name,role,created,removed) VALUES (?,?,?,?,0)`).run(id, name, 'member', 1);
+  scoresInit(q2);
+  await scoresRoute(q2, { id: 'x', name: 'X' }, '/sugar-race', 'POST', new URL('https://x/'), async () => ({ icon: 'cat', stop: 4, stars: 9 }), T0);
+  await scoresRoute(q2, { id: 'y', name: 'Y' }, '/sugar-race', 'POST', new URL('https://x/'), async () => ({ icon: 'dog', stop: 4, stars: 9 }), T0 + 1);
+  const ev = expireRaces(q2, T0 + 49 * 36e5, []);
+  assert.equal(ev.length, 2); assert.ok(ev.every(n => /before anyone won/.test(n.text)));
+  assert.equal(q2.db.prepare(`SELECT winner FROM sugar_race_event`).get().winner, null);
+  // stale players (no play for a week) don't get pulled into a race
+  const q3 = stubSql();
+  q3.db.exec(`CREATE TABLE members (id TEXT PRIMARY KEY, name TEXT NOT NULL, role TEXT NOT NULL, tok TEXT, created INTEGER, seen INTEGER, removed INTEGER DEFAULT 0)`);
+  for (const id of ['x', 'y']) q3.db.prepare(`INSERT INTO members (id,name,role,created,removed) VALUES (?,?,?,?,0)`).run(id, id, 'member', 1);
+  scoresInit(q3);
+  await scoresRoute(q3, { id: 'x', name: 'x' }, '/sugar-race', 'POST', new URL('https://x/'), async () => ({ icon: 'cat', stop: 4, stars: 9 }), T0);
+  r = await scoresRoute(q3, { id: 'y', name: 'y' }, '/sugar-race', 'POST', new URL('https://x/'), async () => ({ icon: 'dog', stop: 4, stars: 9 }), T0 + 8 * 864e5);
+  assert.equal(r.body.event, null);
+  assert.ok(!JSON.stringify(r.body).includes('"x"'), 'no member ids in the race view');
+}
+
+// ---- 1.9.222 Sugar Rush lives: send a life (once a day per recipient), claim on next open, ask family
+{
+  const q = stubSql();
+  q.db.exec(`CREATE TABLE members (id TEXT PRIMARY KEY, name TEXT NOT NULL, role TEXT NOT NULL, tok TEXT, created INTEGER, seen INTEGER, removed INTEGER DEFAULT 0)`);
+  for (const [id, name, removed] of [['m1', 'Shane Jenkins', 0], ['m2', 'Sarah', 0], ['m3', 'Aranea', 0], ['m9', 'Gone', 1]]) q.db.prepare(`INSERT INTO members (id,name,role,created,removed) VALUES (?,?,?,?,?)`).run(id, name, 'member', 1, removed);
+  scoresInit(q);
+  const pushed = [];
+  const hooks = { note: async (mid, text, card) => { pushed.push({ mid, text, card }); } };
+  const S = { id: 'm1', name: 'Shane Jenkins' }, H = { id: 'm2', name: 'Sarah' }, A = { id: 'm3', name: 'Aranea' };
+  const T = Date.parse('2026-11-14T08:00:00Z'); // 9pm Saturday 14 Nov in Auckland
+  const get = (me, t) => scoresRoute(q, me, '/sugar-lives', 'GET', new URL('https://x/api/sugar-lives'), async () => ({}), t, hooks);
+  const post = (me, b, t) => scoresRoute(q, me, '/sugar-lives', 'POST', new URL('https://x/api/sugar-lives'), async () => b, t, hooks);
+  assert.equal(LIVES.perDay, 3);
+  assert.equal(nzDay(T), '2026-11-14');
+  assert.equal(nzDay(Date.parse('2026-11-14T11:30:00Z')), '2026-11-15', 'NZ midnight, not UTC');
+  let r = await get(H, T);
+  assert.deepEqual(r.body.family.map(f => f.name), ['Aranea', 'Shane Jenkins'], 'family list: not me, not removed members');
+  assert.ok(!JSON.stringify(r.body).includes('m1') && !JSON.stringify(r.body).includes('Gone'), 'no member ids');
+  assert.equal(r.body.pending, 0); assert.equal(r.body.asked, false);
+  const shaneKey = r.body.family.find(f => f.name === 'Shane Jenkins').key;
+  assert.equal(shaneKey, lifeKey('m1'));
+  // sending
+  r = await post(H, { act: 'send', to: shaneKey }, T);
+  assert.equal(r.status, 200); assert.equal(r.body.sent, 'Shane');
+  assert.deepEqual(pushed, [{ mid: 'm1', text: 'Sarah sent you a life ❤️', card: 'sugar-lives' }], 'the recipient gets a push');
+  assert.equal(r.body.family.find(f => f.key === shaneKey).sent, true);
+  assert.equal((await post(H, { act: 'send', to: lifeKey('m2') }, T)).status, 400, 'cannot send to yourself');
+  assert.equal((await post(H, { act: 'send', to: lifeKey('m9') }, T)).status, 400, 'cannot send to a removed member');
+  assert.equal((await post(H, { act: 'send', to: 'nope' }, T)).status, 400);
+  assert.equal((await post(H, { act: 'wat' }, T)).status, 400);
+  // the daily limit: once per day per recipient; a different recipient is fine; a new NZ day resets it
+  pushed.length = 0;
+  r = await post(H, { act: 'send', to: shaneKey }, T + 3600e3);
+  assert.equal(r.status, 429); assert.equal(r.body.err, 'already sent today'); assert.equal(pushed.length, 0);
+  assert.equal((await post(H, { act: 'send', to: lifeKey('m3') }, T + 60e3)).status, 200, 'another family member can still get one');
+  assert.equal((await post(A, { act: 'send', to: shaneKey }, T + 120e3)).status, 200, 'Aranea can send Shane one too');
+  const NEXT = Date.parse('2026-11-14T11:05:00Z'); // 12:05am Sunday in Auckland
+  assert.equal((await post(H, { act: 'send', to: shaneKey }, NEXT)).status, 200, 'a new NZ day, a new gift');
+  // claiming: Shane gets every pending gift once, on his next open
+  r = await get(S, NEXT + 1000);
+  assert.equal(r.body.pending, 3);
+  r = await post(S, { act: 'claim' }, NEXT + 2000);
+  assert.equal(r.body.claimed, 3); assert.deepEqual(r.body.from, ['Sarah', 'Aranea', 'Sarah']); assert.equal(r.body.pending, 0);
+  r = await post(S, { act: 'claim' }, NEXT + 3000);
+  assert.equal(r.body.claimed, 0, 'claimed only once');
+  assert.equal((await post(A, { act: 'claim' }, NEXT)).body.claimed, 1, 'Aranea claims the one from Sarah');
+  // ask family: notifies everyone else, once a day
+  pushed.length = 0;
+  r = await post(S, { act: 'ask' }, NEXT + 5000);
+  assert.equal(r.status, 200); assert.equal(r.body.told, 2); assert.equal(r.body.asked, true);
+  assert.deepEqual(pushed.map(p => p.mid).sort(), ['m2', 'm3']);
+  assert.ok(pushed.every(p => p.text === 'Shane is out of lives in Sugar Rush. Send a life ❤️'));
+  assert.equal((await post(S, { act: 'ask' }, NEXT + 6000)).status, 429, 'one ask a day');
+  assert.equal((await get(S, NEXT + 7000)).body.asked, true);
+  assert.equal((await scoresRoute(q, S, '/sugar-lives', 'PUT', new URL('https://x/'), async () => ({}), NEXT, hooks)).status, 405);
+}
 
 console.log('scores tests ok');
 
