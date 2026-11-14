@@ -18,6 +18,12 @@
   button:focus-visible { outline: 2px solid #22d3ee; outline-offset: 2px; }
   /* Setup */
   .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .modes button.wide { grid-column: 1 / -1; min-height: 72px; }
+  .yourturn { display: block; width: 100%; margin: 0 0 10px; padding: 12px 14px; border-radius: 14px; background: #0e7490; border: 2px solid #22d3ee; color: #fff; font-size: 22px; font-weight: 800; text-align: center; letter-spacing: .01em; }
+  .yourturn.wait { background: rgba(0,0,0,.28); border-color: rgba(255,255,255,.2); font-size: 16px; font-weight: 700; }
+  .picks, .glist { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 12px; }
+  .picks button, .glist button { text-align: left; }
+  .glist button.your { background: #0e7490; border-color: #22d3ee; }
   .modes button { min-height: 92px; display: flex; flex-direction: column; gap: 6px; align-items: center; justify-content: center; font-size: 16px; }
   .modes button b { font-size: 28px; }
   .modes button small { font-weight: 400; font-size: 12px; color: rgba(255,255,255,.7); }
@@ -91,11 +97,20 @@
   .final small { grid-column: 1 / -1; color: rgba(255,255,255,.6); font-size: 12px; }
   .row2 { display: flex; gap: 8px; }
   .row2 button { flex: 1; }
+
+  .rt .ord { position: absolute; top: -7px; left: -7px; width: 20px; height: 20px; border-radius: 50%; background: #22d3ee; color: #042830; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,.35); z-index: 1; }
+  .dirseg { margin-bottom: 8px; }
+  .glist button small { display: block; font-weight: 400; font-size: 12px; color: rgba(255,255,255,.7); margin-top: 2px; }
+  .picks button.challenge { min-height: 56px; font-size: 16px; }
+  .offline { color: #fcd34d; }
+  #resignbtn { display: none; }
+  #resignbtn.show { display: inline-flex; }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
   <div class="wrap">
+    <button type="button" id="famalert" class="yourturn" hidden>Your turn</button>
     <div id="loading">
       <h1>Scrabble</h1>
       <p class="help" id="loadmsg">Loading the word list…</p>
@@ -108,11 +123,19 @@
       <div class="modes">
         <button type="button" data-mode="cpu"><b>🤖</b>Play the computer<small>Just you</small></button>
         <button type="button" data-mode="pass"><b>📱</b>Pass the phone<small>2 to 4 people</small></button>
+        <button type="button" data-mode="family" class="wide"><b>👨‍👩‍👧</b>Challenge a family member<small>Play over the internet, on your own phones</small></button>
       </div>
       <div class="opts" id="cpuopts">
         <label>Your name<input type="text" id="myname" maxlength="16" autocomplete="off" placeholder="You"></label>
         <p>Computer</p>
         <div class="seg"><button type="button" data-level="gentle">Gentle</button><button type="button" data-level="clever">Clever</button></div>
+      </div>
+      <div class="opts" id="famopts" hidden>
+        <p id="setupturn" class="yourturn" hidden>Your turn</p>
+        <p class="help" style="margin-top:0">Your games</p>
+        <div id="famgames" class="glist"></div>
+        <p id="famstatus">Challenge a family member. Each of you plays on your own phone, whenever it suits you.</p>
+        <div id="fampeople" class="picks"></div>
       </div>
       <div class="opts" id="passopts" hidden>
         <p>How many players?</p>
@@ -125,13 +148,15 @@
     </div>
 
     <div id="game" hidden>
+      <p id="yourturn" class="yourturn" hidden>Your turn</p>
       <div class="top"><div id="scores" class="scores"></div><div class="bagc"><span>Bag</span><strong id="bagn">100</strong></div><button type="button" id="gscoresbtn" class="trophy" aria-label="Family scoreboard">🏆</button></div>
       <div id="boardwrap" class="boardwrap"><div id="board" class="board" role="grid" aria-label="Board"></div></div>
       <p id="msg" class="msg" role="status" aria-live="polite"></p>
       <div id="rack" class="rack" aria-label="Your tiles"></div>
-      <div class="acts"><button type="button" id="playbtn" class="pri">Play</button><button type="button" id="recallbtn">Recall</button><button type="button" id="shufbtn">Shuffle</button></div>
-      <div class="acts sm"><button type="button" id="swapbtn">Swap</button><button type="button" id="passbtn">Pass</button><button type="button" id="zoombtn">Bigger</button><button type="button" id="soundbtn">Sound on</button><button type="button" id="newbtn">New game</button></div>
-      <p class="credit">Tap a tile, then a square. Tap a new tile on the board to take it back. TW triple word, DW double word, TL triple letter, DL double letter.</p>
+      <div class="seg dirseg" id="dirseg" hidden><button type="button" data-dir="one" class="on">One by one</button><button type="button" data-dir="across">Across →</button><button type="button" data-dir="down">Down ↓</button></div>
+      <div class="acts"><button type="button" id="playbtn" class="pri">Play</button><button type="button" id="recallbtn">Clear</button><button type="button" id="shufbtn">Shuffle</button></div>
+      <div class="acts sm"><button type="button" id="swapbtn">Swap</button><button type="button" id="passbtn">Pass</button><button type="button" id="resignbtn">Resign</button><button type="button" id="zoombtn">Bigger</button><button type="button" id="soundbtn">Sound on</button><button type="button" id="newbtn">New game</button></div>
+      <p class="credit">Tap several tiles in order (they get numbers), then tap squares to place them, or pick Across or Down and tap the first square. Clear takes them all back. TW triple word, DW double word, TL triple letter, DL double letter.</p>
     </div>
   </div>
 
