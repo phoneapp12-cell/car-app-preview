@@ -4734,7 +4734,7 @@ console.log('1.9.227 echo and 3 s pace ok');
   const S = SR.MAP_STOPS, by = n => S.find(s => s.place === n);
   assert.ok(S.every(s => typeof s.lat === 'number' && typeof s.lon === 'number'), 'every stop knows its real lat/lon');
   S.slice(3, 16).forEach(s => assert.ok(near(s, SR.nzXY(s.lat, s.lon), 1.5), s.place + ' sits at its real NZ position'));
-  S.slice(0, 3).forEach(s => assert.ok(s.inset === 'whangarei' && near(s, SR.insetXY(s.lat, s.lon), 1.5), s.place + ' sits in the Whangārei close-up'));
+  S.slice(0, 3).forEach(s => assert.ok(s.inset === 'whangarei' && near(s, SR.insetXY(s.lat, s.lon), s.nudged ? 60 : 1.5), s.place + ' sits in the Whangārei close-up'));
   S.slice(16, 19).forEach(s => assert.ok(near(s, SR.pacXY(s.lat, s.lon), 1.5), s.place + ' sits at its real Pacific position'));
   S.slice(19).forEach(s => assert.ok(near(s, SR.ausXY(s.lat, s.lon), 1.5), s.place + ' sits at its real Australian position'));
   SR.FUTURE_STOPS.forEach(s => assert.ok(near(s, SR.ausXY(s.lat, s.lon), s.nudged ? 40 : 1.5), s.place + ' coming-soon marker in place'));
@@ -4742,6 +4742,10 @@ console.log('1.9.227 echo and 3 s pace ok');
   assert.ok(nap.x > akl.x && nap.y < wel.y - 120 && wel.y < by('Christchurch').y && blf.y > by('Dunedin').y, 'Napier on the east coast, Wellington at the bottom of the North Island');
   const on = by('Onerahi'), wh = by('Whangārei');
   assert.ok(on.x > wh.x && on.y > wh.y, 'Onerahi sits south-east of Whangārei city');
+  // 1.9.228 Sarah's House is in Onerahi, east of central Whangārei: real lat/lon inside Onerahi, pin just beside Onerahi's.
+  const sh = by("Sarah's House"), d = Math.hypot(sh.x - on.x, sh.y - on.y);
+  assert.ok(Math.abs(sh.lat - on.lat) < 0.02 && Math.abs(sh.lon - on.lon) < 0.03 && sh.lon > wh.lon + 0.03, "Sarah's House is in Onerahi, east of Whangārei");
+  assert.ok(sh.x > wh.x + 100 && d >= 46 && d <= 70 && sh.label !== on.label, "Sarah's House pin sits beside Onerahi with its own readable label");
   const real = SR.nzXY(-35.725, 174.323), svg = SR.nzMapSvg ? SR.nzMapSvg() : '';
   assert.ok(real.y < akl.y && real.x < akl.x, 'Whangārei really sits north-west of Auckland');
   assert.ok(!svg || (svg.includes('sr-inset') && svg.includes('Whangārei close-up')), 'the close-up inset is drawn');
@@ -4749,6 +4753,7 @@ console.log('1.9.227 echo and 3 s pace ok');
   const cr = SR.nzXY(-34.43, 172.68), ec = SR.nzXY(-37.69, 178.55), cp = SR.nzXY(-41.61, 175.29), sp = SR.nzXY(-46.6, 168.35);
   assert.ok(cr.x < 80 && cr.y < 140 && ec.x > 340 && cp.y > wel.y && sp.y > 1050 && sp.y < 1180 && [cr, ec, cp, sp].every(p => p.x > 0 && p.x < SR.MAP_W), 'projection matches real coastline points');
   console.log('1.9.227 real map geography ok');
+  console.log('1.9.228 Sarah in Onerahi ok');
 }
 
 
