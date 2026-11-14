@@ -31,7 +31,7 @@ export function checkScore(b) {
 }
 
 export const RACE_ICONS = ['lolly','cupcake','donut','cherry','icecream','cookie','kiwi','cat','dog','bunny','unicorn','car','train','bike','rocket','star','bear','bee','butterfly','boat'];
-export const RACE_LIMITS = { stop: 15, stars: 45, gapMs: 1000, perDay: 300 }; // 1.9.219 Sugar Rush has 15 stops (to Dunedin).
+export const RACE_LIMITS = { stop: 18, stars: 54, gapMs: 1000, perDay: 300 }; // 1.9.220 Sugar Rush has 18 stops (Dunedin, then Rarotonga, Tonga and Samoa).
 
 export function scoresInit(sql) {
   sql.exec(`CREATE TABLE IF NOT EXISTS scores (id INTEGER PRIMARY KEY AUTOINCREMENT, game TEXT NOT NULL, mid TEXT NOT NULL, score INTEGER NOT NULL, lines INTEGER, level INTEGER, won INTEGER, opp TEXT, at INTEGER NOT NULL);

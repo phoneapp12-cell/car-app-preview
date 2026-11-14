@@ -371,6 +371,8 @@
   .sc-roll { animation: scrollx var(--d, 9s) ease-in-out var(--dl, 0s) infinite alternate; }
   .sc-glide { animation: scglide var(--d, 7s) ease-in-out var(--dl, 0s) infinite alternate; }
   @keyframes scrollx { from { transform: translateX(-70px); } to { transform: translateX(70px); } }
+  .sc-sway { transform-origin: 50% 100%; animation: scsway var(--d, 4s) ease-in-out var(--dl, 0s) infinite alternate; }
+  @keyframes scsway { from { transform: rotate(-4deg); } to { transform: rotate(4deg); } }
   @keyframes scglide { from { transform: translate(-60px, 22px); } to { transform: translate(110px, -40px); } }
   @keyframes scdrift { from { transform: translateX(-26px); } to { transform: translateX(26px); } }
   @keyframes scbob { from { transform: translateY(-4px) rotate(-2deg); } to { transform: translateY(4px) rotate(2deg); } }

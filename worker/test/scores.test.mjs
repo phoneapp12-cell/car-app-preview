@@ -192,11 +192,13 @@ assert.ok(checkRace({ icon: 'lolly', stop: 5, stars: 9 }).ok);
 assert.ok(checkRace({ icon: 'spaceship', stop: 5, stars: 9 }).err, 'unknown icon refused');
 assert.ok(checkRace({ icon: 'lolly', stop: 0, stars: 0 }).err);
 // 1.9.219 Levels 11-15: the race now runs to stop 15 (Dunedin) with up to 45 stars.
-assert.deepEqual(RACE_LIMITS, { stop: 15, stars: 45, gapMs: 1000, perDay: 300 });
+// 1.9.220 Pacific Islands: stops 16-18 (Rarotonga, Tonga, Samoa), up to 54 stars.
+assert.deepEqual(RACE_LIMITS, { stop: 18, stars: 54, gapMs: 1000, perDay: 300 });
 assert.ok(checkRace({ icon: 'lolly', stop: 11, stars: 31 }).ok);
 assert.ok(checkRace({ icon: 'lolly', stop: 15, stars: 45 }).ok);
-assert.ok(checkRace({ icon: 'lolly', stop: 16, stars: 0 }).err);
-assert.ok(checkRace({ icon: 'lolly', stop: 3, stars: 46 }).err);
+assert.ok(checkRace({ icon: 'lolly', stop: 18, stars: 54 }).ok);
+assert.ok(checkRace({ icon: 'lolly', stop: 19, stars: 0 }).err);
+assert.ok(checkRace({ icon: 'lolly', stop: 3, stars: 55 }).err);
 assert.ok(checkRace({ icon: 'lolly', stop: 3, stars: -1 }).err);
 assert.ok(checkRace({ icon: 'lolly', stop: 1.5, stars: 1 }).err);
 
