@@ -157,7 +157,10 @@
       bells: ['G4', 'A4', 'B4', 'D5', 'E5', 'G5'] },
     { name: 'Food', beat: 0.667, pad: 'sine', ambient: 'none', critter: 'none', pitch: 1, sfx: 'sine',
       chords: [['F2', 'C3', 'F3', 'A3'], ['AS2', 'F3', 'AS3', 'D4'], ['C3', 'G3', 'C4', 'E4'], ['D3', 'A3', 'D4', 'F4']],
-      bells: ['F4', 'G4', 'A4', 'C5', 'D5', 'F5'] }
+      bells: ['F4', 'G4', 'A4', 'C5', 'D5', 'F5'] },
+    { name: 'Sewers', beat: 0.75, pad: 'sine', ambient: 'none', critter: 'none', pitch: 0.84, sfx: 'sine',
+      chords: [['D2', 'A2', 'D3', 'F3'], ['AS1', 'F2', 'AS2', 'D3'], ['G1', 'D2', 'G2', 'AS2'], ['A1', 'E2', 'A2', 'C3']],
+      bells: ['D3', 'F3', 'G3', 'A3', 'C4', 'D4'] }
   ];
   // Colours and see-through backgrounds for each theme (same order as THEMES).
   const LOOKS = [
@@ -173,17 +176,15 @@
     { colors: ['#ef4444', '#14b8a6', '#22c55e', '#facc15', '#38bdf8', '#e5e7eb', '#f97316'], bg: 'linear-gradient(180deg,#2563eb 0%,#22d3ee 45%,#15803d 100%)', board: 'rgba(5,30,30,0.5)' },
     { colors: ['#e0f2fe', '#93c5fd', '#f9a8d4', '#fde68a', '#5eead4', '#c4b5fd', '#fca5a5'], bg: 'linear-gradient(180deg,#f9a8d4 0%,#818cf8 45%,#1e3a8a 100%)', board: 'rgba(15,23,60,0.5)' },
     { colors: ['#4ade80', '#16a34a', '#f472b6', '#facc15', '#22d3ee', '#a3e635', '#fb923c'], bg: 'linear-gradient(180deg,#fb923c 0%,#f472b6 35%,#0e7490 70%,#14532d 100%)', board: 'rgba(5,30,20,0.5)' },
-    { colors: ['#fde6c8', '#facc15', '#eab308', '#fb7185', '#f97316', '#9333ea', '#ef4444'], bg: 'linear-gradient(180deg,#f5d0a0 0%,#c4b59a 40%,#6b4f3a 100%)', board: 'rgba(40,24,12,0.48)' }
+    { colors: ['#fde6c8', '#facc15', '#eab308', '#fb7185', '#f97316', '#9333ea', '#ef4444'], bg: 'linear-gradient(180deg,#f5d0a0 0%,#c4b59a 40%,#6b4f3a 100%)', board: 'rgba(40,24,12,0.48)' },
+    { colors: ['#4ade80', '#22c55e', '#86efac', '#a3e635', '#14b8a6', '#65a30d', '#facc15'], bg: 'linear-gradient(180deg,#1a140e 0%,#0c1814 55%,#062018 100%)', board: 'rgba(6,12,10,0.55)' }
   ];
   // Colourful picture behind each theme (same order as THEMES), softened with a dark veil so the blocks stand out.
   const PICS = THEMES.map((_, i) => 'tetris-bg/' + i + '.webp');
   let themeIdx = 0;
-  // Level order (indexes into THEMES): Farmyard, Jeremiah was a bullfrog, Beach, Fireworks, City, Ocean, Bush walk, New Zealand, Snowy mountains, Night sky, Space travel, Triangles last.
-  // 1.9.188: City (theme 4) moved to level 5; Ocean and the levels after it shift down one.
-  // 1.9.192: Space travel is level 11; Triangles is last (level 12).
-  // 1.9.198: Beach is level 2, Space travel is level 3 (Farmyard, Beach, Space travel, Bullfrog, Fireworks, City, Ocean, Bush walk, New Zealand, Snowy mountains, Night sky, Triangles).
-  // 1.9.199: Food is level 12, just before Triangles (still last).
-  const ORDER = [6, 0, 7, 11, 1, 4, 2, 3, 9, 10, 5, 12, 8];
+  // Level order (indexes into THEMES).
+  // 1.9.208: Shane's 14-level order — Farmyard, Bush walk, Jeremiah was a bullfrog, Food, Beach, Ocean, New Zealand, Snowy mountains, City, Sewers, Fireworks, Night sky, Space travel, Triangles last.
+  const ORDER = [6, 3, 11, 12, 0, 2, 9, 10, 4, 13, 1, 5, 7, 8];
   function themeFor(level) { return ORDER[(Math.max(1, level) - 1) % ORDER.length]; }
   function stages() { return ORDER.map((ti, i) => ({ level: i + 1, theme: ti, name: THEMES[ti].name })); }
   function shouldSubmit(gm) { return !!(gm && !gm.practice && gm.score > 0); }
@@ -475,7 +476,8 @@
     { bpm: 108.79, offset: 0.023, key: 'E', mode: 'minor' },
     { bpm: 123, offset: 0.218, key: 'G', mode: 'major' },
     { bpm: 127.45, offset: 0.266, key: 'D', mode: 'major' },
-    { bpm: 140.8, offset: 0, key: 'A', mode: 'minor' }
+    { bpm: 140.8, offset: 0, key: 'A', mode: 'minor' },
+    { bpm: 80, offset: 0.015, key: 'D', mode: 'minor' }
   ];
   const MAJOR_IV = [0, 2, 4, 5, 7, 9, 11], MINOR_IV = [0, 2, 3, 5, 7, 8, 10];
   const PC = { C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, F: 5, 'F#': 6, Gb: 6, G: 7, 'G#': 8, Ab: 8, A: 9, 'A#': 10, Bb: 10, B: 11 };
@@ -1828,9 +1830,9 @@
     }
     return a;
   }
-  function spawn(t) {
+  function spawn(t, opt) {
     const m = SHAPES[t].map(r => r.slice());
-    return { t, m, x: Math.floor((COLS - m[0].length) / 2), y: t === 1 ? -1 : 0, rot: 0 };
+    return { t, m, x: Math.floor((COLS - m[0].length) / 2), y: t === 1 ? -1 : 0, rot: 0, slime: !!(opt && opt.slime) };
   }
   function takeNext(g, rand) {
     function fromBag() {
@@ -2300,7 +2302,7 @@
   function clearDuration(n) { return Math.min(400, 240 + 40 * Math.max(1, Math.min(4, n || 1))); }
   function clearKind(ti) { return CLEAR_KIND[ti] || 'sparkle'; }
   function clearPartCount(n) { return Math.min(36, 8 + 8 * Math.max(1, Math.min(4, n || 1))); }
-  function startClear(g, rows, snap, lines, level, snapHits, snapFood) {
+  function startClear(g, rows, snap, lines, level, snapHits, snapFood, snapSlime) {
     const n = rows.length;
     const ti = themeFor(level);
     const kind = clearKind(ti);
@@ -2334,7 +2336,7 @@
         hop: 18 + Math.random() * 16
       });
     }
-    g.clearFx = { t: 0, dur, rows: rows.slice(), snap, snapHits: snapHits ? snapHits.map(r => r.slice()) : null, snapFood: snapFood ? cloneFood(snapFood) : null, n, kind, parts, lines, level, hold: false, at: 0, banner: n === 4 };
+    g.clearFx = { t: 0, dur, rows: rows.slice(), snap, snapHits: snapHits ? snapHits.map(r => r.slice()) : null, snapFood: snapFood ? cloneFood(snapFood) : null, snapSlime: snapSlime ? cloneSlime(snapSlime) : null, n, kind, parts, lines, level, hold: false, at: 0, banner: n === 4 };
     if (isEffect(ti)) { effectOnClear(g.clearFx, ti); lifeReact(); }
     if (ti === NZ_THEME) startNzFlash();
     if (ti === FOOD_THEME) spawnFoodBurst(g, null, rows);
@@ -2523,8 +2525,8 @@
     opt = opt || {};
     const level = Math.max(1, opt.level || 1);
     const practice = !!opt.practice;
-    const g = { board: emptyBoard(), hits: emptyBoard(), food: emptyFood(), piece: spawn(1), bag: refillBag(), next: 0, hold: 0, canHold: true, score: 0, lines: (level - 1) * 10, level, over: false, paused: false, acc: 0, flashT: 0, popup: '', popupT: 0, practice, startLevel: level, clearFx: null, pendingLevel: null, levelUp: null, callout: null, clearCombo: 0, lastWasTetris: false, familyHigh: 0, highNoted: false, highScore: null, pendingHigh: false, lastCherry: false };
-    g.piece = spawn(takeNext(g));
+    const g = { board: emptyBoard(), hits: emptyBoard(), food: emptyFood(), slime: emptySlime(), piece: spawn(1), bag: refillBag(), next: 0, hold: 0, holdSlime: false, canHold: true, score: 0, lines: (level - 1) * 10, level, over: false, paused: false, acc: 0, flashT: 0, popup: '', popupT: 0, practice, startLevel: level, clearFx: null, pendingLevel: null, levelUp: null, callout: null, clearCombo: 0, lastWasTetris: false, familyHigh: 0, highNoted: false, highScore: null, pendingHigh: false, lastCherry: false };
+    g.piece = maybeSlime(spawn(takeNext(g)), level);
     g.next = takeNext(g);
     seedHighBar(g);
     resetNzPal(g.lines, g.level);
@@ -2642,10 +2644,12 @@
     const snap = g.board.map(r => r.slice());
     const snapHits = ensureHits(g).map(r => r.slice());
     const snapFood = cloneFood(ensureFood(g));
-    startClear(g, full, snap, g.lines, g.level, snapHits, snapFood);
+    const snapSlime = cloneSlime(ensureSlime(g));
+    startClear(g, full, snap, g.lines, g.level, snapHits, snapFood, snapSlime);
     g.board = dropRows(g.board, full, 0);
     g.hits = dropRows(g.hits, full, 0);
     g.food = dropFood(g.food, full);
+    g.slime = dropSlime(g.slime, full);
     const pts = LINE_POINTS[full.length] * g.level;
     g.lines += full.length;
     g.score += pts;
@@ -2888,6 +2892,11 @@
   function lockPiece(g) {
 
     const p = g.piece;
+    if (p && p.slime) {
+      trySlimeSlide(g, p);
+      playSquelch();
+    }
+    try { sewerOnLand(g, p); } catch (e) { }
     let foodSpecial = false;
     if (p && p.t === CHERRY_T) {
       if (p.y < 0) { g.over = true; sfx('over'); return g; }
@@ -2903,6 +2912,7 @@
         }
       }
       stampFood(g, p);
+      stampSlime(g, p);
       if (applyBananaBurst(g, p)) foodSpecial = true;
     }
     if (g.over) { sfx('over'); return g; }
@@ -2923,8 +2933,8 @@
       maybeCallout(g, { n: 0, combo: 0, b2b: false, high: high, near: near, level: g.level });
     }
     maybeHighScore(g);
-    g.piece = spawn(g.next);
-    if (themeFor(g.level) !== FOOD_THEME && g.piece && g.piece.t === CHERRY_T) g.piece = spawn(takeNext(g));
+    g.piece = maybeSlime(spawn(g.next), g.level);
+    if (themeFor(g.level) !== FOOD_THEME && g.piece && g.piece.t === CHERRY_T) g.piece = maybeSlime(spawn(takeNext(g)), g.level);
     g.next = takeNext(g);
     g.canHold = true;
     if (collides(g.board, g.piece.m, g.piece.x, g.piece.y)) { g.over = true; sfx('over'); }
@@ -2978,10 +2988,11 @@
       }
       if (!turned) sfx('rotateFail');
     } else if (a === 'hold' && g.canHold) {
-      const cur = p.t;
-      if (g.hold) g.piece = spawn(g.hold);
-      else { g.piece = spawn(g.next); g.next = takeNext(g); }
+      const cur = p.t, curSlime = !!p.slime;
+      if (g.hold) g.piece = maybeSlime(spawn(g.hold, { slime: !!g.holdSlime }), g.level);
+      else { g.piece = maybeSlime(spawn(g.next), g.level); g.next = takeNext(g); }
       g.hold = cur;
+      g.holdSlime = curSlime;
       g.canHold = false;
       resetRotRiff();
       sfx('hold');
@@ -2997,7 +3008,7 @@
   // (1.9.163 busted the URL but Shane still heard the old bullfrog track).
   // 1.9.199 Food (theme 12) uses a gentle synthesised F-major placeholder until Shane supplies a song.
   // Swap by replacing m12-<hash>.mp3 and updating BGM_HASH[12] plus TRACKS[12] bpm/offset/key/mode.
-  const BGM_HASH = ['da11a54a', '9813c57a', '9ca3b84e', '7776197f', '1814d32a', '63c9eafe', '7bc4ebcd', 'b76dd1d3', 'fdec4369', '812638a3', 'cdbe7d34', '8afd517f', '6308c33f']; // 1.9.200 Shane's Food song; swap by replacing m12-<hash>.mp3 and updating BGM_HASH[12] plus TRACKS[12]
+  const BGM_HASH = ['da11a54a', '9813c57a', '9ca3b84e', '7776197f', '1814d32a', '63c9eafe', '7bc4ebcd', 'b76dd1d3', 'fdec4369', '812638a3', 'cdbe7d34', '8afd517f', '6308c33f', '314a9c8c']; // 1.9.208 Sewers m13; 1.9.200 Food m12
   function bgmSrc(ti) { return 'tetris-bg/m' + ti + '-' + BGM_HASH[ti] + '.mp3'; }
   let bgmGain = null, bgmNode = null, bgmIdx = -1, bgmBufs = {}, bgmLoading = {}, bgmAt = 0, bgmRate = 1, bgmWant = false, bgmWantTi = -1, bgmAnalyser = null, bgmBins = null;
   function silentUnlock() {
@@ -3108,7 +3119,7 @@
   function cloneBoard(b) { return (b || []).map(r => (r || []).slice()); }
   function clonePiece(p) {
     if (!p) return null;
-    return { t: p.t, x: p.x, y: p.y, m: (p.m || []).map(r => r.slice()), rot: p.rot || 0 };
+    return { t: p.t, x: p.x, y: p.y, m: (p.m || []).map(r => r.slice()), rot: p.rot || 0, slime: !!p.slime };
   }
   function snapshotGame(g, extra) {
     extra = extra || {};
@@ -3140,6 +3151,8 @@
         scored: !!g.scored,
         hits: cloneBoard(ensureHits(g)),
         food: cloneFood(ensureFood(g)),
+        slime: cloneSlime(ensureSlime(g)),
+        holdSlime: !!g.holdSlime,
         lastCherry: !!g.lastCherry
       }
     };
@@ -3194,6 +3207,8 @@
     g.scored = !!s.scored;
     g.hits = s.hits ? cloneBoard(s.hits) : emptyBoard();
     g.food = s.food ? cloneFood(s.food) : emptyFood();
+    g.slime = s.slime ? cloneSlime(s.slime) : emptySlime();
+    g.holdSlime = !!s.holdSlime;
     g.lastCherry = !!s.lastCherry;
     g.paused = true;
     g.clearFx = null;
@@ -4246,9 +4261,11 @@
       '<h3>What you see</h3>' +
       '<p>A faint ghost shows where the piece will land. Next shows the coming piece. Hold keeps one piece aside — you can swap once per drop.</p>' +
       '<h3>Levels</h3>' +
-      '<p>There are 13 levels, in this order: ' + levels + '. The game gets faster as you go.</p>' +
+      '<p>There are 14 levels, in this order: ' + levels + '. The game gets faster as you go.</p>' +
       '<h3>Food stage</h3>' +
       '<p>Cherry bombs are a one-block cherry that shows up now and then. When one locks it explodes itself and the blocks under it. Banana bursts happen when two banana pieces (J or L) lock touching each other — the touching bananas explode.</p>' +
+      '<h3>Sewers stage</h3>' +
+      '<p>Now and then a piece spawns as green slime. When it locks, it slides one square sideways if that space is free, or stays put if it is not, with a little squelch.</p>' +
       '<h3>Cheers and scores</h3>' +
       '<p>A voice may cheer you on, and a high score is saved on this phone. The family scoreboard keeps everyone’s best too.</p>' +
       '<h3>Extreme</h3>' +
@@ -4271,7 +4288,465 @@
   }
   try { clearTetrisScoresOnce207(); } catch (e) { }
 
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_BUILD_EVERY_LOW, CITY_SAFE_TOP, CITY_CREW_N, CITY_ANIM_CLIMB, CITY_ANIM_PLACE, CITY_ANIM_DOWN, CITY_ANIM_FAST, cityHighestSettled, cityStackLow, cityBuildEvery, cityBuildWait, cityAnimDur, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, DROP_SLOW, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, HIGH_SCORE_MS, HIGH_SCORE_FADE_MS, highScoreProg, maybeHighScore, startHighScore, tickHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, FARM_SUN, FARM_HZ, FARM_SUNRISE_PROG, FARM_SUNRISE_SEC, farmDayTarget, farmSunPos, ROOSTER_HASH, roosterSrc, farmThemeActive, playRoosterSfx, stopRoosterSfx, stackColY, stackSkyline, stackPathAt, stackPathLen, newStackWash, stepStackWash, STACK_WASH_PERIOD, washCover, washSpill, washPool, stackWashInland, washCycle, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, fwSkyFlashAlpha, startFwSkyFlash, maybeFwSkyFlash, FW_SKY_FLASH_PEAK, FW_SKY_FLASH_FADE, FW_MAJOR_SCALE, FW_BIGGER_GROW, fwSkyFlashState: () => fw.skyFlash, fwProg: (p) => { if (p != null) fw.prog = p; return fw.prog; }, fwReset, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts, SNOW_THEME, snowProg, snowFallParams, newBoardSnow, stepBoardSnow, snowOnLineClear, snowReset, boardSnow: () => boardSnow, newAbseil, stepAbseil, drawAbseil, poseAbseil, abseilState, abseilReset, ABSEIL_GAP, ABSEIL_FIRST, NZ_THEME, nzProg, nzBeatsPerRow, nzDropInterval, NZ_PAL, NZ_PAL_STEPS, NZ_PAL_FADE_MS, nzPalIndex, nzPaletteNow, mixHex, nzMixProgress, resetNzPal, setNzPal, tickNzPal, nzPalState, EXTREME_KEY, EXTREME_PEEK_MS, EXTREME_EXIT_MIN, EXTREME_TOP_RESERVE, SEAGULL_HASH, seagullSrc, startNzFlash, nzFlashAlpha, newNzGulls, stepNzGulls, nzGulls: () => nzGulls, nzFlashState: () => nzFlash, FOOD_THEME, FOOD_KIND, FOOD_HASH, FOOD_VOL, foodKind, foodSoundFor, foodSrc, emptyFood, ensureFood, cloneFood, dropFood, stampFood, foodMetaAt, rotShape, shapeCells, shapePath, playFoodSfx, playFoodLand, playFoodChomp, playFoodBoom, CHERRY_T, CHERRY_ODDS, CHERRY_BONUS, CHERRY_PER_CELL, isCherry, takeNext, cherryBlastCells, dropColumns, applyCherryBomb, isBanana, BANANA_BONUS, BANANA_PER_CELL, bananaTouchesLocked, connectedBananaCells, applyBananaBurst, spawnBananaBurst, FOOD_SPRITES, loadFoodSprites, PAUSE_CLOSE_MS, CLOSE_MSG, TETRIS_SCORES_CLEAR_207, clearTetrisScoresOnce207, nowMs, setNowMs, nextPausedAt, shouldCloseAfterPause, howToPlayLevels, howToPlayHtml };
+  // 1.9.208 Sewers (theme 13, level 10): dim brick tunnel, slime pieces, rats, bubbles, manhole beam.
+  const SEWER_THEME = 13;
+  const SLIME_ODDS = 7; // about 1 in 7 pieces on this stage only
+  const SLIME_COLOR = '#7dce3a';
+  function isSlime(p) { return !!(p && p.slime); }
+  function emptySlime() { return Array.from({ length: ROWS }, () => Array(COLS).fill(0)); }
+  function ensureSlime(g) {
+    if (!g.slime || g.slime.length !== ROWS) g.slime = emptySlime();
+    return g.slime;
+  }
+  function cloneSlime(slime) {
+    return (slime || emptySlime()).map(row => (row || []).slice());
+  }
+  function dropSlime(slime, rows) {
+    const next = (slime || emptySlime()).filter((_, i) => rows.indexOf(i) < 0);
+    while (next.length < ROWS) next.unshift(Array(COLS).fill(0));
+    return next;
+  }
+  function stampSlime(g, p) {
+    if (!g || !p || !p.m || !p.slime) return;
+    const grid = ensureSlime(g);
+    for (let r = 0; r < p.m.length; r++) {
+      for (let c = 0; c < p.m[r].length; c++) {
+        if (!p.m[r][c]) continue;
+        const y = p.y + r, x = p.x + c;
+        if (y >= 0 && y < ROWS && x >= 0 && x < COLS) grid[y][x] = 1;
+      }
+    }
+  }
+  function maybeSlime(p, level, rand) {
+    if (!p) return p;
+    if (themeFor(level) !== SEWER_THEME) { p.slime = false; return p; }
+    if (p.slime) return p;
+    const r = (typeof rand === 'number') ? rand : Math.random();
+    p.slime = r < 1 / SLIME_ODDS;
+    return p;
+  }
+  function trySlimeSlide(g, p, dir) {
+    if (!g || !p || !p.slime || !p.m) return 0;
+    let d = dir;
+    if (d !== -1 && d !== 1) d = Math.random() < 0.5 ? -1 : 1;
+    if (!collides(g.board, p.m, p.x + d, p.y)) { p.x += d; return d; }
+    return 0;
+  }
+  function pieceColor(t, lines, level, slimy) {
+    if (slimy) return SLIME_COLOR;
+    return blockColor(t, lines, level);
+  }
+  function cellIsSlime(g, c, r, falling, snapSlime) {
+    if (falling && g && g.piece && g.piece.slime) {
+      const p = g.piece;
+      const lr = r - p.y, lc = c - p.x;
+      if (p.m && p.m[lr] && p.m[lr][lc]) return true;
+    }
+    const grid = snapSlime || (g && g.slime);
+    return !!(grid && grid[r] && grid[r][c]);
+  }
+  function playSquelch() {
+    if (!soundOn || !ac) return;
+    try {
+      const t0 = ac.currentTime;
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.09, t0 + 0.018);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.16);
+      g.connect(sfxGain || ac.destination);
+      const o = ac.createOscillator();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(210, t0);
+      o.frequency.exponentialRampToValueAtTime(78, t0 + 0.14);
+      o.connect(g);
+      o.start(t0);
+      o.stop(t0 + 0.18);
+      const o2 = ac.createOscillator();
+      o2.type = 'triangle';
+      o2.frequency.setValueAtTime(140, t0);
+      o2.frequency.exponentialRampToValueAtTime(60, t0 + 0.12);
+      const g2 = ac.createGain();
+      g2.gain.setValueAtTime(0.04, t0);
+      g2.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.14);
+      o2.connect(g2); g2.connect(sfxGain || ac.destination);
+      o2.start(t0); o2.stop(t0 + 0.16);
+    } catch (e) { }
+  }
+  function playBlorp() {
+    if (!soundOn || !ac) return;
+    try {
+      const t0 = ac.currentTime;
+      const o = ac.createOscillator();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(240, t0);
+      o.frequency.exponentialRampToValueAtTime(90, t0 + 0.11);
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.05, t0 + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.12);
+      o.connect(g); g.connect(sfxGain || ac.destination);
+      o.start(t0); o.stop(t0 + 0.14);
+    } catch (e) { }
+  }
+
+  const SEWER_HOLE_GAP = [14, 22];
+  const SEWER_HOLE_FIRST = [5, 10];
+  function sewerWait(first) {
+    const w = first ? SEWER_HOLE_FIRST : SEWER_HOLE_GAP;
+    return w[0] + Math.random() * (w[1] - w[0]);
+  }
+  function newSewerFx() {
+    return {
+      ready: false, t: 0, w: 0, h: 0, hold: false,
+      lamps: [], drips: [], bubbles: [], rats: [],
+      manhole: { open: 0, phase: 'shut', t: 0, wait: sewerWait(true) },
+      water: 0, sniff: null, landAt: 0
+    };
+  }
+  let sewerFx = newSewerFx();
+  function sewerReset() { sewerFx = newSewerFx(); }
+  function sewerState() { return sewerFx; }
+  function sewerSeed(st, w, h) {
+    st = st || sewerFx;
+    st.w = w; st.h = h; st.ready = true;
+    if (!st.lamps || !st.lamps.length) {
+      st.lamps = [
+        { x: 0.13, y: 0.32, ph: 0.2 }, { x: 0.87, y: 0.30, ph: 1.1 },
+        { x: 0.11, y: 0.52, ph: 2.0 }, { x: 0.89, y: 0.50, ph: 2.8 },
+        { x: 0.16, y: 0.70, ph: 3.4 }, { x: 0.84, y: 0.68, ph: 4.1 }
+      ];
+    }
+    if (!st.rats || st.rats.length < 2) {
+      st.rats = [
+        { x: w * 0.2, dir: 1, phase: 'walk', t: 0, wait: 1.2, sniff: 0 },
+        { x: w * 0.72, dir: -1, phase: 'idle', t: 0, wait: 3.5, sniff: 0 }
+      ];
+    }
+    return st;
+  }
+  function sewerOnLand(g, p) {
+    if (!g || themeFor(g.level) !== SEWER_THEME || !p) return;
+    const cells = [];
+    if (p.m) {
+      for (let r = 0; r < p.m.length; r++) for (let c = 0; c < p.m[r].length; c++) {
+        if (p.m[r][c]) cells.push({ x: p.x + c, y: p.y + r });
+      }
+    }
+    const mid = cells.length ? cells[Math.floor(cells.length / 2)] : { x: p.x, y: p.y };
+    sewerFx.sniff = { col: mid.x, row: mid.y, t: 0 };
+    sewerFx.landAt = sewerFx.t || 0;
+  }
+  function stepSewerFx(st, dt, w, h, opts) {
+    opts = opts || {};
+    st = st || sewerFx;
+    if (!st.ready || st.w !== w || st.h !== h) st = sewerSeed(st, w, h);
+    const sec = (dt || 0) / 1000;
+    const reduce = !!opts.reduce;
+    if (st.hold) return st;
+    st.t = (st.t || 0) + sec;
+    st.water = (st.water || 0) + sec * (reduce ? 0.15 : 0.55);
+    // lamps flicker as a slow brightness wander
+    (st.lamps || []).forEach(function (L) {
+      if (reduce) { L.bri = 0.72; return; }
+      const n = Math.sin(st.t * 7.3 + L.ph * 6) * 0.08 + Math.sin(st.t * 21 + L.ph * 3) * 0.04;
+      L.bri = 0.62 + 0.28 * (0.5 + 0.5 * Math.sin(st.t * 1.4 + L.ph)) + n;
+      if (L.bri < 0.35) L.bri = 0.35;
+      if (L.bri > 1) L.bri = 1;
+    });
+    // manhole
+    const hole = st.manhole || (st.manhole = { open: 0, phase: 'shut', t: 0, wait: sewerWait(true) });
+    if (reduce) {
+      hole.phase = 'open';
+      hole.open = 0.28;
+    } else {
+      hole.t = (hole.t || 0) + sec;
+      if (hole.phase === 'shut') {
+        hole.wait = (hole.wait == null ? sewerWait(true) : hole.wait) - sec;
+        hole.open = 0;
+        if (hole.wait <= 0) { hole.phase = 'opening'; hole.t = 0; }
+      } else if (hole.phase === 'opening') {
+        hole.open = Math.min(1, hole.t / 1.2);
+        if (hole.open >= 1) { hole.phase = 'open'; hole.t = 0; }
+      } else if (hole.phase === 'open') {
+        hole.open = 1;
+        if (hole.t > 4.2) { hole.phase = 'closing'; hole.t = 0; }
+      } else if (hole.phase === 'closing') {
+        hole.open = Math.max(0, 1 - hole.t / 1.2);
+        if (hole.open <= 0) { hole.phase = 'shut'; hole.t = 0; hole.wait = sewerWait(false); }
+      }
+    }
+    // drips from overhead pipes
+    if (!st.drips) st.drips = [];
+    if (!reduce && st.drips.length < 6 && Math.random() < sec * 1.4) {
+      const xs = [0.18, 0.45, 0.68, 0.82];
+      st.drips.push({ x: xs[(Math.random() * xs.length) | 0] * w, y: 0.08 * h + Math.random() * 0.04 * h, v: 80 + Math.random() * 50, r: 1.6 + Math.random() * 1.1 });
+    }
+    const waterY = h * 0.82;
+    for (let i = st.drips.length - 1; i >= 0; i--) {
+      const d = st.drips[i];
+      if (!reduce) d.y += d.v * sec;
+      if (d.y > waterY) st.drips.splice(i, 1);
+    }
+    // gas bubbles
+    if (!st.bubbles) st.bubbles = [];
+    if (!reduce && st.bubbles.length < 8 && Math.random() < sec * 1.8) {
+      st.bubbles.push({
+        x: w * (0.08 + Math.random() * 0.84),
+        y: h * (0.88 + Math.random() * 0.1),
+        r: 2.2 + Math.random() * 3.4,
+        v: 18 + Math.random() * 22,
+        ph: Math.random() * 6.28,
+        pop: false
+      });
+    }
+    for (let i = st.bubbles.length - 1; i >= 0; i--) {
+      const b = st.bubbles[i];
+      if (!reduce) {
+        b.y -= b.v * sec;
+        b.x += Math.sin((st.t || 0) * 2 + b.ph) * 10 * sec;
+      }
+      const popAt = waterY - 8;
+      if (!b.pop && b.y <= popAt) {
+        b.pop = true;
+        b.r *= 1.6;
+        try { if (!opts.silent) playBlorp(); } catch (e) { }
+      }
+      if (b.y < waterY - 28 || (b.pop && b.y < popAt - 6)) st.bubbles.splice(i, 1);
+    }
+    // rats on the ledge
+    const ledgeY = h * 0.78;
+    (st.rats || []).forEach(function (rat, i) {
+      rat.y = ledgeY;
+      if (reduce) { rat.phase = 'idle'; rat.sniff = 0; return; }
+      // A land event sends one rat to sniff
+      if (st.sniff && !st.sniff.claimed && i === 0) {
+        st.sniff.claimed = true;
+        rat.phase = 'toSniff';
+        rat.t = 0;
+        const wellLeft = (w - 10 * 28) / 2; // rough; refined in draw if needed
+        rat.target = wellLeft + (st.sniff.col + 0.5) * Math.min(28, w * 0.07);
+        if (rat.target < 16) rat.target = 16;
+        if (rat.target > w - 16) rat.target = w - 16;
+        rat.dir = rat.target >= rat.x ? 1 : -1;
+      }
+      if (rat.phase === 'toSniff') {
+        const dx = rat.target - rat.x;
+        const step = 70 * sec;
+        if (Math.abs(dx) <= step) { rat.x = rat.target; rat.phase = 'sniff'; rat.t = 0; rat.sniff = 1; }
+        else rat.x += Math.sign(dx) * step;
+      } else if (rat.phase === 'sniff') {
+        rat.t += sec;
+        rat.sniff = 1;
+        if (rat.t > 1.6) { rat.phase = 'idle'; rat.t = 0; rat.wait = 1 + Math.random() * 2; rat.sniff = 0; st.sniff = null; }
+      } else if (rat.phase === 'walk') {
+        rat.x += rat.dir * (38 + i * 8) * sec;
+        if (rat.x < 10) { rat.x = 10; rat.dir = 1; rat.phase = 'idle'; rat.wait = 0.6 + Math.random(); }
+        if (rat.x > w - 10) { rat.x = w - 10; rat.dir = -1; rat.phase = 'idle'; rat.wait = 0.6 + Math.random(); }
+        rat.t += sec;
+        if (rat.t > 2.8 + Math.random()) { rat.phase = 'idle'; rat.t = 0; rat.wait = 0.8 + Math.random() * 2.4; }
+      } else {
+        rat.wait = (rat.wait || 0) - sec;
+        if (rat.wait <= 0) { rat.phase = 'walk'; rat.t = 0; if (Math.random() < 0.5) rat.dir *= -1; }
+      }
+    });
+    return st;
+  }
+  function poseSewer(opt, w, h) {
+    opt = opt || {};
+    sewerFx = newSewerFx();
+    sewerSeed(sewerFx, w || 390, h || 844);
+    sewerFx.hold = true;
+    sewerFx.t = opt.t != null ? opt.t : 8;
+    sewerFx.water = opt.water != null ? opt.water : sewerFx.t * 0.55;
+    const open = opt.manhole != null ? opt.manhole : 1;
+    sewerFx.manhole = { open: open, phase: open >= 1 ? 'open' : (open > 0 ? 'opening' : 'shut'), t: 1, wait: 0 };
+    (sewerFx.lamps || []).forEach(function (L, i) { L.bri = opt.bri != null ? opt.bri : 0.8 + 0.1 * (i % 2); });
+    sewerFx.drips = opt.drips !== false ? [
+      { x: (w || 390) * 0.18, y: (h || 844) * 0.28, v: 0, r: 2 },
+      { x: (w || 390) * 0.68, y: (h || 844) * 0.42, v: 0, r: 2.2 }
+    ] : [];
+    sewerFx.bubbles = [
+      { x: (w || 390) * 0.22, y: (h || 844) * 0.86, r: 3.4, v: 0, ph: 0, pop: false },
+      { x: (w || 390) * 0.48, y: (h || 844) * 0.90, r: 4.2, v: 0, ph: 1, pop: false },
+      { x: (w || 390) * 0.74, y: (h || 844) * 0.84, r: 2.8, v: 0, ph: 2, pop: false },
+      { x: (w || 390) * 0.36, y: (h || 844) * 0.83, r: 5, v: 0, ph: 0.5, pop: true }
+    ];
+    const sniff = opt.sniff !== false;
+    sewerFx.rats = [
+      { x: (w || 390) * (sniff ? 0.42 : 0.22), dir: 1, phase: sniff ? 'sniff' : 'walk', t: 0.4, wait: 0, sniff: sniff ? 1 : 0, y: (h || 844) * 0.78 },
+      { x: (w || 390) * 0.78, dir: -1, phase: 'walk', t: 0.8, wait: 0, sniff: 0, y: (h || 844) * 0.78 }
+    ];
+    return sewerFx;
+  }
+  function drawSewerRat(ctx, rat) {
+    if (!ctx || !rat) return;
+    const x = rat.x, y = (rat.y || 0) - 2;
+    const dir = rat.dir >= 0 ? 1 : -1;
+    const sniff = rat.sniff ? Math.sin((rat.t || 0) * 14) * 2 : 0;
+    ctx.save();
+    ctx.translate(x, y + (rat.phase === 'walk' ? Math.sin((rat.t || 0) * 16) * 1.2 : 0));
+    ctx.scale(dir, 1);
+    // tail
+    ctx.strokeStyle = '#f4a89a';
+    ctx.lineWidth = 1.6;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-11, 1);
+    ctx.quadraticCurveTo(-18, -4, -22, 3);
+    ctx.stroke();
+    // body
+    ctx.fillStyle = '#6b4423';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 10, 5.5, -0.15, 0, 6.283);
+    ctx.fill();
+    ctx.fillStyle = '#8a5a32';
+    ctx.beginPath();
+    ctx.ellipse(2, -1, 6, 3.4, -0.2, 0, 6.283);
+    ctx.fill();
+    // head
+    ctx.fillStyle = '#6b4423';
+    ctx.beginPath();
+    ctx.ellipse(10, -2 - sniff, 5.2, 4.2, 0.1, 0, 6.283);
+    ctx.fill();
+    // ear
+    ctx.fillStyle = '#f4a89a';
+    ctx.beginPath();
+    ctx.ellipse(9, -6 - sniff, 2.2, 2.4, 0, 0, 6.283);
+    ctx.fill();
+    ctx.fillStyle = '#6b4423';
+    ctx.beginPath();
+    ctx.ellipse(9, -6 - sniff, 1.3, 1.5, 0, 0, 6.283);
+    ctx.fill();
+    // snout / nose
+    ctx.fillStyle = '#3f2a18';
+    ctx.beginPath();
+    ctx.ellipse(14.4, -1.4 - sniff, 2.1, 1.5, 0.2, 0, 6.283);
+    ctx.fill();
+    ctx.fillStyle = '#e88a8a';
+    ctx.beginPath();
+    ctx.arc(15.8, -1.2 - sniff, 1.05, 0, 6.283);
+    ctx.fill();
+    // eye
+    ctx.fillStyle = '#111';
+    ctx.beginPath();
+    ctx.arc(12.2, -3.1 - sniff, 0.9, 0, 6.283);
+    ctx.fill();
+    // feet
+    ctx.fillStyle = '#f4a89a';
+    ctx.fillRect(-6, 4, 3, 2);
+    ctx.fillRect(3, 4, 3, 2);
+    ctx.restore();
+  }
+  function drawSewerScene(ctx, st, w, h, reduce) {
+    if (!ctx || !st || !st.ready) return;
+    const t = st.t || 0;
+    ctx.save();
+    // lamp glows
+    (st.lamps || []).forEach(function (L) {
+      const x = L.x * w, y = L.y * h, bri = L.bri == null ? 0.7 : L.bri;
+      const rad = 70;
+      const g = ctx.createRadialGradient(x, y + 8, 4, x, y + 8, rad);
+      g.addColorStop(0, 'rgba(255,210,120,' + (0.42 * bri) + ')');
+      g.addColorStop(0.35, 'rgba(255,180,80,' + (0.16 * bri) + ')');
+      g.addColorStop(1, 'rgba(255,160,60,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y + 8, rad, 0, 6.283);
+      ctx.fill();
+    });
+    // manhole + city light beam at the top
+    const mx = w * 0.5, my = 22, mr = 28;
+    const open = (st.manhole && st.manhole.open) || 0;
+    if (open > 0.02) {
+      const beam = ctx.createLinearGradient(mx, my, mx, h * 0.62);
+      beam.addColorStop(0, 'rgba(255, 220, 140,' + (0.38 * open) + ')');
+      beam.addColorStop(0.45, 'rgba(255, 200, 110,' + (0.12 * open) + ')');
+      beam.addColorStop(1, 'rgba(255, 180, 80, 0)');
+      ctx.fillStyle = beam;
+      ctx.beginPath();
+      ctx.moveTo(mx - 16 * open, my + 6);
+      ctx.lineTo(mx + 16 * open, my + 6);
+      ctx.lineTo(mx + 70 * open, h * 0.62);
+      ctx.lineTo(mx - 70 * open, h * 0.62);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // manhole rim and sliding cover
+    ctx.save();
+    ctx.translate(mx, my);
+    ctx.scale(1, 0.45);
+    ctx.fillStyle = '#2a2a28';
+    ctx.beginPath(); ctx.arc(0, 0, mr, 0, 6.283); ctx.fill();
+    ctx.strokeStyle = '#8a8680';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    // cover slides to the right as it opens
+    ctx.fillStyle = '#3e3c38';
+    ctx.beginPath(); ctx.arc(open * mr * 1.7, 0, mr - 4, 0, 6.283); ctx.fill();
+    ctx.strokeStyle = '#1a1a18';
+    ctx.lineWidth = 1.4;
+    for (let k = -3; k <= 3; k++) {
+      ctx.beginPath();
+      ctx.moveTo(open * mr * 1.7 + k * 6 - 8, -10);
+      ctx.lineTo(open * mr * 1.7 + k * 6 + 8, 12);
+      ctx.stroke();
+    }
+    ctx.restore();
+    // flowing green water along the bottom
+    const waterY = h * 0.82;
+    const flow = st.water || 0;
+    const still = !!reduce;
+    ctx.beginPath();
+    ctx.moveTo(0, h);
+    ctx.lineTo(0, waterY);
+    for (let x = 0; x <= w; x += 8) {
+      const y = waterY + Math.sin(x / 28 + flow * (still ? 0.2 : 1.4)) * (still ? 1.2 : 3.4)
+        + Math.sin(x / 11 + flow * 0.7) * (still ? 0.4 : 1.4);
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo(w, h);
+    ctx.closePath();
+    const wg = ctx.createLinearGradient(0, waterY, 0, h);
+    wg.addColorStop(0, 'rgba(70, 150, 100, 0.55)');
+    wg.addColorStop(0.35, 'rgba(24, 80, 58, 0.7)');
+    wg.addColorStop(1, 'rgba(8, 28, 22, 0.85)');
+    ctx.fillStyle = wg;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(150, 220, 170, 0.45)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    for (let x = 0; x <= w; x += 8) {
+      const y = waterY + Math.sin(x / 28 + flow * (still ? 0.2 : 1.4)) * (still ? 1.2 : 3.4);
+      if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    // drips
+    (st.drips || []).forEach(function (d) {
+      ctx.fillStyle = 'rgba(170, 210, 180, 0.75)';
+      ctx.beginPath();
+      ctx.ellipse(d.x, d.y, d.r * 0.55, d.r * 1.3, 0, 0, 6.283);
+      ctx.fill();
+    });
+    // bubbles
+    (st.bubbles || []).forEach(function (b) {
+      ctx.strokeStyle = b.pop ? 'rgba(200, 230, 190, 0.35)' : 'rgba(190, 230, 200, 0.7)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r, 0, 6.283);
+      ctx.stroke();
+      if (!b.pop) {
+        ctx.fillStyle = 'rgba(220, 255, 230, 0.35)';
+        ctx.beginPath();
+        ctx.arc(b.x - b.r * 0.25, b.y - b.r * 0.28, b.r * 0.28, 0, 6.283);
+        ctx.fill();
+      }
+    });
+    // ledge silhouette already in the backdrop; rats on top
+    (st.rats || []).forEach(function (rat) { drawSewerRat(ctx, rat); });
+    ctx.restore();
+  }
+
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, BOMB_EVERY, BOMB_MAX, BOMB_HITS, bombWaitRange, bombWait, pieceCovers, applyBombHit, ensureHits, cellHits, dropRows, makeBombParts, emptyBoard, findFullRows, applyClear, CITY_THEME, CITY_BUILD_EVERY, CITY_BUILD_EVERY_LOW, CITY_SAFE_TOP, CITY_CREW_N, CITY_ANIM_CLIMB, CITY_ANIM_PLACE, CITY_ANIM_DOWN, CITY_ANIM_FAST, cityHighestSettled, cityStackLow, cityBuildEvery, cityBuildWait, cityAnimDur, pieceDropCovers, cityStackTop, cityCanPlace, cityPickCol, placeBuiltCell, newCityCrew, resetCityCrew, seedCityCrew, stepCityCrew, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, DROP_SLOW, spawn, snapshotGame, applyLive, readLive, writeLive, clearLive, LIVE_KEY, LIVE_TTL, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, LEVELUP_HASH, levelUpSrc, loadLevelUp, GAMEOVER_HASH, gameOverSrc, LINECLEAR_HASH, lineClearSrc, CALLOUT_VOICES, CALLOUT_TEXT, calloutSrc, pickCallout, maybeCallout, playGameOverSfx, playLineClearSfx, playRotateSfx, rotateRun, ROT_KIND, HIGHSCORE_HASH, highScoreSrc, HIGH_SCORE_MS, HIGH_SCORE_FADE_MS, highScoreProg, maybeHighScore, startHighScore, tickHighScore, familyHighFrom, boardOccupied, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear, startLevelUp, tickLevelUp, levelUpDuration, levelUpCopy, burstParts, playLevelUpSfx, levelUpNotes, LU_LO, LU_HI, isEffect, effectProg, musicBeat, EFFECT_TI, reduceMotion, lifeReset, lifeFastForward, lifeReact, photoToScreen, farmArt: () => FARM_ART, farmRig: () => FARM_RIG, FARM_SUN, FARM_HZ, FARM_SUNRISE_PROG, FARM_SUNRISE_SEC, farmDayTarget, farmSunPos, ROOSTER_HASH, roosterSrc, farmThemeActive, playRoosterSfx, stopRoosterSfx, stackColY, stackSkyline, stackPathAt, stackPathLen, newStackWash, stepStackWash, STACK_WASH_PERIOD, washCover, washSpill, washPool, stackWashInland, washCycle, farmReady: () => farm.ready, farmLoad, lifeDay: () => life.day, frogArt: () => FROG_ART, frogMeta: () => FROG_META, frogLittle: () => FROG_LITTLE, frogLittlePads: () => FROG_LITTLE_PADS, frogReady: () => frog.ready, frogLoad, beachArt: () => BEACH_ART, beachMeta: () => BEACH_META, beachReady: () => beach.ready, beachLoad, fwArt: () => FW_ART, fwMeta: () => FW_META, fwReady: () => fw.ready, fwLoad, fwPose, fwSize, fwSkyFlashAlpha, startFwSkyFlash, maybeFwSkyFlash, FW_SKY_FLASH_PEAK, FW_SKY_FLASH_FADE, FW_MAJOR_SCALE, FW_BIGGER_GROW, fwSkyFlashState: () => fw.skyFlash, fwProg: (p) => { if (p != null) fw.prog = p; return fw.prog; }, fwReset, oceanArt: () => OCEAN_ART, oceanMeta: () => OCEAN_META, oceanReady: () => ocean.ready, oceanLoad, holdBlockSpark, SPARK_DUR, SPARK_MAX, makeLightning, drawLightningBolts, SNOW_THEME, snowProg, snowFallParams, newBoardSnow, stepBoardSnow, snowOnLineClear, snowReset, boardSnow: () => boardSnow, newAbseil, stepAbseil, drawAbseil, poseAbseil, abseilState, abseilReset, ABSEIL_GAP, ABSEIL_FIRST, NZ_THEME, nzProg, nzBeatsPerRow, nzDropInterval, NZ_PAL, NZ_PAL_STEPS, NZ_PAL_FADE_MS, nzPalIndex, nzPaletteNow, mixHex, nzMixProgress, resetNzPal, setNzPal, tickNzPal, nzPalState, EXTREME_KEY, EXTREME_PEEK_MS, EXTREME_EXIT_MIN, EXTREME_TOP_RESERVE, SEAGULL_HASH, seagullSrc, startNzFlash, nzFlashAlpha, newNzGulls, stepNzGulls, nzGulls: () => nzGulls, nzFlashState: () => nzFlash, FOOD_THEME, FOOD_KIND, FOOD_HASH, FOOD_VOL, foodKind, foodSoundFor, foodSrc, emptyFood, ensureFood, cloneFood, dropFood, stampFood, foodMetaAt, rotShape, shapeCells, shapePath, playFoodSfx, playFoodLand, playFoodChomp, playFoodBoom, CHERRY_T, CHERRY_ODDS, CHERRY_BONUS, CHERRY_PER_CELL, isCherry, takeNext, cherryBlastCells, dropColumns, applyCherryBomb, isBanana, BANANA_BONUS, BANANA_PER_CELL, bananaTouchesLocked, connectedBananaCells, applyBananaBurst, spawnBananaBurst, FOOD_SPRITES, loadFoodSprites, PAUSE_CLOSE_MS, CLOSE_MSG, TETRIS_SCORES_CLEAR_207, clearTetrisScoresOnce207, nowMs, setNowMs, nextPausedAt, shouldCloseAfterPause, howToPlayLevels, howToPlayHtml, SEWER_THEME, SLIME_ODDS, SLIME_COLOR, maybeSlime, trySlimeSlide, isSlime, stampSlime, emptySlime, ensureSlime, cloneSlime, dropSlime, newSewerFx, stepSewerFx, drawSewerScene, poseSewer, sewerState, sewerReset, sewerOnLand, playSquelch, playBlorp, pieceColor, cellIsSlime, SEWER_HOLE_GAP, SEWER_HOLE_FIRST };
 
   if (!root.document) return;
   const doc = root.document;
@@ -4506,6 +4981,8 @@
     else if (opts.board) g.hits = emptyBoard();
     if (opts.food) g.food = cloneFood(opts.food);
     else if (opts.board) g.food = emptyFood();
+    if (opts.slime) g.slime = cloneSlime(opts.slime);
+    else if (opts.board) g.slime = emptySlime();
     if (opts.piece) g.piece = opts.piece;
     if (opts.next != null) g.next = opts.next;
     if (opts.hold != null) { g.hold = opts.hold; g.canHold = true; }
@@ -4600,6 +5077,14 @@
     const sb = doc.getElementById('soundbtn'); if (sb) sb.textContent = 'Sound off';
     invSeed(opts);
     citySeed(opts);
+    if (themeFor(g.level) === SEWER_THEME) {
+      const sw = (root.innerWidth || 390), sh = (root.innerHeight || 844);
+      if (opts.sewer) poseSewer(opts.sewer, sw, sh);
+      else {
+        sewerReset();
+        stepSewerFx(sewerFx, opts.sewerTime != null ? opts.sewerTime : 0, sw, sh, { reduce: reduceMotion(), silent: true });
+      }
+    } else sewerReset();
     snowReset();
     stackWashReset();
     if (isEffect(themeFor(g.level)) === 'beach' && g.board) {
@@ -5338,7 +5823,7 @@
     ctx.strokeRect(5, 5, w - 10, h - 10);
     ctx.restore();
   }
-  function drawMini(cv, t, dim) {
+  function drawMini(cv, t, dim, slimy) {
     if (!cv) return;
     const ctx = cv.getContext('2d');
     if (!ctx) return;
@@ -5353,7 +5838,7 @@
     const w = (maxC - minC + 1) * s, h = (maxR - minR + 1) * s;
     const ox = (cv.width - w) / 2, oy = (cv.height - h) / 2;
     m.forEach((row, r) => row.forEach((v, c) => {
-      if (v) drawCell(ctx, ox + (c - minC) * s, oy + (r - minR) * s, blockColor(t, g.lines, g.level), s, dim ? 0.35 : 1, c, r, { t: t, rot: 0, lr: r, lc: c });
+      if (v) drawCell(ctx, ox + (c - minC) * s, oy + (r - minR) * s, pieceColor(t, g.lines, g.level, slimy), s, dim ? 0.35 : 1, c, r, { t: t, rot: 0, lr: r, lc: c });
     }));
   }
   let lookIdx = -1, boardBg = LOOKS[0].board;
@@ -5397,7 +5882,7 @@
     doc.documentElement.style.backgroundAttachment = 'fixed';
     doc.body.style.background = 'transparent';
     drawMini(doc.getElementById('next'), g.next, false);
-    drawMini(doc.getElementById('hold'), g.hold, !g.canHold);
+    drawMini(doc.getElementById('hold'), g.hold, !g.canHold, g.holdSlime);
   }
 
   // 1.9.142 Gentle moving things behind the board for each theme (same order as THEMES). Off when reduced motion is set.
@@ -5441,6 +5926,7 @@
      { e: ['🪷'], n: 5, m: 'drift', sp: [6, 12], sz: [16, 24], a: 0.85 },
      { e: ['🐞', '🦋'], n: 3, m: 'flutter', sp: [14, 22], y: [0.3, 0.8], sz: [16, 22], a: 0.9 },
      { e: ['o'], n: 8, m: 'bubble', sp: [10, 20], sz: [3, 6], a: 0.45 }],
+    [],
     []
   ];
 
@@ -5635,6 +6121,13 @@
         drawAbseil(c, abseil);
       } catch (e) { }
     } else if (abseil && abseil.ready && abseil.phase !== 'wait') abseilReset();
+    const sewerOn = (lookIdx < 0 ? themeIdx : lookIdx) === SEWER_THEME || (g && themeFor(g.clearFx ? g.clearFx.level : g.level) === SEWER_THEME);
+    if (sewerOn) {
+      try {
+        stepSewerFx(sewerFx, dt * 1000, fx.w, fx.h, { reduce: fx.off || reduceMotion() });
+        drawSewerScene(c, sewerFx, fx.w, fx.h, fx.off || reduceMotion());
+      } catch (e) { }
+    } else if (sewerFx && sewerFx.ready) sewerReset();
   }
   // Pixel invaders on the Space travel board. They drift; bombs fall slowly down a column.
   const INV_SPRITES = [
@@ -8527,11 +9020,12 @@
       const colLevel = fx ? fx.level : g.level;
       const hitBoard = fx && fx.snapHits ? fx.snapHits : (g.hits || null);
       const foodBoard = fx && fx.snapFood ? fx.snapFood : (g.food || null);
+      const slimeBoard = fx && fx.snapSlime ? fx.snapSlime : (g.slime || null);
       for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
         const v = drawBoard[r][c];
         if (v) {
           const fm = (foodBoard && foodBoard[r] && foodBoard[r][c]) ? foodBoard[r][c] : { t: v, rot: 0, lr: 0, lc: 0 };
-          drawCell(ctx, c * CELL, r * CELL, blockColor(v, colLines, colLevel), CELL, 1, c, r, fm);
+          drawCell(ctx, c * CELL, r * CELL, pieceColor(v, colLines, colLevel, !!(slimeBoard && slimeBoard[r] && slimeBoard[r][c])), CELL, 1, c, r, fm);
           const hits = hitBoard && hitBoard[r] ? (hitBoard[r][c] || 0) : 0;
           if (hits) drawBlockHits(ctx, c * CELL, r * CELL, CELL, hits, now);
         }
@@ -8547,10 +9041,10 @@
         let gy = p.y;
         while (!collides(g.board, p.m, p.x, gy + 1)) gy++;
         p.m.forEach((row, r) => row.forEach((v, c) => {
-          if (v && gy + r >= 0) drawGhost(ctx, (p.x + c) * CELL, (gy + r) * CELL, blockColor(p.t, g.lines, g.level), CELL, p.x + c, gy + r, { t: p.t, rot: p.rot || 0, lr: r, lc: c });
+          if (v && gy + r >= 0) drawGhost(ctx, (p.x + c) * CELL, (gy + r) * CELL, pieceColor(p.t, g.lines, g.level, p.slime), CELL, p.x + c, gy + r, { t: p.t, rot: p.rot || 0, lr: r, lc: c });
         }));
         p.m.forEach((row, r) => row.forEach((v, c) => {
-          if (v && p.y + r >= 0) drawCell(ctx, (p.x + c) * CELL, (p.y + r) * CELL, blockColor(p.t, g.lines, g.level), CELL, 1, p.x + c, p.y + r, { t: p.t, rot: p.rot || 0, lr: r, lc: c });
+          if (v && p.y + r >= 0) drawCell(ctx, (p.x + c) * CELL, (p.y + r) * CELL, pieceColor(p.t, g.lines, g.level, p.slime), CELL, 1, p.x + c, p.y + r, { t: p.t, rot: p.rot || 0, lr: r, lc: c });
         }));
       }
       try { drawBlockSparks(ctx, now, CELL); } catch (e) { }
@@ -8602,7 +9096,7 @@
     }
     try { drawStorm(); } catch (e) { }
     drawMini(nextCv, g.next, false);
-    drawMini(holdCv, g.hold, !g.canHold);
+    drawMini(holdCv, g.hold, !g.canHold, g.holdSlime);
     raf = requestAnimationFrame(loop);
   }
   function persistLive() {
