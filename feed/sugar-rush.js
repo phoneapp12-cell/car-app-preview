@@ -1,4 +1,4 @@
-/* Info Book 1.9.166 – Sugar Rush, levels 1–24. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.166 – Sugar Rush, levels 1–25. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -160,7 +160,13 @@
       bub: ['00000000', '00000000', '00000000', '00000000', '10000001', '01000010', '00000000', '00000000'],
       liq: ['00000000', '00000000', '00011000', '00000000', '00000000', '00000000', '00000000', '00000000'],
       help: 'Bring both hot jam doughnuts down the laneway, pop the sugar bubbles and free the liquorice in 31 moves.',
-      badge: { id: 'tramline', name: 'Laneway Tram Bell', icon: '🔔' } }
+      badge: { id: 'tramline', name: 'Laneway Tram Bell', icon: '🔔' } },
+    // 1.9.233 Brisbane: jelly along the winding river, jacaranda-blossom icing on the banks.
+    { n: 25, name: 'Brisbane River Bend', target: 0, moves: 31, stars: [0, 4200, 8400], kinds: 6,
+      jelly: ['00000022', '00000220', '00011100', '00110000', '02200000', '00110000', '00011120', '00000022'],
+      ice: ['11000000', '10000000', '00000000', '00000001', '00000011', '00000000', '10000000', '11000000'],
+      help: 'Clear the jelly all along the winding Brisbane River (double on the bends) and crack the 8 blocks of jacaranda-blossom icing on the banks in 31 moves.',
+      badge: { id: 'citycat', name: 'CityCat Ticket', icon: '⛴️' } }
   ];
 
 
@@ -189,7 +195,8 @@
     { icon: '🌊', goal: 'Bring both treats down, clear the foam and free the liquorice', detail: 'Bring both beach treats down, clear the 4 sea-foam icing blocks and free the liquorice in 32 moves.', tip: 'Free the liquorice in the middle before it creeps, and clear the foam under each treat.', mechanic: 'surf' },
     { icon: '🦢', goal: 'Finish every objective', detail: 'Clear the double jelly in the river, free 2 jars, pop 2 bubbles and free the liquorice, with chocolate on the loose — all in 26 moves.', tip: 'The Super Hard finale. Free the corner liquorice early and keep the chocolate in check.', mechanic: 'swan' },
     { icon: '🐸', goal: 'Clear the city-square jelly and free the jars', detail: "Clear the jelly in Adelaide's 5 city squares and free 4 locked jars in 30 moves.", tip: 'Adelaide is laid out around five squares. Work the corners early; the jars sit between them.', mechanic: 'squares' },
-    { icon: '🍩', goal: 'Bring both doughnuts down, pop the bubbles and free the liquorice', detail: 'Bring both hot jam doughnuts down the laneway, pop 4 sugar bubbles and free the liquorice in 31 moves.', tip: 'Free the liquorice in the middle before it creeps, then clear the columns under each doughnut.', mechanic: 'laneway' }
+    { icon: '🍩', goal: 'Bring both doughnuts down, pop the bubbles and free the liquorice', detail: 'Bring both hot jam doughnuts down the laneway, pop 4 sugar bubbles and free the liquorice in 31 moves.', tip: 'Free the liquorice in the middle before it creeps, then clear the columns under each doughnut.', mechanic: 'laneway' },
+    { icon: '⛴️', goal: 'Clear the river jelly and crack the blossom icing', detail: 'Clear the jelly along the winding Brisbane River (double on the bends) and crack 8 blocks of jacaranda-blossom icing in 31 moves.', tip: 'Follow the river like the CityCat: the bends are where matches pile up. Hit the corner icing with specials.', mechanic: 'river' }
   ];
   function levelIntro(n, p) {
     const lv = LEVELS[(n | 0) - 1]; if (!lv) return null;
@@ -595,6 +602,18 @@
           { icon: '➿', text: 'Free the liquorice' }
         ]
       }
+    ],
+    // 1.9.233 Brisbane recap.
+    25: [
+      {
+        id: 'recap25', kind: 'recap',
+        title: 'Brisbane',
+        bubble: 'Jacarandas, the Story Bridge and a CityCat on the river.',
+        items: [
+          { icon: '💜', text: 'Clear the jelly along the river' },
+          { icon: '🧁', text: 'Crack the blossom icing' }
+        ]
+      }
     ]
   };
   function tutorialFor(n) { return TUTORIALS[n] || null; }
@@ -648,18 +667,19 @@
     { n: 22, x: 51, y: 2041, place: "Perth", kind: 'city', label: 'right', lat: -31.95, lon: 115.86, via: [{ x: 310, y: 1965 }] },
     // 1.9.232 Along the Great Australian Bight to Adelaide, then on to Melbourne.
     { n: 23, x: 245, y: 2074, place: "Adelaide", kind: 'city', label: 'left', lat: -34.93, lon: 138.6, via: [{ x: 154, y: 2075 }] },
-    { n: 24, x: 299, y: 2105, place: "Melbourne", kind: 'city', label: 'left', lat: -37.81, lon: 144.96 }
+    { n: 24, x: 299, y: 2105, place: "Melbourne", kind: 'city', label: 'left', lat: -37.81, lon: 144.96 },
+    // 1.9.233 Up the east coast to Brisbane. Its true spot is under the Gold Coast pin, so the pin is nudged ~38 px north (nudged).
+    { n: 25, x: 362, y: 1954, place: "Brisbane", kind: 'city', label: 'left', lat: -27.47, lon: 153.03, nudged: true, via: [{ x: 318, y: 2030 }] }
   ];
   // Coming soon: other Australian cities. Shown as markers only (no trail), so they never look like the route.
-  // Brisbane and Canberra are nudged a few pixels clear of the Gold Coast and Sydney pins (marked nudged).
+  // Canberra is nudged a few pixels clear of the Sydney and Melbourne pins (marked nudged). Brisbane is a stop since 1.9.233.
   const FUTURE_STOPS = [
-    { place: 'Brisbane', x: 366, y: 1956, label: 'left', lat: -27.47, lon: 153.03, nudged: true },
     { place: 'Canberra', x: 338, y: 2103, label: 'below', lat: -35.28, lon: 149.13, nudged: true },
     { place: 'Hobart', x: 319, y: 2161, label: 'left', lat: -42.88, lon: 147.33 },
     { place: 'Darwin', x: 179, y: 1827, label: 'left', lat: -12.46, lon: 130.84 },
     { place: 'Cairns', x: 306, y: 1876, label: 'left', lat: -16.92, lon: 145.77 }
   ];
-  const LV_COUNT = 24;
+  const LV_COUNT = 25;
   function stopForLevel(n) { return MAP_STOPS[(n | 0) - 1] || null; }
   function icingPath(pts) {
     if (!pts || pts.length < 2) return '';
@@ -1746,7 +1766,7 @@
   // ("make levels 3 to 10 my music"); Saturday night in Nelson (10) gets the calm one. Levels 1 and 2 keep their own
   // songs. Each song ships as AAC (.m4a, ~96 kbps) with an .mp3 fallback; a mood with no
   // file yet simply keeps the usual loop, so this is safe before the songs land.
-  const SONG_PLAN = { intense: [13, 15, 19, 22], calm: [10, 17, 18], upbeat: [3, 4, 5, 6, 7, 8, 9, 11, 12, 14, 16, 20, 21, 23, 24] };
+  const SONG_PLAN = { intense: [13, 15, 19, 22], calm: [10, 17, 18], upbeat: [3, 4, 5, 6, 7, 8, 9, 11, 12, 14, 16, 20, 21, 23, 24, 25] };
   // "Sugar Rush travel" (~136 BPM, the loudest and punchiest) drives the Hard levels; "Sugar Rush Kiss" (~89 BPM,
   // the softest, "let it linger") floats over the Pacific islands; "Sugar Rush" ("now I can't sit still") for the rest.
   const SONG_FILES = { intense: 'sugar-rush-travel.m4a', calm: 'sugar-rush-kiss.m4a', upbeat: 'sugar-rush-song.m4a' };
@@ -2706,6 +2726,51 @@
         { x: 86, y: 69, w: 3, cls: 'sc-twinkle', d: 2.3, dl: -0.4, svg: 'glint' },
         { x: 30, y: 84, w: 14, cls: 'sc-bob', d: 3.4, svg: 'boat' },
         { x: 70, y: 6, w: 4, cls: 'sc-twinkle', d: 2.6, svg: 'glint' }
+      ] },
+    // 1.9.233 Brisbane: the river, the Story Bridge, a CityCat and jacarandas dropping purple blossom.
+    { n: 25, id: 'brisbane', place: 'Brisbane', title: 'Story Bridge and jacarandas, Brisbane', night: false,
+      art: function () {
+        const truss = function (x0, x1, top, deck) {
+          let w = '';
+          for (let x = x0; x < x1; x += 12) w += '<path d="M' + x + ' ' + deck + ' L' + (x + 6) + ' ' + top(x + 6) + ' L' + (x + 12) + ' ' + deck + '" stroke="#5a6f8a" stroke-width="2" fill="none"/>';
+          return w;
+        };
+        const arc = function (x) { return 470 + Math.pow((x - 195) / 150, 2) * 70; };
+        return '<defs>' + scGrad('sk', [[0, '#7ccfff'], [0.6, '#d4f0ff'], [1, '#fff3dc']]) + scGrad('rv', [[0, '#5aa7c8'], [1, '#2f6f8f']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(300, 110, 0.8, 0.85) +
+          '<circle cx="70" cy="110" r="32" fill="#fff3a0"/>' +
+          [[150, 380, 30, 180], [184, 330, 26, 230], [214, 400, 34, 160], [252, 350, 28, 210], [284, 420, 30, 140], [318, 390, 36, 170]].map(function (b, i) {
+            let w = '<rect x="' + b[0] + '" y="' + b[1] + '" width="' + b[2] + '" height="' + b[3] + '" fill="' + (i % 2 ? '#e4ecf6' : '#cbd8ea') + '"/>';
+            for (let yy = b[1] + 10; yy < b[1] + b[3] - 8; yy += 15) w += '<rect x="' + (b[0] + 4) + '" y="' + yy + '" width="' + (b[2] - 8) + '" height="4" fill="#7ec8ef" opacity=".7"/>';
+            return w;
+          }).join('') +
+          '<path d="M0 560 C80 548 160 562 240 554 C300 548 350 556 390 560 L390 580 L0 580 Z" fill="#7cae5a"/>' +
+          '<rect y="576" width="390" height="190" fill="url(#rv)"/>' +
+          // Story Bridge: two towers, a cantilever truss rising to each tower, the deck across the river.
+          '<rect x="96" y="470" width="10" height="120" fill="#4a5f7a"/><rect x="284" y="470" width="10" height="120" fill="#4a5f7a"/>' +
+          '<path d="M20 560 Q60 548 101 470 Q195 545 289 470 Q330 548 370 560" stroke="#4a5f7a" stroke-width="5" fill="none"/>' +
+          truss(24, 366, function (x) { return x < 101 ? 560 - (x - 20) * 1.0 : x > 289 ? 470 + (x - 289) * 1.1 : arc(x) + 6; }, 560) +
+          '<rect x="10" y="558" width="370" height="7" fill="#3e526a"/>' +
+          '<path d="M30 640 h40 M200 680 h60 M120 720 h40 M300 700 h40" stroke="#fff" stroke-width="3" opacity=".35" stroke-linecap="round"/>' +
+          '<path d="M0 766 C90 752 190 774 290 758 C340 752 370 756 390 758 L390 844 L0 844 Z" fill="#7cbf5a"/>' +
+          '<path d="M0 792 C100 780 200 802 300 788 C350 782 375 784 390 786 L390 844 L0 844 Z" fill="#66a84c"/>' +
+          [[44, 760, 1], [346, 756, 0.9], [196, 790, 0.7]].map(function (t) {
+            const x = t[0], y = t[1], k = t[2];
+            return '<path d="M' + x + ' ' + y + ' v' + (-46 * k) + '" stroke="#6b4a2e" stroke-width="' + (6 * k) + '"/>' +
+              '<circle cx="' + x + '" cy="' + (y - 60 * k) + '" r="' + (30 * k) + '" fill="#9b6fd8"/>' +
+              '<circle cx="' + (x - 22 * k) + '" cy="' + (y - 46 * k) + '" r="' + (20 * k) + '" fill="#b48ae6"/>' +
+              '<circle cx="' + (x + 22 * k) + '" cy="' + (y - 48 * k) + '" r="' + (22 * k) + '" fill="#8a5ccc"/>';
+          }).join('') +
+          '<ellipse cx="196" cy="836" rx="120" ry="8" fill="#b48ae6" opacity=".5"/>';
+      },
+      sprites: [
+        { x: 20, y: 76, w: 24, cls: 'sc-glide', d: 11, svg: 'citycat' },
+        { x: 8, y: 80, w: 4, cls: 'sc-float', d: 6, svg: 'petal' },
+        { x: 30, y: 84, w: 3, cls: 'sc-float', d: 7.5, dl: -2, svg: 'petal' },
+        { x: 82, y: 79, w: 4, cls: 'sc-float', d: 6.5, dl: -3, svg: 'petal' },
+        { x: 60, y: 88, w: 3, cls: 'sc-float', d: 8, dl: -1, svg: 'petal' },
+        { x: 50, y: 20, w: 8, cls: 'sc-drift', d: 10, svg: 'gull' },
+        { x: 10, y: 6, w: 24, cls: 'sc-drift', d: 22, svg: 'cloud' }
       ] }
   ];
   const SCENE_SPRITE_SVG = {
@@ -2720,6 +2785,9 @@
     blades: '<svg viewBox="-30 -30 60 60"><path d="M0 0 L-3 -28 L3 -28 Z M0 0 L25.7 12.4 L22.7 17.6 Z M0 0 L-22.7 17.6 L-25.7 12.4 Z" fill="#fff"/><circle r="3.5" fill="#ddd"/></svg>',
     shoot: '<svg viewBox="0 0 80 20"><path d="M2 2 L70 16" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".7"/><circle cx="72" cy="16" r="3" fill="#fff"/></svg>',
     whale: '<svg viewBox="0 0 100 40"><path d="M6 30 C20 20 50 18 74 24 C82 26 88 30 92 34 L6 34 Z" fill="#3a4a66"/><path d="M60 22 C62 10 66 4 72 2 C70 10 74 14 80 12 C76 18 70 22 64 24 Z" fill="#2c3a52"/><circle cx="20" cy="28" r="1.6" fill="#fff"/><path d="M0 36 q10 -4 20 0 t20 0 t20 0 t20 0 t20 0" stroke="#fff" stroke-width="2.5" fill="none" opacity=".75"/></svg>',
+    // 1.9.233 Brisbane: a blue-and-white CityCat and a jacaranda petal.
+    citycat: '<svg viewBox="0 0 100 36"><path d="M4 22 H96 L90 30 H10 Z" fill="#1d5fae"/><path d="M8 30 H40 M60 30 H92" stroke="#0e3a6e" stroke-width="3"/><rect x="18" y="10" width="64" height="12" rx="4" fill="#fff"/><rect x="22" y="13" width="56" height="5" fill="#3d8bfd"/><rect x="40" y="4" width="22" height="7" rx="2" fill="#fff"/></svg>',
+    petal: '<svg viewBox="-10 -10 20 20"><ellipse cx="0" cy="0" rx="8" ry="5" fill="#a77ae0" transform="rotate(30)"/><ellipse cx="0" cy="0" rx="4" ry="2" fill="#d6c0f5" transform="rotate(30)"/></svg>',
     tram: '<svg viewBox="0 0 100 44"><path d="M40 2 L46 8 M60 2 L54 8" stroke="#333" stroke-width="1.6"/><rect x="6" y="8" width="88" height="28" rx="5" fill="#2f7a3e"/><rect x="6" y="8" width="88" height="7" rx="3" fill="#ffd43b"/><rect x="12" y="17" width="12" height="10" rx="2" fill="#fff6c8"/><rect x="28" y="17" width="12" height="10" rx="2" fill="#fff6c8"/><rect x="44" y="17" width="12" height="10" rx="2" fill="#fff6c8"/><rect x="60" y="17" width="12" height="10" rx="2" fill="#fff6c8"/><rect x="76" y="17" width="12" height="10" rx="2" fill="#fff6c8"/><circle cx="24" cy="38" r="5" fill="#333"/><circle cx="76" cy="38" r="5" fill="#333"/></svg>',
     punt: '<svg viewBox="0 0 60 40"><path d="M2 30 H58 L54 36 H6 Z" fill="#9a5b3a"/><rect x="20" y="20" width="10" height="10" rx="3" fill="#ff8ab8"/><circle cx="25" cy="16" r="4" fill="#f2c79a"/><path d="M44 30 L50 2" stroke="#7a4a2a" stroke-width="2"/><rect x="38" y="20" width="8" height="10" rx="2" fill="#fff"/><rect x="38" y="13" width="8" height="3" fill="#333"/><circle cx="42" cy="17" r="3" fill="#f2c79a"/></svg>',
     heli: '<svg viewBox="0 0 80 40"><path d="M10 6 H70" stroke="#333" stroke-width="2.5" stroke-linecap="round"/><rect x="38" y="6" width="3" height="6" fill="#333"/><ellipse cx="38" cy="20" rx="16" ry="9" fill="#e0333a"/><path d="M24 20 H4 L2 14" stroke="#e0333a" stroke-width="4" fill="none"/><path d="M46 16 a8 7 0 0 1 6 8 H44 Z" fill="#bfe9ff"/><path d="M28 32 H52 M32 29 V32 M48 29 V32" stroke="#333" stroke-width="2"/></svg>',
@@ -3971,6 +4039,7 @@
     if (kind === 'swan') return '<span class="choco"></span><span class="jelly"></span><span class="bubp sm"></span><span class="liqp sm"></span>';
     if (kind === 'reef') return '<span class="jelly"></span><span class="bubp"></span><span class="bubp sm"></span>';
     if (kind === 'squares') return '<span class="jelly"></span><span class="lock">🔒</span><span class="jelly"></span>';
+    if (kind === 'river') return '<span class="jelly"></span><span class="jelly"></span><span class="ice"></span>';
     if (kind === 'laneway') return '<span class="ing">🍩</span><span class="bubp sm"></span><span class="liqp sm"></span>';
     if (kind === 'coconut') return '<span class="ing">🥥</span><span class="liqp sm"></span>';
     if (kind === 'sunset') return '<span class="jelly"></span><span class="lock">🔒</span><span class="liqp sm"></span>';
