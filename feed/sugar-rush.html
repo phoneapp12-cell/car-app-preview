@@ -583,6 +583,9 @@
   .stops .future-stop .meta { max-width: none; white-space: nowrap; }
   .stops .future-stop.lab-left .meta { right: 28px; top: 3px; }
   .stops .future-stop.lab-right .meta { left: 28px; top: 3px; }
+  /* 1.9.232 Sydney's label sits up and to the left, clear of the Adelaide pin; Canberra's coming-soon name sits below its pin. */
+  .stops .lv.lift .meta { top: -26px; }
+  .stops .future-stop.lab-below .meta { position: absolute; top: 24px; left: 50%; transform: translateX(-50%); }
   .stops .future-stop .meta b, .stops .future-stop .meta em { display: inline; }
   .stops .future-stop .meta em::before { content: ' · '; }
   .stops .future-stop .meta, .stops .lv.kind-city .meta { background: rgba(255,255,255,.78); border-radius: 9px; padding: 1px 6px; box-shadow: 0 1px 3px rgba(122,31,76,.12); }
