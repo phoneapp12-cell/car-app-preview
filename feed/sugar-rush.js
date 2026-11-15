@@ -1,4 +1,4 @@
-/* Info Book 1.9.166 – Sugar Rush, levels 1–25. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.166 – Sugar Rush, levels 1–26. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -166,7 +166,14 @@
       jelly: ['00000022', '00000220', '00011100', '00110000', '02200000', '00110000', '00011120', '00000022'],
       ice: ['11000000', '10000000', '00000000', '00000001', '00000011', '00000000', '10000000', '11000000'],
       help: 'Clear the jelly all along the winding Brisbane River (double on the bends) and crack the 8 blocks of jacaranda-blossom icing on the banks in 31 moves.',
-      badge: { id: 'citycat', name: 'CityCat Ticket', icon: '⛴️' } }
+      badge: { id: 'citycat', name: 'CityCat Ticket', icon: '⛴️' } },
+    // 1.9.234 Papua New Guinea: the stilt village over the water at Port Moresby.
+    { n: 26, name: 'Port Moresby Paradise', target: 0, moves: 24, stars: [0, 4400, 8800], kinds: 6,
+      jelly: ['00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '11111111', '11111111'],
+      bub: ['00000000', '00000000', '10000001', '01000010', '00000000', '00000000', '00000000', '00000000'],
+      locks: ['00000000', '00000000', '00000000', '00000000', '00011000', '00000000', '00000000', '00000000'],
+      help: 'Clear the jelly under the stilt village, pop the 4 sugar bubbles and free the 2 locked jars in 24 moves.',
+      badge: { id: 'paradise', name: 'Bird of Paradise', icon: '🦜' } }
   ];
 
 
@@ -196,7 +203,8 @@
     { icon: '🦢', goal: 'Finish every objective', detail: 'Clear the double jelly in the river, free 2 jars, pop 2 bubbles and free the liquorice, with chocolate on the loose — all in 26 moves.', tip: 'The Super Hard finale. Free the corner liquorice early and keep the chocolate in check.', mechanic: 'swan' },
     { icon: '🐸', goal: 'Clear the city-square jelly and free the jars', detail: "Clear the jelly in Adelaide's 5 city squares and free 4 locked jars in 30 moves.", tip: 'Adelaide is laid out around five squares. Work the corners early; the jars sit between them.', mechanic: 'squares' },
     { icon: '🍩', goal: 'Bring both doughnuts down, pop the bubbles and free the liquorice', detail: 'Bring both hot jam doughnuts down the laneway, pop 4 sugar bubbles and free the liquorice in 31 moves.', tip: 'Free the liquorice in the middle before it creeps, then clear the columns under each doughnut.', mechanic: 'laneway' },
-    { icon: '⛴️', goal: 'Clear the river jelly and crack the blossom icing', detail: 'Clear the jelly along the winding Brisbane River (double on the bends) and crack 8 blocks of jacaranda-blossom icing in 31 moves.', tip: 'Follow the river like the CityCat: the bends are where matches pile up. Hit the corner icing with specials.', mechanic: 'river' }
+    { icon: '⛴️', goal: 'Clear the river jelly and crack the blossom icing', detail: 'Clear the jelly along the winding Brisbane River (double on the bends) and crack 8 blocks of jacaranda-blossom icing in 31 moves.', tip: 'Follow the river like the CityCat: the bends are where matches pile up. Hit the corner icing with specials.', mechanic: 'river' },
+    { icon: '🦜', goal: 'Clear the village jelly, pop the bubbles and free the jars', detail: 'Clear the jelly under the stilt village, pop 4 sugar bubbles and free 2 locked jars in 24 moves.', tip: 'The jelly sits along the bottom two rows. Matches down there also bring new sweets tumbling in from the top.', mechanic: 'village' }
   ];
   function levelIntro(n, p) {
     const lv = LEVELS[(n | 0) - 1]; if (!lv) return null;
@@ -614,6 +622,19 @@
           { icon: '🧁', text: 'Crack the blossom icing' }
         ]
       }
+    ],
+    // 1.9.234 Papua New Guinea recap.
+    26: [
+      {
+        id: 'recap26', kind: 'recap',
+        title: 'Papua New Guinea',
+        bubble: 'Port Moresby: a stilt village, a lakatoi and a bird of paradise.',
+        items: [
+          { icon: '💜', text: 'Clear the jelly under the stilt village' },
+          { icon: '🫧', text: 'Pop the sugar bubbles' },
+          { icon: '🔒', text: 'Free the locked jars' }
+        ]
+      }
     ]
   };
   function tutorialFor(n) { return TUTORIALS[n] || null; }
@@ -639,6 +660,8 @@
     return { x: WHANGAREI_INSET.x + WHANGAREI_INSET.k * (a.x - b.x), y: WHANGAREI_INSET.y + WHANGAREI_INSET.k * (a.y - b.y) };
   }
   // Pacific Islands panel and Australia: plain longitude/latitude scales (east longitudes wrap past 180°).
+  // 1.9.234 West Pacific inset (Solomons, Vanuatu, New Caledonia, Fiji): 156-180°E across x 60-340, 8-23°S down y 1580-1668.
+  function westPacXY(lat, lon) { return { x: 60 + (lon - 156) * 280 / 24, y: 1580 + (-lat - 8) * 88 / 15 }; }
   function pacXY(lat, lon) { return { x: 70 + 16.86 * (((lon % 360) + 360) % 360 - 184.8), y: 1350 + 21.6 * (-lat - 13.83) }; }
   function ausXY(lat, lon) { return { x: 8.533 * lon - 937.8, y: 1808 + 10.97 * (-lat - 10.707) }; }
   const MAP_W = 400, MAP_H = 2240;
@@ -669,7 +692,9 @@
     { n: 23, x: 245, y: 2074, place: "Adelaide", kind: 'city', label: 'left', lat: -34.93, lon: 138.6, via: [{ x: 154, y: 2075 }] },
     { n: 24, x: 299, y: 2105, place: "Melbourne", kind: 'city', label: 'left', lat: -37.81, lon: 144.96 },
     // 1.9.233 Up the east coast to Brisbane. Its true spot is under the Gold Coast pin, so the pin is nudged ~38 px north (nudged).
-    { n: 25, x: 362, y: 1954, place: "Brisbane", kind: 'city', label: 'left', lat: -27.47, lon: 153.03, nudged: true, via: [{ x: 318, y: 2030 }] }
+    { n: 25, x: 362, y: 1954, place: "Brisbane", kind: 'city', label: 'left', lat: -27.47, lon: 153.03, nudged: true, via: [{ x: 318, y: 2030 }] },
+    // 1.9.234 North across the Coral Sea to Port Moresby, Papua New Guinea (true position; kept east of Cairns).
+    { n: 26, x: 318, y: 1794, place: "Port Moresby", kind: 'city', label: 'below', lat: -9.44, lon: 147.18, via: [{ x: 356, y: 1880 }] }
   ];
   // Coming soon: other Australian cities. Shown as markers only (no trail), so they never look like the route.
   // Canberra is nudged a few pixels clear of the Sydney and Melbourne pins (marked nudged). Brisbane is a stop since 1.9.233.
@@ -677,9 +702,14 @@
     { place: 'Canberra', x: 338, y: 2103, label: 'below', lat: -35.28, lon: 149.13, nudged: true },
     { place: 'Hobart', x: 319, y: 2161, label: 'left', lat: -42.88, lon: 147.33 },
     { place: 'Darwin', x: 179, y: 1827, label: 'left', lat: -12.46, lon: 130.84 },
-    { place: 'Cairns', x: 306, y: 1876, label: 'left', lat: -16.92, lon: 145.77 }
+    { place: 'Cairns', x: 306, y: 1876, label: 'left', lat: -16.92, lon: 145.77 },
+    // 1.9.234 West Pacific, coming soon: drawn in a small inset inside the Pacific panel (westPacXY), names only.
+    { place: 'Solomon Islands', x: 106, y: 1588, label: 'right', lat: -9.43, lon: 159.95, inset: 'westpac' },
+    { place: 'Vanuatu', x: 204, y: 1637, label: 'left', lat: -17.73, lon: 168.32, inset: 'westpac' },
+    { place: 'New Caledonia', x: 182, y: 1664, label: 'right', lat: -22.27, lon: 166.45, inset: 'westpac' },
+    { place: 'Fiji', x: 322, y: 1640, label: 'right', lat: -18.14, lon: 178.44, inset: 'westpac' }
   ];
-  const LV_COUNT = 25;
+  const LV_COUNT = 26;
   function stopForLevel(n) { return MAP_STOPS[(n | 0) - 1] || null; }
   function icingPath(pts) {
     if (!pts || pts.length < 2) return '';
@@ -700,6 +730,20 @@
   const TAS_PATH = 'M 296 2138 L 312 2142 L 328 2140 L 328 2154 L 323 2165 L 315 2170 L 307 2167 L 301 2154 L 297 2143 Z';
   function planeAt(x, y, deg) {
     return '<g class="sr-plane" transform="translate(' + x + ' ' + y + ') rotate(' + deg + ')"><path d="M0 -14 L3 -4 L14 2 L14 5 L3 2 L2 10 L6 13 L6 15 L0 13 L-6 15 L-6 13 L-2 10 L-3 2 L-14 5 L-14 2 L-3 -4 Z" fill="#fff" stroke="#3d8bfd" stroke-width="1.5"/></g>';
+  }
+  // 1.9.234 Papua New Guinea coast points (lat, lon) and the West Pacific islands (lat, lon, rx, ry, rotate).
+  const PNG_PTS = [[-2.6, 141.0], [-3.1, 142.2], [-3.4, 143.5], [-3.9, 144.5], [-4.6, 145.6], [-5.4, 145.8], [-6.0, 147.0], [-6.1, 147.8], [-7.5, 147.7], [-8.3, 148.3], [-9.0, 149.3], [-9.6, 149.9], [-10.3, 150.6], [-10.6, 150.3], [-10.2, 149.7], [-9.9, 148.6], [-9.5, 147.4], [-8.9, 146.6], [-8.0, 145.8], [-7.6, 144.6], [-8.0, 143.6], [-8.6, 143.2], [-9.1, 142.6], [-9.1, 141.0]];
+  const NEW_BRITAIN_PTS = [[-5.6, 148.4], [-5.1, 150.0], [-4.3, 151.6], [-4.2, 152.3], [-4.8, 152.0], [-5.6, 150.9], [-6.2, 149.5], [-6.0, 148.5]];
+  const WESTPAC_ISLES = [[-8.0, 157.5, 9, 3, 30], [-9.0, 160.5, 10, 3, 30], [-10.0, 161.6, 7, 2.5, 30], [-15.5, 167.1, 3, 6, -10], [-17.7, 168.4, 3, 4, 0], [-21.4, 165.6, 16, 4, 35], [-17.8, 178.0, 6, 4, 0], [-16.6, 179.2, 7, 3, -20]];
+  function ausPath(pts) { return pts.map(function (q, i) { const a = ausXY(q[0], q[1]); return (i ? 'L' : 'M') + a.x.toFixed(1) + ' ' + a.y.toFixed(1); }).join(' ') + ' Z'; }
+  // 1.9.234 Soft clouds drifting slowly over the map (CSS .sr-cloud; still under reduced motion). Over sea, clear of the pins.
+  const MAP_CLOUDS = [[330, 140, 1, 26], [40, 640, 0.8, 34], [350, 860, 0.9, 30], [60, 1120, 1.1, 38], [330, 1200, 0.8, 28], [64, 1722, 0.7, 32], [40, 1880, 0.9, 36], [370, 2200, 0.8, 30]];
+  function mapClouds() {
+    return '<g class="sr-clouds" pointer-events="none">' + MAP_CLOUDS.map(function (c, i) {
+      const x = c[0], y = c[1], k = c[2];
+      return '<g class="sr-cloud" style="--d:' + c[3] + 's;--dl:' + (-i * 4) + 's"><g transform="translate(' + x + ' ' + y + ') scale(' + k + ')" opacity=".62">' +
+        '<ellipse cx="0" cy="0" rx="34" ry="11" fill="#fff"/><ellipse cx="-13" cy="-7" rx="15" ry="11" fill="#fff"/><ellipse cx="11" cy="-10" rx="18" ry="13" fill="#fff"/></g></g>';
+    }).join('') + '</g>';
   }
   function nzMapSvg() {
     const live = icingPath(MAP_STOPS);
@@ -770,7 +814,12 @@
       '<circle cx="330" cy="1509" r="30" fill="#bff5ec" opacity=".85"/><circle cx="330" cy="1509" r="26" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="4 4"/><circle cx="330" cy="1509" r="16" fill="url(#sr-land)" stroke="#fff" stroke-width="4"/>' +
       '<path d="M323 1507 l9 -9 5 11 Z" fill="#7ac77a"/>' +
       [[102, 1339], [150, 1354], [94, 1522], [350, 1503]].map(function (q) { return '<path d="M' + q[0] + ' ' + q[1] + ' v-12 M' + q[0] + ' ' + (q[1] - 12) + ' q-6 -2 -9 3 M' + q[0] + ' ' + (q[1] - 12) + ' q6 -2 9 3 M' + q[0] + ' ' + (q[1] - 12) + ' q-2 -6 -7 -6 M' + q[0] + ' ' + (q[1] - 12) + ' q2 -6 7 -6" stroke="#2f9a5a" stroke-width="2.4" fill="none" stroke-linecap="round"/>'; }).join('') +
-      '<path d="M40 1600 q12 -5 24 0 M300 1620 q12 -5 24 0 M90 1660 q12 -5 24 0 M250 1440 q12 -5 24 0" stroke="#fff" stroke-width="2.5" fill="none" opacity=".7"/>' +
+      '<path d="M250 1440 q12 -5 24 0" stroke="#fff" stroke-width="2.5" fill="none" opacity=".7"/>' +
+      // 1.9.234 West Pacific inset (coming soon): Solomons, Vanuatu, New Caledonia, Fiji at their real relative spots (westPacXY).
+      '<g class="sr-westpac"><rect x="28" y="1554" width="344" height="122" rx="18" fill="#bff5ec" opacity=".55" stroke="#fff" stroke-width="2.5" stroke-dasharray="6 6"/>' +
+      '<text x="358" y="1572" text-anchor="end" font-size="11" font-weight="900" fill="#1b8a7c" font-family="ui-rounded,system-ui,sans-serif">West Pacific · coming soon</text>' +
+      WESTPAC_ISLES.map(function (q) { const a = westPacXY(q[0], q[1]); return '<ellipse cx="' + a.x.toFixed(1) + '" cy="' + a.y.toFixed(1) + '" rx="' + q[2] + '" ry="' + q[3] + '" transform="rotate(' + q[4] + ' ' + a.x.toFixed(1) + ' ' + a.y.toFixed(1) + ')" fill="url(#sr-land)" stroke="#fff" stroke-width="2"/>'; }).join('') +
+      '</g>' +
       '</g>' +
       // A little plane on the flight out of Dunedin
       // 1.9.222 Australia: same full-screen style as New Zealand, with Tasmania and a heading pill.
@@ -779,11 +828,16 @@
       '<text x="200" y="1773" text-anchor="middle" font-size="15" font-weight="900" fill="#c0601a" font-family="ui-rounded,system-ui,sans-serif">Australia</text>' +
       '<path filter="url(#sr-soft)" fill="url(#sr-land)" stroke="#fff" stroke-width="8" stroke-linejoin="round" d="' + AUS_PATH + '"/>' +
       '<path filter="url(#sr-soft)" fill="url(#sr-land)" stroke="#fff" stroke-width="6" stroke-linejoin="round" d="' + TAS_PATH + '"/>' +
+      // 1.9.234 Papua New Guinea (mainland + New Britain), from real coast points through ausXY.
+      '<path filter="url(#sr-soft)" fill="#ffd3e4" stroke="#fff" stroke-width="5" stroke-linejoin="round" d="' + ausPath(PNG_PTS) + '"/>' +
+      '<path fill="#ffd3e4" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="' + ausPath(NEW_BRITAIN_PTS) + '"/>' +
+      '<text x="306" y="1711" text-anchor="middle" font-size="10" font-weight="900" fill="#2f7a4a" font-family="ui-rounded,system-ui,sans-serif">Papua New Guinea</text>' +
       '<path d="M120 1960 C150 1940 190 1950 210 1980 C190 1990 150 1990 120 1960 Z" fill="#ffd9a8" opacity=".6"/>' +
       '<path d="M236 1930 C250 1918 270 1922 276 1936 C264 1944 246 1942 236 1930 Z" fill="#ffd9a8" opacity=".55"/>' +
       '<circle class="sr-bob" cx="380" cy="1860" r="6" fill="#ffb347" opacity=".5"/><circle class="sr-bob" cx="30" cy="2160" r="7" fill="#ff8ab8" opacity=".45"/>' +
       '</g>' +
-      planeAt(250, 1700, 172) + planeAt(180, 2003, -106) +
+      planeAt(220, 1712, 172) + planeAt(180, 2003, -106) +
+      mapClouds() +
       '<g class="sr-plane" transform="translate(219 1195) rotate(166)"><path d="M0 -14 L3 -4 L14 2 L14 5 L3 2 L2 10 L6 13 L6 15 L0 13 L-6 15 L-6 13 L-2 10 L-3 2 L-14 5 L-14 2 L-3 -4 Z" fill="#fff" stroke="#3d8bfd" stroke-width="1.5"/></g>' +
       '<path id="sr-future" d="' + future + '" fill="none" stroke="#ffb3d3" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 9" opacity=".7"/>' +
       '<path id="sr-path-wide" d="' + live + '" fill="none" stroke="url(#sr-icing)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>' +
@@ -1766,7 +1820,7 @@
   // ("make levels 3 to 10 my music"); Saturday night in Nelson (10) gets the calm one. Levels 1 and 2 keep their own
   // songs. Each song ships as AAC (.m4a, ~96 kbps) with an .mp3 fallback; a mood with no
   // file yet simply keeps the usual loop, so this is safe before the songs land.
-  const SONG_PLAN = { intense: [13, 15, 19, 22], calm: [10, 17, 18], upbeat: [3, 4, 5, 6, 7, 8, 9, 11, 12, 14, 16, 20, 21, 23, 24, 25] };
+  const SONG_PLAN = { intense: [13, 15, 19, 22], calm: [10, 17, 18], upbeat: [3, 4, 5, 6, 7, 8, 9, 11, 12, 14, 16, 20, 21, 23, 24, 25, 26] };
   // "Sugar Rush travel" (~136 BPM, the loudest and punchiest) drives the Hard levels; "Sugar Rush Kiss" (~89 BPM,
   // the softest, "let it linger") floats over the Pacific islands; "Sugar Rush" ("now I can't sit still") for the rest.
   const SONG_FILES = { intense: 'sugar-rush-travel.m4a', calm: 'sugar-rush-kiss.m4a', upbeat: 'sugar-rush-song.m4a' };
@@ -2771,8 +2825,45 @@
         { x: 60, y: 88, w: 3, cls: 'sc-float', d: 8, dl: -1, svg: 'petal' },
         { x: 50, y: 20, w: 8, cls: 'sc-drift', d: 10, svg: 'gull' },
         { x: 10, y: 6, w: 24, cls: 'sc-drift', d: 22, svg: 'cloud' }
+      ] },
+    // 1.9.234 Port Moresby, Papua New Guinea: the Owen Stanley Range, Hanuabada stilt village, a lakatoi and a bird of paradise.
+    { n: 26, id: 'portmoresby', place: 'Port Moresby', title: 'Stilt village and lagoon, Port Moresby', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#3fb4ff'], [0.6, '#b8ecff'], [1, '#fff6d6']]) + scGrad('lg', [[0, '#3fd0c8'], [1, '#1590a8']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(90, 100, 0.9, 0.9) + scCloud(300, 160, 0.7, 0.8) +
+          '<circle cx="320" cy="90" r="34" fill="#fff3a0"/>' +
+          '<path d="M0 520 L60 430 L110 480 L170 400 L230 470 L290 410 L350 470 L390 440 L390 600 L0 600 Z" fill="#5f9a7a"/>' +
+          '<path d="M0 560 L70 490 L130 530 L200 470 L260 520 L330 480 L390 520 L390 610 L0 610 Z" fill="#4a8a5a"/>' +
+          '<rect y="600" width="390" height="170" fill="url(#lg)"/>' +
+          [[30, 600], [130, 590], [240, 604], [320, 596]].map(function (h, i) {
+            const x = h[0], y = h[1];
+            let w = '<path d="M' + (x + 4) + ' ' + (y + 30) + ' v40 M' + (x + 30) + ' ' + (y + 30) + ' v40 M' + (x + 56) + ' ' + (y + 30) + ' v40" stroke="#7a5236" stroke-width="3"/>';
+            w += '<rect x="' + x + '" y="' + y + '" width="60" height="30" fill="' + ['#f2d29a', '#e8b878', '#f6dcaa', '#ecc488'][i] + '"/>';
+            w += '<path d="M' + (x - 6) + ' ' + y + ' L' + (x + 30) + ' ' + (y - 22) + ' L' + (x + 66) + ' ' + y + ' Z" fill="#b8763a"/>';
+            w += '<rect x="' + (x + 24) + '" y="' + (y + 12) + '" width="12" height="18" fill="#7a4a2a"/>';
+            return w;
+          }).join('') +
+          '<path d="M90 640 H130 M200 644 H240 M300 640 H320" stroke="#a87a4a" stroke-width="5"/>' +
+          '<path d="M20 700 q14 -5 28 0 M180 720 q14 -5 28 0 M300 690 q14 -5 28 0" stroke="#fff" stroke-width="2" fill="none" opacity=".5"/>' +
+          '<path d="M0 768 C90 754 190 776 290 760 C340 754 370 758 390 760 L390 844 L0 844 Z" fill="#f4dca0"/>' +
+          '<path d="M0 794 C100 782 200 804 300 790 C350 784 375 786 390 788 L390 844 L0 844 Z" fill="#ffe8b6"/>';
+      },
+      sprites: [
+        { x: 2, y: 84, w: 16, cls: 'sc-sway', d: 4, svg: 'palm' },
+        { x: 84, y: 82, w: 15, cls: 'sc-sway', d: 4.6, dl: -1.5, svg: 'palm' },
+        { x: 40, y: 80, w: 18, cls: 'sc-bob', d: 3.4, svg: 'vaka' },
+        { x: 60, y: 22, w: 12, cls: 'sc-float', d: 7, svg: 'paradise' },
+        { x: 20, y: 30, w: 8, cls: 'sc-drift', d: 10, svg: 'gull' },
+        { x: 30, y: 6, w: 26, cls: 'sc-drift', d: 22, svg: 'cloud' }
       ] }
   ];
+  // 1.9.234 "Some clouds": every daytime outdoor scene gets one more soft cloud drifting slowly across the top of the sky
+  // (pink-gold at sunset). Night scenes keep their clear skies.
+  const SUNSET_SCENES = ['samoa', 'perth'];
+  SCENES.forEach(function (sc, i) {
+    if (sc.night) return;
+    (sc.sprites = sc.sprites || []).push({ x: i % 2 ? 58 : 6, y: 3 + (i % 3) * 3, w: 30, cls: 'sc-drift', d: 34 + (i % 4) * 4, dl: -(i % 5) * 5, svg: 'softcloud', col: SUNSET_SCENES.indexOf(sc.id) >= 0 ? '#ffd2e0' : '#ffffff' });
+  });
   const SCENE_SPRITE_SVG = {
     cloud: '<svg viewBox="-40 -30 80 46"><ellipse cx="0" cy="0" rx="36" ry="13" fill="#fff"/><ellipse cx="-15" cy="-8" rx="16" ry="13" fill="#fff"/><ellipse cx="12" cy="-12" rx="20" ry="16" fill="#fff"/></svg>',
     boat: '<svg viewBox="0 0 40 40"><path d="M20 4 L20 28 L6 28 Z" fill="#fff"/><path d="M22 8 L22 28 L34 28 Z" fill="#ffd0e4"/><path d="M4 30 H36 L31 37 H9 Z" fill="#e0333a"/></svg>',
@@ -2786,6 +2877,9 @@
     shoot: '<svg viewBox="0 0 80 20"><path d="M2 2 L70 16" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".7"/><circle cx="72" cy="16" r="3" fill="#fff"/></svg>',
     whale: '<svg viewBox="0 0 100 40"><path d="M6 30 C20 20 50 18 74 24 C82 26 88 30 92 34 L6 34 Z" fill="#3a4a66"/><path d="M60 22 C62 10 66 4 72 2 C70 10 74 14 80 12 C76 18 70 22 64 24 Z" fill="#2c3a52"/><circle cx="20" cy="28" r="1.6" fill="#fff"/><path d="M0 36 q10 -4 20 0 t20 0 t20 0 t20 0 t20 0" stroke="#fff" stroke-width="2.5" fill="none" opacity=".75"/></svg>',
     // 1.9.233 Brisbane: a blue-and-white CityCat and a jacaranda petal.
+    // 1.9.234 A soft, see-through cloud (colour from the sprite) and a bird of paradise.
+    softcloud: '<svg viewBox="-46 -30 92 48" opacity=".7"><ellipse cx="0" cy="0" rx="42" ry="13" fill="currentColor"/><ellipse cx="-17" cy="-8" rx="18" ry="14" fill="currentColor"/><ellipse cx="14" cy="-12" rx="22" ry="17" fill="currentColor"/></svg>',
+    paradise: '<svg viewBox="0 0 60 50"><path d="M24 22 C14 30 8 44 4 48 C14 42 22 36 28 28 Z" fill="#ffb43b"/><path d="M26 24 C22 34 22 44 24 50 C28 42 30 34 30 26 Z" fill="#ffd36a"/><ellipse cx="32" cy="20" rx="10" ry="7" fill="#8a3a1a"/><circle cx="41" cy="14" r="5" fill="#ffe44a"/><circle cx="43" cy="13" r="1.2" fill="#222"/><path d="M46 14 l6 1 -6 2 Z" fill="#9ad0ff"/><path d="M38 18 q4 4 8 3" stroke="#2a9a5a" stroke-width="2" fill="none"/></svg>',
     citycat: '<svg viewBox="0 0 100 36"><path d="M4 22 H96 L90 30 H10 Z" fill="#1d5fae"/><path d="M8 30 H40 M60 30 H92" stroke="#0e3a6e" stroke-width="3"/><rect x="18" y="10" width="64" height="12" rx="4" fill="#fff"/><rect x="22" y="13" width="56" height="5" fill="#3d8bfd"/><rect x="40" y="4" width="22" height="7" rx="2" fill="#fff"/></svg>',
     petal: '<svg viewBox="-10 -10 20 20"><ellipse cx="0" cy="0" rx="8" ry="5" fill="#a77ae0" transform="rotate(30)"/><ellipse cx="0" cy="0" rx="4" ry="2" fill="#d6c0f5" transform="rotate(30)"/></svg>',
     tram: '<svg viewBox="0 0 100 44"><path d="M40 2 L46 8 M60 2 L54 8" stroke="#333" stroke-width="1.6"/><rect x="6" y="8" width="88" height="28" rx="5" fill="#2f7a3e"/><rect x="6" y="8" width="88" height="7" rx="3" fill="#ffd43b"/><rect x="12" y="17" width="12" height="10" rx="2" fill="#fff6c8"/><rect x="28" y="17" width="12" height="10" rx="2" fill="#fff6c8"/><rect x="44" y="17" width="12" height="10" rx="2" fill="#fff6c8"/><rect x="60" y="17" width="12" height="10" rx="2" fill="#fff6c8"/><rect x="76" y="17" width="12" height="10" rx="2" fill="#fff6c8"/><circle cx="24" cy="38" r="5" fill="#333"/><circle cx="76" cy="38" r="5" fill="#333"/></svg>',
@@ -2988,7 +3082,7 @@
     return true;
   }
 
-  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_STOPS, FUTURE_STOPS, NZ_PROJ, nzXY, WHANGAREI_INSET, insetXY, pacXY, ausXY, LV_COUNT, lvId, levelIds, stopId, LEGACY_220_IDS, migrateProg, stopForLevel, icingPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, bubLeft, liqLeft, spreadLiq, LIQ_IDLE, goalCounts, cloneState, bestMove, hintMoveFor, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
+  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_STOPS, FUTURE_STOPS, NZ_PROJ, nzXY, WHANGAREI_INSET, insetXY, pacXY, ausXY, westPacXY, LV_COUNT, lvId, levelIds, stopId, LEGACY_220_IDS, migrateProg, stopForLevel, icingPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, bubLeft, liqLeft, spreadLiq, LIQ_IDLE, goalCounts, cloneState, bestMove, hintMoveFor, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
     allowed: () => true, // 1.9.228 open to every family member
     SAY_REST_MS, SAY_BIG, sayBig, COMBO_KINDS, COMBO_BONUS, comboKind, comboSwap, adjacentSpecials, isSpecialTile, HARD_LINES, hardLine, CANDY_STYLES, candySfxPlan, playCandySfx, SAY_SHOW_MS, SAY_AFTER_MS, sayShowGap, SPEAK_GAP, SPEAK_PITCH, SPEAK_RATE, SPEAK_VOL, pickSpeechVoice, speechGender, speakWorthy, SAY_SPRITES, SAY_CLIPS, sayClip, nextSayVoice, SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL, XF,
     VOICE_FILES, VOICE_RANK, MEDIA_HASH, mediaUrl, gameTrack, SONG_PLAN, SONG_FILES, SONG_FROM, songMood, attachSfxBus, playTone, playChime, playMovesWarnChime, playClip, voiceForStep,
@@ -4040,6 +4134,7 @@
     if (kind === 'reef') return '<span class="jelly"></span><span class="bubp"></span><span class="bubp sm"></span>';
     if (kind === 'squares') return '<span class="jelly"></span><span class="lock">🔒</span><span class="jelly"></span>';
     if (kind === 'river') return '<span class="jelly"></span><span class="jelly"></span><span class="ice"></span>';
+    if (kind === 'village') return '<span class="jelly"></span><span class="bubp sm"></span><span class="lock">🔒</span>';
     if (kind === 'laneway') return '<span class="ing">🍩</span><span class="bubp sm"></span><span class="liqp sm"></span>';
     if (kind === 'coconut') return '<span class="ing">🥥</span><span class="liqp sm"></span>';
     if (kind === 'sunset') return '<span class="jelly"></span><span class="lock">🔒</span><span class="liqp sm"></span>';
@@ -4851,7 +4946,7 @@
     });
     FUTURE_STOPS.forEach(function (stop) {
       const el = doc.createElement('div');
-      el.className = 'future-stop lab-' + (stop.label || 'right');
+      el.className = 'future-stop lab-' + (stop.label || 'right') + (stop.inset ? ' inset-' + stop.inset : '');
       el.dataset.place = stop.place;
       el.style.left = (stop.x / MAP_W * 100) + '%';
       el.style.top = (stop.y / MAP_H * 100) + '%';

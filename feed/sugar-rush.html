@@ -521,6 +521,7 @@
     .scs, .scs .fallin, .tray.shk1, .tray.shk2, .crushban .cbw, .crushban .cbf, .stars .on.fly, .chest.shake, .chest.open .chest-rays, .loot.show .lootchip, .spinbtn.ready, .wheelsvg .bulb0, .wheelsvg .bulb1, .stat.streak.up, .streakpop.go, .scr-in, .card { animation: none !important; }
     .lootchip { opacity: 1; transform: none; }
     .sc-rise, .sc-shoot { opacity: .6; }
+    .sr-cloud { animation: none; }
     .wheelsvg { transition: none !important; }
   }
 
@@ -585,6 +586,11 @@
   .stops .future-stop.lab-right .meta { left: 28px; top: 3px; }
   /* 1.9.232 Sydney's label sits up and to the left, clear of the Adelaide pin; Canberra's coming-soon name sits below its pin. */
   .stops .lv.lift .meta { top: -26px; }
+  /* 1.9.234 West Pacific inset: names only (the inset says coming soon); map clouds drift slowly. */
+  .stops .future-stop.inset-westpac .meta em { display: none; }
+  .stops .future-stop.inset-westpac .meta { font-size: 11px; }
+  .sr-cloud { animation: srclouddrift var(--d, 30s) ease-in-out var(--dl, 0s) infinite alternate; }
+  @keyframes srclouddrift { from { transform: translateX(-14px); } to { transform: translateX(14px); } }
   .stops .future-stop.lab-below .meta { position: absolute; top: 24px; left: 50%; transform: translateX(-50%); }
   .stops .future-stop .meta b, .stops .future-stop .meta em { display: inline; }
   .stops .future-stop .meta em::before { content: ' · '; }
