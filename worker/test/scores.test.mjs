@@ -194,15 +194,15 @@ assert.ok(checkRace({ icon: 'lolly', stop: 0, stars: 0 }).err);
 // 1.9.219 Levels 11-15: the race now runs to stop 15 (Dunedin) with up to 45 stars.
 // 1.9.220 Pacific Islands: stops 16-18 (Rarotonga, Tonga, Samoa), up to 54 stars.
 // 1.9.222 Bluff + Australia: 22 stops, up to 66 stars.
-assert.deepEqual(RACE_LIMITS, { stop: 25, stars: 75, gapMs: 1000, perDay: 300, wins: 1e6 });
+assert.deepEqual(RACE_LIMITS, { stop: 26, stars: 78, gapMs: 1000, perDay: 300, wins: 1e6 });
 assert.ok(checkRace({ icon: 'lolly', stop: 11, stars: 31 }).ok);
 assert.ok(checkRace({ icon: 'lolly', stop: 15, stars: 45 }).ok);
 assert.ok(checkRace({ icon: 'lolly', stop: 18, stars: 54 }).ok);
 assert.ok(checkRace({ icon: 'lolly', stop: 22, stars: 66 }).ok);
-assert.ok(checkRace({ icon: 'lolly', stop: 24, stars: 72 }).ok, '1.9.232 Melbourne'); assert.ok(checkRace({ icon: 'lolly', stop: 25, stars: 75 }).ok, '1.9.233 Brisbane'); assert.ok(!checkRace({ icon: 'lolly', stop: 26, stars: 75 }).ok);
+assert.ok(checkRace({ icon: 'lolly', stop: 24, stars: 72 }).ok, '1.9.232 Melbourne'); assert.ok(checkRace({ icon: 'lolly', stop: 25, stars: 75 }).ok, '1.9.233 Brisbane'); assert.ok(checkRace({ icon: 'lolly', stop: 26, stars: 78 }).ok, '1.9.234 Port Moresby'); assert.ok(!checkRace({ icon: 'lolly', stop: 27, stars: 78 }).ok);
 assert.equal(checkRace({ icon: 'lolly', stop: 3, stars: 70, sid: 'tramline' }).ok.stop, 24);
-assert.ok(checkRace({ icon: 'lolly', stop: 26, stars: 0 }).err);
-assert.ok(checkRace({ icon: 'lolly', stop: 3, stars: 76 }).err);
+assert.ok(checkRace({ icon: 'lolly', stop: 27, stars: 0 }).err);
+assert.ok(checkRace({ icon: 'lolly', stop: 3, stars: 79 }).err);
 assert.ok(checkRace({ icon: 'lolly', stop: 3, stars: -1 }).err);
 assert.ok(checkRace({ icon: 'lolly', stop: 1.5, stars: 1 }).err);
 
@@ -238,9 +238,9 @@ assert.equal((await scoresRoute(sqlR, shane, '/sugar-race', 'PUT', new URL('http
 
 
 // ---- 1.9.222 stops follow the level id, not its number
-assert.equal(RACE_STOP_IDS.length, 25);
-assert.equal(new Set(RACE_STOP_IDS).size, 25, 'level ids are unique');
-assert.deepEqual(RACE_STOP_IDS.slice(15), ['oyster', 'hibiscus', 'coconut', 'shell', 'opera', 'wave', 'swan', 'frogcake', 'tramline', 'citycat']);
+assert.equal(RACE_STOP_IDS.length, 26);
+assert.equal(new Set(RACE_STOP_IDS).size, 26, 'level ids are unique');
+assert.deepEqual(RACE_STOP_IDS.slice(15), ['oyster', 'hibiscus', 'coconut', 'shell', 'opera', 'wave', 'swan', 'frogcake', 'tramline', 'citycat', 'paradise']);
 assert.equal(checkRace({ icon: 'lolly', stop: 16, stars: 40, sid: 'oyster' }).ok.stop, 16, 'Bluff is stop 16');
 assert.equal(checkRace({ icon: 'lolly', stop: 17, stars: 40, sid: 'hibiscus' }).ok.stop, 17);
 assert.equal(checkRace({ icon: 'lolly', stop: 3, stars: 40, sid: 'swan' }).ok.stop, 22, 'the id wins over a wrong number');
