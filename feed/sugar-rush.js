@@ -1,4 +1,4 @@
-/* Info Book 1.9.166 – Sugar Rush, levels 1–22. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.166 – Sugar Rush, levels 1–24. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -148,7 +148,19 @@
       bub: ['00000000', '01000010', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000'],
       liq: ['10000001', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000'],
       help: 'The Swan River finale: clear the double jelly in the river, free the jars, pop the bubbles and free the liquorice, with chocolate on the loose, in 26 moves.',
-      badge: { id: 'swan', name: 'Black Swan', icon: '🦢' } }
+      badge: { id: 'swan', name: 'Black Swan', icon: '🦢' } },
+    // 1.9.232 Adelaide, then Melbourne: a gentle rise after the Perth finale (neither is Hard).
+    { n: 23, name: 'Adelaide City Squares', target: 0, moves: 30, stars: [0, 3800, 7600], kinds: 6,
+      jelly: ['11000011', '11000011', '00000000', '00011000', '00011000', '00000000', '11000011', '11000011'],
+      locks: ['00000000', '00000000', '00100100', '00000000', '00000000', '00100100', '00000000', '00000000'],
+      help: "Clear the jelly in Adelaide's five city squares and free the 4 locked jars in 30 moves.",
+      badge: { id: 'frogcake', name: 'Frog Cake', icon: '🐸' } },
+    { n: 24, name: 'Melbourne Laneways', target: 0, moves: 31, stars: [0, 4000, 8000], kinds: 6,
+      ings: [[0, 1], [0, 6]], ingStyle: 'doughnut', ingIcon: '🍩',
+      bub: ['00000000', '00000000', '00000000', '00000000', '10000001', '01000010', '00000000', '00000000'],
+      liq: ['00000000', '00000000', '00011000', '00000000', '00000000', '00000000', '00000000', '00000000'],
+      help: 'Bring both hot jam doughnuts down the laneway, pop the sugar bubbles and free the liquorice in 31 moves.',
+      badge: { id: 'tramline', name: 'Laneway Tram Bell', icon: '🔔' } }
   ];
 
 
@@ -175,7 +187,9 @@
     { icon: '🐚', goal: 'Clear the jelly, free the jars and the liquorice', detail: 'Clear the jelly on both islands, free the 4 locked jars and free the liquorice in 34 moves.', tip: 'Two islands side by side. Free the liquorice early, then work the jelly on each beach.', mechanic: 'sunset' },
     { icon: '🎭', goal: 'Clear the harbour jelly and pop the bubbles', detail: 'Clear the jelly along the harbour and pop the 6 sugar bubbles under the bridge in 28 moves.', tip: 'The bridge arch splits the board. Work the bottom rows to reach the bubbles.', mechanic: 'harbour' },
     { icon: '🌊', goal: 'Bring both treats down, clear the foam and free the liquorice', detail: 'Bring both beach treats down, clear the 4 sea-foam icing blocks and free the liquorice in 32 moves.', tip: 'Free the liquorice in the middle before it creeps, and clear the foam under each treat.', mechanic: 'surf' },
-    { icon: '🦢', goal: 'Finish every objective', detail: 'Clear the double jelly in the river, free 2 jars, pop 2 bubbles and free the liquorice, with chocolate on the loose — all in 26 moves.', tip: 'The Super Hard finale. Free the corner liquorice early and keep the chocolate in check.', mechanic: 'swan' }
+    { icon: '🦢', goal: 'Finish every objective', detail: 'Clear the double jelly in the river, free 2 jars, pop 2 bubbles and free the liquorice, with chocolate on the loose — all in 26 moves.', tip: 'The Super Hard finale. Free the corner liquorice early and keep the chocolate in check.', mechanic: 'swan' },
+    { icon: '🐸', goal: 'Clear the city-square jelly and free the jars', detail: "Clear the jelly in Adelaide's 5 city squares and free 4 locked jars in 30 moves.", tip: 'Adelaide is laid out around five squares. Work the corners early; the jars sit between them.', mechanic: 'squares' },
+    { icon: '🍩', goal: 'Bring both doughnuts down, pop the bubbles and free the liquorice', detail: 'Bring both hot jam doughnuts down the laneway, pop 4 sugar bubbles and free the liquorice in 31 moves.', tip: 'Free the liquorice in the middle before it creeps, then clear the columns under each doughnut.', mechanic: 'laneway' }
   ];
   function levelIntro(n, p) {
     const lv = LEVELS[(n | 0) - 1]; if (!lv) return null;
@@ -557,6 +571,30 @@
           { icon: '➿', text: 'Free the corner liquorice' }
         ]
       }
+    ],
+    // 1.9.232 Adelaide and Melbourne recaps.
+    23: [
+      {
+        id: 'recap23', kind: 'recap',
+        title: 'Adelaide',
+        bubble: 'Five city squares and a frog cake waiting at the end.',
+        items: [
+          { icon: '💜', text: 'Clear the jelly in the five squares' },
+          { icon: '🔒', text: 'Free the locked jars' }
+        ]
+      }
+    ],
+    24: [
+      {
+        id: 'recap24', kind: 'recap',
+        title: 'Melbourne',
+        bubble: 'Laneway lights, trams and hot jam doughnuts.',
+        items: [
+          { icon: '🍩', text: 'Bring both doughnuts down' },
+          { icon: '🫧', text: 'Pop the sugar bubbles' },
+          { icon: '➿', text: 'Free the liquorice' }
+        ]
+      }
     ]
   };
   function tutorialFor(n) { return TUTORIALS[n] || null; }
@@ -605,22 +643,23 @@
     { n: 17, x: 330, y: 1509, place: "Rarotonga", kind: 'island', label: 'below', lat: -21.21, lon: -159.78 },
     { n: 18, x: 70, y: 1508, place: "Tonga", kind: 'island', label: 'right', lat: -21.14, lon: -175.2 },
     { n: 19, x: 128, y: 1350, place: "Samoa", kind: 'island', label: 'right', lat: -13.83, lon: -171.76 },
-    { n: 20, x: 352, y: 2062, place: "Sydney", kind: 'city', label: 'left', lat: -33.87, lon: 151.21, via: [{ x: 270, y: 1900 }, { x: 310, y: 2040 }] },
+    { n: 20, x: 352, y: 2062, place: "Sydney", kind: 'city', label: 'left', lift: true, lat: -33.87, lon: 151.21, via: [{ x: 270, y: 1900 }, { x: 310, y: 2040 }] },
     { n: 21, x: 371, y: 1998, place: "Gold Coast", kind: 'city', label: 'left', lat: -28.0, lon: 153.43 },
-    { n: 22, x: 51, y: 2041, place: "Perth", kind: 'city', label: 'right', lat: -31.95, lon: 115.86, via: [{ x: 310, y: 1965 }] }
+    { n: 22, x: 51, y: 2041, place: "Perth", kind: 'city', label: 'right', lat: -31.95, lon: 115.86, via: [{ x: 310, y: 1965 }] },
+    // 1.9.232 Along the Great Australian Bight to Adelaide, then on to Melbourne.
+    { n: 23, x: 245, y: 2074, place: "Adelaide", kind: 'city', label: 'left', lat: -34.93, lon: 138.6, via: [{ x: 154, y: 2075 }] },
+    { n: 24, x: 299, y: 2105, place: "Melbourne", kind: 'city', label: 'left', lat: -37.81, lon: 144.96 }
   ];
   // Coming soon: other Australian cities. Shown as markers only (no trail), so they never look like the route.
   // Brisbane and Canberra are nudged a few pixels clear of the Gold Coast and Sydney pins (marked nudged).
   const FUTURE_STOPS = [
-    { place: 'Melbourne', x: 299, y: 2105, label: 'left', lat: -37.81, lon: 144.96 },
     { place: 'Brisbane', x: 366, y: 1956, label: 'left', lat: -27.47, lon: 153.03, nudged: true },
-    { place: 'Adelaide', x: 245, y: 2074, label: 'left', lat: -34.93, lon: 138.6 },
-    { place: 'Canberra', x: 327, y: 2089, label: 'left', lat: -35.28, lon: 149.13, nudged: true },
+    { place: 'Canberra', x: 338, y: 2103, label: 'below', lat: -35.28, lon: 149.13, nudged: true },
     { place: 'Hobart', x: 319, y: 2161, label: 'left', lat: -42.88, lon: 147.33 },
     { place: 'Darwin', x: 179, y: 1827, label: 'left', lat: -12.46, lon: 130.84 },
     { place: 'Cairns', x: 306, y: 1876, label: 'left', lat: -16.92, lon: 145.77 }
   ];
-  const LV_COUNT = 22;
+  const LV_COUNT = 24;
   function stopForLevel(n) { return MAP_STOPS[(n | 0) - 1] || null; }
   function icingPath(pts) {
     if (!pts || pts.length < 2) return '';
@@ -1703,21 +1742,22 @@
   }
   function mediaUrl(file) { return file.replace(/\.(mp3|m4a)$/, '-' + MEDIA_HASH[file] + '.$1'); }
   // 1.9.223 Shane's songs for the later levels, picked by mood: the most intense for the Hard and Super Hard levels,
-  // the calmest for the Pacific islands, the upbeat one for the rest. Levels 1-7 keep our own tunes (Shane likes
-  // them for the early stages). Each song ships as AAC (.m4a, ~96 kbps) with an .mp3 fallback; a mood with no
+  // the calmest for the Pacific islands, the upbeat one for the rest. 1.9.232: Shane's songs now start at level 3
+  // ("make levels 3 to 10 my music"); Saturday night in Nelson (10) gets the calm one. Levels 1 and 2 keep their own
+  // songs. Each song ships as AAC (.m4a, ~96 kbps) with an .mp3 fallback; a mood with no
   // file yet simply keeps the usual loop, so this is safe before the songs land.
-  const SONG_PLAN = { intense: [13, 15, 19, 22], calm: [17, 18], upbeat: [8, 9, 10, 11, 12, 14, 16, 20, 21] };
+  const SONG_PLAN = { intense: [13, 15, 19, 22], calm: [10, 17, 18], upbeat: [3, 4, 5, 6, 7, 8, 9, 11, 12, 14, 16, 20, 21, 23, 24] };
   // "Sugar Rush travel" (~136 BPM, the loudest and punchiest) drives the Hard levels; "Sugar Rush Kiss" (~89 BPM,
   // the softest, "let it linger") floats over the Pacific islands; "Sugar Rush" ("now I can't sit still") for the rest.
   const SONG_FILES = { intense: 'sugar-rush-travel.m4a', calm: 'sugar-rush-kiss.m4a', upbeat: 'sugar-rush-song.m4a' };
-  const SONG_FROM = 8;
+  const SONG_FROM = 3;
   function songMood(level) {
     if (!(level >= SONG_FROM)) return null;
     for (const k in SONG_PLAN) if (SONG_PLAN[k].indexOf(level) >= 0) return k;
     return 'upbeat';
   }
   // Level 1 plays Shane's "Sugar Rush" song, level 2 plays "Sarah's Sugar Sprint";
-  // later levels keep the usual gameplay loop until their song is in.
+  // from level 3 every level has one of Shane's songs (the usual loop is only a fallback).
   function gameTrack(level) {
     const mood = songMood(level);
     if (mood && SONG_FILES[mood]) return SONG_FILES[mood];
@@ -2600,6 +2640,72 @@
         { x: 20, y: 74, w: 14, cls: 'sc-bob', d: 3.4, dl: -0.6, svg: 'boat' },
         { x: 70, y: 10, w: 4, cls: 'sc-twinkle', d: 1.8, svg: 'glint' },
         { x: 40, y: 20, w: 8, cls: 'sc-drift', d: 10, svg: 'gull' }
+      ] },
+    // 1.9.232 Adelaide: the Hills behind the city, the Mall's Balls, a tram to Glenelg and balloons over the parklands.
+    { n: 23, id: 'adelaide', place: 'Adelaide', title: 'City squares and the Hills, Adelaide', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#5cc2ff'], [0.65, '#c8ecff'], [1, '#fff6dc']]) + scGrad('ms', [[0, '#ffffff'], [0.5, '#c8d2dc'], [1, '#7c8a98']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(90, 120, 0.8, 0.85) + scCloud(300, 80, 0.6, 0.7) +
+          '<circle cx="64" cy="96" r="30" fill="#fff3a0"/>' +
+          '<path d="M0 470 C60 420 120 440 180 410 C240 380 300 420 390 400 L390 560 L0 560 Z" fill="#8cc06a"/>' +
+          '<path d="M0 500 C70 470 150 490 220 466 C290 446 340 470 390 460 L390 580 L0 580 Z" fill="#6ea85a"/>' +
+          [[30, 500, 30, 80], [70, 470, 26, 110], [104, 520, 34, 60], [146, 480, 24, 100], [178, 450, 30, 130], [216, 500, 28, 80], [252, 476, 32, 104], [292, 510, 26, 70], [326, 490, 34, 90]].map(function (b, i) {
+            let w = '<rect x="' + b[0] + '" y="' + b[1] + '" width="' + b[2] + '" height="' + b[3] + '" fill="' + (i % 2 ? '#f2e6d0' : '#e2d2b8') + '"/>';
+            for (let yy = b[1] + 10; yy < b[1] + b[3] - 6; yy += 14) w += '<rect x="' + (b[0] + 4) + '" y="' + yy + '" width="' + (b[2] - 8) + '" height="4" fill="#7ec8ef" opacity=".7"/>';
+            return w;
+          }).join('') +
+          '<rect y="580" width="390" height="80" fill="#9ad27a"/>' +
+          [[40, 600], [120, 630], [200, 600], [280, 630], [350, 604]].map(function (t) { return '<rect x="' + (t[0] - 2) + '" y="' + t[1] + '" width="4" height="18" fill="#7a4a2a"/><circle cx="' + t[0] + '" cy="' + (t[1] - 4) + '" r="14" fill="#4f9a48"/>'; }).join('') +
+          '<rect y="660" width="390" height="10" fill="#c9b79a"/><path d="M0 664 H390" stroke="#7a6a5a" stroke-width="2"/><path d="M0 670 H390" stroke="#7a6a5a" stroke-width="2"/>' +
+          '<rect y="670" width="390" height="100" fill="#ead9bc"/>' +
+          '<path d="M0 700 H390 M0 740 H390" stroke="#d8c4a2" stroke-width="2"/>' +
+          '<rect x="186" y="752" width="18" height="14" fill="#8a7a6a"/>' +
+          '<circle cx="195" cy="736" r="17" fill="url(#ms)"/><circle cx="195" cy="704" r="15" fill="url(#ms)"/>' +
+          '<circle cx="189" cy="730" r="4" fill="#fff" opacity=".8"/><circle cx="190" cy="699" r="3.5" fill="#fff" opacity=".8"/>' +
+          '<path d="M0 770 C90 758 190 780 290 764 C340 758 370 762 390 764 L390 844 L0 844 Z" fill="#7bbf5a"/>' +
+          '<path d="M0 796 C100 784 200 806 300 792 C350 786 375 788 390 790 L390 844 L0 844 Z" fill="#62a84a"/>';
+      },
+      sprites: [
+        { x: 10, y: 76, w: 26, cls: 'sc-roll', d: 10, svg: 'tram' },
+        { x: 12, y: 10, w: 11, cls: 'sc-float', d: 10, svg: 'balloon', col: '#ff6fa8' },
+        { x: 72, y: 16, w: 9, cls: 'sc-float', d: 12, dl: -5, svg: 'balloon', col: '#3fbf6a' },
+        { x: 46, y: 84, w: 4, cls: 'sc-twinkle', d: 2, svg: 'glint' },
+        { x: 40, y: 22, w: 8, cls: 'sc-drift', d: 11, svg: 'gull' },
+        { x: 30, y: 4, w: 24, cls: 'sc-drift', d: 24, svg: 'cloud' }
+      ] },
+    // 1.9.232 Melbourne: laneway fairy lights at dusk, Flinders Street Station, a green-and-gold tram and the Yarra.
+    { n: 24, id: 'melbourne', place: 'Melbourne', title: 'Laneway lights, Melbourne', night: true,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#1d1b4a'], [0.5, '#4a3a8a'], [0.85, '#d86a9a'], [1, '#ffb27a']]) + scGrad('yr', [[0, '#4a3a8a'], [1, '#1d1b4a']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' +
+          [[30, 70], [90, 40], [160, 90], [250, 50], [320, 100], [360, 30]].map(function (t) { return '<circle cx="' + t[0] + '" cy="' + t[1] + '" r="1.6" fill="#fff"/>'; }).join('') +
+          [[10, 400, 34, 200], [50, 440, 28, 160], [84, 360, 30, 240], [122, 420, 26, 180], [300, 380, 30, 220], [336, 430, 40, 170]].map(function (b) {
+            let w = '<rect x="' + b[0] + '" y="' + b[1] + '" width="' + b[2] + '" height="' + b[3] + '" fill="#2a2556"/>';
+            for (let yy = b[1] + 12; yy < b[1] + b[3] - 10; yy += 18) w += '<rect x="' + (b[0] + 5) + '" y="' + yy + '" width="' + (b[2] - 10) + '" height="5" fill="#ffd77a" opacity=".55"/>';
+            return w;
+          }).join('') +
+          '<rect x="244" y="250" width="34" height="350" fill="#2e2a60"/><rect x="244" y="250" width="34" height="40" fill="#ffd43b"/><path d="M244 250 L261 222 L278 250 Z" fill="#ffd43b"/>' +
+          '<rect x="150" y="520" width="90" height="80" fill="#f2b24a"/><rect x="150" y="510" width="90" height="12" fill="#d8902a"/>' +
+          '<path d="M170 510 Q195 450 220 510 Z" fill="#3a9a6a"/><rect x="192" y="440" width="6" height="20" fill="#3a9a6a"/>' +
+          [0, 1, 2, 3].map(function (i) { return '<path d="M' + (160 + i * 20) + ' 600 v-34 a6 6 0 0 1 12 0 v34" fill="#7a3a1a"/>'; }).join('') +
+          '<circle cx="195" cy="540" r="9" fill="#fff6c8"/><path d="M195 540 V534 M195 540 L199 542" stroke="#333" stroke-width="1.5"/>' +
+          '<rect y="600" width="390" height="70" fill="#3a3466"/>' +
+          '<path d="M0 640 H390" stroke="#8a84b8" stroke-width="2"/><path d="M0 652 H390" stroke="#8a84b8" stroke-width="2"/>' +
+          '<path d="M0 560 Q60 590 120 562 Q180 592 240 564 Q300 594 390 566" stroke="#ffe7a0" stroke-width="1.5" fill="none" opacity=".8"/>' +
+          [20, 50, 80, 110, 140, 170, 200, 230, 260, 290, 320, 350, 380].map(function (x, i) { return '<circle cx="' + x + '" cy="' + (566 + (i % 2 ? 20 : 6)) + '" r="4" fill="' + ['#ffd43b', '#ff6fa8', '#7fe0ff'][i % 3] + '"/>'; }).join('') +
+          '<rect y="670" width="390" height="100" fill="url(#yr)"/>' +
+          '<path d="M60 700 h50 M220 720 h60 M120 750 h40" stroke="#ffd77a" stroke-width="3" opacity=".45" stroke-linecap="round"/>' +
+          '<path d="M0 770 C90 758 190 780 290 764 C340 758 370 762 390 764 L390 844 L0 844 Z" fill="#3a5a4a"/>' +
+          '<path d="M0 796 C100 784 200 806 300 792 C350 786 375 788 390 790 L390 844 L0 844 Z" fill="#2e4a3c"/>';
+      },
+      sprites: [
+        { x: 8, y: 70, w: 28, cls: 'sc-roll', d: 9, svg: 'tram' },
+        { x: 10, y: 67, w: 3, cls: 'sc-twinkle', d: 1.6, svg: 'glint' },
+        { x: 34, y: 69, w: 3, cls: 'sc-twinkle', d: 2.1, dl: -0.7, svg: 'glint' },
+        { x: 62, y: 67, w: 3, cls: 'sc-twinkle', d: 1.9, dl: -1.1, svg: 'glint' },
+        { x: 86, y: 69, w: 3, cls: 'sc-twinkle', d: 2.3, dl: -0.4, svg: 'glint' },
+        { x: 30, y: 84, w: 14, cls: 'sc-bob', d: 3.4, svg: 'boat' },
+        { x: 70, y: 6, w: 4, cls: 'sc-twinkle', d: 2.6, svg: 'glint' }
       ] }
   ];
   const SCENE_SPRITE_SVG = {
@@ -3260,6 +3366,18 @@
       drawCandyShine(ctx, R * 0.78, .7);
       ctx.restore(); return;
     }
+    if (t.ing && st && st.lv && st.lv.ingStyle === 'doughnut') {
+      // 1.9.232 Melbourne: the ingredients are hot jam doughnuts, sugar-dusted with a jam dot.
+      const g = ctx.createRadialGradient(-R * .2, -R * .25, R * .1, 0, 0, R * .85);
+      g.addColorStop(0, '#f2b867'); g.addColorStop(1, '#b8702e');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R * .8, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,250,240,.75)';
+      for (let i = 0; i < 14; i++) { const a = i * 2.4, rr2 = R * (.25 + (i % 5) * .11); ctx.beginPath(); ctx.arc(Math.cos(a) * rr2, Math.sin(a) * rr2, R * .045, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = '#c8203a'; ctx.beginPath(); ctx.arc(R * .3, -R * .05, R * .17, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ff6a7a'; ctx.beginPath(); ctx.arc(R * .25, -R * .1, R * .06, 0, Math.PI * 2); ctx.fill();
+      drawCandyShine(ctx, R * 0.8, .7);
+      ctx.restore(); return;
+    }
     if (t.ing) {
       ctx.fillStyle = '#c45c2e'; rr(-R * .7, -R * .55, R * 1.4, R * 1.2, R * .18); ctx.fill();
       ctx.fillStyle = '#e8b04a'; rr(-R * .7, -R * .55, R * 1.4, R * .4, R * .16); ctx.fill();
@@ -3852,6 +3970,8 @@
     if (kind === 'surf') return '<span class="ing">🎁</span><span class="ice"></span><span class="liqp sm"></span>';
     if (kind === 'swan') return '<span class="choco"></span><span class="jelly"></span><span class="bubp sm"></span><span class="liqp sm"></span>';
     if (kind === 'reef') return '<span class="jelly"></span><span class="bubp"></span><span class="bubp sm"></span>';
+    if (kind === 'squares') return '<span class="jelly"></span><span class="lock">🔒</span><span class="jelly"></span>';
+    if (kind === 'laneway') return '<span class="ing">🍩</span><span class="bubp sm"></span><span class="liqp sm"></span>';
     if (kind === 'coconut') return '<span class="ing">🥥</span><span class="liqp sm"></span>';
     if (kind === 'sunset') return '<span class="jelly"></span><span class="lock">🔒</span><span class="liqp sm"></span>';
     if (kind === 'factory') return '<span class="choco"></span><span class="bubp sm"></span><span class="liqp sm"></span>';
@@ -4646,7 +4766,7 @@
       const n = i + 1, open = n <= prog.open, stars = prog.stars[i] || 0, stop = MAP_STOPS[i];
       const b = doc.createElement('button');
       b.type = 'button';
-      b.className = 'lv lab-' + (stop.label || 'right') + (lv.theme === 'sarah' ? ' sarah' : '') + (lv.hard ? ' hard hard' + lv.hard : '') + (open ? ' open' : '') + (stars ? ' done' : '') + (n === here ? ' here' : '') + ' kind-' + (stop.kind || 'town');
+      b.className = 'lv lab-' + (stop.label || 'right') + (stop.lift ? ' lift' : '') + (lv.theme === 'sarah' ? ' sarah' : '') + (lv.hard ? ' hard hard' + lv.hard : '') + (open ? ' open' : '') + (stars ? ' done' : '') + (n === here ? ' here' : '') + ' kind-' + (stop.kind || 'town');
       b.disabled = !open;
       b.dataset.n = String(n);
       b.style.left = (stop.x / MAP_W * 100) + '%';
