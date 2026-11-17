@@ -1,4 +1,4 @@
-/* Info Book 1.9.240 – Sugar Rush, levels 1–31. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.241 – Sugar Rush, levels 1–31. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -202,7 +202,7 @@
       ice: ['00000000', '00011000', '00000000', '00000000', '00000000', '00000000', '00011000', '00000000'],
       help: 'Clear the jelly by the temple gates and crack the 4 icing blocks in the market in 32 moves.',
       badge: { id: 'bali', name: 'Temple Gate', icon: '🌴' } },
-    // 1.9.240 Canberra, then Hobart. Both were map markers; now they are levels.
+    // 1.9.241 Canberra, then Hobart. Both were map markers; now they are levels.
     { n: 32, name: 'Canberra Lake Light', target: 0, moves: 32, stars: [0, 5000, 10000], kinds: 6,
       jelly: ['00000000', '00111100', '01000010', '01000010', '01000010', '01000010', '00111100', '00000000'],
       bub: ['00000000', '00000000', '00011000', '00000000', '00000000', '00011000', '00000000', '00000000'],
@@ -755,18 +755,18 @@
     { n: 25, x: 362, y: 1954, place: "Brisbane", kind: 'city', label: 'left', lat: -27.47, lon: 153.03, nudged: true, via: [{ x: 318, y: 2030 }] },
     // 1.9.234 North across the Coral Sea to Port Moresby, Papua New Guinea (true position; kept east of Cairns).
     { n: 26, x: 318, y: 1794, place: "Port Moresby", kind: 'city', label: 'below', lat: -9.44, lon: 147.18, via: [{ x: 356, y: 1880 }] },
-    // 1.9.240 On the same map as Australia and Papua New Guinea (ausXY), not in a separate panel.
+    // 1.9.241 On the same map as Australia and Papua New Guinea (ausXY), not in a separate panel.
     { n: 27, x: 427, y: 1794, place: "Solomon Islands", kind: 'island', label: 'below', lat: -9.43, lon: 159.95 },
     { n: 28, x: 499, y: 1885, place: "Vanuatu", kind: 'island', label: 'left', lat: -17.73, lon: 168.32 },
     { n: 29, x: 585, y: 1890, place: "Fiji", kind: 'island', label: 'right', lat: -18.14, lon: 178.44 },
     { n: 30, x: 483, y: 1935, place: "New Caledonia", kind: 'island', label: 'below', lat: -22.27, lon: 166.45, via: [{ x: 560, y: 1930 }] },
     { n: 31, x: 45, y: 1785, place: "Indonesia", kind: 'island', label: 'right', lat: -8.65, lon: 115.22, via: [{ x: 520, y: 1748 }, { x: 340, y: 1696 }, { x: 160, y: 1710 }, { x: 80, y: 1748 }] },
-    // 1.9.240 Canberra is nudged clear of the Sydney and Melbourne pins. Hobart sits on Tasmania.
+    // 1.9.241 Canberra is nudged clear of the Sydney and Melbourne pins. Hobart sits on Tasmania.
     { n: 32, x: 338, y: 2103, place: "Canberra", kind: 'city', label: 'below', lat: -35.28, lon: 149.13, nudged: true, via: [{ x: 140, y: 1980 }, { x: 260, y: 2088 }] },
     { n: 33, x: 319, y: 2161, place: "Hobart", kind: 'city', label: 'left', lat: -42.88, lon: 147.33, via: [{ x: 360, y: 2148 }] }
   ];
   // Coming soon: other Australian cities. Shown as markers only (no trail), so they never look like the route.
-  // Brisbane is a stop since 1.9.233. Canberra and Hobart are stops since 1.9.240.
+  // Brisbane is a stop since 1.9.233. Canberra and Hobart are stops since 1.9.241.
   const FUTURE_STOPS = [
     { place: 'Darwin', x: 179, y: 1827, label: 'left', lat: -12.46, lon: 130.84 },
     { place: 'Cairns', x: 306, y: 1876, label: 'left', lat: -16.92, lon: 145.77 }
@@ -811,7 +811,7 @@
   // 1.9.234 Papua New Guinea coast points (lat, lon) and the West Pacific islands (lat, lon, rx, ry, rotate).
   const PNG_PTS = [[-2.6, 141.0], [-3.1, 142.2], [-3.4, 143.5], [-3.9, 144.5], [-4.6, 145.6], [-5.4, 145.8], [-6.0, 147.0], [-6.1, 147.8], [-7.5, 147.7], [-8.3, 148.3], [-9.0, 149.3], [-9.6, 149.9], [-10.3, 150.6], [-10.6, 150.3], [-10.2, 149.7], [-9.9, 148.6], [-9.5, 147.4], [-8.9, 146.6], [-8.0, 145.8], [-7.6, 144.6], [-8.0, 143.6], [-8.6, 143.2], [-9.1, 142.6], [-9.1, 141.0]];
   const NEW_BRITAIN_PTS = [[-5.6, 148.4], [-5.1, 150.0], [-4.3, 151.6], [-4.2, 152.3], [-4.8, 152.0], [-5.6, 150.9], [-6.2, 149.5], [-6.0, 148.5]];
-  // 1.9.240 Islands on the Australia projection: Solomons, Vanuatu, New Caledonia, Fiji, then Bali and the islands just east of it.
+  // 1.9.241 Islands on the Australia projection: Solomons, Vanuatu, New Caledonia, Fiji, then Bali and the islands just east of it.
   const EAST_ISLES = [[-8.1, 157.2, 16, 5, 28], [-9.4, 160.0, 18, 6, 32], [-10.6, 161.5, 12, 5, 30], [-15.4, 167.2, 5, 11, -8], [-17.7, 168.3, 6, 10, 0], [-21.3, 165.5, 26, 7, 38], [-17.8, 178.0, 14, 8, -8], [-16.5, 179.4, 13, 6, -18], [-8.3, 114.4, 9, 5, 18], [-8.65, 115.22, 7, 4, 12], [-8.8, 116.5, 8, 4, 10], [-8.9, 118.0, 12, 5, 6]];
   function ausPath(pts) { return pts.map(function (q, i) { const a = ausXY(q[0], q[1]); return (i ? 'L' : 'M') + a.x.toFixed(1) + ' ' + a.y.toFixed(1); }).join(' ') + ' Z'; }
   // 1.9.234 Soft clouds drifting slowly over the map (CSS .sr-cloud; still under reduced motion). Over sea, clear of the pins.
@@ -3033,7 +3033,7 @@
         { x: 40, y: 78, w: 16, cls: 'sc-bob', d: 3.4, svg: 'vaka' },
         { x: 20, y: 16, w: 8, cls: 'sc-drift', d: 10, svg: 'gull' }
       ] },
-    // 1.9.240 Canberra: a round lake, a low white building and a flag, with autumn trees.
+    // 1.9.241 Canberra: a round lake, a low white building and a flag, with autumn trees.
     { n: 32, id: 'canberra', place: 'Canberra', title: 'Lake and flag, Canberra', night: false,
       art: function () {
         return '<defs>' + scGrad('sk', [[0, '#7ec4f2'], [0.6, '#e7f6ff'], [1, '#fff6e4']]) + '</defs>' +
@@ -3054,7 +3054,7 @@
         { x: 18, y: 20, w: 8, cls: 'sc-drift', d: 11, svg: 'gull' },
         { x: 48, y: 8, w: 24, cls: 'sc-drift', d: 24, svg: 'cloud' }
       ] },
-    // 1.9.240 Hobart: a dark mountain behind a cool harbour and stone warehouses.
+    // 1.9.241 Hobart: a dark mountain behind a cool harbour and stone warehouses.
     { n: 33, id: 'hobart', place: 'Hobart', title: 'Mountain and wharf, Hobart', night: false,
       art: function () {
         return '<defs>' + scGrad('sk', [[0, '#8eb4d4'], [0.55, '#d5e6f2'], [1, '#f3eee4']]) + scGrad('se', [[0, '#4d88b0'], [1, '#2a5878']]) + '</defs>' +
@@ -3953,7 +3953,7 @@
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, W);
   }
-  // 1.9.240 Each open tile is a little glass well. Jelly is a glossy dome; two layers read darker.
+  // 1.9.241 Each open tile is a little glass well. Jelly is a glossy dome; two layers read darker.
   function drawTile(x, y, s, jelly, blush) {
     const rad = s * .2;
     ctx.fillStyle = 'rgba(176, 64, 112, .16)';
