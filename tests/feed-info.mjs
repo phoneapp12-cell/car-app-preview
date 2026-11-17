@@ -374,12 +374,12 @@ for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 3, at.join(',
 const appSrc = fs.readFileSync('feed/app.js', 'utf8');
 for (const id of sights.TOPICS) assert.ok(appSrc.includes("'" + id + "'"), id);
 assert.ok(!/Math\.pow\(baseOf\(t\), 3\)/.test(appSrc));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.242'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.242'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.242'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.243'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.243'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.243'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.cdot.tv'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.bd ul.sum'));
-assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.242'"));
+assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.243'"));
 function swVersion(src) { const m = String(src).match(/const VERSION = '([^']+)'/); assert.ok(m, 'parent sw.js VERSION'); return m[1]; }
 const parentHere = swVersion(fs.readFileSync('sw.js', 'utf8'));
 let parentMain = parentHere;
@@ -418,10 +418,10 @@ assert.equal(artB.length, 1);
 assert.notEqual(artB[0].id, artA.id);
 seenArt.wasSeen = () => true;
 assert.equal(seenArt.ibArt.cards(0).length, 0);
-assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.242'"));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.243'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'art3d.js?v=' + VERSION"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'portal.js?v=' + VERSION"));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.242'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.243'));
 const portalSrc = fs.readFileSync('feed/portal.js', 'utf8');
 assert.ok(portalSrc.includes('prefers-reduced-motion'));
 assert.ok(portalSrc.includes("sessionStorage.getItem(KEY)"));
@@ -449,7 +449,7 @@ assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("cache: 'reload'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("u.pathname + '?v=' + VERSION"), 'game scripts are fetched at this VERSION, not from a stale unversioned cache');
 assert.ok(appSrc.includes('ibPortalRise'));
 assert.ok(!/portal-style\.jpg|attachments\/image/.test(portalSrc + fs.readFileSync('feed/index.html', 'utf8')));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.242'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.243'));
 assert.ok(appSrc.includes("['art3d', '3D art'"));
 assert.ok(appSrc.includes("['3D art', 'art3d'"));
 assert.ok(appSrc.includes("'art3d'"));
@@ -967,7 +967,7 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   assert.strictEqual(SR.voiceForStep({ popped: [{}, {}, {}], made: [], fired: [], cascade: 5 }, 5), 'succulent');
   assert.ok(srJs.includes("if (won) candySfx('win'") && srJs.includes('function chime') && srJs.includes('function say'));
   assert.ok(srJs.includes('duckMusicBrief') && srJs.includes('linearRampToValueAtTime(1, t0 + dur + 0.22)'));
-  assert.ok(SR.LEVELS.length === 33 && SR.LEVELS[1].name === "Sarah's Sweet Spot");
+  assert.ok(SR.LEVELS.length === 38 && SR.LEVELS[1].name === "Sarah's Sweet Spot");
   assert.ok(SR.LEVELS[1].theme === 'sarah' && SR.LEVELS[1].badge && SR.LEVELS[1].badge.special);
   assert.ok(SR.LEVELS[1].intro && /Sarah, Shane's partner/.test(SR.LEVELS[1].intro.body));
   assert.ok(SR.LEVELS.every(lv => lv.badge && lv.badge.icon && lv.badge.name));
@@ -2188,7 +2188,7 @@ if (live) {
       fullscreenElement: null,
       webkitFullscreenElement: null,
       readyState: 'complete',
-      currentScript: { src: 'play.js?v=1.9.242' },
+      currentScript: { src: 'play.js?v=1.9.243' },
       createElement: (tag) => {
         const n = el(tag);
         // artWin innerHTML path is not used if we only call ibArt.open — artParts uses innerHTML.
@@ -3868,15 +3868,15 @@ if (live) {
   const SR = load('feed/sugar-rush.js').SugarRush;
   const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
   const html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
-  assert.strictEqual(SR.LEVELS.length, 33);
+  assert.strictEqual(SR.LEVELS.length, 38);
   assert.strictEqual(SR.LEVELS[1].name, "Sarah's Sweet Spot");
   assert.strictEqual(SR.LEVELS[1].badge.icon, '💖');
   assert.strictEqual(SR.LEVELS[1].badge.name, "Sarah's Heart");
-  assert.strictEqual(SR.MAP_STOPS.length, 33);
+  assert.strictEqual(SR.MAP_STOPS.length, 38);
   assert.strictEqual(SR.MAP_W, 640);
   assert.ok(SR.MAP_H > 1000, 'the map is tall enough to scroll south');
   const places = SR.MAP_STOPS.map(s => s.place);
-  assert.deepStrictEqual(Array.from(places), ['Onerahi', "Sarah's House", 'Whangārei', 'Auckland Post Office', 'Hamilton', 'Rotorua', 'Taupō Station', 'Napier', 'Wellington', 'Nelson', 'Kaikōura', 'Christchurch', 'Franz Josef', 'Queenstown', 'Dunedin', 'Bluff', 'Rarotonga', 'Tonga', 'Samoa', 'Sydney', 'Gold Coast', 'Perth', 'Adelaide', 'Melbourne', 'Brisbane', 'Port Moresby', 'Solomon Islands', 'Vanuatu', 'Fiji', 'New Caledonia', 'Indonesia', 'Canberra', 'Hobart']);
+  assert.deepStrictEqual(Array.from(places), ['Onerahi', "Sarah's House", 'Whangārei', 'Auckland Post Office', 'Hamilton', 'Rotorua', 'Taupō Station', 'Napier', 'Wellington', 'Nelson', 'Kaikōura', 'Christchurch', 'Franz Josef', 'Queenstown', 'Dunedin', 'Bluff', 'Rarotonga', 'Tonga', 'Samoa', 'Sydney', 'Gold Coast', 'Perth', 'Adelaide', 'Melbourne', 'Brisbane', 'Port Moresby', 'Solomon Islands', 'Vanuatu', 'Fiji', 'New Caledonia', 'Indonesia', 'Canberra', 'Hobart', 'Vietnam', 'Malaysia', 'Thailand', 'Myanmar', 'India']);
   assert.strictEqual(SR.stopForLevel(2).kind, 'house');
   assert.strictEqual(SR.stopForLevel(2).place, "Sarah's House");
   assert.strictEqual(SR.stopForLevel(4).kind, 'post');
@@ -3955,7 +3955,7 @@ if (live) {
   const play = fs.readFileSync('feed/play.js', 'utf8');
   const idx = fs.readFileSync('feed/index.html', 'utf8');
   const SR = load('feed/sugar-rush.js').SugarRush;
-  assert.strictEqual(SR.LEVELS.length, 33);
+  assert.strictEqual(SR.LEVELS.length, 38);
   assert.strictEqual(SR.LEVELS[1].name, "Sarah's Sweet Spot");
   assert.ok(html.includes('id="mapbar"') && html.includes('id="mapexit"') && html.includes('Exit'));
   assert.ok(html.includes('id="racechip"') && html.includes('id="pickicon"') && html.includes('Pick your icon'));
@@ -3978,9 +3978,9 @@ if (live) {
   const SR = load('feed/sugar-rush.js').SugarRush;
   const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
   const html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
-  assert.strictEqual(SR.LEVELS.length, 33);
+  assert.strictEqual(SR.LEVELS.length, 38);
   assert.ok(SR.LEVELS[1].intro && /Sarah, Shane's partner/.test(SR.LEVELS[1].intro.body));
-  assert.strictEqual(SR.LEVEL_INTROS.length, 33);
+  assert.strictEqual(SR.LEVEL_INTROS.length, 38);
   assert.strictEqual(SR.LEVELS[0].target, 0);
   assert.strictEqual(SR.LEVELS[0].moves, 20);
   const lines = {
@@ -4075,7 +4075,7 @@ if (live) {
   const SR = load('feed/sugar-rush.js').SugarRush;
   const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
   const html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
-  assert.strictEqual(SR.LEVELS.length, 33);
+  assert.strictEqual(SR.LEVELS.length, 38);
   assert.ok(SR.LEVELS[1].intro && /Sarah, Shane's partner/.test(SR.LEVELS[1].intro.body));
   assert.ok(SR.TUTORIALS[1] && SR.TUTORIALS[1] === SR.TUTORIAL_STEPS);
   assert.strictEqual(SR.tutorialFor(1), SR.TUTORIAL_STEPS);
@@ -4386,8 +4386,8 @@ if (live) {
   const SR = load('feed/sugar-rush.js').SugarRush;
   const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
   const html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
-  assert.strictEqual(SR.LEVELS.length, 33);
-  assert.strictEqual(SR.LV_COUNT, 33);
+  assert.strictEqual(SR.LEVELS.length, 38);
+  assert.strictEqual(SR.LV_COUNT, 38);
   const names = SR.LEVELS.slice(10, 15).map(l => l.name);
   assert.deepStrictEqual(Array.from(names), ['Whale Watch', 'Garden City', 'Glacier Run', 'Liquorice Gondola', 'The Chocolate Factory']);
   // Every goal is an objective; score only sets stars.
@@ -4452,7 +4452,7 @@ if (live) {
   // Map: five new South Island stops, Bluff still to come, race and progress cap at 15.
   const south = SR.MAP_STOPS.slice(10, 15).map(s => s.place);
   assert.deepStrictEqual(Array.from(south), ['Kaikōura', 'Christchurch', 'Franz Josef', 'Queenstown', 'Dunedin']);
-  assert.ok(SR.MAP_STOPS.every(s => s.x > 20 && s.x < SR.MAP_W - 20 && s.y < SR.MAP_H));
+  assert.ok(SR.MAP_STOPS.every(s => s.x > SR.MAP_X0 + 20 && s.x < SR.MAP_W - 20 && s.y > 0 && s.y < SR.MAP_H));
   assert.strictEqual(SR.raceStop({ open: 15 }), 15);
   assert.ok(!/Math\.min\(10,/.test(src) && !/< 10\)/.test(src.slice(src.indexOf('function recordWin'))), 'no level count hardcoded to 10');
   assert.ok(src.includes('while (open < LV_COUNT && (m.stars[open - 1] || 0) > 0) open++;'), 'players who finished Nelson or Dunedin can go on');
@@ -4470,8 +4470,8 @@ console.log('1.9.219 sugar levels ok');
   const SR = load('feed/sugar-rush.js').SugarRush;
   const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
   const html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
-  assert.strictEqual(SR.LEVELS.length, 33);
-  assert.strictEqual(SR.LV_COUNT, 33);
+  assert.strictEqual(SR.LEVELS.length, 38);
+  assert.strictEqual(SR.LV_COUNT, 38);
   assert.deepStrictEqual(Array.from(SR.LEVELS.slice(16, 19).map(l => l.name)), ['Rarotonga Lagoon', 'Tongan Coconut Coast', 'Samoan Sunset']);
   assert.deepStrictEqual(Array.from(SR.MAP_STOPS.slice(16, 19).map(s => s.place)), ['Rarotonga', 'Tonga', 'Samoa']);
   assert.ok(SR.MAP_STOPS.slice(16, 19).every(s => s.kind === 'island' && s.y > 1236 && s.y < 1684), 'island stops sit in the Pacific Islands section');
@@ -4505,25 +4505,26 @@ console.log('1.9.220 pacific levels ok');
   const SR = load('feed/sugar-rush.js').SugarRush;
   const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
   const html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
-  assert.strictEqual(SR.LEVELS.length, 33);
-  assert.strictEqual(SR.LV_COUNT, 33);
-  assert.deepStrictEqual(Array.from(SR.MAP_STOPS.slice(14).map(s => s.place)), ['Dunedin', 'Bluff', 'Rarotonga', 'Tonga', 'Samoa', 'Sydney', 'Gold Coast', 'Perth', 'Adelaide', 'Melbourne', 'Brisbane', 'Port Moresby', 'Solomon Islands', 'Vanuatu', 'Fiji', 'New Caledonia', 'Indonesia', 'Canberra', 'Hobart']);
+  assert.strictEqual(SR.LEVELS.length, 38);
+  assert.strictEqual(SR.LV_COUNT, 38);
+  assert.deepStrictEqual(Array.from(SR.MAP_STOPS.slice(14).map(s => s.place)), ['Dunedin', 'Bluff', 'Rarotonga', 'Tonga', 'Samoa', 'Sydney', 'Gold Coast', 'Perth', 'Adelaide', 'Melbourne', 'Brisbane', 'Port Moresby', 'Solomon Islands', 'Vanuatu', 'Fiji', 'New Caledonia', 'Indonesia', 'Canberra', 'Hobart', 'Vietnam', 'Malaysia', 'Thailand', 'Myanmar', 'India']);
   assert.ok(SR.MAP_STOPS.every((s, i) => s.n === i + 1 && SR.LEVELS[i].n === i + 1), 'stops and levels are numbered in route order');
-  assert.deepStrictEqual(Array.from(SR.LEVELS.slice(15).map(l => l.name)), ['Bluff Oyster Bay', 'Rarotonga Lagoon', 'Tongan Coconut Coast', 'Samoan Sunset', 'Sydney Harbour Lights', 'Gold Coast Sweet Surf', 'Swan River Sunset', 'Adelaide City Squares', 'Melbourne Laneways', 'Brisbane River Bend', 'Port Moresby Paradise', 'Honiara Reef', 'Port Vila Waterfront', 'Bula Beach', 'Nouméa Bay', 'Bali Beach Market', 'Canberra Lake Light', 'Hobart Mountain Wharf']);
+  assert.deepStrictEqual(Array.from(SR.LEVELS.slice(15).map(l => l.name)), ['Bluff Oyster Bay', 'Rarotonga Lagoon', 'Tongan Coconut Coast', 'Samoan Sunset', 'Sydney Harbour Lights', 'Gold Coast Sweet Surf', 'Swan River Sunset', 'Adelaide City Squares', 'Melbourne Laneways', 'Brisbane River Bend', 'Port Moresby Paradise', 'Honiara Reef', 'Port Vila Waterfront', 'Bula Beach', 'Nouméa Bay', 'Bali Beach Market', 'Canberra Lake Light', 'Hobart Mountain Wharf', 'Saigon Lanterns', 'Kuala Lumpur Market', 'Bangkok Temple', 'Yangon Pagoda', 'Delhi Sweets']);
   assert.deepStrictEqual(Array.from(SR.FUTURE_STOPS.map(s => s.place)).sort(), ['Cairns', 'Darwin']);
-  assert.ok(SR.MAP_STOPS.slice(19).every(s => s.y > 1700 && s.y < SR.MAP_H) && SR.MAP_STOPS.slice(19, 25).every(s => s.y > 1800) && SR.FUTURE_STOPS.filter(s => !s.inset).every(s => s.y > 1800 && s.y < SR.MAP_H), 'Australia sits below the Pacific section');
-  assert.ok(SR.MAP_STOPS.concat(SR.FUTURE_STOPS).every(s => s.x > 20 && s.x < SR.MAP_W - 20));
+  assert.ok(SR.MAP_STOPS.slice(19, 33).every(s => s.y > 1700 && s.y < SR.MAP_H) && SR.MAP_STOPS.slice(19, 25).every(s => s.y > 1800) && SR.FUTURE_STOPS.filter(s => !s.inset).every(s => s.y > 1800 && s.y < SR.MAP_H), 'Australia sits below the Pacific section');
+  assert.ok(SR.MAP_STOPS.slice(0, 33).concat(SR.FUTURE_STOPS).every(s => s.x > 20 && s.x < SR.MAP_W - 20));
+  assert.ok(SR.MAP_STOPS.slice(33).every(s => s.x > SR.MAP_X0 + 20 && s.x < 20), 'the new countries sit west of Indonesia');
   const svg = SR.nzMapSvg();
   assert.ok(svg.includes('sr-aus') && svg.includes('>Australia<') && (svg.match(/class="sr-plane"/g) || []).length >= 3, 'Australia section with planes');
   assert.ok(!svg.includes('id="sr-future" d="M'), 'coming-soon cities have no trail');
-  assert.strictEqual(SR.raceStop({ open: 99 }), 33);
+  assert.strictEqual(SR.raceStop({ open: 99 }), 38);
   // Level ids: progress follows the level, not its number.
   const ids = SR.levelIds();
-  assert.strictEqual(new Set(ids).size, 33);
-  assert.deepStrictEqual(Array.from(ids.slice(29)), ['noumea', 'bali', 'canberra', 'hobart']);
+  assert.strictEqual(new Set(ids).size, 38);
+  assert.deepStrictEqual(Array.from(ids.slice(29, 33)), ['noumea', 'bali', 'canberra', 'hobart']);
   const old = [3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 2, 1, 2, 1, 2, 3, 1, 2];
   const m = SR.migrateProg({ open: 18, stars: old, best: old.map(x => x * 1000), badges: old.map(x => x ? 1 : 0), wins: 40 });
-  assert.deepStrictEqual(Array.from(m.stars.slice(14)), [2, 0, 3, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], '1.9.220 island stars move to 17-19; Bluff starts fresh');
+  assert.deepStrictEqual(Array.from(m.stars.slice(14)), [2, 0, 3, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], '1.9.220 island stars move to 17-19; Bluff starts fresh');
   assert.strictEqual(m.best[16], 3000); assert.strictEqual(m.badges[18], 1); assert.strictEqual(m.badges[15], 0);
   assert.strictEqual(m.open, 19, 'the open stop (Samoa) follows its id');
   assert.strictEqual(m.wins, 40);
@@ -4542,7 +4543,7 @@ console.log('1.9.220 pacific levels ok');
     assert.ok(SR.tryBeat(lv, 16) >= 2, 'level ' + lv.n + ' is winnable');
     assert.ok(!/rugby|football|cricket|netball|stadium|surfboard race/i.test(SR.sceneSvg(lv.n) + SR.sceneSprites(lv.n)), 'no sport ' + lv.n);
   }
-  assert.deepStrictEqual(Array.from(SR.SCENES.slice(15).map(s => s.id)), ['bluff', 'rarotonga', 'tonga', 'samoa', 'sydney', 'goldcoast', 'perth', 'adelaide', 'melbourne', 'brisbane', 'portmoresby', 'honiara', 'vila', 'fiji', 'noumea', 'bali', 'canberra', 'hobart']);
+  assert.deepStrictEqual(Array.from(SR.SCENES.slice(15).map(s => s.id)), ['bluff', 'rarotonga', 'tonga', 'samoa', 'sydney', 'goldcoast', 'perth', 'adelaide', 'melbourne', 'brisbane', 'portmoresby', 'honiara', 'vila', 'fiji', 'noumea', 'bali', 'canberra', 'hobart', 'saigon', 'nightmarket', 'bangkok', 'yangon', 'delhi']);
   assert.deepStrictEqual(Array.from([16, 20, 21, 22].map(n => SR.LEVELS[n - 1].badge.name)), ['Bluff Oyster', 'Opera House Sail', 'Golden Wave', 'Black Swan']);
   assert.ok(SR.sceneSvg(16).includes('SYDNEY') && SR.sceneSvg(20).length > 500 && SR.sceneSvg(22).length > 500);
   // Hard and Super Hard levels.
@@ -4888,7 +4889,7 @@ console.log('1.9.227 echo and 3 s pace ok');
   }
   assert.ok(SR.LEVELS.every(l => !l.hard || SR.gameTrack(l.n) === 'sugar-rush-travel.m4a'), 'every Hard level gets "Sugar Rush travel"');
   // New levels.
-  assert.strictEqual(SR.LV_COUNT, 33);
+  assert.strictEqual(SR.LV_COUNT, 38);
   const [a, m] = [SR.LEVELS[22], SR.LEVELS[23]];
   assert.deepStrictEqual([a.n, a.name, m.n, m.name], [23, 'Adelaide City Squares', 24, 'Melbourne Laneways']);
   assert.ok(!a.hard && !m.hard, 'neither is Hard');
@@ -4905,7 +4906,7 @@ console.log('1.9.227 echo and 3 s pace ok');
   assert.ok(a.stars[1] >= SR.LEVELS[20].stars[1] && m.stars[1] >= a.stars[1]);
   // Race and progress.
   const p = SR.migrateProg({ open: 22, stars: Array(22).fill(3), best: Array(22).fill(9000), badges: Array(22).fill(1), ids: SR.levelIds().slice(0, 22) });
-  assert.strictEqual(p.stars.length, 33); let open = p.open; while (open < SR.LV_COUNT && (p.stars[open - 1] || 0) > 0) open++; assert.strictEqual(open, 23, 'Perth finishers go straight on to Adelaide (loadProg)'); assert.ok(src.includes('while (open < LV_COUNT && (m.stars[open - 1] || 0) > 0) open++;')); assert.strictEqual(p.stars[22], 0);
+  assert.strictEqual(p.stars.length, 38); let open = p.open; while (open < SR.LV_COUNT && (p.stars[open - 1] || 0) > 0) open++; assert.strictEqual(open, 23, 'Perth finishers go straight on to Adelaide (loadProg)'); assert.ok(src.includes('while (open < LV_COUNT && (m.stars[open - 1] || 0) > 0) open++;')); assert.strictEqual(p.stars[22], 0);
   assert.strictEqual(SR.raceStop({ open: 24 }), 24);
   console.log('1.9.232 songs and Adelaide/Melbourne ok');
 }
@@ -4914,7 +4915,7 @@ console.log('1.9.227 echo and 3 s pace ok');
 {
   const SR = load('feed/sugar-rush.js').SugarRush;
   const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
-  assert.strictEqual(SR.LV_COUNT, 33);
+  assert.strictEqual(SR.LV_COUNT, 38);
   const b = SR.LEVELS[24], stop = SR.stopForLevel(25);
   assert.deepStrictEqual([b.n, b.name, stop.place], [25, 'Brisbane River Bend', 'Brisbane']);
   assert.ok(!b.target && !b.hard, 'objective goal, not Hard');
@@ -4933,7 +4934,7 @@ console.log('1.9.227 echo and 3 s pace ok');
   const w = n => SR.tryBeat(SR.LEVELS[n - 1], 80), w24 = w(24), w25 = w(25);
   assert.ok(w25 <= w24 && w25 >= 28, 'gentle rise ' + [w24, w25]);
   assert.ok(b.stars[1] >= SR.LEVELS[23].stars[1]);
-  assert.strictEqual(SR.raceStop({ open: 99 }), 33);
+  assert.strictEqual(SR.raceStop({ open: 99 }), 38);
   console.log('1.9.233 Brisbane ok');
 }
 
@@ -4941,7 +4942,7 @@ console.log('1.9.227 echo and 3 s pace ok');
 {
   const SR = load('feed/sugar-rush.js').SugarRush;
   const src = fs.readFileSync('feed/sugar-rush.js', 'utf8'), html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
-  assert.strictEqual(SR.LV_COUNT, 33);
+  assert.strictEqual(SR.LV_COUNT, 38);
   const g = SR.LEVELS[25], stop = SR.stopForLevel(26);
   assert.deepStrictEqual([g.n, g.name, stop.place], [26, 'Port Moresby Paradise', 'Port Moresby']);
   assert.ok(!g.target && !g.hard);
@@ -4966,7 +4967,7 @@ console.log('1.9.227 echo and 3 s pace ok');
   // Scenes: one more soft drifting cloud by day, none added at night.
   for (const s of SR.SCENES) assert.strictEqual(s.sprites.filter(p => p.svg === 'softcloud').length, s.night ? 0 : 1, s.id);
   assert.ok(SR.sceneSprites(22).includes('color:#ffd2e0'), 'sunset-tinted cloud in Perth');
-  assert.strictEqual(SR.raceStop({ open: 99 }), 33);
+  assert.strictEqual(SR.raceStop({ open: 99 }), 38);
   console.log('1.9.234 Papua New Guinea, clouds, West Pacific ok');
 }
 
@@ -4974,14 +4975,14 @@ console.log('1.9.227 echo and 3 s pace ok');
 {
   const SR = load('feed/sugar-rush.js').SugarRush;
   const html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
-  assert.strictEqual(SR.LV_COUNT, 33);
+  assert.strictEqual(SR.LV_COUNT, 38);
   assert.deepStrictEqual(Array.from(SR.MAP_STOPS.slice(26, 31).map(s => s.place)), ['Solomon Islands', 'Vanuatu', 'Fiji', 'New Caledonia', 'Indonesia']);
   assert.deepStrictEqual(Array.from(SR.LEVELS.slice(26, 31).map(l => l.name)), ['Honiara Reef', 'Port Vila Waterfront', 'Bula Beach', 'Nouméa Bay', 'Bali Beach Market']);
   assert.ok(!SR.FUTURE_STOPS.some(s => /Solomon|Vanuatu|Fiji|Caledonia|Indonesia|Bali/.test(s.place)));
   const map = SR.nzMapSvg();
-  assert.ok(!map.includes('sr-countries') && !map.includes('>New countries<') && map.includes('viewBox="0 0 640 2240"'));
+  assert.ok(!map.includes('sr-countries') && !map.includes('>New countries<') && map.includes('viewBox="-360 0 1000 2240"'));
   SR.MAP_STOPS.slice(26, 31).forEach(function (s) { assert.ok(Math.hypot(s.x - SR.ausXY(s.lat, s.lon).x, s.y - SR.ausXY(s.lat, s.lon).y) < 1.5, s.place + ' sits where it belongs beside Australia'); });
-  assert.ok(html.includes('sugar-rush.js?v=1.9.242'));
+  assert.ok(html.includes('sugar-rush.js?v=1.9.243'));
   for (const n of [27, 28, 29, 30, 31]) {
     const lv = SR.LEVELS[n - 1];
     assert.ok(!lv.target && !lv.hard);
@@ -5000,7 +5001,7 @@ console.log('1.9.227 echo and 3 s pace ok');
   assert.ok(SR.aheadPath([3, 1]).startsWith('M ') && SR.aheadPath([3, 1]).includes(String(SR.MAP_STOPS[1].x)), 'dots continue from the last place cleared');
   assert.strictEqual(SR.aheadPath(SR.MAP_STOPS.map(function () { return 3; })), '', 'no dots once every stop is cleared');
   assert.ok(html.includes('where you have been'));
-  assert.strictEqual(SR.raceStop({ open: 99 }), 33);
+  assert.strictEqual(SR.raceStop({ open: 99 }), 38);
   const can = SR.stopForLevel(32), hob = SR.stopForLevel(33);
   assert.ok(Math.hypot(can.x - SR.ausXY(can.lat, can.lon).x, can.y - SR.ausXY(can.lat, can.lon).y) < 40, 'Canberra stays near its real spot');
   assert.ok(Math.hypot(hob.x - SR.ausXY(hob.lat, hob.lon).x, hob.y - SR.ausXY(hob.lat, hob.lon).y) < 1.5, 'Hobart sits on Tasmania');
@@ -5012,5 +5013,26 @@ console.log('1.9.227 echo and 3 s pace ok');
     assert.ok(SR.sceneSvg(n).length > 400);
     assert.ok(SR.tryBeat(lv, 16) >= 2, 'winnable ' + n);
   }
-  console.log('1.9.242 Canberra and Hobart ok');
+  console.log('1.9.243 Canberra and Hobart ok');
+}
+
+// 1.9.243 Next big countries west of Indonesia: Vietnam, Malaysia, Thailand, Myanmar, India.
+{
+  const SR = load('feed/sugar-rush.js').SugarRush;
+  assert.deepStrictEqual(Array.from(SR.MAP_STOPS.slice(33).map(s => s.place)), ['Vietnam', 'Malaysia', 'Thailand', 'Myanmar', 'India']);
+  SR.MAP_STOPS.slice(33).forEach(function (s) {
+    const a = SR.ausXY(s.lat, s.lon);
+    assert.ok(Math.hypot(a.x - s.x, a.y - s.y) < 1.5, s.place + ' is on the world map');
+    assert.ok(s.x < 16, s.place + ' is west of the Pacific panel');
+  });
+  for (const n of [34, 35, 36, 37, 38]) {
+    const lv = SR.LEVELS[n - 1];
+    assert.ok(!lv.target && !lv.hard);
+    assert.ok(SR.LEVEL_INTROS[n - 1].detail.includes(lv.moves + ' moves'));
+    assert.strictEqual(SR.tutorialFor(n)[0].kind, 'recap');
+    assert.ok(SR.sceneSvg(n).length > 400, 'scene ' + n);
+    assert.ok(SR.tryBeat(lv, 16) >= 1, 'winnable ' + n);
+  }
+  assert.strictEqual(SR.raceStop({ open: 99 }), 38);
+  console.log('1.9.243 Vietnam, Malaysia, Thailand, Myanmar and India ok');
 }

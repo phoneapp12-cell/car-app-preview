@@ -12,7 +12,7 @@
   [hidden] { display: none !important; }
   .wrap { max-width: 460px; margin: 0 auto; }
   .awning { height: 16px; margin: -12px -12px 10px; background: repeating-linear-gradient(90deg, #ff6fa8 0 22px, #fff 22px 44px); border-radius: 0 0 14px 14px; box-shadow: 0 3px 0 rgba(160,30,90,.15); }
-  /* 1.9.242 Bright wrapped sweets in the sky behind the Sugar Rush banner. */
+  /* 1.9.243 Bright wrapped sweets in the sky behind the Sugar Rush banner. */
   .candy-sky { position: fixed; top: 0; left: 0; right: 0; height: 168px; z-index: 0; pointer-events: none; overflow: hidden; }
   body.ingame .candy-sky { z-index: 1; }
   body.ingame .wrap { z-index: 2; }
@@ -30,9 +30,9 @@
   .wrapc.p { --hi: #f0c6ff; --mid: #c44bff; --lo: #7a12b0; }
   .wrapc.k { --hi: #ffc2e4; --mid: #ff5ea8; --lo: #d6246e; }
   @keyframes wrapbob { from { translate: 0 0; } to { translate: 0 6px; } }
-  @font-face { font-family: "Sugar Script"; src: url("fonts/Pacifico-Regular.ttf?v=1.9.242") format("truetype"); font-weight: 400; font-style: normal; font-display: swap; }
+  @font-face { font-family: "Sugar Script"; src: url("fonts/Pacifico-Regular.ttf?v=1.9.243") format("truetype"); font-weight: 400; font-style: normal; font-display: swap; }
   h1 { font-size: 27px; line-height: 1.15; font-weight: 900; margin: 0; color: #d6246e; letter-spacing: .01em; text-shadow: 0 2px 0 #fff; }
-  /* 1.9.242 Candy script: white face, hot-pink edge, deep-red block side. */
+  /* 1.9.243 Candy script: white face, hot-pink edge, deep-red block side. */
   #game h1 .frost, #soon h1 .frost { display: inline-block; font-family: "Sugar Script", cursive; font-size: 42px; font-weight: 400; line-height: 1.05; letter-spacing: 0; color: #fff; background: none; -webkit-text-fill-color: #fff; -webkit-text-stroke: 4px #ff4fa8; paint-order: stroke fill; text-shadow: 1px 1px 0 #e2186c, 2px 2px 0 #d41464, 3px 3px 0 #c4125c, 4px 4px 0 #b21054, 5px 5px 0 #a00e4c, 6px 6px 0 #8c0c42, 7px 7px 0 #720a36; filter: none; }
   h1 small { font-size: 14px; font-weight: 800; color: #8a3a62; margin-left: 6px; }
   .help { font-size: 13.5px; line-height: 1.35; color: #7a2f55; margin: 4px 0 10px; }
@@ -100,7 +100,7 @@
   body.onmap #map { position: absolute; inset: 0; display: block; min-height: 0; }
   .mapwrap { position: absolute; inset: 0; }
   .mapview { position: absolute; inset: 0; flex: none; min-height: 0; overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-x pan-y; border-radius: 0; border: 0; box-shadow: none; background: #9be7ff; }
-  .mapstage { position: relative; width: 160%; min-width: 320px; }
+  .mapstage { position: relative; width: 250%; min-width: 320px; }
   .mapstage svg.nzsvg { display: block; width: 100%; height: auto; }
   .stops { position: absolute; inset: 0; pointer-events: none; }
   .stops .lv, .stops .future-stop { position: absolute; pointer-events: auto; transform: translate(-50%, -50%); width: auto; height: auto; aspect-ratio: auto; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 1px; border: 0; background: none; box-shadow: none; padding: 0; }
@@ -942,7 +942,7 @@
     </div>
   </div>
   <canvas id="fxov" class="fxov" hidden aria-hidden="true"></canvas>
-  <script src="scores.js?v=1.9.242"></script>
-  <script src="sugar-rush.js?v=1.9.242"></script>
+  <script src="scores.js?v=1.9.243"></script>
+  <script src="sugar-rush.js?v=1.9.243"></script>
 </body>
 </html>
