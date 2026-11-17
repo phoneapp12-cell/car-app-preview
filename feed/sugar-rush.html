@@ -123,6 +123,9 @@
   .stops .lab-right .meta { left: 48px; right: auto; top: 6px; text-align: left; }
   .stops .meta b { display: block; font-size: 11px; font-weight: 800; color: #5a1238; line-height: 1.15; text-shadow: 0 1px 0 #fff; }
   .stops .meta em { display: block; font-size: 10px; font-style: normal; font-weight: 700; color: #8a3a62; line-height: 1.15; text-shadow: 0 1px 0 #fff; }
+  .stops .lv:not(.done) .st { display: none; }
+  .stops .lv .meta em { display: none; }
+  .stops .lv.here .meta em, .stops .lv:hover .meta em, .stops .lv:focus-visible .meta em { display: block; }
   .stops .gotbadge { position: absolute; top: -4px; right: -2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 1.5px solid #ffb400; font-size: 11px; display: flex; align-items: center; justify-content: center; }
   .stops .lv.sarah .gotbadge { border-color: #ff6fa8; }
   .stops .future-stop { pointer-events: none; }
@@ -619,7 +622,7 @@
   .stops .future-stop.lab-below .meta { position: absolute; top: 24px; left: 50%; transform: translateX(-50%); }
   .stops .future-stop .meta b, .stops .future-stop .meta em { display: inline; }
   .stops .future-stop .meta em::before { content: ' · '; }
-  .stops .future-stop .meta, .stops .lv.kind-city .meta { background: rgba(255,255,255,.78); border-radius: 9px; padding: 1px 6px; box-shadow: 0 1px 3px rgba(122,31,76,.12); }
+  .stops .future-stop .meta, .stops .lv .meta { background: rgba(255,255,255,.9); border-radius: 9px; padding: 2px 6px; box-shadow: 0 1px 4px rgba(122,31,76,.14); }
   .stops .lv.kind-city .meta { max-width: 150px; }
   /* 1.9.222 Family race events. */
   .racebar { position: absolute; left: 10px; right: 10px; top: 100px; z-index: 6; padding: 7px 10px 6px; border-radius: 16px; background: rgba(255,255,255,.94); border: 2px solid #ffb3d3; box-shadow: 0 4px 0 #f4a0c4, 0 8px 18px rgba(180,40,90,.18); font: 800 12px/1.2 ui-rounded, system-ui, sans-serif; color: #7a1f4c; }
@@ -744,7 +747,7 @@
         </div>
         <header class="mapbar" id="mapbar">
           <button type="button" id="mapexit">Exit</button>
-          <h1>Sugar Rush <small>New Zealand</small></h1>
+          <h1>Sugar Rush <small>Pacific &amp; Asia</small></h1>
           <button type="button" id="mapsound" aria-label="Sound">🔉</button>
           <button type="button" id="mapmusic" aria-label="Music">🎵</button>
           <button type="button" class="iconbtn" id="pickicon">Pick your icon</button>
