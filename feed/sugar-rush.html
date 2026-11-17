@@ -388,8 +388,8 @@
   body.ingame .stat { background: rgba(255,255,255,.88); box-shadow: 0 3px 0 rgba(242,123,176,.3); }
   body.ingame .goal { background: rgba(255,255,255,.9); }
   body.ingame .credit { display: table; margin: 10px auto 0; padding: 3px 10px; border-radius: 10px; background: rgba(255,255,255,.78); }
-  /* Glossy candy-glass board */
-  body.ingame .tray { position: relative; background: linear-gradient(180deg, rgba(255,255,255,.66), rgba(255,226,240,.5)); border: 3px solid rgba(255,255,255,.95); box-shadow: 0 0 0 3px #ff9cc6, 0 7px 0 3px #f27bb0, 0 16px 30px rgba(90,18,56,.3), inset 0 2px 0 rgba(255,255,255,.9), inset 0 -6px 14px rgba(255,140,190,.25); }
+  /* Glossy candy tin: a raised rim, a soft well, and the scene still showing through the glass. */
+  body.ingame .tray { position: relative; background: radial-gradient(120% 90% at 50% 0%, rgba(255,255,255,.82), rgba(255,228,240,.46) 46%, rgba(255,170,205,.3)); border: 3px solid #fff; box-shadow: 0 0 0 4px #ff7eb3, 0 8px 0 4px #e25a96, 0 18px 28px rgba(90,18,56,.28), inset 0 2px 0 #fff, inset 0 -10px 16px rgba(255,120,170,.28); }
   body.ingame .tray::before { content: ""; position: absolute; left: 10px; right: 10px; top: 3px; height: 9px; border-radius: 9px; background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(255,255,255,0)); pointer-events: none; }
   body.ingame.sarah .tray { box-shadow: 0 0 0 3px #ff8ab8, 0 7px 0 3px #f06aa8, 0 16px 30px rgba(90,18,56,.3), inset 0 2px 0 rgba(255,255,255,.9); }
   canvas#board { max-width: min(100%, calc(100dvh - 360px)); }
@@ -905,7 +905,7 @@
     </div>
   </div>
   <canvas id="fxov" class="fxov" hidden aria-hidden="true"></canvas>
-  <script src="scores.js?v=1.9.238"></script>
-  <script src="sugar-rush.js?v=1.9.238"></script>
+  <script src="scores.js?v=1.9.239"></script>
+  <script src="sugar-rush.js?v=1.9.239"></script>
 </body>
 </html>
