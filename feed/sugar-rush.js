@@ -1,4 +1,4 @@
-/* Info Book 1.9.166 – Sugar Rush, levels 1–26. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.235 – Sugar Rush, levels 1–31. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -173,7 +173,35 @@
       bub: ['00000000', '00000000', '10000001', '01000010', '00000000', '00000000', '00000000', '00000000'],
       locks: ['00000000', '00000000', '00000000', '00000000', '00011000', '00000000', '00000000', '00000000'],
       help: 'Clear the jelly under the stilt village, pop the 4 sugar bubbles and free the 2 locked jars in 24 moves.',
-      badge: { id: 'paradise', name: 'Bird of Paradise', icon: '🦜' } }
+      badge: { id: 'paradise', name: 'Bird of Paradise', icon: '🦜' } },
+    // 1.9.235 New countries, five at a time. First five: Solomon Islands, Vanuatu, Fiji, New Caledonia, Indonesia.
+    { n: 27, name: 'Honiara Reef', target: 0, moves: 30, stars: [0, 4500, 9000], kinds: 6,
+      jelly: ['00000000', '00111100', '01000010', '01000010', '01000010', '01000010', '00111100', '00000000'],
+      bub: ['00000000', '00000000', '00011000', '00000000', '00000000', '00011000', '00000000', '00000000'],
+      help: 'Clear the reef-ring jelly around Honiara lagoon and pop the 4 sugar bubbles in 30 moves.',
+      badge: { id: 'honiara', name: 'Reef Ring', icon: '🐠' } },
+    { n: 28, name: 'Port Vila Waterfront', target: 0, moves: 32, stars: [0, 4600, 9200], kinds: 6,
+      ings: [[0, 2], [0, 5]], ingIcon: '🥭',
+      ice: ['00000000', '00000000', '00011000', '00000000', '00000000', '00000000', '00011000', '00000000'],
+      help: 'Bring both market mangoes down the waterfront and crack the 4 icing blocks in 32 moves.',
+      badge: { id: 'vila', name: 'Market Mango', icon: '🥭' } },
+    { n: 29, name: 'Bula Beach', target: 0, moves: 36, stars: [0, 4700, 9400], kinds: 6,
+      ings: [[0, 1], [0, 6]], ingStyle: 'coconut', ingIcon: '🥥',
+      jelly: ['00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '11111111', '11111111'],
+      help: 'Bring both coconuts down onto the beach and clear the jelly along the sand in 36 moves.',
+      badge: { id: 'bula', name: 'Bula Flower', icon: '🌸' } },
+    { n: 30, name: 'Nouméa Bay', target: 0, moves: 30, stars: [0, 4800, 9600], kinds: 6,
+      mask: HARBOUR,
+      jelly: ['00000000', '00000000', '00000000', '00000000', '00000000', '11111111', '00000000', '00000000'],
+      locks: ['00011000', '00000000', '00000000', '00000000', '00000000', '00000000', '00011000', '00000000'],
+      bub: ['00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '00100100', '00000000'],
+      help: 'Clear the jelly across the bay, free the 4 locked jars and pop the 2 sugar bubbles in 30 moves.',
+      badge: { id: 'noumea', name: 'Bay Sail', icon: '⛵' } },
+    { n: 31, name: 'Bali Beach Market', target: 0, moves: 32, stars: [0, 4900, 9800], kinds: 6,
+      jelly: ['11000011', '10000001', '00000000', '00000000', '00000000', '00000000', '10000001', '11000011'],
+      ice: ['00000000', '00011000', '00000000', '00000000', '00000000', '00000000', '00011000', '00000000'],
+      help: 'Clear the jelly by the temple gates and crack the 4 icing blocks in the market in 32 moves.',
+      badge: { id: 'bali', name: 'Temple Gate', icon: '🌴' } }
   ];
 
 
@@ -204,7 +232,12 @@
     { icon: '🐸', goal: 'Clear the city-square jelly and free the jars', detail: "Clear the jelly in Adelaide's 5 city squares and free 4 locked jars in 30 moves.", tip: 'Adelaide is laid out around five squares. Work the corners early; the jars sit between them.', mechanic: 'squares' },
     { icon: '🍩', goal: 'Bring both doughnuts down, pop the bubbles and free the liquorice', detail: 'Bring both hot jam doughnuts down the laneway, pop 4 sugar bubbles and free the liquorice in 31 moves.', tip: 'Free the liquorice in the middle before it creeps, then clear the columns under each doughnut.', mechanic: 'laneway' },
     { icon: '⛴️', goal: 'Clear the river jelly and crack the blossom icing', detail: 'Clear the jelly along the winding Brisbane River (double on the bends) and crack 8 blocks of jacaranda-blossom icing in 31 moves.', tip: 'Follow the river like the CityCat: the bends are where matches pile up. Hit the corner icing with specials.', mechanic: 'river' },
-    { icon: '🦜', goal: 'Clear the village jelly, pop the bubbles and free the jars', detail: 'Clear the jelly under the stilt village, pop 4 sugar bubbles and free 2 locked jars in 24 moves.', tip: 'The jelly sits along the bottom two rows. Matches down there also bring new sweets tumbling in from the top.', mechanic: 'village' }
+    { icon: '🦜', goal: 'Clear the village jelly, pop the bubbles and free the jars', detail: 'Clear the jelly under the stilt village, pop 4 sugar bubbles and free 2 locked jars in 24 moves.', tip: 'The jelly sits along the bottom two rows. Matches down there also bring new sweets tumbling in from the top.', mechanic: 'village' },
+    { icon: '🐠', goal: 'Clear the reef jelly and pop the lagoon bubbles', detail: 'Clear the reef-ring jelly around Honiara lagoon and pop the 4 sugar bubbles in 30 moves.', tip: 'The jelly is a ring. Clear a side of it and the bubbles in the middle pop together.', mechanic: 'reef' },
+    { icon: '🥭', goal: 'Bring both mangoes down and crack the icing', detail: 'Bring both market mangoes down the waterfront and crack the 4 icing blocks in 32 moves.', tip: 'Match under each mango to drop it. The icing sits in two pairs on the way down.', mechanic: 'market' },
+    { icon: '🥥', goal: 'Bring both coconuts down and clear the beach jelly', detail: 'Bring both coconuts down onto the beach and clear the jelly along the sand in 36 moves.', tip: 'Drop the coconuts first, then sweep the bottom two rows of jelly.', mechanic: 'beach' },
+    { icon: '⛵', goal: 'Clear the bay jelly, free the jars and pop the bubbles', detail: 'Clear the jelly across the bay, free the 4 locked jars and pop the 2 sugar bubbles in 30 moves.', tip: 'The harbour arch splits the middle. Work above and below it.', mechanic: 'bay' },
+    { icon: '🌴', goal: 'Clear the gate jelly and crack the market icing', detail: 'Clear the jelly by the temple gates and crack the 4 icing blocks in the market in 32 moves.', tip: 'The jelly sits in the four corners, like the gates. The icing is just inside each pair.', mechanic: 'gates' }
   ];
   function levelIntro(n, p) {
     const lv = LEVELS[(n | 0) - 1]; if (!lv) return null;
@@ -635,7 +668,17 @@
           { icon: '🔒', text: 'Free the locked jars' }
         ]
       }
-    ]
+    ],
+    27: [{ id: 'recap27', kind: 'recap', title: 'Solomon Islands', bubble: 'Honiara: a reef ring around the lagoon.',
+      items: [{ icon: '💜', text: 'Clear the reef-ring jelly' }, { icon: '🫧', text: 'Pop the sugar bubbles' }] }],
+    28: [{ id: 'recap28', kind: 'recap', title: 'Vanuatu', bubble: 'Port Vila: mangoes on the waterfront.',
+      items: [{ icon: '🥭', text: 'Bring both mangoes down' }, { icon: '🧁', text: 'Crack the icing' }] }],
+    29: [{ id: 'recap29', kind: 'recap', title: 'Fiji', bubble: 'A bula from the beach: coconuts and sand jelly.',
+      items: [{ icon: '🥥', text: 'Bring both coconuts down' }, { icon: '💜', text: 'Clear the beach jelly' }] }],
+    30: [{ id: 'recap30', kind: 'recap', title: 'New Caledonia', bubble: 'Nouméa: a bay, a sail and jars on the quay.',
+      items: [{ icon: '💜', text: 'Clear the bay jelly' }, { icon: '🔒', text: 'Free the locked jars' }, { icon: '🫧', text: 'Pop the sugar bubbles' }] }],
+    31: [{ id: 'recap31', kind: 'recap', title: 'Indonesia', bubble: 'Bali: temple gates and a beach market.',
+      items: [{ icon: '💜', text: 'Clear the jelly by the gates' }, { icon: '🧁', text: 'Crack the market icing' }] }]
   };
   function tutorialFor(n) { return TUTORIALS[n] || null; }
 
@@ -664,7 +707,7 @@
   function westPacXY(lat, lon) { return { x: 60 + (lon - 156) * 280 / 24, y: 1580 + (-lat - 8) * 88 / 15 }; }
   function pacXY(lat, lon) { return { x: 70 + 16.86 * (((lon % 360) + 360) % 360 - 184.8), y: 1350 + 21.6 * (-lat - 13.83) }; }
   function ausXY(lat, lon) { return { x: 8.533 * lon - 937.8, y: 1808 + 10.97 * (-lat - 10.707) }; }
-  const MAP_W = 400, MAP_H = 2240;
+  const MAP_W = 400, MAP_H = 2960;
   const MAP_STOPS = [
     { n: 1, x: 148, y: 432, place: "Onerahi", kind: 'town', label: 'left', lat: -35.77, lon: 174.37, inset: 'whangarei' },
     { n: 2, x: 204, y: 432, place: "Sarah's House", kind: 'house', label: 'below', lat: -35.762, lon: 174.385, inset: 'whangarei', nudged: true },
@@ -694,7 +737,13 @@
     // 1.9.233 Up the east coast to Brisbane. Its true spot is under the Gold Coast pin, so the pin is nudged ~38 px north (nudged).
     { n: 25, x: 362, y: 1954, place: "Brisbane", kind: 'city', label: 'left', lat: -27.47, lon: 153.03, nudged: true, via: [{ x: 318, y: 2030 }] },
     // 1.9.234 North across the Coral Sea to Port Moresby, Papua New Guinea (true position; kept east of Cairns).
-    { n: 26, x: 318, y: 1794, place: "Port Moresby", kind: 'city', label: 'below', lat: -9.44, lon: 147.18, via: [{ x: 356, y: 1880 }] }
+    { n: 26, x: 318, y: 1794, place: "Port Moresby", kind: 'city', label: 'below', lat: -9.44, lon: 147.18, via: [{ x: 356, y: 1880 }] },
+    // 1.9.235 New countries, drawn in their own panel below Australia (one level each).
+    { n: 27, x: 110, y: 2420, place: "Solomon Islands", kind: 'island', label: 'right', lat: -9.43, lon: 159.95, via: [{ x: 360, y: 2100 }, { x: 300, y: 2320 }, { x: 180, y: 2380 }] },
+    { n: 28, x: 280, y: 2520, place: "Vanuatu", kind: 'island', label: 'left', lat: -17.73, lon: 168.32 },
+    { n: 29, x: 120, y: 2620, place: "Fiji", kind: 'island', label: 'right', lat: -18.14, lon: 178.44 },
+    { n: 30, x: 270, y: 2720, place: "New Caledonia", kind: 'island', label: 'left', lat: -22.27, lon: 166.45 },
+    { n: 31, x: 160, y: 2820, place: "Indonesia", kind: 'island', label: 'right', lat: -8.65, lon: 115.22 }
   ];
   // Coming soon: other Australian cities. Shown as markers only (no trail), so they never look like the route.
   // Canberra is nudged a few pixels clear of the Sydney and Melbourne pins (marked nudged). Brisbane is a stop since 1.9.233.
@@ -702,14 +751,9 @@
     { place: 'Canberra', x: 338, y: 2103, label: 'below', lat: -35.28, lon: 149.13, nudged: true },
     { place: 'Hobart', x: 319, y: 2161, label: 'left', lat: -42.88, lon: 147.33 },
     { place: 'Darwin', x: 179, y: 1827, label: 'left', lat: -12.46, lon: 130.84 },
-    { place: 'Cairns', x: 306, y: 1876, label: 'left', lat: -16.92, lon: 145.77 },
-    // 1.9.234 West Pacific, coming soon: drawn in a small inset inside the Pacific panel (westPacXY), names only.
-    { place: 'Solomon Islands', x: 106, y: 1588, label: 'right', lat: -9.43, lon: 159.95, inset: 'westpac' },
-    { place: 'Vanuatu', x: 204, y: 1637, label: 'left', lat: -17.73, lon: 168.32, inset: 'westpac' },
-    { place: 'New Caledonia', x: 182, y: 1664, label: 'right', lat: -22.27, lon: 166.45, inset: 'westpac' },
-    { place: 'Fiji', x: 322, y: 1640, label: 'right', lat: -18.14, lon: 178.44, inset: 'westpac' }
+    { place: 'Cairns', x: 306, y: 1876, label: 'left', lat: -16.92, lon: 145.77 }
   ];
-  const LV_COUNT = 26;
+  const LV_COUNT = 31;
   function stopForLevel(n) { return MAP_STOPS[(n | 0) - 1] || null; }
   function icingPath(pts) {
     if (!pts || pts.length < 2) return '';
@@ -724,6 +768,13 @@
       d += ' C ' + c1x + ' ' + c1y + ' ' + c2x + ' ' + c2y + ' ' + p2.x + ' ' + p2.y;
     }
     return d;
+  }
+  // The icing only covers stops already cleared. The road ahead stays blank.
+  function beenPath(stars) {
+    stars = stars || [];
+    let n = 0;
+    while (n < MAP_STOPS.length && (stars[n] || 0) > 0) n++;
+    return icingPath(MAP_STOPS.slice(0, n));
   }
   // 1.9.222 Australia outline (from real coastline points; x = lon, y = lat, scaled into the map).
   const AUS_PATH = 'M 28 1932 L 32 1960 L 33 1976 L 38 2004 L 41 2020 L 47 2040 L 47 2058 L 41 2067 L 54 2075 L 67 2075 L 84 2063 L 114 2063 L 136 2045 L 162 2038 L 179 2036 L 196 2043 L 206 2052 L 218 2073 L 226 2062 L 236 2053 L 237 2071 L 243 2073 L 242 2082 L 252 2097 L 261 2108 L 273 2112 L 286 2117 L 296 2109 L 304 2114 L 311 2120 L 321 2108 L 341 2102 L 344 2082 L 353 2062 L 364 2044 L 370 2026 L 373 2005 L 370 1989 L 368 1970 L 355 1954 L 349 1938 L 335 1921 L 325 1910 L 310 1897 L 307 1877 L 303 1860 L 302 1850 L 291 1846 L 285 1828 L 278 1808 L 273 1822 L 270 1840 L 269 1860 L 263 1882 L 252 1881 L 239 1873 L 226 1864 L 218 1855 L 221 1840 L 229 1824 L 220 1822 L 205 1821 L 193 1815 L 181 1823 L 172 1833 L 167 1854 L 155 1858 L 144 1846 L 132 1850 L 120 1868 L 115 1880 L 103 1887 L 95 1903 L 76 1910 L 58 1917 L 46 1921 L 34 1931 Z';
@@ -746,7 +797,7 @@
     }).join('') + '</g>';
   }
   function nzMapSvg() {
-    const live = icingPath(MAP_STOPS);
+    const live = ''; // the icing is filled in from the stops this player has already cleared
     const future = ''; // 1.9.222 coming-soon cities are markers only
     return (
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + MAP_W + ' ' + MAP_H + '" width="' + MAP_W + '" height="' + MAP_H + '" aria-hidden="true" class="nzsvg">' +
@@ -817,7 +868,7 @@
       '<path d="M250 1440 q12 -5 24 0" stroke="#fff" stroke-width="2.5" fill="none" opacity=".7"/>' +
       // 1.9.234 West Pacific inset (coming soon): Solomons, Vanuatu, New Caledonia, Fiji at their real relative spots (westPacXY).
       '<g class="sr-westpac"><rect x="28" y="1554" width="344" height="122" rx="18" fill="#bff5ec" opacity=".55" stroke="#fff" stroke-width="2.5" stroke-dasharray="6 6"/>' +
-      '<text x="358" y="1572" text-anchor="end" font-size="11" font-weight="900" fill="#1b8a7c" font-family="ui-rounded,system-ui,sans-serif">West Pacific · coming soon</text>' +
+      '<text x="358" y="1572" text-anchor="end" font-size="11" font-weight="900" fill="#1b8a7c" font-family="ui-rounded,system-ui,sans-serif">West Pacific</text>' +
       WESTPAC_ISLES.map(function (q) { const a = westPacXY(q[0], q[1]); return '<ellipse cx="' + a.x.toFixed(1) + '" cy="' + a.y.toFixed(1) + '" rx="' + q[2] + '" ry="' + q[3] + '" transform="rotate(' + q[4] + ' ' + a.x.toFixed(1) + ' ' + a.y.toFixed(1) + ')" fill="url(#sr-land)" stroke="#fff" stroke-width="2"/>'; }).join('') +
       '</g>' +
       '</g>' +
@@ -836,7 +887,17 @@
       '<path d="M236 1930 C250 1918 270 1922 276 1936 C264 1944 246 1942 236 1930 Z" fill="#ffd9a8" opacity=".55"/>' +
       '<circle class="sr-bob" cx="380" cy="1860" r="6" fill="#ffb347" opacity=".5"/><circle class="sr-bob" cx="30" cy="2160" r="7" fill="#ff8ab8" opacity=".45"/>' +
       '</g>' +
-      planeAt(220, 1712, 172) + planeAt(180, 2003, -106) +
+      planeAt(220, 1712, 172) + planeAt(180, 2003, -106) + planeAt(330, 2140, 110) +
+      '<g class="sr-countries">' +
+      '<rect x="16" y="2340" width="368" height="540" rx="28" fill="#7fe6dc" opacity=".42" stroke="#fff" stroke-width="4" stroke-dasharray="10 8"/>' +
+      '<rect x="108" y="2324" width="184" height="30" rx="15" fill="#fff" stroke="#3fc1b0" stroke-width="3"/>' +
+      '<text x="200" y="2345" text-anchor="middle" font-size="14" font-weight="900" fill="#1b8a7c" font-family="ui-rounded,system-ui,sans-serif">New countries</text>' +
+      '<ellipse cx="110" cy="2420" rx="38" ry="16" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
+      '<ellipse cx="280" cy="2520" rx="34" ry="14" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
+      '<ellipse cx="120" cy="2620" rx="40" ry="16" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
+      '<ellipse cx="270" cy="2720" rx="42" ry="14" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
+      '<ellipse cx="160" cy="2820" rx="44" ry="18" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
+      '</g>' +
       mapClouds() +
       '<g class="sr-plane" transform="translate(219 1195) rotate(166)"><path d="M0 -14 L3 -4 L14 2 L14 5 L3 2 L2 10 L6 13 L6 15 L0 13 L-6 15 L-6 13 L-2 10 L-3 2 L-14 5 L-14 2 L-3 -4 Z" fill="#fff" stroke="#3d8bfd" stroke-width="1.5"/></g>' +
       '<path id="sr-future" d="' + future + '" fill="none" stroke="#ffb3d3" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 9" opacity=".7"/>' +
@@ -2855,6 +2916,109 @@
         { x: 60, y: 22, w: 12, cls: 'sc-float', d: 7, svg: 'paradise' },
         { x: 20, y: 30, w: 8, cls: 'sc-drift', d: 10, svg: 'gull' },
         { x: 30, y: 6, w: 26, cls: 'sc-drift', d: 22, svg: 'cloud' }
+      ] },
+    // 1.9.235 Solomon Islands: Honiara lagoon and its reef ring.
+    { n: 27, id: 'honiara', place: 'Solomon Islands', title: 'Reef ring, Honiara', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#3fb4ff'], [0.55, '#b8ecff'], [1, '#fff6d6']]) + scGrad('lg', [[0, '#2ec8c0'], [1, '#0e7898']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(80, 90, 0.9, 0.85) + scCloud(280, 140, 0.7, 0.75) +
+          '<circle cx="300" cy="80" r="32" fill="#fff3a0"/>' +
+          '<path d="M0 520 L80 470 L150 510 L230 450 L310 500 L390 460 L390 600 L0 600 Z" fill="#3f9a62"/>' +
+          '<rect y="590" width="390" height="254" fill="url(#lg)"/>' +
+          '<ellipse cx="195" cy="700" rx="120" ry="46" fill="none" stroke="#fff6c8" stroke-width="10" opacity=".85"/>' +
+          '<ellipse cx="195" cy="700" rx="78" ry="28" fill="#7ee0ea" opacity=".55"/>' +
+          '<path d="M0 790 C90 774 180 806 280 784 C340 774 370 780 390 782 L390 844 L0 844 Z" fill="#f6e2b0"/>';
+      },
+      sprites: [
+        { x: 4, y: 78, w: 16, cls: 'sc-sway', d: 4, svg: 'palm' },
+        { x: 82, y: 76, w: 15, cls: 'sc-sway', d: 4.4, dl: -1, svg: 'palm' },
+        { x: 36, y: 78, w: 16, cls: 'sc-bob', d: 3.6, svg: 'vaka' },
+        { x: 18, y: 28, w: 8, cls: 'sc-drift', d: 10, svg: 'gull' },
+        { x: 28, y: 6, w: 24, cls: 'sc-drift', d: 22, svg: 'cloud' }
+      ] },
+    // 1.9.235 Vanuatu: Port Vila waterfront, with a quiet green cone behind the town.
+    { n: 28, id: 'vila', place: 'Vanuatu', title: 'Waterfront, Port Vila', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#5ec4ff'], [0.6, '#d8f4ff'], [1, '#fff4d0']]) + scGrad('lg', [[0, '#49c8d8'], [1, '#147a98']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(70, 110, 0.8, 0.8) +
+          '<circle cx="80" cy="96" r="30" fill="#fff3a0"/>' +
+          '<path d="M250 560 L310 360 L370 560 Z" fill="#6aaa62"/>' +
+          '<path d="M286 430 L310 372 L328 424 Z" fill="#8fd0ea" opacity=".8"/>' +
+          '<rect y="560" width="390" height="150" fill="url(#lg)"/>' +
+          '<path d="M0 700 H390" stroke="#c9894a" stroke-width="10"/>' +
+          '<rect x="40" y="640" width="70" height="60" fill="#f2d2a0"/><path d="M34 640 L75 608 L116 640 Z" fill="#c46a3a"/>' +
+          '<rect x="150" y="650" width="64" height="50" fill="#f6e0b4"/><path d="M144 650 L182 620 L220 650 Z" fill="#d4844a"/>' +
+          '<rect x="56" y="662" width="14" height="18" fill="#7a4a2a"/><rect x="168" y="666" width="12" height="16" fill="#7a4a2a"/>' +
+          '<path d="M0 760 C100 746 200 774 300 752 C350 744 375 748 390 750 L390 844 L0 844 Z" fill="#f4d8a4"/>';
+      },
+      sprites: [
+        { x: 78, y: 80, w: 14, cls: 'sc-sway', d: 4.2, svg: 'palm' },
+        { x: 20, y: 74, w: 16, cls: 'sc-bob', d: 3.2, svg: 'vaka' },
+        { x: 40, y: 24, w: 8, cls: 'sc-drift', d: 11, svg: 'gull' },
+        { x: 8, y: 8, w: 26, cls: 'sc-drift', d: 20, svg: 'cloud' }
+      ] },
+    // 1.9.235 Fiji: a beach bure and white sand.
+    { n: 29, id: 'fiji', place: 'Fiji', title: 'Bula beach, Fiji', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#49b8ff'], [0.5, '#c6f0ff'], [1, '#fff8dc']]) + scGrad('lg', [[0, '#3ad0d4'], [1, '#1288a4']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(240, 100, 0.85, 0.8) +
+          '<circle cx="310" cy="86" r="34" fill="#fff3a0"/>' +
+          '<rect y="560" width="390" height="180" fill="url(#lg)"/>' +
+          '<path d="M40 620 v70 M90 620 v70 M140 620 v70" stroke="#8a5a32" stroke-width="4"/>' +
+          '<path d="M20 620 Q90 540 160 620 Z" fill="#c9843c"/>' +
+          '<path d="M28 618 Q90 560 152 618" fill="none" stroke="#a86a28" stroke-width="6"/>' +
+          '<rect x="70" y="640" width="22" height="36" fill="#6a3e22"/>' +
+          '<path d="M0 740 C80 724 160 756 250 732 C320 718 360 726 390 730 L390 844 L0 844 Z" fill="#fff4d2"/>' +
+          '<path d="M0 790 C120 776 220 804 320 784 C360 776 380 780 390 782 L390 844 L0 844 Z" fill="#ffe8b4"/>';
+      },
+      sprites: [
+        { x: 2, y: 78, w: 16, cls: 'sc-sway', d: 3.8, svg: 'palm' },
+        { x: 70, y: 74, w: 18, cls: 'sc-sway', d: 4.5, dl: -1.2, svg: 'palm' },
+        { x: 48, y: 70, w: 16, cls: 'sc-bob', d: 3.5, svg: 'vaka' },
+        { x: 22, y: 18, w: 8, cls: 'sc-drift', d: 9, svg: 'gull' }
+      ] },
+    // 1.9.235 New Caledonia: Nouméa bay, red roofs and a small lighthouse.
+    { n: 30, id: 'noumea', place: 'New Caledonia', title: 'Bay and lighthouse, Nouméa', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#6ec8f0'], [0.55, '#dff6ff'], [1, '#fff2d4']]) + scGrad('lg', [[0, '#3aa8d8'], [1, '#166090']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(100, 120, 0.8, 0.75) +
+          '<circle cx="70" cy="90" r="28" fill="#fff3a0"/>' +
+          '<path d="M0 500 L70 460 L140 500 L210 450 L280 500 L350 470 L390 490 L390 580 L0 580 Z" fill="#6aaa72"/>' +
+          '<rect y="560" width="390" height="200" fill="url(#lg)"/>' +
+          '<rect x="250" y="470" width="18" height="90" fill="#f4f0e4" stroke="#d8d0c0" stroke-width="2"/>' +
+          '<path d="M246 470 h26 l-4 -16 h-18 Z" fill="#e05848"/>' +
+          '<rect x="268" y="500" width="22" height="10" fill="#fff6a8"/>' +
+          '<rect x="60" y="500" width="46" height="36" fill="#f6e2c4"/><path d="M56 500 L83 478 L110 500 Z" fill="#d85040"/>' +
+          '<rect x="120" y="508" width="40" height="30" fill="#f3d7b0"/><path d="M116 508 L140 488 L164 508 Z" fill="#e06048"/>' +
+          '<path d="M0 760 C100 744 200 776 300 754 C350 746 376 750 390 752 L390 844 L0 844 Z" fill="#f3d7a6"/>';
+      },
+      sprites: [
+        { x: 8, y: 80, w: 14, cls: 'sc-sway', d: 4, svg: 'palm' },
+        { x: 30, y: 76, w: 18, cls: 'sc-bob', d: 3.8, svg: 'vaka' },
+        { x: 55, y: 22, w: 8, cls: 'sc-drift', d: 12, svg: 'gull' },
+        { x: 16, y: 6, w: 24, cls: 'sc-drift', d: 22, svg: 'cloud' }
+      ] },
+    // 1.9.235 Indonesia: Bali rice terraces and a split temple gate above the beach.
+    { n: 31, id: 'bali', place: 'Indonesia', title: 'Temple gate and beach, Bali', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#4eb6ff'], [0.5, '#d2f3ff'], [1, '#fff6d8']]) + scGrad('lg', [[0, '#2ec4c8'], [1, '#0e7090']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(260, 90, 0.75, 0.8) +
+          '<circle cx="300" cy="78" r="32" fill="#fff3a0"/>' +
+          '<path d="M0 430 H390 V470 H0 Z" fill="#7dba58"/>' +
+          '<path d="M0 470 H390 V510 H0 Z" fill="#69a84a"/>' +
+          '<path d="M0 510 H390 V548 H0 Z" fill="#8ec86a"/>' +
+          '<path d="M20 430 H370 M20 470 H370 M20 510 H370" stroke="#f2e2a0" stroke-width="3" opacity=".7"/>' +
+          '<rect x="70" y="548" width="28" height="90" fill="#f4e6c8" stroke="#e0c898" stroke-width="2"/>' +
+          '<rect x="292" y="548" width="28" height="90" fill="#f4e6c8" stroke="#e0c898" stroke-width="2"/>' +
+          '<path d="M60 548 h48 l-6 -22 h-36 Z" fill="#d85040"/><path d="M282 548 h48 l-6 -22 h-36 Z" fill="#d85040"/>' +
+          '<rect y="640" width="390" height="120" fill="url(#lg)"/>' +
+          '<path d="M0 760 C90 744 190 778 290 756 C340 746 370 752 390 754 L390 844 L0 844 Z" fill="#fff1cc"/>';
+      },
+      sprites: [
+        { x: 2, y: 82, w: 14, cls: 'sc-sway', d: 4, svg: 'palm' },
+        { x: 84, y: 80, w: 14, cls: 'sc-sway', d: 4.6, dl: -1, svg: 'palm' },
+        { x: 40, y: 78, w: 16, cls: 'sc-bob', d: 3.4, svg: 'vaka' },
+        { x: 20, y: 16, w: 8, cls: 'sc-drift', d: 10, svg: 'gull' }
       ] }
   ];
   // 1.9.234 "Some clouds": every daytime outdoor scene gets one more soft cloud drifting slowly across the top of the sky
@@ -3082,7 +3246,7 @@
     return true;
   }
 
-  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_STOPS, FUTURE_STOPS, NZ_PROJ, nzXY, WHANGAREI_INSET, insetXY, pacXY, ausXY, westPacXY, LV_COUNT, lvId, levelIds, stopId, LEGACY_220_IDS, migrateProg, stopForLevel, icingPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, bubLeft, liqLeft, spreadLiq, LIQ_IDLE, goalCounts, cloneState, bestMove, hintMoveFor, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
+  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_STOPS, FUTURE_STOPS, NZ_PROJ, nzXY, WHANGAREI_INSET, insetXY, pacXY, ausXY, westPacXY, LV_COUNT, lvId, levelIds, stopId, LEGACY_220_IDS, migrateProg, stopForLevel, icingPath, beenPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, bubLeft, liqLeft, spreadLiq, LIQ_IDLE, goalCounts, cloneState, bestMove, hintMoveFor, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
     allowed: () => true, // 1.9.228 open to every family member
     SAY_REST_MS, SAY_BIG, sayBig, COMBO_KINDS, COMBO_BONUS, comboKind, comboSwap, adjacentSpecials, isSpecialTile, HARD_LINES, hardLine, CANDY_STYLES, candySfxPlan, playCandySfx, SAY_SHOW_MS, SAY_AFTER_MS, sayShowGap, SPEAK_GAP, SPEAK_PITCH, SPEAK_RATE, SPEAK_VOL, pickSpeechVoice, speechGender, speakWorthy, SAY_SPRITES, SAY_CLIPS, sayClip, nextSayVoice, SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL, XF,
     VOICE_FILES, VOICE_RANK, MEDIA_HASH, mediaUrl, gameTrack, SONG_PLAN, SONG_FILES, SONG_FROM, songMood, attachSfxBus, playTone, playChime, playMovesWarnChime, playClip, voiceForStep,
@@ -4916,7 +5080,7 @@
       stage.insertAdjacentHTML('afterbegin', nzMapSvg());
       if (hold && hold.parentNode !== stage) stage.appendChild(hold);
     }
-    const live = icingPath(MAP_STOPS);
+    const live = beenPath(prog.stars);
     const future = '';
     const wide = stage && stage.querySelector('#sr-path-wide');
     const dash = stage && stage.querySelector('#sr-path-dash');
@@ -5772,7 +5936,7 @@
   async function celebrateOnMap(fromN, toN) {
     showMap({ scroll: toN || 'start', behavior: reduce ? 'auto' : 'smooth', keepSong: true });
     await wait(reduce ? 60 : 280);
-    animatePathSegment(fromN, toN);
+    animatePathSegment(fromN > 1 ? fromN - 1 : fromN, fromN);
     await hopRacer(fromN, toN);
     const ov = $('goalnext');
     if (ov && toN && toN <= LV_COUNT && fromN < LV_COUNT) {
