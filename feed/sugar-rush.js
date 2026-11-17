@@ -1,4 +1,4 @@
-/* Info Book 1.9.238 – Sugar Rush, levels 1–31. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.239 – Sugar Rush, levels 1–31. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -202,7 +202,7 @@
       ice: ['00000000', '00011000', '00000000', '00000000', '00000000', '00000000', '00011000', '00000000'],
       help: 'Clear the jelly by the temple gates and crack the 4 icing blocks in the market in 32 moves.',
       badge: { id: 'bali', name: 'Temple Gate', icon: '🌴' } },
-    // 1.9.238 Canberra, then Hobart. Both were map markers; now they are levels.
+    // 1.9.239 Canberra, then Hobart. Both were map markers; now they are levels.
     { n: 32, name: 'Canberra Lake Light', target: 0, moves: 32, stars: [0, 5000, 10000], kinds: 6,
       jelly: ['00000000', '00111100', '01000010', '01000010', '01000010', '01000010', '00111100', '00000000'],
       bub: ['00000000', '00000000', '00011000', '00000000', '00000000', '00011000', '00000000', '00000000'],
@@ -755,18 +755,18 @@
     { n: 25, x: 362, y: 1954, place: "Brisbane", kind: 'city', label: 'left', lat: -27.47, lon: 153.03, nudged: true, via: [{ x: 318, y: 2030 }] },
     // 1.9.234 North across the Coral Sea to Port Moresby, Papua New Guinea (true position; kept east of Cairns).
     { n: 26, x: 318, y: 1794, place: "Port Moresby", kind: 'city', label: 'below', lat: -9.44, lon: 147.18, via: [{ x: 356, y: 1880 }] },
-    // 1.9.238 On the same map as Australia and Papua New Guinea (ausXY), not in a separate panel.
+    // 1.9.239 On the same map as Australia and Papua New Guinea (ausXY), not in a separate panel.
     { n: 27, x: 427, y: 1794, place: "Solomon Islands", kind: 'island', label: 'below', lat: -9.43, lon: 159.95 },
     { n: 28, x: 499, y: 1885, place: "Vanuatu", kind: 'island', label: 'left', lat: -17.73, lon: 168.32 },
     { n: 29, x: 585, y: 1890, place: "Fiji", kind: 'island', label: 'right', lat: -18.14, lon: 178.44 },
     { n: 30, x: 483, y: 1935, place: "New Caledonia", kind: 'island', label: 'below', lat: -22.27, lon: 166.45, via: [{ x: 560, y: 1930 }] },
     { n: 31, x: 45, y: 1785, place: "Indonesia", kind: 'island', label: 'right', lat: -8.65, lon: 115.22, via: [{ x: 520, y: 1748 }, { x: 340, y: 1696 }, { x: 160, y: 1710 }, { x: 80, y: 1748 }] },
-    // 1.9.238 Canberra is nudged clear of the Sydney and Melbourne pins. Hobart sits on Tasmania.
+    // 1.9.239 Canberra is nudged clear of the Sydney and Melbourne pins. Hobart sits on Tasmania.
     { n: 32, x: 338, y: 2103, place: "Canberra", kind: 'city', label: 'below', lat: -35.28, lon: 149.13, nudged: true, via: [{ x: 140, y: 1980 }, { x: 260, y: 2088 }] },
     { n: 33, x: 319, y: 2161, place: "Hobart", kind: 'city', label: 'left', lat: -42.88, lon: 147.33, via: [{ x: 360, y: 2148 }] }
   ];
   // Coming soon: other Australian cities. Shown as markers only (no trail), so they never look like the route.
-  // Brisbane is a stop since 1.9.233. Canberra and Hobart are stops since 1.9.238.
+  // Brisbane is a stop since 1.9.233. Canberra and Hobart are stops since 1.9.239.
   const FUTURE_STOPS = [
     { place: 'Darwin', x: 179, y: 1827, label: 'left', lat: -12.46, lon: 130.84 },
     { place: 'Cairns', x: 306, y: 1876, label: 'left', lat: -16.92, lon: 145.77 }
@@ -811,7 +811,7 @@
   // 1.9.234 Papua New Guinea coast points (lat, lon) and the West Pacific islands (lat, lon, rx, ry, rotate).
   const PNG_PTS = [[-2.6, 141.0], [-3.1, 142.2], [-3.4, 143.5], [-3.9, 144.5], [-4.6, 145.6], [-5.4, 145.8], [-6.0, 147.0], [-6.1, 147.8], [-7.5, 147.7], [-8.3, 148.3], [-9.0, 149.3], [-9.6, 149.9], [-10.3, 150.6], [-10.6, 150.3], [-10.2, 149.7], [-9.9, 148.6], [-9.5, 147.4], [-8.9, 146.6], [-8.0, 145.8], [-7.6, 144.6], [-8.0, 143.6], [-8.6, 143.2], [-9.1, 142.6], [-9.1, 141.0]];
   const NEW_BRITAIN_PTS = [[-5.6, 148.4], [-5.1, 150.0], [-4.3, 151.6], [-4.2, 152.3], [-4.8, 152.0], [-5.6, 150.9], [-6.2, 149.5], [-6.0, 148.5]];
-  // 1.9.238 Islands on the Australia projection: Solomons, Vanuatu, New Caledonia, Fiji, then Bali and the islands just east of it.
+  // 1.9.239 Islands on the Australia projection: Solomons, Vanuatu, New Caledonia, Fiji, then Bali and the islands just east of it.
   const EAST_ISLES = [[-8.1, 157.2, 16, 5, 28], [-9.4, 160.0, 18, 6, 32], [-10.6, 161.5, 12, 5, 30], [-15.4, 167.2, 5, 11, -8], [-17.7, 168.3, 6, 10, 0], [-21.3, 165.5, 26, 7, 38], [-17.8, 178.0, 14, 8, -8], [-16.5, 179.4, 13, 6, -18], [-8.3, 114.4, 9, 5, 18], [-8.65, 115.22, 7, 4, 12], [-8.8, 116.5, 8, 4, 10], [-8.9, 118.0, 12, 5, 6]];
   function ausPath(pts) { return pts.map(function (q, i) { const a = ausXY(q[0], q[1]); return (i ? 'L' : 'M') + a.x.toFixed(1) + ' ' + a.y.toFixed(1); }).join(' ') + ' Z'; }
   // 1.9.234 Soft clouds drifting slowly over the map (CSS .sr-cloud; still under reduced motion). Over sea, clear of the pins.
@@ -3033,7 +3033,7 @@
         { x: 40, y: 78, w: 16, cls: 'sc-bob', d: 3.4, svg: 'vaka' },
         { x: 20, y: 16, w: 8, cls: 'sc-drift', d: 10, svg: 'gull' }
       ] },
-    // 1.9.238 Canberra: a round lake, a low white building and a flag, with autumn trees.
+    // 1.9.239 Canberra: a round lake, a low white building and a flag, with autumn trees.
     { n: 32, id: 'canberra', place: 'Canberra', title: 'Lake and flag, Canberra', night: false,
       art: function () {
         return '<defs>' + scGrad('sk', [[0, '#7ec4f2'], [0.6, '#e7f6ff'], [1, '#fff6e4']]) + '</defs>' +
@@ -3054,7 +3054,7 @@
         { x: 18, y: 20, w: 8, cls: 'sc-drift', d: 11, svg: 'gull' },
         { x: 48, y: 8, w: 24, cls: 'sc-drift', d: 24, svg: 'cloud' }
       ] },
-    // 1.9.238 Hobart: a dark mountain behind a cool harbour and stone warehouses.
+    // 1.9.239 Hobart: a dark mountain behind a cool harbour and stone warehouses.
     { n: 33, id: 'hobart', place: 'Hobart', title: 'Mountain and wharf, Hobart', night: false,
       art: function () {
         return '<defs>' + scGrad('sk', [[0, '#8eb4d4'], [0.55, '#d5e6f2'], [1, '#f3eee4']]) + scGrad('se', [[0, '#4d88b0'], [1, '#2a5878']]) + '</defs>' +
@@ -3766,18 +3766,29 @@
       ctx.restore(); return;
     }
     if (t.ice > 0) {
-      const g = ctx.createLinearGradient(-R, -R, R, R);
-      g.addColorStop(0, t.ice > 1 ? 'rgba(230,248,255,.95)' : 'rgba(210,240,255,.85)');
-      g.addColorStop(1, 'rgba(160,210,240,.8)');
-      ctx.fillStyle = g; rr(-R * .85, -R * .85, R * 1.7, R * 1.7, R * .28); ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = R * .08; rr(-R * .85, -R * .85, R * 1.7, R * 1.7, R * .28); ctx.stroke();
-      drawCandyShine(ctx, R * 0.9, 0.95);
+      // Frosting: a thick white swirl with a drip, darker when it still has two layers.
+      const thick = t.ice > 1;
+      const g = ctx.createRadialGradient(-R * .25, -R * .4, R * .06, 0, R * .05, R * 1.15);
+      g.addColorStop(0, '#ffffff');
+      g.addColorStop(.45, thick ? '#e7f7ff' : '#f4fbff');
+      g.addColorStop(1, thick ? '#7eb6dc' : '#b7dff3');
+      ctx.fillStyle = g; rr(-R * .88, -R * .84, R * 1.76, R * 1.68, R * .34); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-R * .22, R * .5); ctx.quadraticCurveTo(-R * .02, R * 1.08, R * .2, R * .48); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = R * .11; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(0, -R * .02, R * .34, .35, Math.PI * 1.65); ctx.stroke();
+      ctx.strokeStyle = thick ? 'rgba(70,150,200,.6)' : 'rgba(120,180,215,.45)'; ctx.lineWidth = R * .055;
+      ctx.beginPath(); ctx.arc(R * .02, R * .02, R * .16, .2, Math.PI * 1.25); ctx.stroke();
+      drawCandyShine(ctx, R * 0.82, thick ? 1 : .65);
       ctx.restore(); return;
     }
     if (t.choco) {
-      ctx.fillStyle = '#6b3a1f'; rr(-R * .85, -R * .85, R * 1.7, R * 1.7, R * .2); ctx.fill();
-      ctx.fillStyle = '#4a2414'; rr(-R * .6, -R * .6, R * 1.2, R * 1.2, R * .12); ctx.fill();
-      drawCandyShine(ctx, R * 0.85, 0.8);
+      const g = ctx.createLinearGradient(-R, -R, R, R * .6);
+      g.addColorStop(0, '#a86a3c'); g.addColorStop(.45, '#6b3a1f'); g.addColorStop(1, '#3a1c10');
+      ctx.fillStyle = g; rr(-R * .86, -R * .86, R * 1.72, R * 1.72, R * .24); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,214,170,.4)'; ctx.lineWidth = R * .06; ctx.beginPath();
+      ctx.moveTo(-R * .62, 0); ctx.lineTo(R * .62, 0); ctx.moveTo(0, -R * .62); ctx.lineTo(0, R * .62); ctx.stroke();
+      ctx.fillStyle = 'rgba(90,40,18,.45)'; ctx.beginPath(); ctx.ellipse(R * .1, R * .55, R * .28, R * .1, 0, 0, Math.PI * 2); ctx.fill();
+      drawCandyShine(ctx, R * 0.8, 0.9);
       ctx.restore(); return;
     }
     if (t.c < 0) {
@@ -3942,6 +3953,36 @@
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, W);
   }
+  // 1.9.239 Each open tile is a little glass well. Jelly is a glossy dome; two layers read darker.
+  function drawTile(x, y, s, jelly, blush) {
+    const rad = s * .2;
+    ctx.fillStyle = 'rgba(176, 64, 112, .16)';
+    rr(x + 2, y + 4, s - 4, s - 5, rad); ctx.fill();
+    if (jelly) {
+      const deep = jelly >= 2;
+      const g = ctx.createLinearGradient(x, y, x, y + s);
+      g.addColorStop(0, deep ? 'rgba(255,186,236,.86)' : 'rgba(255,168,214,.74)');
+      g.addColorStop(1, deep ? 'rgba(132, 28, 160, .62)' : 'rgba(226, 48, 132, .48)');
+      ctx.fillStyle = g;
+      rr(x + 1.6, y + 1.6, s - 3.2, s - 3.2, rad); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.5)';
+      ctx.beginPath(); ctx.ellipse(x + s * .48, y + s * .3, s * .26, s * .09, -.3, 0, Math.PI * 2); ctx.fill();
+      if (deep) {
+        ctx.fillStyle = 'rgba(96, 16, 128, .28)';
+        rr(x + s * .16, y + s * .18, s * .68, s * .64, rad * .6); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,.42)';
+        ctx.beginPath(); ctx.ellipse(x + s * .44, y + s * .36, s * .14, s * .05, -.4, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.strokeStyle = deep ? 'rgba(110, 20, 150, .55)' : 'rgba(214, 40, 120, .4)';
+      ctx.lineWidth = Math.max(1.5, 1.4 * DPR);
+      rr(x + 4, y + 4, s - 8, s - 8, rad * .8); ctx.stroke();
+    } else {
+      ctx.fillStyle = blush ? 'rgba(255,255,255,.8)' : 'rgba(255,214,232,.72)';
+      rr(x + 1.6, y + 1.6, s - 3.2, s - 3.2, rad); ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(255,255,255,.55)';
+    rr(x + s * .16, y + s * .07, s * .66, s * .1, s * .05); ctx.fill();
+  }
   function frame() {
     if (screen === 'game' && st) {
       const t = sparkleHoldT != null ? sparkleHoldT : now();
@@ -3953,12 +3994,7 @@
           if (sarah) drawHeart(c * CS + CS / 2, r * CS + CS / 2, CS * .018, 'rgba(255,140,180,.22)');
           continue;
         }
-        const jelly = st.jelly ? (st.jelly[r][c] || 0) : 0;
-        // Candy-glass tiles: the scene shows faintly through the board.
-        ctx.fillStyle = jelly >= 2 ? 'rgba(180,80,200,.42)' : jelly === 1 ? 'rgba(255,120,190,.36)' : ((r + c) % 2 ? 'rgba(255,255,255,.52)' : 'rgba(255,232,244,.66)');
-        rr(c * CS + 1.5, r * CS + 1.5, CS - 3, CS - 3, CS * .18); ctx.fill();
-        ctx.fillStyle = 'rgba(255,255,255,.4)'; rr(c * CS + CS * .14, r * CS + 3, CS * .72, CS * .12, CS * .06); ctx.fill();
-        if (jelly) { ctx.strokeStyle = jelly >= 2 ? 'rgba(140,40,180,.55)' : 'rgba(230,70,150,.45)'; ctx.lineWidth = 2 * DPR; rr(c * CS + 4, r * CS + 4, CS - 8, CS - 8, CS * .16); ctx.stroke(); }
+        drawTile(c * CS, r * CS, CS, st.jelly ? (st.jelly[r][c] || 0) : 0, (r + c) % 2);
       }
       if (sel && !busy) { ctx.strokeStyle = '#ff4f9a'; ctx.lineWidth = 3 * DPR; rr(sel[1] * CS + 3, sel[0] * CS + 3, CS - 6, CS - 6, CS * .2); ctx.stroke(); }
       for (const f of fx) if (f.type === 'beam') {
@@ -4056,8 +4092,7 @@
         for (const key of lit) {
           const r = +key.split(',')[0], c = +key.split(',')[1];
           const jelly = st.jelly ? (st.jelly[r][c] || 0) : 0;
-          ctx.fillStyle = jelly ? 'rgba(255,120,190,.28)' : ((r + c) % 2 ? 'rgba(255,255,255,.7)' : 'rgba(255,228,240,.85)');
-          rr(c * CS + 1.5, r * CS + 1.5, CS - 3, CS - 3, CS * .18); ctx.fill();
+          drawTile(c * CS, r * CS, CS, jelly, (r + c) % 2);
         }
         const R2 = CS * .37;
         for (const s of sprites.values()) {
