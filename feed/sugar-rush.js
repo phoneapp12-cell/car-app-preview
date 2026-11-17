@@ -1,4 +1,4 @@
-/* Info Book 1.9.236 – Sugar Rush, levels 1–31. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.237 – Sugar Rush, levels 1–31. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -707,7 +707,7 @@
   function westPacXY(lat, lon) { return { x: 60 + (lon - 156) * 280 / 24, y: 1580 + (-lat - 8) * 88 / 15 }; }
   function pacXY(lat, lon) { return { x: 70 + 16.86 * (((lon % 360) + 360) % 360 - 184.8), y: 1350 + 21.6 * (-lat - 13.83) }; }
   function ausXY(lat, lon) { return { x: 8.533 * lon - 937.8, y: 1808 + 10.97 * (-lat - 10.707) }; }
-  const MAP_W = 400, MAP_H = 2960;
+  const MAP_W = 640, MAP_H = 2240;
   const MAP_STOPS = [
     { n: 1, x: 148, y: 432, place: "Onerahi", kind: 'town', label: 'left', lat: -35.77, lon: 174.37, inset: 'whangarei' },
     { n: 2, x: 204, y: 432, place: "Sarah's House", kind: 'house', label: 'below', lat: -35.762, lon: 174.385, inset: 'whangarei', nudged: true },
@@ -738,12 +738,12 @@
     { n: 25, x: 362, y: 1954, place: "Brisbane", kind: 'city', label: 'left', lat: -27.47, lon: 153.03, nudged: true, via: [{ x: 318, y: 2030 }] },
     // 1.9.234 North across the Coral Sea to Port Moresby, Papua New Guinea (true position; kept east of Cairns).
     { n: 26, x: 318, y: 1794, place: "Port Moresby", kind: 'city', label: 'below', lat: -9.44, lon: 147.18, via: [{ x: 356, y: 1880 }] },
-    // 1.9.235 New countries, drawn in their own panel below Australia (one level each).
-    { n: 27, x: 110, y: 2420, place: "Solomon Islands", kind: 'island', label: 'right', lat: -9.43, lon: 159.95, via: [{ x: 360, y: 2100 }, { x: 300, y: 2320 }, { x: 180, y: 2380 }] },
-    { n: 28, x: 280, y: 2520, place: "Vanuatu", kind: 'island', label: 'left', lat: -17.73, lon: 168.32 },
-    { n: 29, x: 120, y: 2620, place: "Fiji", kind: 'island', label: 'right', lat: -18.14, lon: 178.44 },
-    { n: 30, x: 270, y: 2720, place: "New Caledonia", kind: 'island', label: 'left', lat: -22.27, lon: 166.45 },
-    { n: 31, x: 160, y: 2820, place: "Indonesia", kind: 'island', label: 'right', lat: -8.65, lon: 115.22 }
+    // 1.9.237 On the same map as Australia and Papua New Guinea (ausXY), not in a separate panel.
+    { n: 27, x: 427, y: 1794, place: "Solomon Islands", kind: 'island', label: 'below', lat: -9.43, lon: 159.95 },
+    { n: 28, x: 499, y: 1885, place: "Vanuatu", kind: 'island', label: 'left', lat: -17.73, lon: 168.32 },
+    { n: 29, x: 585, y: 1890, place: "Fiji", kind: 'island', label: 'right', lat: -18.14, lon: 178.44 },
+    { n: 30, x: 483, y: 1935, place: "New Caledonia", kind: 'island', label: 'below', lat: -22.27, lon: 166.45, via: [{ x: 560, y: 1930 }] },
+    { n: 31, x: 45, y: 1785, place: "Indonesia", kind: 'island', label: 'right', lat: -8.65, lon: 115.22, via: [{ x: 520, y: 1748 }, { x: 340, y: 1696 }, { x: 160, y: 1710 }, { x: 80, y: 1748 }] }
   ];
   // Coming soon: other Australian cities. Shown as markers only (no trail), so they never look like the route.
   // Canberra is nudged a few pixels clear of the Sydney and Melbourne pins (marked nudged). Brisbane is a stop since 1.9.233.
@@ -793,7 +793,8 @@
   // 1.9.234 Papua New Guinea coast points (lat, lon) and the West Pacific islands (lat, lon, rx, ry, rotate).
   const PNG_PTS = [[-2.6, 141.0], [-3.1, 142.2], [-3.4, 143.5], [-3.9, 144.5], [-4.6, 145.6], [-5.4, 145.8], [-6.0, 147.0], [-6.1, 147.8], [-7.5, 147.7], [-8.3, 148.3], [-9.0, 149.3], [-9.6, 149.9], [-10.3, 150.6], [-10.6, 150.3], [-10.2, 149.7], [-9.9, 148.6], [-9.5, 147.4], [-8.9, 146.6], [-8.0, 145.8], [-7.6, 144.6], [-8.0, 143.6], [-8.6, 143.2], [-9.1, 142.6], [-9.1, 141.0]];
   const NEW_BRITAIN_PTS = [[-5.6, 148.4], [-5.1, 150.0], [-4.3, 151.6], [-4.2, 152.3], [-4.8, 152.0], [-5.6, 150.9], [-6.2, 149.5], [-6.0, 148.5]];
-  const WESTPAC_ISLES = [[-8.0, 157.5, 9, 3, 30], [-9.0, 160.5, 10, 3, 30], [-10.0, 161.6, 7, 2.5, 30], [-15.5, 167.1, 3, 6, -10], [-17.7, 168.4, 3, 4, 0], [-21.4, 165.6, 16, 4, 35], [-17.8, 178.0, 6, 4, 0], [-16.6, 179.2, 7, 3, -20]];
+  // 1.9.237 Islands on the Australia projection: Solomons, Vanuatu, New Caledonia, Fiji, then Bali and the islands just east of it.
+  const EAST_ISLES = [[-8.1, 157.2, 16, 5, 28], [-9.4, 160.0, 18, 6, 32], [-10.6, 161.5, 12, 5, 30], [-15.4, 167.2, 5, 11, -8], [-17.7, 168.3, 6, 10, 0], [-21.3, 165.5, 26, 7, 38], [-17.8, 178.0, 14, 8, -8], [-16.5, 179.4, 13, 6, -18], [-8.3, 114.4, 9, 5, 18], [-8.65, 115.22, 7, 4, 12], [-8.8, 116.5, 8, 4, 10], [-8.9, 118.0, 12, 5, 6]];
   function ausPath(pts) { return pts.map(function (q, i) { const a = ausXY(q[0], q[1]); return (i ? 'L' : 'M') + a.x.toFixed(1) + ' ' + a.y.toFixed(1); }).join(' ') + ' Z'; }
   // 1.9.234 Soft clouds drifting slowly over the map (CSS .sr-cloud; still under reduced motion). Over sea, clear of the pins.
   const MAP_CLOUDS = [[330, 140, 1, 26], [40, 640, 0.8, 34], [350, 860, 0.9, 30], [60, 1120, 1.1, 38], [330, 1200, 0.8, 28], [64, 1722, 0.7, 32], [40, 1880, 0.9, 36], [370, 2200, 0.8, 30]];
@@ -874,11 +875,6 @@
       '<path d="M323 1507 l9 -9 5 11 Z" fill="#7ac77a"/>' +
       [[102, 1339], [150, 1354], [94, 1522], [350, 1503]].map(function (q) { return '<path d="M' + q[0] + ' ' + q[1] + ' v-12 M' + q[0] + ' ' + (q[1] - 12) + ' q-6 -2 -9 3 M' + q[0] + ' ' + (q[1] - 12) + ' q6 -2 9 3 M' + q[0] + ' ' + (q[1] - 12) + ' q-2 -6 -7 -6 M' + q[0] + ' ' + (q[1] - 12) + ' q2 -6 7 -6" stroke="#2f9a5a" stroke-width="2.4" fill="none" stroke-linecap="round"/>'; }).join('') +
       '<path d="M250 1440 q12 -5 24 0" stroke="#fff" stroke-width="2.5" fill="none" opacity=".7"/>' +
-      // 1.9.234 West Pacific inset (coming soon): Solomons, Vanuatu, New Caledonia, Fiji at their real relative spots (westPacXY).
-      '<g class="sr-westpac"><rect x="28" y="1554" width="344" height="122" rx="18" fill="#bff5ec" opacity=".55" stroke="#fff" stroke-width="2.5" stroke-dasharray="6 6"/>' +
-      '<text x="358" y="1572" text-anchor="end" font-size="11" font-weight="900" fill="#1b8a7c" font-family="ui-rounded,system-ui,sans-serif">West Pacific</text>' +
-      WESTPAC_ISLES.map(function (q) { const a = westPacXY(q[0], q[1]); return '<ellipse cx="' + a.x.toFixed(1) + '" cy="' + a.y.toFixed(1) + '" rx="' + q[2] + '" ry="' + q[3] + '" transform="rotate(' + q[4] + ' ' + a.x.toFixed(1) + ' ' + a.y.toFixed(1) + ')" fill="url(#sr-land)" stroke="#fff" stroke-width="2"/>'; }).join('') +
-      '</g>' +
       '</g>' +
       // A little plane on the flight out of Dunedin
       // 1.9.222 Australia: same full-screen style as New Zealand, with Tasmania and a heading pill.
@@ -891,24 +887,15 @@
       '<path filter="url(#sr-soft)" fill="#ffd3e4" stroke="#fff" stroke-width="5" stroke-linejoin="round" d="' + ausPath(PNG_PTS) + '"/>' +
       '<path fill="#ffd3e4" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="' + ausPath(NEW_BRITAIN_PTS) + '"/>' +
       '<text x="306" y="1711" text-anchor="middle" font-size="10" font-weight="900" fill="#2f7a4a" font-family="ui-rounded,system-ui,sans-serif">Papua New Guinea</text>' +
+      EAST_ISLES.map(function (q) { const a = ausXY(q[0], q[1]); return '<ellipse cx="' + a.x.toFixed(1) + '" cy="' + a.y.toFixed(1) + '" rx="' + q[2] + '" ry="' + q[3] + '" transform="rotate(' + q[4] + ' ' + a.x.toFixed(1) + ' ' + a.y.toFixed(1) + ')" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>'; }).join('') +
       '<path d="M120 1960 C150 1940 190 1950 210 1980 C190 1990 150 1990 120 1960 Z" fill="#ffd9a8" opacity=".6"/>' +
       '<path d="M236 1930 C250 1918 270 1922 276 1936 C264 1944 246 1942 236 1930 Z" fill="#ffd9a8" opacity=".55"/>' +
       '<circle class="sr-bob" cx="380" cy="1860" r="6" fill="#ffb347" opacity=".5"/><circle class="sr-bob" cx="30" cy="2160" r="7" fill="#ff8ab8" opacity=".45"/>' +
       '</g>' +
       planeAt(220, 1712, 172) + planeAt(180, 2003, -106) + planeAt(330, 2140, 110) +
-      '<g class="sr-countries">' +
-      '<rect x="16" y="2340" width="368" height="540" rx="28" fill="#7fe6dc" opacity=".42" stroke="#fff" stroke-width="4" stroke-dasharray="10 8"/>' +
-      '<rect x="108" y="2324" width="184" height="30" rx="15" fill="#fff" stroke="#3fc1b0" stroke-width="3"/>' +
-      '<text x="200" y="2345" text-anchor="middle" font-size="14" font-weight="900" fill="#1b8a7c" font-family="ui-rounded,system-ui,sans-serif">New countries</text>' +
-      '<ellipse cx="110" cy="2420" rx="38" ry="16" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
-      '<ellipse cx="280" cy="2520" rx="34" ry="14" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
-      '<ellipse cx="120" cy="2620" rx="40" ry="16" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
-      '<ellipse cx="270" cy="2720" rx="42" ry="14" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
-      '<ellipse cx="160" cy="2820" rx="44" ry="18" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
-      '</g>' +
       mapClouds() +
       '<g class="sr-plane" transform="translate(219 1195) rotate(166)"><path d="M0 -14 L3 -4 L14 2 L14 5 L3 2 L2 10 L6 13 L6 15 L0 13 L-6 15 L-6 13 L-2 10 L-3 2 L-14 5 L-14 2 L-3 -4 Z" fill="#fff" stroke="#3d8bfd" stroke-width="1.5"/></g>' +
-      '<path id="sr-future" d="' + future + '" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="1.2 9" opacity=".34"/>' +
+      '<path id="sr-future" d="' + future + '" fill="none" stroke="#1565b0" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="2.4 8" opacity=".95"/>' +
       '<path id="sr-path-wide" d="' + live + '" fill="none" stroke="url(#sr-icing)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>' +
       '<path id="sr-path-dash" d="' + live + '" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 10" opacity=".9"/>' +
       '<path id="sr-path-win" d="" fill="none" stroke="#fff6a8" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>' +
