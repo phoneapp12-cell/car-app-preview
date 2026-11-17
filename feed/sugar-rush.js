@@ -1,4 +1,4 @@
-/* Info Book 1.9.235 – Sugar Rush, levels 1–31. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.236 – Sugar Rush, levels 1–31. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -769,12 +769,20 @@
     }
     return d;
   }
-  // The icing only covers stops already cleared. The road ahead stays blank.
-  function beenPath(stars) {
+  // The icing only covers stops already cleared. The road still to come is a faint dotted line.
+  function clearedCount(stars) {
     stars = stars || [];
     let n = 0;
     while (n < MAP_STOPS.length && (stars[n] || 0) > 0) n++;
-    return icingPath(MAP_STOPS.slice(0, n));
+    return n;
+  }
+  function beenPath(stars) {
+    return icingPath(MAP_STOPS.slice(0, clearedCount(stars)));
+  }
+  function aheadPath(stars) {
+    const n = clearedCount(stars);
+    if (n >= MAP_STOPS.length) return '';
+    return icingPath(MAP_STOPS.slice(Math.max(0, n - 1)));
   }
   // 1.9.222 Australia outline (from real coastline points; x = lon, y = lat, scaled into the map).
   const AUS_PATH = 'M 28 1932 L 32 1960 L 33 1976 L 38 2004 L 41 2020 L 47 2040 L 47 2058 L 41 2067 L 54 2075 L 67 2075 L 84 2063 L 114 2063 L 136 2045 L 162 2038 L 179 2036 L 196 2043 L 206 2052 L 218 2073 L 226 2062 L 236 2053 L 237 2071 L 243 2073 L 242 2082 L 252 2097 L 261 2108 L 273 2112 L 286 2117 L 296 2109 L 304 2114 L 311 2120 L 321 2108 L 341 2102 L 344 2082 L 353 2062 L 364 2044 L 370 2026 L 373 2005 L 370 1989 L 368 1970 L 355 1954 L 349 1938 L 335 1921 L 325 1910 L 310 1897 L 307 1877 L 303 1860 L 302 1850 L 291 1846 L 285 1828 L 278 1808 L 273 1822 L 270 1840 L 269 1860 L 263 1882 L 252 1881 L 239 1873 L 226 1864 L 218 1855 L 221 1840 L 229 1824 L 220 1822 L 205 1821 L 193 1815 L 181 1823 L 172 1833 L 167 1854 L 155 1858 L 144 1846 L 132 1850 L 120 1868 L 115 1880 L 103 1887 L 95 1903 L 76 1910 L 58 1917 L 46 1921 L 34 1931 Z';
@@ -900,7 +908,7 @@
       '</g>' +
       mapClouds() +
       '<g class="sr-plane" transform="translate(219 1195) rotate(166)"><path d="M0 -14 L3 -4 L14 2 L14 5 L3 2 L2 10 L6 13 L6 15 L0 13 L-6 15 L-6 13 L-2 10 L-3 2 L-14 5 L-14 2 L-3 -4 Z" fill="#fff" stroke="#3d8bfd" stroke-width="1.5"/></g>' +
-      '<path id="sr-future" d="' + future + '" fill="none" stroke="#ffb3d3" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 9" opacity=".7"/>' +
+      '<path id="sr-future" d="' + future + '" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="1.2 9" opacity=".34"/>' +
       '<path id="sr-path-wide" d="' + live + '" fill="none" stroke="url(#sr-icing)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>' +
       '<path id="sr-path-dash" d="' + live + '" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 10" opacity=".9"/>' +
       '<path id="sr-path-win" d="" fill="none" stroke="#fff6a8" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>' +
@@ -3246,7 +3254,7 @@
     return true;
   }
 
-  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_STOPS, FUTURE_STOPS, NZ_PROJ, nzXY, WHANGAREI_INSET, insetXY, pacXY, ausXY, westPacXY, LV_COUNT, lvId, levelIds, stopId, LEGACY_220_IDS, migrateProg, stopForLevel, icingPath, beenPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, bubLeft, liqLeft, spreadLiq, LIQ_IDLE, goalCounts, cloneState, bestMove, hintMoveFor, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
+  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_STOPS, FUTURE_STOPS, NZ_PROJ, nzXY, WHANGAREI_INSET, insetXY, pacXY, ausXY, westPacXY, LV_COUNT, lvId, levelIds, stopId, LEGACY_220_IDS, migrateProg, stopForLevel, icingPath, beenPath, aheadPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, bubLeft, liqLeft, spreadLiq, LIQ_IDLE, goalCounts, cloneState, bestMove, hintMoveFor, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
     allowed: () => true, // 1.9.228 open to every family member
     SAY_REST_MS, SAY_BIG, sayBig, COMBO_KINDS, COMBO_BONUS, comboKind, comboSwap, adjacentSpecials, isSpecialTile, HARD_LINES, hardLine, CANDY_STYLES, candySfxPlan, playCandySfx, SAY_SHOW_MS, SAY_AFTER_MS, sayShowGap, SPEAK_GAP, SPEAK_PITCH, SPEAK_RATE, SPEAK_VOL, pickSpeechVoice, speechGender, speakWorthy, SAY_SPRITES, SAY_CLIPS, sayClip, nextSayVoice, SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL, XF,
     VOICE_FILES, VOICE_RANK, MEDIA_HASH, mediaUrl, gameTrack, SONG_PLAN, SONG_FILES, SONG_FROM, songMood, attachSfxBus, playTone, playChime, playMovesWarnChime, playClip, voiceForStep,
@@ -5081,7 +5089,7 @@
       if (hold && hold.parentNode !== stage) stage.appendChild(hold);
     }
     const live = beenPath(prog.stars);
-    const future = '';
+    const future = aheadPath(prog.stars);
     const wide = stage && stage.querySelector('#sr-path-wide');
     const dash = stage && stage.querySelector('#sr-path-dash');
     const fut = stage && stage.querySelector('#sr-future');
