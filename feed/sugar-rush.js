@@ -1,4 +1,4 @@
-/* Info Book 1.9.242 – Sugar Rush, levels 1–31. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.243 – Sugar Rush, levels 1–31. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -202,7 +202,7 @@
       ice: ['00000000', '00011000', '00000000', '00000000', '00000000', '00000000', '00011000', '00000000'],
       help: 'Clear the jelly by the temple gates and crack the 4 icing blocks in the market in 32 moves.',
       badge: { id: 'bali', name: 'Temple Gate', icon: '🌴' } },
-    // 1.9.242 Canberra, then Hobart. Both were map markers; now they are levels.
+    // 1.9.243 Canberra, then Hobart. Both were map markers; now they are levels.
     { n: 32, name: 'Canberra Lake Light', target: 0, moves: 32, stars: [0, 5000, 10000], kinds: 6,
       jelly: ['00000000', '00111100', '01000010', '01000010', '01000010', '01000010', '00111100', '00000000'],
       bub: ['00000000', '00000000', '00011000', '00000000', '00000000', '00011000', '00000000', '00000000'],
@@ -212,7 +212,34 @@
       jelly: ['00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '11111111', '11111111'],
       ice: ['11000011', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000'],
       help: 'Clear the jelly along the wharf and crack the 4 icing blocks on the mountain in 34 moves.',
-      badge: { id: 'hobart', name: 'Mountain Apple', icon: '🍎' } }
+      badge: { id: 'hobart', name: 'Mountain Apple', icon: '🍎' } },
+    // 1.9.243 Next countries west of Indonesia, on the same latitude and longitude scale.
+    { n: 34, name: 'Saigon Lanterns', target: 0, moves: 30, stars: [0, 5200, 10400], kinds: 6,
+      jelly: ['00000000', '00111100', '01000010', '01000010', '01000010', '01000010', '00111100', '00000000'],
+      bub: ['00000000', '00000000', '00011000', '00000000', '00000000', '00011000', '00000000', '00000000'],
+      help: 'Clear the lantern-ring jelly along the river and pop the 4 sugar bubbles in 30 moves.',
+      badge: { id: 'saigon', name: 'River Lantern', icon: '🏮' } },
+    { n: 35, name: 'Kuala Lumpur Market', target: 0, moves: 32, stars: [0, 5300, 10600], kinds: 6,
+      jelly: ['11000011', '10000001', '00000000', '00000000', '00000000', '00000000', '10000001', '11000011'],
+      ice: ['00000000', '00011000', '00000000', '00000000', '00000000', '00000000', '00011000', '00000000'],
+      help: 'Clear the jelly by the market gates and crack the 4 icing blocks in 32 moves.',
+      badge: { id: 'nightmarket', name: 'Night Market', icon: '🌙' } },
+    { n: 36, name: 'Bangkok Temple', target: 0, moves: 24, stars: [0, 5400, 10800], kinds: 6,
+      jelly: ['00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '11111111', '11111111'],
+      bub: ['00000000', '00000000', '10000001', '01000010', '00000000', '00000000', '00000000', '00000000'],
+      locks: ['00000000', '00000000', '00000000', '00000000', '00011000', '00000000', '00000000', '00000000'],
+      help: 'Clear the jelly along the river steps, pop the 4 sugar bubbles and free the 2 locked jars in 24 moves.',
+      badge: { id: 'lotus', name: 'Temple Lotus', icon: '🪷' } },
+    { n: 37, name: 'Yangon Pagoda', target: 0, moves: 32, stars: [0, 5500, 11000], kinds: 6,
+      ings: [[0, 2], [0, 5]], ingIcon: '🌼',
+      ice: ['00000000', '00000000', '00011000', '00000000', '00000000', '00000000', '00011000', '00000000'],
+      help: 'Bring both flowers down to the pagoda and crack the 4 icing blocks in 32 moves.',
+      badge: { id: 'pagoda', name: 'Golden Pagoda', icon: '🛕' } },
+    { n: 38, name: 'Delhi Sweets', target: 0, moves: 34, stars: [0, 5600, 11200], kinds: 6,
+      jelly: ['00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '11111111', '11111111'],
+      ice: ['11000011', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000'],
+      help: 'Clear the jelly along the market and crack the 4 icing blocks by the gate in 34 moves.',
+      badge: { id: 'indiagate', name: 'India Gate', icon: '🪔' } }
   ];
 
 
@@ -250,7 +277,12 @@
     { icon: '⛵', goal: 'Clear the bay jelly, free the jars and pop the bubbles', detail: 'Clear the jelly across the bay, free the 4 locked jars and pop the 2 sugar bubbles in 30 moves.', tip: 'The harbour arch splits the middle. Work above and below it.', mechanic: 'bay' },
     { icon: '🌴', goal: 'Clear the gate jelly and crack the market icing', detail: 'Clear the jelly by the temple gates and crack the 4 icing blocks in the market in 32 moves.', tip: 'The jelly sits in the four corners, like the gates. The icing is just inside each pair.', mechanic: 'gates' },
     { icon: '🚩', goal: 'Clear the lake jelly and pop the bubbles', detail: 'Clear the jelly around the lake and pop the 4 sugar bubbles on the water in 32 moves.', tip: 'The jelly is a ring around the lake. Pop one bubble and the one beside it follows.', mechanic: 'lake' },
-    { icon: '🍎', goal: 'Clear the wharf jelly and crack the mountain icing', detail: 'Clear the jelly along the wharf and crack the 4 icing blocks on the mountain in 34 moves.', tip: 'The icing sits in the top corners, like the mountain. The jelly is the wharf along the bottom.', mechanic: 'wharf' }
+    { icon: '🍎', goal: 'Clear the wharf jelly and crack the mountain icing', detail: 'Clear the jelly along the wharf and crack the 4 icing blocks on the mountain in 34 moves.', tip: 'The icing sits in the top corners, like the mountain. The jelly is the wharf along the bottom.', mechanic: 'wharf' },
+    { icon: '🏮', goal: 'Clear the lantern jelly and pop the bubbles', detail: 'Clear the lantern-ring jelly along the river and pop the 4 sugar bubbles in 30 moves.', tip: 'The jelly is a ring. Pop one bubble and the one beside it follows.', mechanic: 'reef' },
+    { icon: '🌙', goal: 'Clear the market jelly and crack the icing', detail: 'Clear the jelly by the market gates and crack the 4 icing blocks in 32 moves.', tip: 'The jelly sits in the four corners, like the gates. The icing is just inside each pair.', mechanic: 'gates' },
+    { icon: '🪷', goal: 'Clear the river jelly, pop the bubbles and free the jars', detail: 'Clear the jelly along the river steps, pop 4 sugar bubbles and free 2 locked jars in 24 moves.', tip: 'The jelly sits along the bottom two rows. The jars are in the middle.', mechanic: 'village' },
+    { icon: '🌼', goal: 'Bring both flowers down and crack the icing', detail: 'Bring both flowers down to the pagoda and crack the 4 icing blocks in 32 moves.', tip: 'Match under each flower to drop it. The icing sits in two pairs on the way down.', mechanic: 'market' },
+    { icon: '🪔', goal: 'Clear the market jelly and crack the gate icing', detail: 'Clear the jelly along the market and crack the 4 icing blocks by the gate in 34 moves.', tip: 'The icing sits in the top corners, like the gate. The jelly is the market along the bottom.', mechanic: 'wharf' }
   ];
   function levelIntro(n, p) {
     const lv = LEVELS[(n | 0) - 1]; if (!lv) return null;
@@ -695,7 +727,17 @@
     32: [{ id: 'recap32', kind: 'recap', title: 'Canberra', bubble: 'A lake, a flag and autumn trees.',
       items: [{ icon: '💜', text: 'Clear the jelly around the lake' }, { icon: '🫧', text: 'Pop the sugar bubbles' }] }],
     33: [{ id: 'recap33', kind: 'recap', title: 'Hobart', bubble: 'The mountain behind the wharf.',
-      items: [{ icon: '💜', text: 'Clear the wharf jelly' }, { icon: '🧁', text: 'Crack the mountain icing' }] }]
+      items: [{ icon: '💜', text: 'Clear the wharf jelly' }, { icon: '🧁', text: 'Crack the mountain icing' }] }],
+    34: [{ id: 'recap34', kind: 'recap', title: 'Vietnam', bubble: 'Saigon: lanterns along the river.',
+      items: [{ icon: '💜', text: 'Clear the lantern-ring jelly' }, { icon: '🫧', text: 'Pop the sugar bubbles' }] }],
+    35: [{ id: 'recap35', kind: 'recap', title: 'Malaysia', bubble: 'Kuala Lumpur: a night market.',
+      items: [{ icon: '💜', text: 'Clear the jelly by the gates' }, { icon: '🧁', text: 'Crack the market icing' }] }],
+    36: [{ id: 'recap36', kind: 'recap', title: 'Thailand', bubble: 'Bangkok: a temple beside the river.',
+      items: [{ icon: '💜', text: 'Clear the jelly along the steps' }, { icon: '🫧', text: 'Pop the sugar bubbles' }, { icon: '🔒', text: 'Free the locked jars' }] }],
+    37: [{ id: 'recap37', kind: 'recap', title: 'Myanmar', bubble: 'Yangon: flowers on the way to the pagoda.',
+      items: [{ icon: '🌼', text: 'Bring both flowers down' }, { icon: '🧁', text: 'Crack the icing' }] }],
+    38: [{ id: 'recap38', kind: 'recap', title: 'India', bubble: 'Delhi: sweets by the gate.',
+      items: [{ icon: '💜', text: 'Clear the market jelly' }, { icon: '🧁', text: 'Crack the gate icing' }] }]
   };
   function tutorialFor(n) { return TUTORIALS[n] || null; }
 
@@ -724,7 +766,9 @@
   function westPacXY(lat, lon) { return { x: 60 + (lon - 156) * 280 / 24, y: 1580 + (-lat - 8) * 88 / 15 }; }
   function pacXY(lat, lon) { return { x: 70 + 16.86 * (((lon % 360) + 360) % 360 - 184.8), y: 1350 + 21.6 * (-lat - 13.83) }; }
   function ausXY(lat, lon) { return { x: 8.533 * lon - 937.8, y: 1808 + 10.97 * (-lat - 10.707) }; }
-  const MAP_W = 640, MAP_H = 2240;
+  // 1.9.243 The map grows west so Vietnam, Malaysia, Thailand, Myanmar and India sit on this same scale.
+  const MAP_X0 = -360, MAP_W = 640, MAP_H = 2240, MAP_VW = MAP_W - MAP_X0;
+  function mapXPct(x) { return ((x - MAP_X0) / MAP_VW * 100) + '%'; }
   const MAP_STOPS = [
     { n: 1, x: 148, y: 432, place: "Onerahi", kind: 'town', label: 'left', lat: -35.77, lon: 174.37, inset: 'whangarei' },
     { n: 2, x: 204, y: 432, place: "Sarah's House", kind: 'house', label: 'below', lat: -35.762, lon: 174.385, inset: 'whangarei', nudged: true },
@@ -755,23 +799,29 @@
     { n: 25, x: 362, y: 1954, place: "Brisbane", kind: 'city', label: 'left', lat: -27.47, lon: 153.03, nudged: true, via: [{ x: 318, y: 2030 }] },
     // 1.9.234 North across the Coral Sea to Port Moresby, Papua New Guinea (true position; kept east of Cairns).
     { n: 26, x: 318, y: 1794, place: "Port Moresby", kind: 'city', label: 'below', lat: -9.44, lon: 147.18, via: [{ x: 356, y: 1880 }] },
-    // 1.9.242 On the same map as Australia and Papua New Guinea (ausXY), not in a separate panel.
+    // 1.9.243 On the same map as Australia and Papua New Guinea (ausXY), not in a separate panel.
     { n: 27, x: 427, y: 1794, place: "Solomon Islands", kind: 'island', label: 'below', lat: -9.43, lon: 159.95 },
     { n: 28, x: 499, y: 1885, place: "Vanuatu", kind: 'island', label: 'left', lat: -17.73, lon: 168.32 },
     { n: 29, x: 585, y: 1890, place: "Fiji", kind: 'island', label: 'right', lat: -18.14, lon: 178.44 },
     { n: 30, x: 483, y: 1935, place: "New Caledonia", kind: 'island', label: 'below', lat: -22.27, lon: 166.45, via: [{ x: 560, y: 1930 }] },
     { n: 31, x: 45, y: 1785, place: "Indonesia", kind: 'island', label: 'right', lat: -8.65, lon: 115.22, via: [{ x: 520, y: 1748 }, { x: 340, y: 1696 }, { x: 160, y: 1710 }, { x: 80, y: 1748 }] },
-    // 1.9.242 Canberra is nudged clear of the Sydney and Melbourne pins. Hobart sits on Tasmania.
+    // 1.9.243 Canberra is nudged clear of the Sydney and Melbourne pins. Hobart sits on Tasmania.
     { n: 32, x: 338, y: 2103, place: "Canberra", kind: 'city', label: 'below', lat: -35.28, lon: 149.13, nudged: true, via: [{ x: 140, y: 1980 }, { x: 260, y: 2088 }] },
-    { n: 33, x: 319, y: 2161, place: "Hobart", kind: 'city', label: 'left', lat: -42.88, lon: 147.33, via: [{ x: 360, y: 2148 }] }
+    { n: 33, x: 319, y: 2161, place: "Hobart", kind: 'city', label: 'left', lat: -42.88, lon: 147.33, via: [{ x: 360, y: 2148 }] },
+    // 1.9.243 West from Indonesia: real positions. The road up from Hobart stays over the sea.
+    { n: 34, x: -27.9, y: 1571.8, place: "Vietnam", kind: 'city', label: 'right', lat: 10.8231, lon: 106.6297, via: [{ x: 400, y: 2088 }, { x: 430, y: 1920 }, { x: 360, y: 1760 }, { x: 160, y: 1688 }, { x: 40, y: 1630 }] },
+    { n: 35, x: -70.1, y: 1656.1, place: "Malaysia", kind: 'city', label: 'left', lat: 3.139, lon: 101.6869 },
+    { n: 36, x: -80.2, y: 1539.6, place: "Thailand", kind: 'city', label: 'right', lat: 13.7563, lon: 100.5018 },
+    { n: 37, x: -117.2, y: 1505.8, place: "Myanmar", kind: 'city', label: 'left', lat: 16.8409, lon: 96.1735 },
+    { n: 38, x: -279, y: 1376.6, place: "India", kind: 'city', label: 'right', lat: 28.6139, lon: 77.209, via: [{ x: -190, y: 1520 }, { x: -240, y: 1460 }] }
   ];
   // Coming soon: other Australian cities. Shown as markers only (no trail), so they never look like the route.
-  // Brisbane is a stop since 1.9.233. Canberra and Hobart are stops since 1.9.242.
+  // Brisbane is a stop since 1.9.233. Canberra and Hobart are stops since 1.9.243.
   const FUTURE_STOPS = [
     { place: 'Darwin', x: 179, y: 1827, label: 'left', lat: -12.46, lon: 130.84 },
     { place: 'Cairns', x: 306, y: 1876, label: 'left', lat: -16.92, lon: 145.77 }
   ];
-  const LV_COUNT = 33;
+  const LV_COUNT = 38;
   function stopForLevel(n) { return MAP_STOPS[(n | 0) - 1] || null; }
   function icingPath(pts) {
     if (!pts || pts.length < 2) return '';
@@ -811,8 +861,16 @@
   // 1.9.234 Papua New Guinea coast points (lat, lon) and the West Pacific islands (lat, lon, rx, ry, rotate).
   const PNG_PTS = [[-2.6, 141.0], [-3.1, 142.2], [-3.4, 143.5], [-3.9, 144.5], [-4.6, 145.6], [-5.4, 145.8], [-6.0, 147.0], [-6.1, 147.8], [-7.5, 147.7], [-8.3, 148.3], [-9.0, 149.3], [-9.6, 149.9], [-10.3, 150.6], [-10.6, 150.3], [-10.2, 149.7], [-9.9, 148.6], [-9.5, 147.4], [-8.9, 146.6], [-8.0, 145.8], [-7.6, 144.6], [-8.0, 143.6], [-8.6, 143.2], [-9.1, 142.6], [-9.1, 141.0]];
   const NEW_BRITAIN_PTS = [[-5.6, 148.4], [-5.1, 150.0], [-4.3, 151.6], [-4.2, 152.3], [-4.8, 152.0], [-5.6, 150.9], [-6.2, 149.5], [-6.0, 148.5]];
-  // 1.9.242 Islands on the Australia projection: Solomons, Vanuatu, New Caledonia, Fiji, then Bali and the islands just east of it.
+  // 1.9.243 Islands on the Australia projection: Solomons, Vanuatu, New Caledonia, Fiji, then Bali and the islands just east of it.
   const EAST_ISLES = [[-8.1, 157.2, 16, 5, 28], [-9.4, 160.0, 18, 6, 32], [-10.6, 161.5, 12, 5, 30], [-15.4, 167.2, 5, 11, -8], [-17.7, 168.3, 6, 10, 0], [-21.3, 165.5, 26, 7, 38], [-17.8, 178.0, 14, 8, -8], [-16.5, 179.4, 13, 6, -18], [-8.3, 114.4, 9, 5, 18], [-8.65, 115.22, 7, 4, 12], [-8.8, 116.5, 8, 4, 10], [-8.9, 118.0, 12, 5, 6]];
+  // 1.9.243 Simplified coasts, west of Indonesia, on the Australia scale.
+  const ASIA_LAND = [
+    [[8.6, 104.7], [10.4, 106.7], [12.3, 109.2], [16.2, 108.3], [21.0, 105.9], [22.2, 103.9], [18.2, 105.4], [14.2, 108.6], [11.2, 107.1], [8.8, 104.9]],
+    [[1.2, 103.6], [1.5, 104.2], [3.2, 103.4], [5.4, 103.0], [6.4, 101.8], [6.2, 100.2], [4.2, 100.6], [2.4, 101.3], [1.3, 102.9]],
+    [[7.2, 100.3], [10.2, 99.2], [13.2, 100.1], [16.4, 102.4], [19.2, 100.2], [16.8, 98.2], [13.0, 99.6], [9.4, 98.6], [7.6, 98.8]],
+    [[10.2, 98.3], [14.2, 98.0], [16.8, 96.2], [19.4, 93.6], [23.6, 94.2], [25.2, 97.4], [21.4, 99.2], [16.2, 98.4], [12.2, 98.5]],
+    [[8.1, 77.5], [15.2, 73.9], [19.2, 72.8], [23.0, 68.8], [23.4, 72.8], [28.8, 76.2], [30.2, 78.2], [27.2, 80.4], [22.4, 86.2], [16.2, 82.2], [8.9, 78.0]]
+  ];
   function ausPath(pts) { return pts.map(function (q, i) { const a = ausXY(q[0], q[1]); return (i ? 'L' : 'M') + a.x.toFixed(1) + ' ' + a.y.toFixed(1); }).join(' ') + ' Z'; }
   // 1.9.234 Soft clouds drifting slowly over the map (CSS .sr-cloud; still under reduced motion). Over sea, clear of the pins.
   const MAP_CLOUDS = [[330, 140, 1, 26], [40, 640, 0.8, 34], [350, 860, 0.9, 30], [60, 1120, 1.1, 38], [330, 1200, 0.8, 28], [64, 1722, 0.7, 32], [40, 1880, 0.9, 36], [370, 2200, 0.8, 30]];
@@ -827,7 +885,7 @@
     const live = ''; // the icing is filled in from the stops this player has already cleared
     const future = ''; // 1.9.222 coming-soon cities are markers only
     return (
-      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + MAP_W + ' ' + MAP_H + '" width="' + MAP_W + '" height="' + MAP_H + '" aria-hidden="true" class="nzsvg">' +
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + MAP_X0 + ' 0 ' + MAP_VW + ' ' + MAP_H + '" width="' + MAP_VW + '" height="' + MAP_H + '" aria-hidden="true" class="nzsvg">' +
       '<defs>' +
       '<linearGradient id="sr-sea" x1="0" y1="0" x2="0" y2="1">' +
       '<stop offset="0" stop-color="#9be7ff"/><stop offset=".45" stop-color="#8fd9f8"/><stop offset="1" stop-color="#b8f3de"/>' +
@@ -842,7 +900,7 @@
       '<feDropShadow dx="0" dy="2" stdDeviation="2.2" flood-color="#4a90b8" flood-opacity=".28"/>' +
       '</filter>' +
       '</defs>' +
-      '<rect width="' + MAP_W + '" height="' + MAP_H + '" fill="url(#sr-sea)"/>' +
+      '<rect x="' + MAP_X0 + '" width="' + MAP_VW + '" height="' + MAP_H + '" fill="url(#sr-sea)"/>' +
       '<circle class="sr-bob" cx="250" cy="60" r="7" fill="#ff8ab8" opacity=".55"/>' +
       '<circle class="sr-bob" cx="264" cy="74" r="5" fill="#ffe066" opacity=".65"/>' +
       '<circle class="sr-bob" cx="372" cy="200" r="6" fill="#7ee0a8" opacity=".5"/>' +
@@ -906,6 +964,7 @@
       '<path fill="#ffd3e4" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="' + ausPath(NEW_BRITAIN_PTS) + '"/>' +
       '<text x="306" y="1711" text-anchor="middle" font-size="10" font-weight="900" fill="#2f7a4a" font-family="ui-rounded,system-ui,sans-serif">Papua New Guinea</text>' +
       EAST_ISLES.map(function (q) { const a = ausXY(q[0], q[1]); return '<ellipse cx="' + a.x.toFixed(1) + '" cy="' + a.y.toFixed(1) + '" rx="' + q[2] + '" ry="' + q[3] + '" transform="rotate(' + q[4] + ' ' + a.x.toFixed(1) + ' ' + a.y.toFixed(1) + ')" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>'; }).join('') +
+      ASIA_LAND.map(function (pts) { return '<path filter="url(#sr-soft)" fill="url(#sr-land)" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="' + ausPath(pts) + '"/>'; }).join('') +
       '<path d="M120 1960 C150 1940 190 1950 210 1980 C190 1990 150 1990 120 1960 Z" fill="#ffd9a8" opacity=".6"/>' +
       '<path d="M236 1930 C250 1918 270 1922 276 1936 C264 1944 246 1942 236 1930 Z" fill="#ffd9a8" opacity=".55"/>' +
       '<circle class="sr-bob" cx="380" cy="1860" r="6" fill="#ffb347" opacity=".5"/><circle class="sr-bob" cx="30" cy="2160" r="7" fill="#ff8ab8" opacity=".45"/>' +
@@ -3033,7 +3092,7 @@
         { x: 40, y: 78, w: 16, cls: 'sc-bob', d: 3.4, svg: 'vaka' },
         { x: 20, y: 16, w: 8, cls: 'sc-drift', d: 10, svg: 'gull' }
       ] },
-    // 1.9.242 Canberra: a round lake, a low white building and a flag, with autumn trees.
+    // 1.9.243 Canberra: a round lake, a low white building and a flag, with autumn trees.
     { n: 32, id: 'canberra', place: 'Canberra', title: 'Lake and flag, Canberra', night: false,
       art: function () {
         return '<defs>' + scGrad('sk', [[0, '#7ec4f2'], [0.6, '#e7f6ff'], [1, '#fff6e4']]) + '</defs>' +
@@ -3054,7 +3113,7 @@
         { x: 18, y: 20, w: 8, cls: 'sc-drift', d: 11, svg: 'gull' },
         { x: 48, y: 8, w: 24, cls: 'sc-drift', d: 24, svg: 'cloud' }
       ] },
-    // 1.9.242 Hobart: a dark mountain behind a cool harbour and stone warehouses.
+    // 1.9.243 Hobart: a dark mountain behind a cool harbour and stone warehouses.
     { n: 33, id: 'hobart', place: 'Hobart', title: 'Mountain and wharf, Hobart', night: false,
       art: function () {
         return '<defs>' + scGrad('sk', [[0, '#8eb4d4'], [0.55, '#d5e6f2'], [1, '#f3eee4']]) + scGrad('se', [[0, '#4d88b0'], [1, '#2a5878']]) + '</defs>' +
@@ -3073,7 +3132,65 @@
         { x: 12, y: 72, w: 16, cls: 'sc-roll', d: 12, svg: 'boat' },
         { x: 36, y: 18, w: 8, cls: 'sc-drift', d: 10, svg: 'gull' },
         { x: 8, y: 6, w: 26, cls: 'sc-drift', d: 26, svg: 'cloud' }
-      ] }
+      ] },
+    { n: 34, id: 'saigon', place: 'Vietnam', title: 'Lanterns on the river, Saigon', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#ffb07a'], [0.45, '#ffd6a8'], [1, '#fff1d6']]) + scGrad('rv', [[0, '#3a88b0'], [1, '#1d5878']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(60, 80, 0.7, 0.7) +
+          '<circle cx="300" cy="90" r="28" fill="#ffe08a"/>' +
+          '<path d="M0 500 H390 V640 H0 Z" fill="#7aaa58"/>' +
+          '<rect y="560" width="390" height="70" fill="url(#rv)"/>' +
+          '<path d="M40 560 h36 l-8 -70 h-20 Z" fill="#e24b4b"/><path d="M120 560 h32 l-6 -56 h-20 Z" fill="#f0c040"/>' +
+          '<path d="M210 560 h40 l-8 -80 h-24 Z" fill="#e24b4b"/><path d="M300 560 h30 l-6 -48 h-18 Z" fill="#f28a2e"/>' +
+          '<path d="M0 760 C90 746 200 782 300 756 C350 746 376 752 390 754 L390 844 L0 844 Z" fill="#6e9a52"/>';
+      },
+      sprites: [{ x: 8, y: 70, w: 16, cls: 'sc-roll', d: 11, svg: 'boat' }, { x: 40, y: 16, w: 8, cls: 'sc-drift', d: 9, svg: 'gull' }] },
+    { n: 35, id: 'nightmarket', place: 'Malaysia', title: 'Night market, Kuala Lumpur', night: true,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#1c2450'], [0.6, '#3a3a78'], [1, '#6a4a88']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' +
+          '<circle cx="70" cy="80" r="3" fill="#fff"/><circle cx="140" cy="50" r="2" fill="#fff"/><circle cx="250" cy="70" r="2" fill="#fff"/><circle cx="320" cy="40" r="3" fill="#fff"/>' +
+          '<rect x="150" y="280" width="28" height="280" fill="#d8d2ea"/><rect x="210" y="280" width="28" height="280" fill="#c8c0e0"/>' +
+          '<path d="M146 280 h36 l-4 -40 h-28 Z" fill="#f2f4ff"/><path d="M206 280 h36 l-4 -40 h-28 Z" fill="#f2f4ff"/>' +
+          '<path d="M20 520 h70 l-8 -36 h-54 Z" fill="#ff5a7a"/><path d="M280 530 h80 l-8 -40 h-64 Z" fill="#ffb020"/>' +
+          '<rect y="560" width="390" height="284" fill="#2a2348"/>';
+      },
+      sprites: [{ x: 6, y: 40, w: 10, cls: 'sc-twinkle', d: 2.2, svg: 'gull' }] },
+    { n: 36, id: 'bangkok', place: 'Thailand', title: 'Temple by the river, Bangkok', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#8fd0f2'], [0.55, '#fff0c8'], [1, '#ffe0a8']]) + scGrad('rv', [[0, '#3a90c0'], [1, '#1d6088']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(240, 70, 0.75, 0.8) +
+          '<circle cx="80" cy="86" r="26" fill="#ffe08a"/>' +
+          '<path d="M0 500 H390 V620 H0 Z" fill="#8fbe6a"/>' +
+          '<path d="M150 500 L195 360 L240 500 Z" fill="#f0c040"/><rect x="178" y="430" width="34" height="70" fill="#f4e2a0"/>' +
+          '<path d="M120 500 L155 420 L190 500 Z" fill="#e8a030"/><path d="M200 500 L245 400 L290 500 Z" fill="#e8a030"/>' +
+          '<rect y="620" width="390" height="80" fill="url(#rv)"/>' +
+          '<path d="M0 780 C100 764 200 800 300 772 C350 762 376 768 390 770 L390 844 L0 844 Z" fill="#6e9a52"/>';
+      },
+      sprites: [{ x: 10, y: 68, w: 16, cls: 'sc-roll', d: 12, svg: 'boat' }, { x: 70, y: 14, w: 8, cls: 'sc-drift', d: 10, svg: 'gull' }] },
+    { n: 37, id: 'yangon', place: 'Myanmar', title: 'Golden pagoda, Yangon', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#f2c27a'], [0.5, '#ffe6b0'], [1, '#fff6e0']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(40, 80, 0.7, 0.75) +
+          '<circle cx="300" cy="78" r="26" fill="#fff3a0"/>' +
+          '<path d="M0 560 H390 V844 H0 Z" fill="#7aaa58"/>' +
+          '<path d="M150 560 L195 300 L240 560 Z" fill="#f0c040"/>' +
+          '<path d="M168 400 h54 l-6 -28 h-42 Z" fill="#ffe08a"/><circle cx="195" cy="292" r="10" fill="#fff6c8"/>' +
+          '<rect x="40" y="500" width="16" height="60" fill="#6aaa48"/><rect x="320" y="510" width="16" height="50" fill="#6aaa48"/>';
+      },
+      sprites: [{ x: 18, y: 20, w: 8, cls: 'sc-drift', d: 11, svg: 'gull' }, { x: 60, y: 8, w: 24, cls: 'sc-drift', d: 22, svg: 'cloud' }] },
+    { n: 38, id: 'delhi', place: 'India', title: 'Sweets by the gate, Delhi', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#ffb070'], [0.5, '#ffd8a0'], [1, '#fff0d4']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(200, 60, 0.8, 0.7) +
+          '<circle cx="70" cy="84" r="28" fill="#ffe08a"/>' +
+          '<path d="M0 520 H390 V844 H0 Z" fill="#c4a06a"/>' +
+          '<rect x="70" y="360" width="250" height="160" fill="#f2d2a0" stroke="#e0b888" stroke-width="3"/>' +
+          '<path d="M60 360 H330 L310 300 H80 Z" fill="#e8a050"/>' +
+          '<path d="M160 520 L195 430 L230 520 Z" fill="#f0c040"/>' +
+          '<rect x="40" y="470" width="18" height="50" fill="#6aaa48"/><rect x="330" y="480" width="18" height="40" fill="#6aaa48"/>';
+      },
+      sprites: [{ x: 8, y: 16, w: 8, cls: 'sc-drift', d: 10, svg: 'gull' }, { x: 50, y: 6, w: 26, cls: 'sc-drift', d: 24, svg: 'cloud' }] }
   ];
   // 1.9.234 "Some clouds": every daytime outdoor scene gets one more soft cloud drifting slowly across the top of the sky
   // (pink-gold at sunset). Night scenes keep their clear skies.
@@ -3300,7 +3417,7 @@
     return true;
   }
 
-  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_STOPS, FUTURE_STOPS, NZ_PROJ, nzXY, WHANGAREI_INSET, insetXY, pacXY, ausXY, westPacXY, LV_COUNT, lvId, levelIds, stopId, LEGACY_220_IDS, migrateProg, stopForLevel, icingPath, beenPath, aheadPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, bubLeft, liqLeft, spreadLiq, LIQ_IDLE, goalCounts, cloneState, bestMove, hintMoveFor, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
+  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_X0, MAP_VW, MAP_STOPS, FUTURE_STOPS, NZ_PROJ, nzXY, WHANGAREI_INSET, insetXY, pacXY, ausXY, westPacXY, LV_COUNT, lvId, levelIds, stopId, LEGACY_220_IDS, migrateProg, stopForLevel, icingPath, beenPath, aheadPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, bubLeft, liqLeft, spreadLiq, LIQ_IDLE, goalCounts, cloneState, bestMove, hintMoveFor, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
     allowed: () => true, // 1.9.228 open to every family member
     SAY_REST_MS, SAY_BIG, sayBig, COMBO_KINDS, COMBO_BONUS, comboKind, comboSwap, adjacentSpecials, isSpecialTile, HARD_LINES, hardLine, CANDY_STYLES, candySfxPlan, playCandySfx, SAY_SHOW_MS, SAY_AFTER_MS, sayShowGap, SPEAK_GAP, SPEAK_PITCH, SPEAK_RATE, SPEAK_VOL, pickSpeechVoice, speechGender, speakWorthy, SAY_SPRITES, SAY_CLIPS, sayClip, nextSayVoice, SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL, XF,
     VOICE_FILES, VOICE_RANK, MEDIA_HASH, mediaUrl, gameTrack, SONG_PLAN, SONG_FILES, SONG_FROM, songMood, attachSfxBus, playTone, playChime, playMovesWarnChime, playClip, voiceForStep,
@@ -3953,7 +4070,7 @@
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, W);
   }
-  // 1.9.242 Each open tile is a little glass well. Jelly is a glossy dome; two layers read darker.
+  // 1.9.243 Each open tile is a little glass well. Jelly is a glossy dome; two layers read darker.
   function drawTile(x, y, s, jelly, blush) {
     const rad = s * .2;
     ctx.fillStyle = 'rgba(176, 64, 112, .16)';
@@ -4914,7 +5031,7 @@
         el.className = 'racer' + (r.mine ? ' me' : '');
         el.dataset.name = racerFirst(r.name);
         el.dataset.stop = String(n);
-        el.style.left = (stop.x / MAP_W * 100) + '%';
+        el.style.left = mapXPct(stop.x);
         el.style.top = (stop.y / MAP_H * 100) + '%';
         el.style.transform = 'translate(calc(-50% + ' + off.x + 'px), calc(-50% + ' + off.y + 'px))';
         el.innerHTML = '<span class="face" style="--ic:' + ic.color + '">' + ic.emoji + '</span><span class="nm">' + racerFirst(r.name) + '</span>';
@@ -5187,7 +5304,7 @@
       b.className = 'lv lab-' + (stop.label || 'right') + (stop.lift ? ' lift' : '') + (lv.theme === 'sarah' ? ' sarah' : '') + (lv.hard ? ' hard hard' + lv.hard : '') + (open ? ' open' : '') + (stars ? ' done' : '') + (n === here ? ' here' : '') + ' kind-' + (stop.kind || 'town');
       b.disabled = !open;
       b.dataset.n = String(n);
-      b.style.left = (stop.x / MAP_W * 100) + '%';
+      b.style.left = mapXPct(stop.x);
       b.style.top = (stop.y / MAP_H * 100) + '%';
       const mark = stop.kind === 'house' ? '🏠' : (stop.kind === 'post' ? '✉️' : (stop.kind === 'station' ? '🚂' : (stop.kind === 'island' ? '🌴' : '')));
       const starHtml = [0, 1, 2].map(k => '<span class="' + (k < stars ? 'on' : '') + '">★</span>').join('');
@@ -5202,7 +5319,7 @@
       const el = doc.createElement('div');
       el.className = 'future-stop lab-' + (stop.label || 'right') + (stop.inset ? ' inset-' + stop.inset : '');
       el.dataset.place = stop.place;
-      el.style.left = (stop.x / MAP_W * 100) + '%';
+      el.style.left = mapXPct(stop.x);
       el.style.top = (stop.y / MAP_H * 100) + '%';
       el.innerHTML = '<span class="pin"></span><span class="meta"><b>' + stop.place + '</b><em>Coming soon</em></span>';
       el.setAttribute('aria-label', 'Coming soon: ' + stop.place);
@@ -6015,10 +6132,10 @@
     const a = MAP_STOPS[fromN - 1], b = MAP_STOPS[toN - 1];
     if (!a || !b) return;
     me.classList.add('hopping');
-    me.style.left = (a.x / MAP_W * 100) + '%';
+    me.style.left = mapXPct(a.x);
     me.style.top = (a.y / MAP_H * 100) + '%';
     await wait(reduce ? 20 : 40);
-    me.style.left = (b.x / MAP_W * 100) + '%';
+    me.style.left = mapXPct(b.x);
     me.style.top = (b.y / MAP_H * 100) + '%';
     await wait(reduce ? 80 : 750);
     me.classList.remove('hopping');
