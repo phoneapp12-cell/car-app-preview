@@ -283,7 +283,11 @@
   .goalstrip #help { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   .cd-items { display: flex; align-items: stretch; gap: 6px; flex: 1; min-width: 0; overflow: hidden; }
   .cd-item { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 3px 10px 3px 6px; border-radius: 14px; background: linear-gradient(180deg, #fff, #ffe9f2); border: 2px solid #ff9cc6; box-shadow: 0 2px 0 #f4a0c4; }
-  .cd-item .cd-icon { font-size: 30px; line-height: 1; }
+  .cd-item .cd-icon { font-size: 30px; line-height: 1; display: flex; align-items: center; justify-content: center; }
+  .cd-swatch { display: block; width: 28px; height: 28px; border-radius: 8px; box-sizing: border-box; }
+  .cd-swatch.jelly { background: linear-gradient(180deg, #ffc4ea 0%, #ff5aaa 42%, #d41478 100%); box-shadow: inset 0 7px 0 rgba(255,255,255,.55), inset 0 -5px 0 rgba(120,10,70,.18); }
+  .cd-swatch.ice { background: radial-gradient(circle at 32% 28%, #fff 0%, #d9f3ff 55%, #5aa6d8 100%); box-shadow: inset 0 0 0 2px #fff, inset 0 -4px 0 rgba(40,110,170,.25); position: relative; }
+  .cd-swatch.ice::after { content: ""; position: absolute; left: 6px; top: 6px; width: 14px; height: 14px; border: 3px solid rgba(255,255,255,.95); border-right-color: transparent; border-bottom-color: transparent; border-radius: 50%; transform: rotate(24deg); }
   .cd-item .cd-num { font-size: 28px; font-weight: 900; font-variant-numeric: tabular-nums; color: #d6246e; line-height: 1; letter-spacing: -.02em; }
   .cd-item .cd-lab { font-size: 11px; font-weight: 800; color: #8a3a62; text-transform: uppercase; letter-spacing: .04em; line-height: 1.1; max-width: 4.6em; }
   .cd-item.tick { animation: cdbounce .45s ease-out; }
@@ -905,7 +909,7 @@
     </div>
   </div>
   <canvas id="fxov" class="fxov" hidden aria-hidden="true"></canvas>
-  <script src="scores.js?v=1.9.239"></script>
-  <script src="sugar-rush.js?v=1.9.239"></script>
+  <script src="scores.js?v=1.9.240"></script>
+  <script src="sugar-rush.js?v=1.9.240"></script>
 </body>
 </html>
