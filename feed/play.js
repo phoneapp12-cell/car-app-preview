@@ -208,7 +208,7 @@
     // 1.9.147 Scrabble, our own page like Tetris. ship-pages.sh sends SAMEORIGIN for /feed/scrabble too.
     scrabble: { url: gameUrl('scrabble'), title: 'Scrabble', host: 'Info Book', live: 'Play the computer, pass the phone, or challenge family', local: true },
     // 1.9.156 Sugar Rush level 1 (Shane only for now; the page itself checks too). ship-pages.sh sends SAMEORIGIN for /feed/sugar-rush.
-    sugar: { url: gameUrl('sugar-rush'), title: 'Sugar Rush', host: 'Info Book', live: 'Levels 1–10 · soft sounds start when you tap', local: true }
+    sugar: { url: gameUrl('sugar-rush'), title: 'Sugar Rush', host: 'Info Book', live: 'Levels 1–31 · five new countries, from the Solomon Islands to Indonesia', local: true }
   };
   let artWin, artFrame, artScroll = 0, artHist = false, artBtn = null, artKind = null;
   const ART_KEY = 'ib-art-open';

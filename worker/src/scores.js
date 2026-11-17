@@ -33,9 +33,9 @@ export function checkScore(b) {
 }
 
 export const RACE_ICONS = ['lolly','cupcake','donut','cherry','icecream','cookie','kiwi','cat','dog','bunny','unicorn','car','train','bike','rocket','star','bear','bee','butterfly','boat'];
-export const RACE_LIMITS = { stop: 26, stars: 78, gapMs: 1000, perDay: 300, wins: 1e6 }; // 1.9.234 Sugar Rush has 26 stops (1.9.222: Bluff, the Pacific Islands, Sydney, Gold Coast and Perth; 1.9.232: Adelaide and Melbourne; 1.9.233: Brisbane; 1.9.234: Port Moresby).
+export const RACE_LIMITS = { stop: 31, stars: 93, gapMs: 1000, perDay: 300, wins: 1e6 }; // 1.9.235 Sugar Rush has 31 stops (1.9.234: Port Moresby; 1.9.235: Solomon Islands, Vanuatu, Fiji, New Caledonia, Indonesia).
 // 1.9.222 Each stop's stable level id (the level's badge id), in map order. The client sends `sid` so the race follows the level, not its number.
-export const RACE_STOP_IDS = ['shop', 'sarah', 'jelly', 'lock', 'icing', 'double', 'down', 'choco', 'path', 'night', 'whale', 'tram', 'glacier', 'gondola', 'ticket', 'oyster', 'hibiscus', 'coconut', 'shell', 'opera', 'wave', 'swan', 'frogcake', 'tramline', 'citycat', 'paradise'];
+export const RACE_STOP_IDS = ['shop', 'sarah', 'jelly', 'lock', 'icing', 'double', 'down', 'choco', 'path', 'night', 'whale', 'tram', 'glacier', 'gondola', 'ticket', 'oyster', 'hibiscus', 'coconut', 'shell', 'opera', 'wave', 'swan', 'frogcake', 'tramline', 'citycat', 'paradise', 'honiara', 'vila', 'bula', 'noumea', 'bali'];
 // 1.9.220 numbered the islands 16-18; from 1.9.222 they are 17-19 (Bluff is 16).
 export const LEGACY_220_ISLANDS = { 16: 17, 17: 18, 18: 19 };
 // 1.9.222 Family race events: 2+ players at the same stop start a race; first to win 5 levels wins; 48 hours max.
