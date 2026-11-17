@@ -1,4 +1,4 @@
-/* Info Book 1.9.237 – Sugar Rush, levels 1–31. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.238 – Sugar Rush, levels 1–31. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -201,7 +201,18 @@
       jelly: ['11000011', '10000001', '00000000', '00000000', '00000000', '00000000', '10000001', '11000011'],
       ice: ['00000000', '00011000', '00000000', '00000000', '00000000', '00000000', '00011000', '00000000'],
       help: 'Clear the jelly by the temple gates and crack the 4 icing blocks in the market in 32 moves.',
-      badge: { id: 'bali', name: 'Temple Gate', icon: '🌴' } }
+      badge: { id: 'bali', name: 'Temple Gate', icon: '🌴' } },
+    // 1.9.238 Canberra, then Hobart. Both were map markers; now they are levels.
+    { n: 32, name: 'Canberra Lake Light', target: 0, moves: 32, stars: [0, 5000, 10000], kinds: 6,
+      jelly: ['00000000', '00111100', '01000010', '01000010', '01000010', '01000010', '00111100', '00000000'],
+      bub: ['00000000', '00000000', '00011000', '00000000', '00000000', '00011000', '00000000', '00000000'],
+      help: 'Clear the jelly around the lake and pop the 4 sugar bubbles on the water in 32 moves.',
+      badge: { id: 'canberra', name: 'Capital Flag', icon: '🚩' } },
+    { n: 33, name: 'Hobart Mountain Wharf', target: 0, moves: 34, stars: [0, 5100, 10200], kinds: 6,
+      jelly: ['00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '11111111', '11111111'],
+      ice: ['11000011', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000'],
+      help: 'Clear the jelly along the wharf and crack the 4 icing blocks on the mountain in 34 moves.',
+      badge: { id: 'hobart', name: 'Mountain Apple', icon: '🍎' } }
   ];
 
 
@@ -237,7 +248,9 @@
     { icon: '🥭', goal: 'Bring both mangoes down and crack the icing', detail: 'Bring both market mangoes down the waterfront and crack the 4 icing blocks in 32 moves.', tip: 'Match under each mango to drop it. The icing sits in two pairs on the way down.', mechanic: 'market' },
     { icon: '🥥', goal: 'Bring both coconuts down and clear the beach jelly', detail: 'Bring both coconuts down onto the beach and clear the jelly along the sand in 36 moves.', tip: 'Drop the coconuts first, then sweep the bottom two rows of jelly.', mechanic: 'beach' },
     { icon: '⛵', goal: 'Clear the bay jelly, free the jars and pop the bubbles', detail: 'Clear the jelly across the bay, free the 4 locked jars and pop the 2 sugar bubbles in 30 moves.', tip: 'The harbour arch splits the middle. Work above and below it.', mechanic: 'bay' },
-    { icon: '🌴', goal: 'Clear the gate jelly and crack the market icing', detail: 'Clear the jelly by the temple gates and crack the 4 icing blocks in the market in 32 moves.', tip: 'The jelly sits in the four corners, like the gates. The icing is just inside each pair.', mechanic: 'gates' }
+    { icon: '🌴', goal: 'Clear the gate jelly and crack the market icing', detail: 'Clear the jelly by the temple gates and crack the 4 icing blocks in the market in 32 moves.', tip: 'The jelly sits in the four corners, like the gates. The icing is just inside each pair.', mechanic: 'gates' },
+    { icon: '🚩', goal: 'Clear the lake jelly and pop the bubbles', detail: 'Clear the jelly around the lake and pop the 4 sugar bubbles on the water in 32 moves.', tip: 'The jelly is a ring around the lake. Pop one bubble and the one beside it follows.', mechanic: 'lake' },
+    { icon: '🍎', goal: 'Clear the wharf jelly and crack the mountain icing', detail: 'Clear the jelly along the wharf and crack the 4 icing blocks on the mountain in 34 moves.', tip: 'The icing sits in the top corners, like the mountain. The jelly is the wharf along the bottom.', mechanic: 'wharf' }
   ];
   function levelIntro(n, p) {
     const lv = LEVELS[(n | 0) - 1]; if (!lv) return null;
@@ -678,7 +691,11 @@
     30: [{ id: 'recap30', kind: 'recap', title: 'New Caledonia', bubble: 'Nouméa: a bay, a sail and jars on the quay.',
       items: [{ icon: '💜', text: 'Clear the bay jelly' }, { icon: '🔒', text: 'Free the locked jars' }, { icon: '🫧', text: 'Pop the sugar bubbles' }] }],
     31: [{ id: 'recap31', kind: 'recap', title: 'Indonesia', bubble: 'Bali: temple gates and a beach market.',
-      items: [{ icon: '💜', text: 'Clear the jelly by the gates' }, { icon: '🧁', text: 'Crack the market icing' }] }]
+      items: [{ icon: '💜', text: 'Clear the jelly by the gates' }, { icon: '🧁', text: 'Crack the market icing' }] }],
+    32: [{ id: 'recap32', kind: 'recap', title: 'Canberra', bubble: 'A lake, a flag and autumn trees.',
+      items: [{ icon: '💜', text: 'Clear the jelly around the lake' }, { icon: '🫧', text: 'Pop the sugar bubbles' }] }],
+    33: [{ id: 'recap33', kind: 'recap', title: 'Hobart', bubble: 'The mountain behind the wharf.',
+      items: [{ icon: '💜', text: 'Clear the wharf jelly' }, { icon: '🧁', text: 'Crack the mountain icing' }] }]
   };
   function tutorialFor(n) { return TUTORIALS[n] || null; }
 
@@ -738,22 +755,23 @@
     { n: 25, x: 362, y: 1954, place: "Brisbane", kind: 'city', label: 'left', lat: -27.47, lon: 153.03, nudged: true, via: [{ x: 318, y: 2030 }] },
     // 1.9.234 North across the Coral Sea to Port Moresby, Papua New Guinea (true position; kept east of Cairns).
     { n: 26, x: 318, y: 1794, place: "Port Moresby", kind: 'city', label: 'below', lat: -9.44, lon: 147.18, via: [{ x: 356, y: 1880 }] },
-    // 1.9.237 On the same map as Australia and Papua New Guinea (ausXY), not in a separate panel.
+    // 1.9.238 On the same map as Australia and Papua New Guinea (ausXY), not in a separate panel.
     { n: 27, x: 427, y: 1794, place: "Solomon Islands", kind: 'island', label: 'below', lat: -9.43, lon: 159.95 },
     { n: 28, x: 499, y: 1885, place: "Vanuatu", kind: 'island', label: 'left', lat: -17.73, lon: 168.32 },
     { n: 29, x: 585, y: 1890, place: "Fiji", kind: 'island', label: 'right', lat: -18.14, lon: 178.44 },
     { n: 30, x: 483, y: 1935, place: "New Caledonia", kind: 'island', label: 'below', lat: -22.27, lon: 166.45, via: [{ x: 560, y: 1930 }] },
-    { n: 31, x: 45, y: 1785, place: "Indonesia", kind: 'island', label: 'right', lat: -8.65, lon: 115.22, via: [{ x: 520, y: 1748 }, { x: 340, y: 1696 }, { x: 160, y: 1710 }, { x: 80, y: 1748 }] }
+    { n: 31, x: 45, y: 1785, place: "Indonesia", kind: 'island', label: 'right', lat: -8.65, lon: 115.22, via: [{ x: 520, y: 1748 }, { x: 340, y: 1696 }, { x: 160, y: 1710 }, { x: 80, y: 1748 }] },
+    // 1.9.238 Canberra is nudged clear of the Sydney and Melbourne pins. Hobart sits on Tasmania.
+    { n: 32, x: 338, y: 2103, place: "Canberra", kind: 'city', label: 'below', lat: -35.28, lon: 149.13, nudged: true, via: [{ x: 140, y: 1980 }, { x: 260, y: 2088 }] },
+    { n: 33, x: 319, y: 2161, place: "Hobart", kind: 'city', label: 'left', lat: -42.88, lon: 147.33, via: [{ x: 360, y: 2148 }] }
   ];
   // Coming soon: other Australian cities. Shown as markers only (no trail), so they never look like the route.
-  // Canberra is nudged a few pixels clear of the Sydney and Melbourne pins (marked nudged). Brisbane is a stop since 1.9.233.
+  // Brisbane is a stop since 1.9.233. Canberra and Hobart are stops since 1.9.238.
   const FUTURE_STOPS = [
-    { place: 'Canberra', x: 338, y: 2103, label: 'below', lat: -35.28, lon: 149.13, nudged: true },
-    { place: 'Hobart', x: 319, y: 2161, label: 'left', lat: -42.88, lon: 147.33 },
     { place: 'Darwin', x: 179, y: 1827, label: 'left', lat: -12.46, lon: 130.84 },
     { place: 'Cairns', x: 306, y: 1876, label: 'left', lat: -16.92, lon: 145.77 }
   ];
-  const LV_COUNT = 31;
+  const LV_COUNT = 33;
   function stopForLevel(n) { return MAP_STOPS[(n | 0) - 1] || null; }
   function icingPath(pts) {
     if (!pts || pts.length < 2) return '';
@@ -793,7 +811,7 @@
   // 1.9.234 Papua New Guinea coast points (lat, lon) and the West Pacific islands (lat, lon, rx, ry, rotate).
   const PNG_PTS = [[-2.6, 141.0], [-3.1, 142.2], [-3.4, 143.5], [-3.9, 144.5], [-4.6, 145.6], [-5.4, 145.8], [-6.0, 147.0], [-6.1, 147.8], [-7.5, 147.7], [-8.3, 148.3], [-9.0, 149.3], [-9.6, 149.9], [-10.3, 150.6], [-10.6, 150.3], [-10.2, 149.7], [-9.9, 148.6], [-9.5, 147.4], [-8.9, 146.6], [-8.0, 145.8], [-7.6, 144.6], [-8.0, 143.6], [-8.6, 143.2], [-9.1, 142.6], [-9.1, 141.0]];
   const NEW_BRITAIN_PTS = [[-5.6, 148.4], [-5.1, 150.0], [-4.3, 151.6], [-4.2, 152.3], [-4.8, 152.0], [-5.6, 150.9], [-6.2, 149.5], [-6.0, 148.5]];
-  // 1.9.237 Islands on the Australia projection: Solomons, Vanuatu, New Caledonia, Fiji, then Bali and the islands just east of it.
+  // 1.9.238 Islands on the Australia projection: Solomons, Vanuatu, New Caledonia, Fiji, then Bali and the islands just east of it.
   const EAST_ISLES = [[-8.1, 157.2, 16, 5, 28], [-9.4, 160.0, 18, 6, 32], [-10.6, 161.5, 12, 5, 30], [-15.4, 167.2, 5, 11, -8], [-17.7, 168.3, 6, 10, 0], [-21.3, 165.5, 26, 7, 38], [-17.8, 178.0, 14, 8, -8], [-16.5, 179.4, 13, 6, -18], [-8.3, 114.4, 9, 5, 18], [-8.65, 115.22, 7, 4, 12], [-8.8, 116.5, 8, 4, 10], [-8.9, 118.0, 12, 5, 6]];
   function ausPath(pts) { return pts.map(function (q, i) { const a = ausXY(q[0], q[1]); return (i ? 'L' : 'M') + a.x.toFixed(1) + ' ' + a.y.toFixed(1); }).join(' ') + ' Z'; }
   // 1.9.234 Soft clouds drifting slowly over the map (CSS .sr-cloud; still under reduced motion). Over sea, clear of the pins.
@@ -3014,6 +3032,47 @@
         { x: 84, y: 80, w: 14, cls: 'sc-sway', d: 4.6, dl: -1, svg: 'palm' },
         { x: 40, y: 78, w: 16, cls: 'sc-bob', d: 3.4, svg: 'vaka' },
         { x: 20, y: 16, w: 8, cls: 'sc-drift', d: 10, svg: 'gull' }
+      ] },
+    // 1.9.238 Canberra: a round lake, a low white building and a flag, with autumn trees.
+    { n: 32, id: 'canberra', place: 'Canberra', title: 'Lake and flag, Canberra', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#7ec4f2'], [0.6, '#e7f6ff'], [1, '#fff6e4']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(70, 90, 0.8, 0.8) +
+          '<circle cx="310" cy="80" r="30" fill="#fff3a0"/>' +
+          '<path d="M0 520 H390 V640 H0 Z" fill="#8fbe6a"/>' +
+          '<ellipse cx="195" cy="700" rx="150" ry="48" fill="#3aa0d0"/>' +
+          '<ellipse cx="195" cy="692" rx="120" ry="28" fill="#7ec8ef" opacity=".7"/>' +
+          '<rect x="168" y="470" width="70" height="36" fill="#f7f4ee" stroke="#e0d8cc" stroke-width="2"/>' +
+          '<path d="M160 470 H246 L230 448 H176 Z" fill="#f4f7fb"/>' +
+          '<rect x="200" y="400" width="4" height="70" fill="#6a7a88"/>' +
+          '<path d="M204 404 h28 l-4 16 h-24 Z" fill="#2a6a88"/>' +
+          '<circle cx="70" cy="500" r="16" fill="#e07a32"/><circle cx="92" cy="488" r="12" fill="#d4a017"/>' +
+          '<circle cx="320" cy="496" r="15" fill="#c45a28"/><circle cx="300" cy="484" r="11" fill="#e08a20"/>' +
+          '<path d="M0 800 C100 784 200 816 300 792 C350 784 376 788 390 790 L390 844 L0 844 Z" fill="#7aaa58"/>';
+      },
+      sprites: [
+        { x: 18, y: 20, w: 8, cls: 'sc-drift', d: 11, svg: 'gull' },
+        { x: 48, y: 8, w: 24, cls: 'sc-drift', d: 24, svg: 'cloud' }
+      ] },
+    // 1.9.238 Hobart: a dark mountain behind a cool harbour and stone warehouses.
+    { n: 33, id: 'hobart', place: 'Hobart', title: 'Mountain and wharf, Hobart', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#8eb4d4'], [0.55, '#d5e6f2'], [1, '#f3eee4']]) + scGrad('se', [[0, '#4d88b0'], [1, '#2a5878']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(240, 70, 0.7, 0.75) +
+          '<path d="M40 560 L150 300 L210 420 L250 340 L360 560 Z" fill="#5d6b78"/>' +
+          '<path d="M150 300 L178 360 L128 352 Z" fill="#f4f7fb"/>' +
+          '<rect y="620" width="390" height="90" fill="url(#se)"/>' +
+          '<rect x="20" y="560" width="54" height="70" fill="#c4a882"/><rect x="80" y="548" width="48" height="82" fill="#b89470"/>' +
+          '<rect x="136" y="566" width="60" height="64" fill="#d2b48c"/><rect x="204" y="552" width="46" height="78" fill="#c2a078"/>' +
+          '<rect x="28" y="578" width="12" height="16" fill="#6a8aaa"/><rect x="90" y="568" width="12" height="16" fill="#6a8aaa"/>' +
+          '<rect x="148" y="582" width="14" height="16" fill="#6a8aaa"/><rect x="214" y="572" width="12" height="16" fill="#6a8aaa"/>' +
+          '<path d="M0 780 C90 766 190 798 300 772 C350 762 376 768 390 770 L390 844 L0 844 Z" fill="#6e9a52"/>' +
+          scPine(40, 820, 50) + scPine(340, 824, 46);
+      },
+      sprites: [
+        { x: 12, y: 72, w: 16, cls: 'sc-roll', d: 12, svg: 'boat' },
+        { x: 36, y: 18, w: 8, cls: 'sc-drift', d: 10, svg: 'gull' },
+        { x: 8, y: 6, w: 26, cls: 'sc-drift', d: 26, svg: 'cloud' }
       ] }
   ];
   // 1.9.234 "Some clouds": every daytime outdoor scene gets one more soft cloud drifting slowly across the top of the sky
