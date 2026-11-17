@@ -374,12 +374,12 @@ for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 3, at.join(',
 const appSrc = fs.readFileSync('feed/app.js', 'utf8');
 for (const id of sights.TOPICS) assert.ok(appSrc.includes("'" + id + "'"), id);
 assert.ok(!/Math\.pow\(baseOf\(t\), 3\)/.test(appSrc));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.236'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.236'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.236'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.237'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.237'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.237'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.cdot.tv'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.bd ul.sum'));
-assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.236'"));
+assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.237'"));
 function swVersion(src) { const m = String(src).match(/const VERSION = '([^']+)'/); assert.ok(m, 'parent sw.js VERSION'); return m[1]; }
 const parentHere = swVersion(fs.readFileSync('sw.js', 'utf8'));
 let parentMain = parentHere;
@@ -418,10 +418,10 @@ assert.equal(artB.length, 1);
 assert.notEqual(artB[0].id, artA.id);
 seenArt.wasSeen = () => true;
 assert.equal(seenArt.ibArt.cards(0).length, 0);
-assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.236'"));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.237'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'art3d.js?v=' + VERSION"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'portal.js?v=' + VERSION"));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.236'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.237'));
 const portalSrc = fs.readFileSync('feed/portal.js', 'utf8');
 assert.ok(portalSrc.includes('prefers-reduced-motion'));
 assert.ok(portalSrc.includes("sessionStorage.getItem(KEY)"));
@@ -449,7 +449,7 @@ assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("cache: 'reload'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("u.pathname + '?v=' + VERSION"), 'game scripts are fetched at this VERSION, not from a stale unversioned cache');
 assert.ok(appSrc.includes('ibPortalRise'));
 assert.ok(!/portal-style\.jpg|attachments\/image/.test(portalSrc + fs.readFileSync('feed/index.html', 'utf8')));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.236'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.237'));
 assert.ok(appSrc.includes("['art3d', '3D art'"));
 assert.ok(appSrc.includes("['3D art', 'art3d'"));
 assert.ok(appSrc.includes("'art3d'"));
@@ -2188,7 +2188,7 @@ if (live) {
       fullscreenElement: null,
       webkitFullscreenElement: null,
       readyState: 'complete',
-      currentScript: { src: 'play.js?v=1.9.236' },
+      currentScript: { src: 'play.js?v=1.9.237' },
       createElement: (tag) => {
         const n = el(tag);
         // artWin innerHTML path is not used if we only call ibArt.open — artParts uses innerHTML.
@@ -3873,7 +3873,7 @@ if (live) {
   assert.strictEqual(SR.LEVELS[1].badge.icon, '💖');
   assert.strictEqual(SR.LEVELS[1].badge.name, "Sarah's Heart");
   assert.strictEqual(SR.MAP_STOPS.length, 31);
-  assert.strictEqual(SR.MAP_W, 400);
+  assert.strictEqual(SR.MAP_W, 640);
   assert.ok(SR.MAP_H > 1000, 'the map is tall enough to scroll south');
   const places = SR.MAP_STOPS.map(s => s.place);
   assert.deepStrictEqual(Array.from(places), ['Onerahi', "Sarah's House", 'Whangārei', 'Auckland Post Office', 'Hamilton', 'Rotorua', 'Taupō Station', 'Napier', 'Wellington', 'Nelson', 'Kaikōura', 'Christchurch', 'Franz Josef', 'Queenstown', 'Dunedin', 'Bluff', 'Rarotonga', 'Tonga', 'Samoa', 'Sydney', 'Gold Coast', 'Perth', 'Adelaide', 'Melbourne', 'Brisbane', 'Port Moresby', 'Solomon Islands', 'Vanuatu', 'Fiji', 'New Caledonia', 'Indonesia']);
@@ -4961,7 +4961,7 @@ console.log('1.9.227 echo and 3 s pace ok');
   const map = SR.nzMapSvg();
   assert.ok(map.includes('class="sr-clouds"') && (map.match(/class="sr-cloud"/g) || []).length >= 6, 'drifting map clouds');
   assert.ok(html.includes('@keyframes srclouddrift') && html.includes('.sr-cloud { animation: none; }'));
-  assert.ok(map.includes('sr-westpac') && map.includes('>West Pacific<') && !map.includes('coming soon'));
+  assert.ok(map.includes('Papua New Guinea') && !map.includes('sr-westpac') && !map.includes('coming soon'));
   assert.ok(!SR.FUTURE_STOPS.some(s => s.inset === 'westpac'), 'those islands are levels now');
   // Scenes: one more soft drifting cloud by day, none added at night.
   for (const s of SR.SCENES) assert.strictEqual(s.sprites.filter(p => p.svg === 'softcloud').length, s.night ? 0 : 1, s.id);
@@ -4979,8 +4979,9 @@ console.log('1.9.227 echo and 3 s pace ok');
   assert.deepStrictEqual(Array.from(SR.LEVELS.slice(26).map(l => l.name)), ['Honiara Reef', 'Port Vila Waterfront', 'Bula Beach', 'Nouméa Bay', 'Bali Beach Market']);
   assert.ok(!SR.FUTURE_STOPS.some(s => /Solomon|Vanuatu|Fiji|Caledonia|Indonesia|Bali/.test(s.place)));
   const map = SR.nzMapSvg();
-  assert.ok(map.includes('sr-countries') && map.includes('>New countries<') && map.includes('viewBox="0 0 400 2960"'));
-  assert.ok(html.includes('sugar-rush.js?v=1.9.236'));
+  assert.ok(!map.includes('sr-countries') && !map.includes('>New countries<') && map.includes('viewBox="0 0 640 2240"'));
+  SR.MAP_STOPS.slice(26).forEach(function (s) { assert.ok(Math.hypot(s.x - SR.ausXY(s.lat, s.lon).x, s.y - SR.ausXY(s.lat, s.lon).y) < 1.5, s.place + ' sits where it belongs beside Australia'); });
+  assert.ok(html.includes('sugar-rush.js?v=1.9.237'));
   for (const n of [27, 28, 29, 30, 31]) {
     const lv = SR.LEVELS[n - 1];
     assert.ok(!lv.target && !lv.hard);
@@ -4995,7 +4996,7 @@ console.log('1.9.227 echo and 3 s pace ok');
   assert.ok(two.startsWith('M ') && two.includes('C '), 'icing joins the places already cleared');
   assert.ok(!two.endsWith(SR.MAP_STOPS[2].x + ' ' + SR.MAP_STOPS[2].y), 'the road does not run on to the next stop');
   assert.ok(!SR.nzMapSvg().includes('id="sr-path-wide" d="M'), 'the icing is not baked in before progress is known');
-  assert.ok(SR.nzMapSvg().includes('stroke-dasharray="1.2 9"') && SR.nzMapSvg().includes('opacity=".34"'), 'the road ahead is a very faint dotted line');
+  assert.ok(SR.nzMapSvg().includes('stroke="#1565b0"') && SR.nzMapSvg().includes('stroke-dasharray="2.4 8"') && SR.nzMapSvg().includes('opacity=".95"'), 'the road ahead is a visible dotted line');
   assert.ok(SR.aheadPath([3, 1]).startsWith('M ') && SR.aheadPath([3, 1]).includes(String(SR.MAP_STOPS[1].x)), 'dots continue from the last place cleared');
   assert.strictEqual(SR.aheadPath(SR.MAP_STOPS.map(function () { return 3; })), '', 'no dots once every stop is cleared');
   assert.ok(html.includes('where you have been'));
