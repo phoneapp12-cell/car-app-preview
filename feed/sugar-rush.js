@@ -1,4 +1,4 @@
-/* Info Book 1.9.257 – Sugar Rush, levels 1–65. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.258 – Sugar Rush, levels 1–70. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -382,7 +382,30 @@
       badge: { id: 'mooncakedelivery', name: 'Mooncake Delivery', icon: '🥮' } },
     { n: 65, name: 'Hainan Starfruit Sprint', target: 0, scoreGoal: 12500, moves: 30, stars: [0, 13000, 19000], kinds: 6,
       help: 'Score 12,500 points before your 30 moves run out.',
-      badge: { id: 'starfruitsprint', name: 'Starfruit Sprint', icon: '⭐' } }
+      badge: { id: 'starfruitsprint', name: 'Starfruit Sprint', icon: '⭐' } },
+    // 1.9.258 Continue east across the Taiwan Strait and the East China Sea.
+    { n: 66, name: 'Taipei Lantern Market', target: 0, moves: 32, stars: [0, 7200, 14400], kinds: 6,
+      collect: { color: 4, n: 12 },
+      bub: ['10000001', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '10000001'],
+      help: 'Collect 12 blueberry gems and pop the four sugar bubbles around Taipei’s lantern market in 32 moves.',
+      badge: { id: 'taipeilantern', name: 'Lantern Market', icon: '🏮' } },
+    { n: 67, name: 'Naha Coral Garden', target: 0, moves: 34, stars: [0, 7600, 15200], kinds: 6,
+      jelly: ['00000000', '00111100', '01100110', '11000011', '11000011', '01100110', '00111100', '00000000'],
+      help: 'Clear the reef-ring jelly surrounding the coral garden in 34 moves.',
+      badge: { id: 'nahacoral', name: 'Coral Garden', icon: '🐠' } },
+    { n: 68, name: 'Fukuoka Mochi Delivery', target: 0, moves: 34, stars: [0, 7800, 15600], kinds: 6,
+      ings: [[0, 2], [0, 5]],
+      ice: ['00000000', '00000000', '00000000', '00011000', '00011000', '00000000', '00000000', '00000000'],
+      help: 'Bring both mochi treats down and crack the four icy blocks in 34 moves.',
+      badge: { id: 'fukuokamochi', name: 'Mochi Delivery', icon: '🍡' } },
+    { n: 69, name: 'Seoul Palace Garden', target: 0, moves: 34, stars: [0, 7900, 15800], kinds: 6,
+      collect: { color: 2, n: 12 },
+      locks: ['00000000', '00000000', '00000000', '00011000', '00011000', '00000000', '00000000', '00000000'],
+      help: 'Collect 12 lemon drops and free the four locked jars in the palace garden in 34 moves.',
+      badge: { id: 'seoulgarden', name: 'Palace Garden', icon: '🌿' } },
+    { n: 70, name: 'Tokyo Star Parade', target: 0, scoreGoal: 14500, moves: 34, stars: [0, 16000, 24000], kinds: 6,
+      help: 'Score 14,500 points before your 34 moves run out.',
+      badge: { id: 'tokyostars', name: 'Star Parade', icon: '🌟' } }
   ];
 
 
@@ -452,7 +475,12 @@
     { icon: '🧚', goal: 'Uncover the sugar sprites', detail: 'Uncover all 6 sugar sprites hidden under the frosting in 34 moves.', tip: 'The tiny silhouettes mark sprites beneath the icing. Match next to the frosting or hit it with a special to uncover them.', mechanic: 'hidden' },
     { icon: '🌈', goal: 'Open the syrup stream', detail: 'Clear the 8 candy clogs along the marked syrup channel and use the two 3×3 Popper bombs to help clear the path in 34 moves.', tip: 'Match on the rainbow-marked tiles to clear the clogs. A match next to a Popper sets it off in a 3×3 blast; the bombs can chain.', mechanic: 'flow' },
     { icon: '🥮', goal: 'Finish the mooncake delivery', detail: 'Bring both mooncakes down, collect 10 apple chews, clear the chocolate and free the liquorice in 38 moves.', tip: 'This mixed order has treats to deliver and blockers to handle. Keep the chocolate and liquorice from spreading while you collect apple chews.', mechanic: 'mix' },
-    { icon: '⭐', goal: 'Reach the star score', detail: 'Score 12,500 points before your 30 moves run out.', tip: 'Long matches and special sweets score more. Keep chaining matches to reach the target.', mechanic: 'score' }
+    { icon: '⭐', goal: 'Reach the star score', detail: 'Score 12,500 points before your 30 moves run out.', tip: 'Long matches and special sweets score more. Keep chaining matches to reach the target.', mechanic: 'score' },
+    { icon: '🏮', goal: 'Collect blueberry gems and pop the bubbles', detail: 'Collect 12 blueberry gems and pop the four sugar bubbles in 32 moves.', tip: 'The bubbles are tucked into the corners. Make matches nearby while you gather the blueberry gems.', mechanic: 'collect-bubbles' },
+    { icon: '🐠', goal: 'Clear the coral-ring jelly', detail: 'Clear the reef-shaped jelly in 34 moves.', tip: 'Work around the outer ring, then clear the last pieces in the corners.', mechanic: 'jelly' },
+    { icon: '🍡', goal: 'Bring both mochi treats down and crack the icing', detail: 'Bring both treats down and clear the four blocks of icing in 34 moves.', tip: 'Match underneath each treat to bring it down; nearby matches will chip away at the icing.', mechanic: 'ingredients' },
+    { icon: '🌿', goal: 'Collect lemon drops and free the jars', detail: 'Collect 12 lemon drops and free the four locked jars in 34 moves.', tip: 'A match that includes a locked jar frees it. Keep collecting lemon drops as you work through the middle.', mechanic: 'collect-locks' },
+    { icon: '🌟', goal: 'Reach the star score', detail: 'Score 14,500 points before your 34 moves run out.', tip: 'Long matches and special sweets score more. Chain matches together to light up the Tokyo night.', mechanic: 'score' }
   ];
   function levelIntro(n, p) {
     const lv = LEVELS[(n | 0) - 1]; if (!lv) return null;
@@ -1042,7 +1070,13 @@
     { n: 62, x: 248, y: 1398, place: 'Quanzhou', kind: 'city', label: 'right', lat: 24.8741, lon: 118.6757 },
     { n: 63, x: 110, y: 1513, place: 'Shenzhen', kind: 'city', label: 'right', lat: 22.5431, lon: 114.0579 },
     { n: 64, x: 118, y: 1544, place: 'Hong Kong', kind: 'city', label: 'right', lat: 22.3193, lon: 114.1694 },
-    { n: 65, x: -70, y: 1580, place: 'Haikou', kind: 'city', label: 'left', lat: 20.044, lon: 110.1999 }
+    { n: 65, x: -70, y: 1580, place: 'Haikou', kind: 'city', label: 'left', lat: 20.044, lon: 110.1999 },
+    // East Asian city stops use the same geographic projection as the China route.
+    { n: 66, x: 99.5, y: 1415.9, place: 'Taipei', kind: 'city', label: 'left', lat: 25.0330, lon: 121.5654 },
+    { n: 67, x: 151.7, y: 1403.0, place: 'Naha', kind: 'city', label: 'right', lat: 26.2124, lon: 127.6809 },
+    { n: 68, x: 174.9, y: 1322.1, place: 'Fukuoka', kind: 'city', label: 'right', lat: 33.5902, lon: 130.4017 },
+    { n: 69, x: 145.7, y: 1278.4, place: 'Seoul', kind: 'city', label: 'left', lat: 37.5665, lon: 126.9780 },
+    { n: 70, x: 253.8, y: 1299.2, place: 'Tokyo', kind: 'city', label: 'right', lat: 35.6762, lon: 139.6503 }
   ];
   // Country is a separate atlas layer from the level stop (city/island) label.
   const MAP_COUNTRIES = Array(16).fill('New Zealand').concat(
@@ -1051,11 +1085,13 @@
     ['Papua New Guinea', 'Solomon Islands', 'Vanuatu', 'Fiji', 'New Caledonia', 'Indonesia', 'Australia', 'Australia',
       'Vietnam', 'Malaysia', 'Thailand', 'Myanmar', 'India', 'Nepal', 'Bangladesh', 'Sri Lanka', 'Singapore', 'Cambodia', 'Philippines', 'Laos', 'Bhutan', 'Pakistan',
       'Afghanistan', 'Iran', 'Uzbekistan', 'Kazakhstan', 'China'],
-    Array(13).fill('China')
+    Array(13).fill('China'),
+    ['Taiwan', 'Japan', 'Japan', 'South Korea', 'Japan']
   );
   function countryForLevel(n) { return MAP_COUNTRIES[(n | 0) - 1] || ''; }
   const POSTCARD_COUNT = 4;
-  const POSTCARD_COUNTRIES = [...new Set(MAP_COUNTRIES)];
+  // Keep the separate Postcard Hunt's original 65-level country roster stable as the campaign grows.
+  const POSTCARD_COUNTRIES = [...new Set(MAP_COUNTRIES.slice(0, 65))];
   const POSTCARD_ICONS = {
     'New Zealand': '🥝', 'Cook Islands': '🌺', Tonga: '🥥', Samoa: '🌴', Australia: '🦘',
     'Papua New Guinea': '🐦', 'Solomon Islands': '🐚', Vanuatu: '🌋', Fiji: '🌊',
@@ -1088,7 +1124,7 @@
     { place: 'Darwin', x: 179, y: 1827, label: 'left', lat: -12.46, lon: 130.84 },
     { place: 'Cairns', x: 306, y: 1876, label: 'left', lat: -16.92, lon: 145.77 }
   ];
-  const LV_COUNT = 65;
+  const LV_COUNT = 70;
   function stopForLevel(n) { return MAP_STOPS[(n | 0) - 1] || null; }
   function icingPath(pts) {
     if (!pts || pts.length < 2) return '';
@@ -1153,6 +1189,20 @@
     [[40.5, 46.5], [44.0, 47.0], [49.0, 50.0], [53.8, 54.0], [55.2, 61.0], [54.0, 70.0], [50.5, 79.0], [47.0, 86.0], [44.0, 81.0], [42.0, 74.0], [40.0, 67.0], [40.5, 59.0]],
     [[22.0, 101.0], [21.0, 108.0], [19.0, 110.0], [21.0, 115.0], [24.0, 119.0], [29.0, 121.0], [34.0, 120.0], [37.0, 122.0], [40.0, 121.0], [42.0, 124.0], [47.0, 131.0], [50.0, 127.0], [53.0, 122.0], [49.0, 118.0], [49.0, 110.0], [47.0, 106.0], [45.0, 99.0], [44.0, 95.0], [41.0, 91.0], [39.0, 87.0], [40.0, 80.0], [37.0, 75.0], [34.0, 78.0], [30.0, 80.0], [27.0, 85.0], [24.0, 89.0]]
   ];
+  // Simplified East Asian island and peninsula outlines, in lat/lon on the same projection.
+  const ASIA_EAST_LAND = [
+    // Taiwan
+    [[25.3, 121.5], [25.3, 122.0], [24.8, 121.9], [24.2, 121.8], [23.6, 121.5], [23.1, 121.4], [22.6, 121.0], [22.0, 120.8], [21.9, 120.4], [22.3, 120.2], [22.9, 120.1], [23.5, 120.0], [24.1, 120.2], [24.7, 120.4], [25.1, 120.8]],
+    // Korean Peninsula
+    [[38.6, 128.4], [38.2, 127.7], [38.0, 126.7], [37.4, 126.4], [36.7, 126.5], [36.2, 126.6], [35.8, 126.5], [35.3, 126.4], [34.7, 126.6], [34.3, 127.0], [34.5, 127.7], [34.7, 128.2], [35.1, 128.6], [35.7, 129.1], [36.4, 129.5], [37.1, 129.5], [37.8, 129.2], [38.4, 129.0]],
+    // Kyushu, Shikoku, Honshu and Hokkaido
+    [[33.9, 130.9], [33.5, 130.6], [32.8, 130.5], [31.8, 130.0], [31.4, 130.1], [31.2, 130.9], [31.6, 131.3], [32.3, 131.3], [32.8, 131.8], [33.3, 131.7], [33.8, 131.2]],
+    [[34.4, 132.2], [34.4, 133.5], [33.9, 134.5], [33.5, 134.7], [33.1, 134.3], [33.0, 133.3], [33.3, 132.5]],
+    [[34.6, 130.8], [34.8, 131.5], [34.3, 132.0], [34.1, 133.0], [34.4, 134.2], [34.6, 135.3], [34.8, 136.2], [35.1, 137.0], [35.3, 138.0], [35.5, 139.3], [36.0, 140.2], [37.0, 140.9], [38.0, 140.9], [39.0, 140.0], [40.0, 140.1], [40.7, 140.6], [41.5, 140.8], [41.5, 139.9], [40.8, 139.0], [40.6, 138.2], [39.8, 137.6], [39.0, 138.3], [38.0, 138.9], [37.0, 138.8], [36.0, 137.4], [35.0, 136.8], [34.8, 135.3], [34.5, 134.5], [34.1, 133.5], [33.7, 132.5], [33.9, 131.3]],
+    [[41.4, 140.3], [41.7, 139.4], [42.4, 139.3], [43.0, 140.0], [43.8, 140.6], [44.4, 141.2], [45.0, 141.7], [45.5, 142.7], [45.4, 143.5], [44.8, 144.1], [43.9, 145.0], [43.2, 145.4], [42.6, 144.3], [42.0, 143.0], [41.5, 142.2], [41.3, 141.2]],
+    // Okinawa's main island, where the level-67 stop sits.
+    [[26.8, 127.7], [26.6, 128.0], [26.3, 128.1], [26.0, 127.9], [26.1, 127.6], [26.4, 127.5], [26.7, 127.5]]
+  ];
   function ausPath(pts) { return pts.map(function (q, i) { const a = ausXY(q[0], q[1]); return (i ? 'L' : 'M') + a.x.toFixed(1) + ' ' + a.y.toFixed(1); }).join(' ') + ' Z'; }
   // 1.9.251: add airy drift and tiny travel-day accents, kept in open sea away from route pins.
   const MAP_CLOUDS = [[330, 140, 1, 26], [40, 640, 0.8, 34], [350, 860, 0.9, 30], [60, 1120, 1.1, 38], [330, 1200, 0.8, 28], [64, 1722, 0.7, 32], [40, 1880, 0.9, 36], [370, 2200, 0.8, 30], [540, 320, 0.68, 35], [510, 500, 0.75, 39], [535, 980, 0.72, 36], [510, 1360, 0.7, 40], [540, 1550, 0.76, 33], [520, 1740, 0.8, 38], [535, 1985, 0.75, 41], [500, 2160, 0.72, 34], [-540, 820, 0.6, 38], [-535, 1810, 0.7, 35]];
@@ -1213,6 +1263,7 @@
       atlasPill(-350, 1695, 195, '05 / ISLAND SOUTHEAST ASIA', 'SOUTHEAST ASIA', 'INDONESIA · MALAYSIA · SINGAPORE') +
       atlasPill(-560, 1350, 195, '06 / HIMALAYAS', 'SOUTH ASIA', 'INDIA · NEPAL · BHUTAN · PAKISTAN') +
       atlasPill(-565, 1137, 190, '07 / THE SILK ROAD', 'CENTRAL ASIA', 'AFGHANISTAN · IRAN · UZBEKISTAN') +
+      atlasPill(370, 1438, 220, '08 / EAST ASIA', 'EAST ASIA', 'TAIWAN · SOUTH KOREA · JAPAN') +
       '</g>';
   }
   function nzMapSvg() {
@@ -1305,8 +1356,9 @@
       '<path fill="url(#sr-candy-strawberry)" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="' + ausPath(NEW_BRITAIN_PTS) + '"/>' +
       '<text x="306" y="1711" text-anchor="middle" font-size="10" font-weight="900" fill="#2f7a4a" font-family="ui-rounded,system-ui,sans-serif">Papua New Guinea</text>' +
       EAST_ISLES.map(function (q, i) { const a = ausXY(q[0], q[1]); return '<ellipse cx="' + a.x.toFixed(1) + '" cy="' + a.y.toFixed(1) + '" rx="' + q[2] + '" ry="' + q[3] + '" transform="rotate(' + q[4] + ' ' + a.x.toFixed(1) + ' ' + a.y.toFixed(1) + ')" fill="url(#' + islandCandy[i % islandCandy.length] + ')" stroke="#fff" stroke-width="3"/>'; }).join('') +
-      // Asia polygon order: Vietnam, Malaysia, Thailand, Myanmar, India; Pakistan, Bhutan, Laos, Cambodia, Philippines; then the Silk Road countries.
+      // Asia polygon order: Southeast/South Asia and Silk Road countries, followed by East Asia.
       ASIA_LAND.map(function (pts, i) { return '<path filter="url(#sr-soft)" fill="url(#' + asiaCandy[i % asiaCandy.length] + ')" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="' + ausPath(pts) + '"/>'; }).join('') +
+      ASIA_EAST_LAND.map(function (pts, i) { return '<path filter="url(#sr-soft)" fill="url(#' + asiaCandy[(i + 3) % asiaCandy.length] + ')" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="' + ausPath(pts) + '"/>'; }).join('') +
       '<path d="M120 1960 C150 1940 190 1950 210 1980 C190 1990 150 1990 120 1960 Z" fill="#ffd9a8" opacity=".6"/>' +
       '<path d="M236 1930 C250 1918 270 1922 276 1936 C264 1944 246 1942 236 1930 Z" fill="#ffd9a8" opacity=".55"/>' +
       '<circle class="sr-bob" cx="380" cy="1860" r="6" fill="#ffb347" opacity=".5"/><circle class="sr-bob" cx="30" cy="2160" r="7" fill="#ff8ab8" opacity=".45"/>' +
