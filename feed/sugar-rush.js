@@ -1,4 +1,4 @@
-/* Info Book 1.9.256 – Sugar Rush, levels 1–57. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.257 – Sugar Rush, levels 1–65. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -343,7 +343,46 @@
       ice: ['11000011', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '11000011'],
       locks: ['00000000', '00000000', '00000000', '00011000', '00011000', '00000000', '00000000', '00000000'],
       help: 'Clear the blossom-ring jelly, crack the icy corners and free all 4 locked jars in 40 moves.',
-      badge: { id: 'pearlriver', name: 'Pearl River Blossom', icon: '🌸' } }
+      badge: { id: 'pearlriver', name: 'Pearl River Blossom', icon: '🌸' } },
+    // 1.9.257 Recipe orders join the regular China route, alongside familiar objectives.
+    { n: 58, name: 'Nanjing Candy Workshop', target: 0, moves: 32, stars: [0, 7600, 15200], kinds: 6,
+      recipe: { candies: [{ color: 0, n: 10 }, { color: 4, n: 8 }], specials: [{ kind: 'w', n: 1 }] },
+      help: 'Collect 10 cherry gumdrops and 8 blueberry gems, then create 1 wrapped sweet in 32 moves.',
+      badge: { id: 'nanjingrecipe', name: 'Golden Recipe', icon: '📜' } },
+    { n: 59, name: 'Hangzhou Three-Scoop Lake', target: 0, moves: 36, stars: [0, 7700, 15400], kinds: 6,
+      jelly: ['00000000', '00111100', '01300310', '01000010', '01000010', '03100130', '00111100', '00000000'],
+      help: 'Clear the lotus-lake jelly. The marked squares have three layers and need three matches to clear.',
+      badge: { id: 'hangzhou', name: 'Lotus Lake', icon: '🪷' } },
+    { n: 60, name: 'Fuzhou Double-Stripe Feast', target: 0, moves: 36, stars: [0, 8000, 16000], kinds: 6,
+      recipe: { candies: [{ color: 1, n: 10 }], combos: [{ kind: 'crisscross', n: 1 }] },
+      help: 'Collect 10 orange jelly sweets and swap two stripe sweets together to make a double-stripe blast in 36 moves.',
+      badge: { id: 'fuzhourecipe', name: 'Double-Stripe Feast', icon: '⚡' } },
+    { n: 61, name: 'Xiamen Lantern Dash', hard: 1, timer: 90, target: 0, moves: 40, stars: [0, 8200, 16400], kinds: 6,
+      collect: { color: 2, n: 12 },
+      jelly: ['00000000', '00000000', '00110000', '01111000', '01111000', '00110000', '00000000', '00000000'],
+      help: 'Hard countdown: collect 12 lemon drops and clear the small lantern-path jelly before 90 seconds run out.',
+      badge: { id: 'lanterndash', name: 'Lantern Dash', icon: '🏮' } },
+    { n: 62, name: 'Quanzhou Sugar Sprites', target: 0, moves: 34, stars: [0, 8000, 16000], kinds: 6,
+      ice: ['00000000', '00000000', '00111100', '00000000', '00100100', '00000000', '00000000', '00000000'],
+      iceGoal: false, hiddenIcon: '🧚',
+      hidden: ['00000000', '00000000', '00111100', '00000000', '00100100', '00000000', '00000000', '00000000'],
+      help: 'Uncover all 6 sugar sprites hidden under the frosting in 34 moves.',
+      badge: { id: 'sugarsprites', name: 'Sugar Sprite Friends', icon: '🧚' } },
+    { n: 63, name: 'Shenzhen Syrup Stream', target: 0, moves: 34, stars: [0, 7900, 15800], kinds: 6,
+      flow: ['00000000', '00000000', '00110000', '00010000', '00010000', '00011100', '00010000', '00000000'],
+      poppers: ['00000000', '00000000', '00000000', '01000000', '00100000', '00000000', '00000000', '00000000'],
+      help: 'Clear the 8 candy clogs along the marked syrup channel. Matches near a Popper bomb set off a 3×3 blast that can clear nearby clogs and chain into the other bomb.',
+      badge: { id: 'syrupstream', name: 'Rainbow Syrup Run', icon: '🌈' } },
+    { n: 64, name: 'Hong Kong Mooncake Delivery', target: 0, moves: 38, stars: [0, 8400, 16800], kinds: 6,
+      ings: [[0, 2], [0, 5]], ingIcon: '🥮',
+      recipe: { candies: [{ color: 3, n: 10 }] },
+      chocoGoal: true, choco: ['00000000', '00000000', '10000001', '00000000', '00000000', '00000000', '00000000', '00000000'],
+      liq: ['00000000', '00000000', '00000000', '00011000', '00000000', '00000000', '00000000', '00000000'],
+      help: 'A mixed order: bring both mooncakes down, collect 10 apple chews, clear the chocolate and free the liquorice in 38 moves.',
+      badge: { id: 'mooncakedelivery', name: 'Mooncake Delivery', icon: '🥮' } },
+    { n: 65, name: 'Hainan Starfruit Sprint', target: 0, scoreGoal: 12500, moves: 30, stars: [0, 13000, 19000], kinds: 6,
+      help: 'Score 12,500 points before your 30 moves run out.',
+      badge: { id: 'starfruitsprint', name: 'Starfruit Sprint', icon: '⭐' } }
   ];
 
 
@@ -405,7 +444,15 @@
     { icon: '🐼', goal: 'Clear the garden jelly and pop the bubbles', detail: 'Clear every jelly and pop all 4 sugar bubbles in 36 moves.', tip: 'Work around the garden ring, then make matches beside the bubbles at the edges.', mechanic: 'panda' },
     { icon: '🚇', goal: 'Bring both treats down and free the jars', detail: 'Bring both treats down and free all 4 locked jars in 38 moves.', tip: 'The treats and jars need attention in different parts of the board. Make a clear lane beneath each treat.', mechanic: 'mountain-rail' },
     { icon: '🌃', goal: 'Clear the double jelly and stop the chocolate', detail: 'Clear every double-layer jelly while keeping the chocolate in check in 38 moves.', tip: 'Some jelly needs two clears. Hit the chocolate when you can so it does not spread.', mechanic: 'bund' },
-    { icon: '🌸', goal: 'Clear the jelly, crack the icing and free the jars', detail: 'Clear the jelly, crack the 4 icy corners and free all 4 locked jars in 40 moves.', tip: 'A little of everything in the final city stop: work the jelly ring and use specials to reach the corners.', mechanic: 'pearl-river' }
+    { icon: '🌸', goal: 'Clear the jelly, crack the icing and free the jars', detail: 'Clear the jelly, crack the 4 icy corners and free all 4 locked jars in 40 moves.', tip: 'A little of everything in the final city stop: work the jelly ring and use specials to reach the corners.', mechanic: 'pearl-river' },
+    { icon: '📜', goal: 'Fill the recipe and create a wrapped sweet', detail: 'Collect 10 cherry gumdrops and 8 blueberry gems, then create a wrapped sweet in 32 moves.', tip: 'Make a T- or L-shaped match to create a wrapped sweet. The recipe counts collected colours and each special as soon as you make it.', mechanic: 'recipe' },
+    { icon: '🪷', goal: 'Clear the lotus-lake jelly', detail: 'Clear every jelly around the lotus lake in 34 moves.', tip: 'Work around the lake ring and clear the jelly underneath each sweet.', mechanic: 'jelly' },
+    { icon: '⚡', goal: 'Fill the recipe and make a double-stripe blast', detail: 'Collect 10 orange jelly sweets and swap two stripe sweets together to make a double-stripe blast in 36 moves.', tip: 'First make two stripe sweets with four-in-a-line matches. Then swap them together to create the double-stripe blast.', mechanic: 'recipe' },
+    { icon: '🏮', goal: 'Race the lantern clock', detail: 'Collect 12 lemon drops and clear the lantern-path jelly before time runs out.', tip: 'You have 1 minute 30 seconds. Make quick matches on the jelly path while collecting lemon drops.', mechanic: 'timer' },
+    { icon: '🧚', goal: 'Uncover the sugar sprites', detail: 'Uncover all 6 sugar sprites hidden under the frosting in 34 moves.', tip: 'The tiny silhouettes mark sprites beneath the icing. Match next to the frosting or hit it with a special to uncover them.', mechanic: 'hidden' },
+    { icon: '🌈', goal: 'Open the syrup stream', detail: 'Clear the 8 candy clogs along the marked syrup channel and use the two 3×3 Popper bombs to help clear the path in 34 moves.', tip: 'Match on the rainbow-marked tiles to clear the clogs. A match next to a Popper sets it off in a 3×3 blast; the bombs can chain.', mechanic: 'flow' },
+    { icon: '🥮', goal: 'Finish the mooncake delivery', detail: 'Bring both mooncakes down, collect 10 apple chews, clear the chocolate and free the liquorice in 38 moves.', tip: 'This mixed order has treats to deliver and blockers to handle. Keep the chocolate and liquorice from spreading while you collect apple chews.', mechanic: 'mix' },
+    { icon: '⭐', goal: 'Reach the star score', detail: 'Score 12,500 points before your 30 moves run out.', tip: 'Long matches and special sweets score more. Keep chaining matches to reach the target.', mechanic: 'score' }
   ];
   function levelIntro(n, p) {
     const lv = LEVELS[(n | 0) - 1]; if (!lv) return null;
@@ -416,8 +463,8 @@
       n: lv.n, name: lv.name, place: stop.place, title: lv.name,
       stopLine: 'Level ' + lv.n + ' · ' + stop.place,
       icon: info.icon, goal: info.goal, detail: info.detail, tip: info.tip, mechanic: info.mechanic,
-      moves: lv.moves, badge: lv.badge, stars: stars, theme: lv.theme || '',
-      strip: info.goal + ' · ' + lv.moves + ' moves'
+      moves: lv.moves, timer: lv.timer || 0, badge: lv.badge, stars: stars, theme: lv.theme || '',
+      strip: info.goal + ' · ' + (lv.timer ? lv.timer + ' seconds' : lv.moves + ' moves')
     };
   }
   const TUTORIAL_KEY = 'ib-sugar-tutorial-done';
@@ -987,7 +1034,15 @@
     { n: 54, x: -100, y: 1360, place: 'Chengdu', kind: 'city', label: 'left', nudged: true, lat: 30.5728, lon: 104.0668, via: [{ x: -49.8, y: 1355.2 }] },
     { n: 55, x: -28.6, y: 1366.2, place: 'Chongqing', kind: 'city', label: 'right', lat: 29.5630, lon: 106.5516 },
     { n: 56, x: 98.7, y: 1347.9, place: 'Shanghai', kind: 'city', label: 'right', lat: 31.2304, lon: 121.4737 },
-    { n: 57, x: 28.7, y: 1436.8, place: 'Guangzhou', kind: 'city', label: 'left', lat: 23.1291, lon: 113.2644 }
+    { n: 57, x: 28.7, y: 1436.8, place: 'Guangzhou', kind: 'city', label: 'left', lat: 23.1291, lon: 113.2644 },
+    { n: 58, x: 151, y: 1286, place: 'Nanjing', kind: 'city', label: 'right', lat: 32.0603, lon: 118.7969 },
+    { n: 59, x: 169, y: 1361, place: 'Hangzhou', kind: 'city', label: 'right', lat: 30.2741, lon: 120.1551 },
+    { n: 60, x: 225, y: 1430, place: 'Fuzhou', kind: 'city', label: 'right', lat: 26.0745, lon: 119.2965 },
+    { n: 61, x: 286, y: 1475, place: 'Xiamen', kind: 'city', label: 'right', lat: 24.4798, lon: 118.0894 },
+    { n: 62, x: 248, y: 1398, place: 'Quanzhou', kind: 'city', label: 'right', lat: 24.8741, lon: 118.6757 },
+    { n: 63, x: 110, y: 1513, place: 'Shenzhen', kind: 'city', label: 'right', lat: 22.5431, lon: 114.0579 },
+    { n: 64, x: 118, y: 1544, place: 'Hong Kong', kind: 'city', label: 'right', lat: 22.3193, lon: 114.1694 },
+    { n: 65, x: -70, y: 1580, place: 'Haikou', kind: 'city', label: 'left', lat: 20.044, lon: 110.1999 }
   ];
   // Country is a separate atlas layer from the level stop (city/island) label.
   const MAP_COUNTRIES = Array(16).fill('New Zealand').concat(
@@ -996,7 +1051,7 @@
     ['Papua New Guinea', 'Solomon Islands', 'Vanuatu', 'Fiji', 'New Caledonia', 'Indonesia', 'Australia', 'Australia',
       'Vietnam', 'Malaysia', 'Thailand', 'Myanmar', 'India', 'Nepal', 'Bangladesh', 'Sri Lanka', 'Singapore', 'Cambodia', 'Philippines', 'Laos', 'Bhutan', 'Pakistan',
       'Afghanistan', 'Iran', 'Uzbekistan', 'Kazakhstan', 'China'],
-    Array(5).fill('China')
+    Array(13).fill('China')
   );
   function countryForLevel(n) { return MAP_COUNTRIES[(n | 0) - 1] || ''; }
   const POSTCARD_COUNT = 4;
@@ -1033,7 +1088,7 @@
     { place: 'Darwin', x: 179, y: 1827, label: 'left', lat: -12.46, lon: 130.84 },
     { place: 'Cairns', x: 306, y: 1876, label: 'left', lat: -16.92, lon: 145.77 }
   ];
-  const LV_COUNT = 57;
+  const LV_COUNT = 65;
   function stopForLevel(n) { return MAP_STOPS[(n | 0) - 1] || null; }
   function icingPath(pts) {
     if (!pts || pts.length < 2) return '';
@@ -1286,7 +1341,7 @@
   const isHole = t => t === HOLE || !!(t && t.hole);
   // 1.9.219 Sugar bubbles (t.bub) hold a sweet in place like a block until a match next to them, or a special, pops them.
   // Liquorice (t.liq) wraps a sweet like a lock, and creeps to a neighbour when a move frees none.
-  const isBlock = t => !!(t && (t.ice > 0 || t.choco > 0 || t.bub > 0));
+  const isBlock = t => !!(t && (t.ice > 0 || t.choco > 0 || t.bub > 0 || t.popper > 0));
   const isIng = t => !!(t && t.ing);
   const isBomb = t => !!(t && t.s === 'b' && t.c < 0 && !t.ing && !t.ice && !t.choco);
   const isCandy = t => !!(t && t.c >= 0 && !t.ice && !t.choco && !t.ing && !t.bub);
@@ -1572,6 +1627,24 @@
   function applyStep(b, step, rand, kinds, cascade, st) {
     const mask = st && st.mask;
     const hit = step.hit || new Set();
+    step.blasts = [];
+    const exploded = new Set(), pending = Array.from(hit);
+    // Poppers are blockers until a match or special hits one; each burst clears a 3×3 patch.
+    // Other Poppers in the patch join the chain, while frosting and other blockers take a hit.
+    for (let q = 0; q < pending.length; q++) {
+      const k = pending[q], [r, c] = rc(k), bomb = b[r][c];
+      if (!bomb || !bomb.popper || exploded.has(k)) continue;
+      exploded.add(k); b[r][c] = null; step.blasts.push({ r: r, c: c });
+      for (let i = r - 1; i <= r + 1; i++) for (let j = c - 1; j <= c + 1; j++) {
+        if (!isOpen(mask, i, j)) continue;
+        const at = key(i, j), t = b[i][j];
+        if (!t || isHole(t) || t === bomb) continue;
+        if (t.popper || isBlock(t)) {
+          if (!hit.has(at)) hit.add(at);
+          if (t.popper && !exploded.has(at)) pending.push(at);
+        } else if (isCandy(t) || isBomb(t)) step.clear.add(at);
+      }
+    }
     step.popped = [];
     step.delivered = step.delivered || [];
     step.jellyCleared = 0;
@@ -1592,6 +1665,7 @@
           st.jelly[r][c] = Math.max(0, before - 1);
           if (before > 0) step.jellyCleared++;
         }
+        if (st && st.flow) st.flow[r][c] = Math.max(0, (st.flow[r][c] || 0) - 1);
       }
     });
     step.blocked = [];
@@ -1601,7 +1675,11 @@
       if (t.ice > 0) {
         t.ice--;
         step.blocked.push({ r, c, kind: 'ice', left: t.ice });
-        if (t.ice <= 0) { b[r][c] = null; if (st && st.jelly) { const before = st.jelly[r][c] || 0; st.jelly[r][c] = Math.max(0, before - 1); if (before > 0) step.jellyCleared++; } }
+        if (t.ice <= 0) {
+          b[r][c] = null;
+          if (t.hidden && st) { st.hiddenLeft = Math.max(0, (st.hiddenLeft || 0) - 1); step.blocked.push({ r, c, kind: 'hidden' }); }
+          if (st && st.jelly) { const before = st.jelly[r][c] || 0; st.jelly[r][c] = Math.max(0, before - 1); if (before > 0) step.jellyCleared++; }
+        }
       } else if (t.choco > 0) {
         step.blocked.push({ r, c, kind: 'choco', left: 0 });
         step.chocoHit = true;
@@ -1619,6 +1697,10 @@
       if (under && Number.isInteger(under.postcardPiece)) t.postcardPiece = under.postcardPiece;
       b[r][c] = t; return { t, r, c };
     });
+    if (st && step.made) step.made.forEach(function (m) {
+      if (m && m.s) st.specialsMade[m.s] = (st.specialsMade[m.s] || 0) + 1;
+    });
+    if (st && step.combo) st.combosMade[step.combo] = (st.combosMade[step.combo] || 0) + 1;
     step.cascade = cascade;
     step.points = step.popped.length * PTS * cascade + (step.made || []).reduce((n, m) => n + (BONUS[m.s] || 0), 0) + (step.comboBonus || 0);
     step.falls = [];
@@ -1700,7 +1782,9 @@
     grid(lv.liq, (r, c) => { if (isCandy(board[r][c]) && !board[r][c].lock) board[r][c].liq = 1; });
     grid(lv.bub, (r, c) => { if (isCandy(board[r][c]) && !board[r][c].lock && !board[r][c].liq) board[r][c].bub = 1; });
     grid(lv.ice, (r, c, n) => { board[r][c] = Object.assign(mk(-4), { ice: n }); });
+    grid(lv.hidden, (r, c, n) => { const t = board[r][c]; if (t && t.ice > 0) { t.hidden = n; t.hiddenIcon = lv.hiddenIcon || '🧚'; } });
     grid(lv.choco, (r, c) => { board[r][c] = Object.assign(mk(-5), { choco: 1 }); });
+    grid(lv.poppers, (r, c, n) => { board[r][c] = Object.assign(mk(-6), { popper: n }); });
     (lv.ings || []).forEach(([r, c]) => { if (isOpen(mask, r, c)) board[r][c] = Object.assign(mk(-3), { ing: 1 }); });
     if (!hasMove(board, mask)) shuffle(board, rand, kinds, mask);
     return board;
@@ -1709,6 +1793,11 @@
   function jellyLeft(st) {
     if (!st.jelly) return 0;
     let n = 0; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) n += st.jelly[r][c] || 0;
+    return n;
+  }
+  function flowLeft(st) {
+    if (!st.flow) return 0;
+    let n = 0; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) n += st.flow[r][c] || 0;
     return n;
   }
   function iceLeft(b) { let n = 0; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (b[r][c] && b[r][c].ice > 0) n += b[r][c].ice; return n; }
@@ -1725,12 +1814,21 @@
     if (st.challenge) return Array.isArray(st.postcardFound) && st.postcardFound.length >= POSTCARD_COUNT;
     // Score is never the win condition — only objectives are.
     if (lv.jelly && jellyLeft(st) > 0) return false;
-    if (lv.ice && iceLeft(st.board) > 0) return false;
+    if (lv.ice && lv.iceGoal !== false && iceLeft(st.board) > 0) return false;
+    if (lv.hidden && (st.hiddenLeft || 0) > 0) return false;
+    if (lv.flow && flowLeft(st) > 0) return false;
     if (lv.collect && (st.collected[lv.collect.color] || 0) < lv.collect.n) return false;
+    if (lv.recipe) {
+      if ((lv.recipe.candies || []).some(function (item) { return (st.collected[item.color] || 0) < item.n; })) return false;
+      if ((lv.recipe.specials || []).some(function (item) { return ((st.specialsMade || {})[item.kind] || 0) < item.n; })) return false;
+      if ((lv.recipe.combos || []).some(function (item) { return ((st.combosMade || {})[item.kind] || 0) < item.n; })) return false;
+    }
     if ((lv.ings && lv.ings.length) && (st.ingsLeft || 0) > 0) return false;
     if (lv.locks && locksLeft(st.board) > 0) return false;
     if (lv.bub && bubLeft(st.board) > 0) return false;
     if (lv.liq && liqLeft(st.board) > 0) return false;
+    if (lv.chocoGoal && chocoLeft(st.board) > 0) return false;
+    if (lv.scoreGoal && st.score < lv.scoreGoal) return false;
     return true;
   }
   // Liquorice creeps: one plain sweet next to it gets wrapped, after LIQ_IDLE moves in a row that freed none.
@@ -1796,6 +1894,21 @@
     if (!st.won) return 0;
     return Math.max(1, starsFor(st.score, st.lv || LEVEL));
   }
+  const RECIPE_COLOR_ICONS = ['🍒', '🍊', '🍋', '🍏', '🫐', '🍇'];
+  const RECIPE_SPECIALS = {
+    w: { icon: '🎁', name: 'wrapped sweet' },
+    b: { icon: '🌈', name: 'sprinkle bomb' },
+    row: { icon: '↔️', name: 'striped sweet' },
+    col: { icon: '↕️', name: 'striped sweet' }
+  };
+  const RECIPE_COMBOS = {
+    crisscross: { icon: '⚡', name: 'double-stripe blast' },
+    bigcross: { icon: '💥', name: 'wide stripe blast' },
+    bigblast: { icon: '🎁', name: 'double-wrap blast' },
+    stripestorm: { icon: '🌈', name: 'rainbow stripe storm' },
+    wrapstorm: { icon: '🎁', name: 'rainbow wrap storm' },
+    sugarstorm: { icon: '🌟', name: 'sweet-shop storm' }
+  };
   function newGame(opt) {
     opt = opt || {};
     const lv = lvOf(opt);
@@ -1807,15 +1920,37 @@
     return {
       board, rand, kinds, mask, lv,
       jelly: parseDigits(lv.jelly),
+      flow: parseDigits(lv.flow),
       collected: new Array(KINDS).fill(0),
+      specialsMade: {},
+      combosMade: {},
+      hiddenLeft: lv.hidden ? parseDigits(lv.hidden).reduce((sum, row) => sum + row.reduce((a, n) => a + n, 0), 0) : 0,
       ingsLeft: countIngs(board),
-      score: 0, moves: lv.moves, target: lv.target || 0, turns: 0, over: false, won: false, stars: 0
+      score: 0, moves: lv.moves, target: lv.target || 0, timerLeft: lv.timer || 0, timerMsLeft: (lv.timer || 0) * 1000, timerUpdatedAt: Date.now(),
+      turns: 0, over: false, won: false, stars: 0
     };
   }
   function isScoreOnly(lv) {
     lv = lv || {};
     // Kept for older tests; no live level is score-only any more.
-    return !lv.jelly && !lv.ice && !lv.collect && !(lv.ings && lv.ings.length) && !lv.locks && !lv.bub && !lv.liq;
+    return !lv.jelly && !lv.flow && !lv.ice && !lv.hidden && !lv.collect && !lv.recipe && !(lv.ings && lv.ings.length) && !lv.locks && !lv.bub && !lv.liq && !lv.chocoGoal && !lv.scoreGoal;
+  }
+  function tickTimer(st, at) {
+    if (!st || !st.lv || !st.lv.timer || st.over) return false;
+    at = at == null ? Date.now() : at;
+    const before = st.timerLeft;
+    const elapsed = Math.max(0, at - (st.timerUpdatedAt || at));
+    st.timerUpdatedAt = at;
+    st.timerMsLeft = Math.max(0, (st.timerMsLeft == null ? st.lv.timer * 1000 : st.timerMsLeft) - elapsed);
+    st.timerLeft = Math.ceil(st.timerMsLeft / 1000);
+    if (st.timerMsLeft <= 0) {
+      st.timerLeft = 0;
+      st.over = true;
+      st.timerExpired = true;
+      st.won = goalsMet(st);
+      st.stars = st.won ? starsOf(st) : 0;
+    }
+    return before !== st.timerLeft || !!st.timerExpired;
   }
   function goalCounts(lv, stt) {
     lv = lv || {};
@@ -1826,6 +1961,27 @@
       const left = Math.max(0, n - have);
       const icon = lv.collect.color === 0 ? '🍒' : lv.collect.color === 2 ? '🍋' : '🍬';
       out.push({ kind: 'collect', icon: icon, left: left, have: have, n: n, lab: 'left', text: icon + ' ' + left + ' left' });
+    }
+    if (lv.recipe) {
+      (lv.recipe.candies || []).forEach(function (item) {
+        const have = stt ? (stt.collected[item.color] || 0) : 0;
+        const left = Math.max(0, item.n - have);
+        const icon = RECIPE_COLOR_ICONS[item.color] || '🍬';
+        const name = NAMES[item.color] || 'sweets';
+        out.push({ kind: 'recipe-candy', icon: icon, left: left, have: have, n: item.n, lab: 'collect', text: icon + ' ' + name + ' ' + have + '/' + item.n });
+      });
+      (lv.recipe.specials || []).forEach(function (item) {
+        const def = RECIPE_SPECIALS[item.kind] || { icon: '✨', name: 'special sweet' };
+        const have = stt ? ((stt.specialsMade || {})[item.kind] || 0) : 0;
+        const left = Math.max(0, item.n - have);
+        out.push({ kind: 'recipe-special', icon: def.icon, left: left, have: have, n: item.n, lab: 'make', text: def.icon + ' ' + def.name + ' ' + have + '/' + item.n });
+      });
+      (lv.recipe.combos || []).forEach(function (item) {
+        const def = RECIPE_COMBOS[item.kind] || { icon: '✨', name: 'special combo' };
+        const have = stt ? ((stt.combosMade || {})[item.kind] || 0) : 0;
+        const left = Math.max(0, item.n - have);
+        out.push({ kind: 'recipe-combo', icon: def.icon, left: left, have: have, n: item.n, lab: 'make', text: def.icon + ' ' + def.name + ' ' + have + '/' + item.n });
+      });
     }
     if (lv.ings && lv.ings.length) {
       const n = lv.ings.length;
@@ -1838,9 +1994,27 @@
       const left = stt ? jellyLeft(stt) : 0;
       out.push({ kind: 'jelly', icon: '🟩', left: left, have: 0, n: left, lab: 'Jelly ' + left + ' left', text: '🟩 Jelly ' + left + ' left' });
     }
-    if (lv.ice) {
+    if (lv.flow) {
+      const left = stt ? flowLeft(stt) : 0;
+      out.push({ kind: 'flow', icon: '🌈', left: left, have: 0, n: left, lab: 'Clogs left', text: '🌈 Syrup Stream clogs ' + left + ' left' });
+    }
+    if (lv.ice && lv.iceGoal !== false) {
       const left = stt && stt.board ? iceLeft(stt.board) : 0;
       out.push({ kind: 'ice', icon: '🧁', left: left, have: 0, n: left, lab: 'Icing ' + left + ' left', text: '🧁 ' + left + ' left' });
+    }
+    if (lv.hidden) {
+      const n = parseDigits(lv.hidden).reduce((sum, row) => sum + row.reduce((a, k) => a + k, 0), 0);
+      const left = stt ? (stt.hiddenLeft || 0) : n;
+      out.push({ kind: 'hidden', icon: '🧚', left: left, have: n - left, n: n, lab: 'Sprites left', text: '🧚 Sugar sprites ' + (n - left) + '/' + n });
+    }
+    if (lv.chocoGoal) {
+      const left = stt && stt.board ? chocoLeft(stt.board) : 0;
+      out.push({ kind: 'choco', icon: '🍫', left: left, have: 0, n: left, lab: 'Chocolate left', text: '🍫 Chocolate ' + left + ' left' });
+    }
+    if (lv.scoreGoal) {
+      const have = stt ? stt.score : 0;
+      const left = Math.max(0, lv.scoreGoal - have);
+      out.push({ kind: 'score', icon: '⭐', left: left, have: have, n: lv.scoreGoal, lab: 'points left', text: '⭐ Score ' + have + '/' + lv.scoreGoal });
     }
     if (lv.locks) {
       const left = stt && stt.board ? locksLeft(stt.board) : 0;
@@ -1996,9 +2170,12 @@
       mask: st.mask,
       lv: st.lv,
       jelly: st.jelly ? st.jelly.map(r => r.slice()) : null,
+      flow: st.flow ? st.flow.map(r => r.slice()) : null,
       collected: st.collected.slice(),
+      specialsMade: Object.assign({}, st.specialsMade || {}), combosMade: Object.assign({}, st.combosMade || {}), hiddenLeft: st.hiddenLeft || 0,
       ingsLeft: st.ingsLeft, liqIdle: st.liqIdle || 0, turns: st.turns || 0,
-      score: st.score, moves: st.moves, target: st.target, over: st.over, won: st.won, stars: st.stars
+      score: st.score, moves: st.moves, target: st.target, timerLeft: st.timerLeft, timerMsLeft: st.timerMsLeft, timerUpdatedAt: st.timerUpdatedAt,
+      over: st.over, won: st.won, stars: st.stars
     };
   }
   function allMoves(st) {
@@ -2013,8 +2190,16 @@
     if (after.won) return 1e7 + after.score + after.moves * 50;
     let h = after.score;
     if (before.lv && before.lv.collect) h += ((after.collected[before.lv.collect.color] || 0) - (before.collected[before.lv.collect.color] || 0)) * 400;
+    if (before.lv && before.lv.recipe) {
+      (before.lv.recipe.candies || []).forEach(function (item) { h += ((after.collected[item.color] || 0) - (before.collected[item.color] || 0)) * 350; });
+      (before.lv.recipe.specials || []).forEach(function (item) { h += (((after.specialsMade || {})[item.kind] || 0) - ((before.specialsMade || {})[item.kind] || 0)) * 1000; });
+      (before.lv.recipe.combos || []).forEach(function (item) { h += (((after.combosMade || {})[item.kind] || 0) - ((before.combosMade || {})[item.kind] || 0)) * 1400; });
+    }
     if (before.jelly) h += (jellyLeft(before) - jellyLeft(after)) * 250;
-    if (before.lv && before.lv.ice) h += (iceLeft(before.board) - iceLeft(after.board)) * 300;
+    if (before.flow) h += (flowLeft(before) - flowLeft(after)) * 450;
+    if (before.lv && before.lv.ice && before.lv.iceGoal !== false) h += (iceLeft(before.board) - iceLeft(after.board)) * 300;
+    if (before.lv && before.lv.hidden) h += ((before.hiddenLeft || 0) - (after.hiddenLeft || 0)) * 500;
+    if (before.lv && before.lv.chocoGoal) h += (chocoLeft(before.board) - chocoLeft(after.board)) * 400;
     if (before.lv && before.lv.locks) h += (locksLeft(before.board) - locksLeft(after.board)) * 350;
     if (before.lv && before.lv.bub) h += (bubLeft(before.board) - bubLeft(after.board)) * 320;
     if (before.lv && before.lv.liq) h += (liqLeft(before.board) - liqLeft(after.board)) * 420;
@@ -4025,7 +4210,7 @@
     return true;
   }
 
-  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_X0, MAP_VW, MAP_STOPS, FUTURE_STOPS, NZ_PROJ, nzXY, WHANGAREI_INSET, insetXY, pacXY, ausXY, westPacXY, LV_COUNT, lvId, levelIds, stopId, LEGACY_220_IDS, migrateProg, stopForLevel, icingPath, beenPath, aheadPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, bubLeft, liqLeft, spreadLiq, beltDirection, shiftBelts, LIQ_IDLE, goalCounts, cloneState, bestMove, hintMoveFor, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
+  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_X0, MAP_VW, MAP_STOPS, FUTURE_STOPS, NZ_PROJ, nzXY, WHANGAREI_INSET, insetXY, pacXY, ausXY, westPacXY, LV_COUNT, lvId, levelIds, stopId, LEGACY_220_IDS, migrateProg, stopForLevel, icingPath, beenPath, aheadPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, bubLeft, liqLeft, flowLeft, chocoLeft, tickTimer, spreadLiq, beltDirection, shiftBelts, LIQ_IDLE, goalCounts, cloneState, bestMove, hintMoveFor, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
     allowed: () => true, // 1.9.228 open to every family member
     SAY_REST_MS, SAY_BIG, sayBig, COMBO_KINDS, COMBO_BONUS, comboKind, comboSwap, adjacentSpecials, isSpecialTile, HARD_LINES, hardLine, CANDY_STYLES, candySfxPlan, playCandySfx, SAY_SHOW_MS, SAY_AFTER_MS, sayShowGap, SPEAK_GAP, SPEAK_PITCH, SPEAK_RATE, SPEAK_VOL, pickSpeechVoice, speechGender, speakWorthy, SAY_SPRITES, SAY_CLIPS, sayClip, nextSayVoice, SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL, XF,
     VOICE_FILES, VOICE_RANK, MEDIA_HASH, mediaUrl, gameTrack, SONG_PLAN, SONG_FILES, SONG_FROM, songMood, attachSfxBus, playTone, playChime, playMovesWarnChime, playClip, voiceForStep,
@@ -4471,6 +4656,17 @@
   // 1.9.218 Glossier, rounder sweets: a soft contact shadow, a darker rim, bounce light
   // from below and a crisp specular. No shadowBlur, so it stays cheap on a phone.
   function drawSweet(t, x, y, R, sc, al, wob) {
+    if (t.popper) {
+      ctx.save(); ctx.translate(x, y); if (wob) ctx.rotate(wob); ctx.scale(sc, sc); ctx.globalAlpha = al;
+      ctx.fillStyle = 'rgba(70,10,40,.2)'; ctx.beginPath(); ctx.ellipse(0, R * .78, R * .72, R * .2, 0, 0, Math.PI * 2); ctx.fill();
+      const g = ctx.createRadialGradient(-R * .28, -R * .35, R * .06, 0, 0, R * .9);
+      g.addColorStop(0, '#ffb36b'); g.addColorStop(.42, '#f05252'); g.addColorStop(1, '#8d2146');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, R * .08, R * .72, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#60233b'; ctx.lineWidth = R * .12; ctx.beginPath(); ctx.moveTo(R * .1, -R * .55); ctx.quadraticCurveTo(R * .42, -R * .98, R * .58, -R * .7); ctx.stroke();
+      ctx.fillStyle = '#fff4a8'; ctx.beginPath(); ctx.arc(R * .59, -R * .7, R * (.1 + .025 * Math.sin(performance.now() / 90)), 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = R * .08; ctx.beginPath(); ctx.arc(-R * .12, R * .03, R * .5, -.8, .5); ctx.stroke();
+      ctx.restore(); return;
+    }
     if (t.bub > 0) { drawBubbled(t, x, y, R, sc, al, wob); return; }
     ctx.save(); ctx.translate(x, y); if (wob) ctx.rotate(wob); ctx.scale(sc, sc); ctx.globalAlpha = al;
     ctx.fillStyle = 'rgba(70,10,40,.16)'; ctx.beginPath(); ctx.ellipse(0, R * .88, R * .72, R * .18, 0, 0, Math.PI * 2); ctx.fill();
@@ -4518,6 +4714,10 @@
       ctx.beginPath(); ctx.arc(-R * .02, -R * .06, R * .46, .25, Math.PI * 1.75); ctx.stroke();
       ctx.strokeStyle = thick ? 'rgba(70,150,200,.6)' : 'rgba(120,180,215,.45)'; ctx.lineWidth = R * .055;
       ctx.beginPath(); ctx.arc(R * .02, R * .02, R * .16, .2, Math.PI * 1.25); ctx.stroke();
+      if (t.hidden) {
+        ctx.font = '900 ' + Math.round(R * .72) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = 'rgba(100,42,150,.9)'; ctx.fillText(t.hiddenIcon || '🧚', 0, R * .08);
+      }
       drawCandyShine(ctx, R * 0.82, thick ? 1 : .65);
       ctx.restore(); return;
     }
@@ -4694,7 +4894,7 @@
     ctx.fillRect(0, 0, W, W);
   }
   // 1.9.243 Each open tile is a little glass well. Jelly is a glossy dome; two layers read darker.
-  function drawTile(x, y, s, jelly, blush) {
+  function drawTile(x, y, s, jelly, blush, flow) {
     const rad = s * .2;
     ctx.fillStyle = 'rgba(176, 64, 112, .16)';
     rr(x + 2, y + 4, s - 4, s - 5, rad); ctx.fill();
@@ -4716,9 +4916,22 @@
       ctx.strokeStyle = deep ? 'rgba(110, 20, 150, .55)' : 'rgba(214, 40, 120, .4)';
       ctx.lineWidth = Math.max(1.5, 1.4 * DPR);
       rr(x + 4, y + 4, s - 8, s - 8, rad * .8); ctx.stroke();
+      if (jelly >= 3) {
+        ctx.strokeStyle = 'rgba(255,212,70,.9)'; ctx.lineWidth = Math.max(1.5, 1.8 * DPR);
+        rr(x + 2.5, y + 2.5, s - 5, s - 5, rad); ctx.stroke();
+      }
     } else {
       ctx.fillStyle = blush ? 'rgba(255,255,255,.8)' : 'rgba(255,214,232,.72)';
       rr(x + 1.6, y + 1.6, s - 3.2, s - 3.2, rad); ctx.fill();
+    }
+    if (flow > 0) {
+      const colors = ['#ff5375', '#ffab3d', '#ffe44d', '#50c979', '#48b6f3', '#9867df'];
+      ctx.save(); ctx.lineCap = 'round'; ctx.globalAlpha = .82;
+      colors.forEach(function (color, i) {
+        ctx.strokeStyle = color; ctx.lineWidth = Math.max(1.4, s * .055); ctx.beginPath();
+        const y0 = y + s * (.77 + (i - 2.5) * .045);
+        ctx.moveTo(x + s * .1, y0); ctx.quadraticCurveTo(x + s * .48, y0 - s * .05, x + s * .9, y0 + s * .01); ctx.stroke();
+      }); ctx.restore();
     }
     ctx.fillStyle = 'rgba(255,255,255,.55)';
     rr(x + s * .16, y + s * .07, s * .66, s * .1, s * .05); ctx.fill();
@@ -4749,6 +4962,11 @@
   }
   function frame() {
     if (screen === 'game' && st) {
+      if (tickTimer(st, Date.now())) hud();
+      if (st.timerExpired && !st.timerEndHandled && !busy) {
+        st.timerEndHandled = true;
+        if (st.won) beginGoalFinish(); else showEnd();
+      }
       const t = sparkleHoldT != null ? sparkleHoldT : now();
       ctx.clearRect(0, 0, W, W);
       const sarah = st.lv && st.lv.theme === 'sarah';
@@ -4758,7 +4976,7 @@
           if (sarah) drawHeart(c * CS + CS / 2, r * CS + CS / 2, CS * .018, 'rgba(255,140,180,.22)');
           continue;
         }
-        drawTile(c * CS, r * CS, CS, st.jelly ? (st.jelly[r][c] || 0) : 0, (r + c) % 2);
+        drawTile(c * CS, r * CS, CS, st.jelly ? (st.jelly[r][c] || 0) : 0, (r + c) % 2, st.flow ? (st.flow[r][c] || 0) : 0);
       }
       if (st.lv && st.lv.belts) st.lv.belts.forEach(function (lane) { drawBeltLane(lane, beltDirection(st.lv, lane, st.turns)); });
       if (sel && !busy) { ctx.strokeStyle = '#ff4f9a'; ctx.lineWidth = 3 * DPR; rr(sel[1] * CS + 3, sel[0] * CS + 3, CS - 6, CS - 6, CS * .2); ctx.stroke(); }
@@ -4768,6 +4986,11 @@
       } else if (f.type === 'ring') {
         const p = Math.min(1, Math.max(0, (t - f.t0) / f.dur)); ctx.strokeStyle = f.col ? rgbaOf(f.col, 0.85 * (1 - p)) : 'rgba(255,255,255,' + (0.8 * (1 - p)) + ')'; ctx.lineWidth = CS * .2 * (1 - p);
         ctx.beginPath(); ctx.arc(f.x, f.y, CS * (.4 + (f.big || 1.3) * p), 0, Math.PI * 2); ctx.stroke();
+      } else if (f.type === 'blast') {
+        const p = Math.min(1, Math.max(0, (t - f.t0) / f.dur)), radius = CS * (.35 + 1.8 * easeOut(p));
+        const g = ctx.createRadialGradient(f.x, f.y, radius * .1, f.x, f.y, radius);
+        g.addColorStop(0, rgbaOf('#fff4a8', .72 * (1 - p))); g.addColorStop(.55, rgbaOf('#ff6b39', .38 * (1 - p))); g.addColorStop(1, rgbaOf('#e92f69', 0));
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(f.x, f.y, radius, 0, Math.PI * 2); ctx.fill();
       }
       const hint = tickHint(t);
       const R = CS * .37;
@@ -4864,7 +5087,7 @@
         for (const key of lit) {
           const r = +key.split(',')[0], c = +key.split(',')[1];
           const jelly = st.jelly ? (st.jelly[r][c] || 0) : 0;
-          drawTile(c * CS, r * CS, CS, jelly, (r + c) % 2);
+          drawTile(c * CS, r * CS, CS, jelly, (r + c) % 2, st.flow ? (st.flow[r][c] || 0) : 0);
         }
         const R2 = CS * .37;
         for (const s of sprites.values()) {
@@ -5224,7 +5447,8 @@
     if (hold) {
       const prev = (hold.dataset.sig || '').split(',');
       hold.innerHTML = counts.map(function (c, i) {
-        const lab = c.kind === 'ings' ? c.lab : (c.kind === 'jelly' ? 'Jelly left' : c.kind === 'ice' ? 'Icing left' : c.kind === 'bub' ? 'Bubbles left' : c.kind === 'locks' ? 'Jars left' : c.kind === 'liq' ? 'Liquorice left' : 'left');
+        const customLab = c.kind.indexOf('recipe-') === 0 || c.kind === 'hidden' || c.kind === 'flow' || c.kind === 'choco' || c.kind === 'score';
+        const lab = c.kind === 'ings' || customLab ? c.lab : (c.kind === 'jelly' ? 'Jelly left' : c.kind === 'ice' ? 'Icing left' : c.kind === 'bub' ? 'Bubbles left' : c.kind === 'locks' ? 'Jars left' : c.kind === 'liq' ? 'Liquorice left' : 'left');
         const num = c.kind === 'ings' ? c.lab : String(c.left);
         const iconId = i === 0 ? ' id="gicon"' : '';
         const face = c.kind === 'jelly' ? '<i class="cd-swatch jelly"></i>' : c.kind === 'ice' ? '<i class="cd-swatch ice"></i>' : c.icon;
@@ -5246,14 +5470,16 @@
     } else if ($('gicon')) $('gicon').textContent = (counts[0] && counts[0].icon) || info.icon;
     if ($('help')) {
       const bits = counts.map(function (c) { return c.text; });
-      if (stt) bits.push(stt.moves + ' moves left');
+      if (stt) bits.push(stt.lv && stt.lv.timer ? ('Time ' + Math.floor(stt.timerLeft / 60) + ':' + String(stt.timerLeft % 60).padStart(2, '0')) : (stt.moves + ' moves left'));
       $('help').textContent = bits.length ? bits.join(' · ') : (stt ? info.goal : info.strip);
     }
     const strip = $('goalstrip');
     if (strip) strip.dataset.n = String(info.n);
     const mc = $('movecount');
     if (mc && stt) {
-      mc.classList.toggle('low', stt.moves <= 5 && stt.moves > 0 && !goalsMet(stt));
+      const timedLow = stt.lv && stt.lv.timer && stt.timerLeft <= 15 && stt.timerLeft > 0;
+      mc.classList.toggle('timer', !!(stt.lv && stt.lv.timer));
+      mc.classList.toggle('low', timedLow || (stt.moves <= 5 && stt.moves > 0 && !goalsMet(stt)));
     } else if (mc) mc.classList.remove('low');
   }
   function showIntro(n) {
@@ -5273,7 +5499,7 @@
     $('introtitle').textContent = info.name;
     $('introicon').textContent = info.icon;
     $('introgoal').textContent = info.detail;
-    $('intromoves').textContent = info.moves + ' moves';
+    $('intromoves').textContent = info.timer ? Math.floor(info.timer / 60) + ':' + String(info.timer % 60).padStart(2, '0') + ' on the clock' : info.moves + ' moves';
     $('introbody').textContent = info.tip;
     $('introstars').innerHTML = [0, 1, 2].map(i => '<span class="' + (i < info.stars ? 'on' : '') + '">★</span>').join('');
     $('introstars').setAttribute('aria-label', info.stars ? info.stars + ' stars earned' : 'No stars yet');
@@ -5588,11 +5814,20 @@
     const lv = g.lv, bits = [];
     if (lv.collect) bits.push((NAMES[lv.collect.color] || 'Sweets') + ' ' + (g.collected[lv.collect.color] || 0) + ' / ' + lv.collect.n);
     if (lv.jelly) bits.push('Jelly ' + jellyLeft(g) + ' left');
-    if (lv.ice) bits.push('Icing ' + iceLeft(g.board) + ' left');
+    if (lv.ice && lv.iceGoal !== false) bits.push('Icing ' + iceLeft(g.board) + ' left');
     if (lv.ings && lv.ings.length) bits.push('Ingredients ' + ((lv.ings.length - (g.ingsLeft || 0))) + ' / ' + lv.ings.length);
     if (lv.locks) bits.push('Locks ' + locksLeft(g.board) + ' left');
     if (lv.bub) bits.push('Bubbles ' + bubLeft(g.board) + ' left');
     if (lv.liq) bits.push('Liquorice ' + liqLeft(g.board) + ' left');
+    if (lv.recipe) {
+      (lv.recipe.candies || []).forEach(function (item) { bits.push((NAMES[item.color] || 'Sweets') + ' ' + (g.collected[item.color] || 0) + ' / ' + item.n); });
+      (lv.recipe.specials || []).forEach(function (item) { bits.push((RECIPE_SPECIALS[item.kind] || { name: 'Special sweet' }).name + ' ' + ((g.specialsMade || {})[item.kind] || 0) + ' / ' + item.n); });
+      (lv.recipe.combos || []).forEach(function (item) { bits.push((RECIPE_COMBOS[item.kind] || { name: 'Special combo' }).name + ' ' + ((g.combosMade || {})[item.kind] || 0) + ' / ' + item.n); });
+    }
+    if (lv.hidden) bits.push('Sugar sprites ' + (lv.hidden.reduce((sum, row) => sum + Array.from(row).reduce((a, n) => a + (+n || 0), 0), 0) - (g.hiddenLeft || 0)) + ' found');
+    if (lv.flow) bits.push('Syrup clogs ' + flowLeft(g) + ' left');
+    if (lv.chocoGoal) bits.push('Chocolate ' + chocoLeft(g.board) + ' left');
+    if (lv.scoreGoal) bits.push('Score ' + g.score.toLocaleString('en-NZ') + ' / ' + lv.scoreGoal);
     return bits.join(' · ');
   }
   function paintPostcardHud() {
@@ -5608,7 +5843,11 @@
   function hud() {
     if (!st) return;
     $('score').textContent = st.score.toLocaleString('en-NZ');
-    $('moves').textContent = st.moves;
+    const timed = !!(st.lv && st.lv.timer && !st.challenge);
+    const moveLabel = $('movecount') && $('movecount').querySelector('span');
+    if (moveLabel) moveLabel.textContent = timed ? 'Time left' : 'Moves left';
+    $('moves').textContent = timed ? Math.floor(st.timerLeft / 60) + ':' + String(st.timerLeft % 60).padStart(2, '0') : st.moves;
+    if ($('movecount')) $('movecount').classList.toggle('timer', timed);
     $('best').textContent = Math.max(prog.best[st.lv.n - 1] || 0, st.score).toLocaleString('en-NZ');
     $('obj').textContent = objText(st);
     if (st.lv) paintGoalStrip(st.lv, st);
@@ -6465,6 +6704,13 @@
       if (!reduce) for (let k = 0; k < 3; k++) pushFx({ type: 'glint', x: x + (Math.random() - .5) * .4, y: y + (Math.random() - .5) * .4, dx: 0, dy: -.2, sz: .12 + Math.random() * .08, rot: 0, t0: t1 + k * 50, dur: 380 });
       const sp = st.board[b.r] && st.board[b.r][b.c] && sprites.get(st.board[b.r][b.c].id); if (sp) sp.grow = t1;
     }
+    for (const b of s.blasts || []) {
+      const [x, y] = cellXY(b.r, b.c);
+      fx.push({ type: 'blast', x, y, t0: t, dur: 460 });
+      fx.push({ type: 'ring', x, y, t0: t, dur: 520, col: '#ff8352', big: 2.2 });
+      addText('POP!', x, y, 23, '#ffe184');
+      playZap(true);
+    }
     for (const f of s.fired || []) {
       const [fx0, fy0] = cellXY(f.r, f.c);
       const t0 = st.board[f.r] && st.board[f.r][f.c];
@@ -6567,6 +6813,7 @@
     const have = inv(), ok = boostOk();
     BOOSTERS.forEach(function (b) {
       const btn = bar.querySelector('[data-boost="' + b.id + '"]'); if (!btn) return;
+      btn.hidden = b.id === 'moves' && !!(st && st.lv && st.lv.timer);
       const n = have[b.id] || 0;
       const num = btn.querySelector('.bn'); if (num) num.textContent = String(n);
       btn.classList.toggle('zero', !n);
@@ -7138,7 +7385,7 @@
       return;
     }
     const fly = !!(won && opts.animateStars && n > 0);
-    $('endtitle').textContent = won ? (lv.theme === 'sarah' ? "Sarah's level complete!" : ('Level ' + lv.n + ' complete!')) : 'So close!';
+    $('endtitle').textContent = won ? (lv.theme === 'sarah' ? "Sarah's level complete!" : ('Level ' + lv.n + ' complete!')) : (st.timerExpired ? "Time's up!" : 'So close!');
     if (fly) {
       $('endstars').innerHTML = [0, 1, 2].map(() => '<span>★</span>').join('');
     } else {
