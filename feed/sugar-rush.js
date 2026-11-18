@@ -1,4 +1,4 @@
-/* Info Book 1.9.255 – Sugar Rush, levels 1–57. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.256 – Sugar Rush, levels 1–57. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -999,6 +999,34 @@
     Array(5).fill('China')
   );
   function countryForLevel(n) { return MAP_COUNTRIES[(n | 0) - 1] || ''; }
+  const POSTCARD_COUNT = 4;
+  const POSTCARD_COUNTRIES = [...new Set(MAP_COUNTRIES)];
+  const POSTCARD_ICONS = {
+    'New Zealand': '🥝', 'Cook Islands': '🌺', Tonga: '🥥', Samoa: '🌴', Australia: '🦘',
+    'Papua New Guinea': '🐦', 'Solomon Islands': '🐚', Vanuatu: '🌋', Fiji: '🌊',
+    'New Caledonia': '🐠', Indonesia: '🛕', Vietnam: '🛶', Malaysia: '🦋', Thailand: '🐘',
+    Myanmar: '🏯', India: '🪷', Nepal: '🏔️', Bangladesh: '🛺', 'Sri Lanka': '🐘',
+    Singapore: '🌆', Cambodia: '🛕', Philippines: '⛵', Laos: '🌿', Bhutan: '🏔️',
+    Pakistan: '🏔️', Afghanistan: '🧿', Iran: '🌷', Uzbekistan: '🕌', Kazakhstan: '🐎', China: '🐉'
+  };
+  function normalizePostcardProgress(raw) {
+    const source = raw && raw.countries && typeof raw.countries === 'object' ? raw.countries : {};
+    const countries = {};
+    POSTCARD_COUNTRIES.forEach(country => {
+      const entry = source[country] || {}, pieces = Array.isArray(entry.pieces)
+        ? [...new Set(entry.pieces.filter(n => Number.isInteger(n) && n >= 0 && n < POSTCARD_COUNT))].sort()
+        : [];
+      countries[country] = { pieces, complete: pieces.length === POSTCARD_COUNT };
+    });
+    return { v: 1, countries };
+  }
+  function addPostcardPiece(progress, country, piece) {
+    const next = normalizePostcardProgress(progress), entry = next.countries[country];
+    if (!entry || !Number.isInteger(piece) || piece < 0 || piece >= POSTCARD_COUNT) return next;
+    if (!entry.pieces.includes(piece)) entry.pieces.push(piece);
+    entry.pieces.sort(); entry.complete = entry.pieces.length === POSTCARD_COUNT;
+    return next;
+  }
   // Coming soon: other Australian cities. Shown as markers only (no trail), so they never look like the route.
   // Brisbane is a stop since 1.9.233. Canberra and Hobart are stops since 1.9.243.
   const FUTURE_STOPS = [
@@ -1553,7 +1581,8 @@
     step.clear.forEach(k => {
       const [r, c] = rc(k), t = b[r][c];
       if (t && !isHole(t) && !isBlock(t)) {
-        step.popped.push({ id: t.id, r, c, color: t.c, s: t.s, lock: t.lock, liq: t.liq });
+        step.popped.push({ id: t.id, r, c, color: t.c, s: t.s, lock: t.lock, liq: t.liq,
+          postcardPiece: Number.isInteger(t.postcardPiece) ? t.postcardPiece : null });
         if (t.lock) step.brokeLock = true;
         if (t.liq) step.liqFreed++;
         if (st && t.c >= 0) st.collected[t.c] = (st.collected[t.c] || 0) + 1;
@@ -1585,7 +1614,11 @@
         [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]].forEach(([i, j]) => { if (isOpen(mask, i, j) && b[i][j] && b[i][j].bub > 0) popBub(i, j, true); });
       }
     });
-    step.madeTiles = (step.made || []).map(m => { const [r, c] = rc(m.k), t = mk(m.color, m.s); b[r][c] = t; return { t, r, c }; });
+    step.madeTiles = (step.made || []).map(m => {
+      const [r, c] = rc(m.k), under = b[r][c], t = mk(m.color, m.s);
+      if (under && Number.isInteger(under.postcardPiece)) t.postcardPiece = under.postcardPiece;
+      b[r][c] = t; return { t, r, c };
+    });
     step.cascade = cascade;
     step.points = step.popped.length * PTS * cascade + (step.made || []).reduce((n, m) => n + (BONUS[m.s] || 0), 0) + (step.comboBonus || 0);
     step.falls = [];
@@ -1689,6 +1722,7 @@
   }
   function goalsMet(st) {
     const lv = st.lv || LEVEL;
+    if (st.challenge) return Array.isArray(st.postcardFound) && st.postcardFound.length >= POSTCARD_COUNT;
     // Score is never the win condition — only objectives are.
     if (lv.jelly && jellyLeft(st) > 0) return false;
     if (lv.ice && iceLeft(st.board) > 0) return false;
@@ -4000,6 +4034,11 @@
     SCENES, sceneFor, sceneSvg, sceneSprites, STREAK_STEP, STREAK_MAX_TIER, STREAK_NAMES, streakStepGain, streakGain, streakNext, streakTier, streakFill, shakeLevel,
     BOOSTERS, EXTRA_MOVES, normBoosters, addPrize, takeBooster, SPIN_PRIZES, nzDay, canSpin, spinPick, spinAngle, prizeAt, chestReward, boosterInfo, hammerAt, shuffleBooster, LIVES_MAX, LIFE_MS, regenLives, changeLives, nextLifeMs, mmss };
   root.SugarRush.MAP_COUNTRIES = MAP_COUNTRIES;
+  root.SugarRush.POSTCARD_COUNT = POSTCARD_COUNT;
+  root.SugarRush.POSTCARD_COUNTRIES = POSTCARD_COUNTRIES;
+  root.SugarRush.POSTCARD_ICONS = POSTCARD_ICONS;
+  root.SugarRush.normalizePostcardProgress = normalizePostcardProgress;
+  root.SugarRush.addPostcardPiece = addPostcardPiece;
   root.SugarRush.countryForLevel = countryForLevel;
   root.SugarRush.createSessionLevelAccess = createSessionLevelAccess;
 
@@ -4050,6 +4089,10 @@
   }
   function saveProg() { prog.ids = levelIds(); ls.set('ib-sugar-progress', prog); }
   const prog = loadProg();
+  const POSTCARD_KEY = 'ib-sugar-postcards';
+  let postcardProgress = normalizePostcardProgress(ls.get(POSTCARD_KEY, null));
+  let challengeRun = null;
+  function savePostcardProgress() { ls.set(POSTCARD_KEY, postcardProgress); }
   let race = { racers: [], friends: [], friendCount: 0, group: 'family', offline: true, mine: null };
   let raceDemo = false; // test / screenshot only: never POST to the family backend
   let raceLw = 0; // 1.9.222 the level just won, sent once with the next race post
@@ -4745,6 +4788,13 @@
         const px = s.x * CS + CS / 2, py = s.y * CS + CS / 2 + bob;
         if (s.t.s && !s.pop && !crushing && (isCandy(s.t) || isBomb(s.t))) drawSpecialGlow(s.t, px, py, R, t, s.al);
         drawSweet(s.t, px, py, R, s.sc * land, s.al, wob);
+        if (challengeRun && Number.isInteger(s.t.postcardPiece) && !s.pop) {
+          ctx.save(); ctx.globalAlpha = .82; ctx.fillStyle = 'rgba(255,255,255,.86)';
+          ctx.strokeStyle = '#d6246e'; ctx.lineWidth = Math.max(1, DPR);
+          rr(s.x * CS + CS * .73, s.y * CS + CS * .04, CS * .23, CS * .2, CS * .04); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = '#c2185b'; ctx.font = '900 ' + Math.max(8, CS * .15) + 'px ui-rounded, system-ui, sans-serif';
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('✉', s.x * CS + CS * .845, s.y * CS + CS * .14); ctx.restore();
+        }
       }
       if (hint) drawHintGlow(hint, t, false);
       for (const f of fx) {
@@ -4981,7 +5031,7 @@
   function setLives(n) { if (sessionLevelAccess.hasUnlimitedLives()) return; const cur = livesState(); addLives((n | 0) - cur.n); }
   function nextLife() { return sessionLevelAccess.hasUnlimitedLives() ? 0 : nextLifeMs(ls.get(livesKey(), null)); }
   function settleLife() {
-    if (!st || st.tutorial || st.won || st.lifeDone) return;
+    if (!st || st.challenge || st.tutorial || st.won || st.lifeDone) return;
     if (!(st.played || st.over)) return;
     st.lifeDone = true;
     if (!sessionLevelAccess.hasUnlimitedLives()) addLives(-1);
@@ -5453,18 +5503,22 @@
   }
   function bootLevel(n, opt) {
     opt = opt || {};
-    $('intro').hidden = true; $('end').hidden = true; $('map').hidden = true; $('game').hidden = false;
+    challengeRun = opt.challengeCountry ? { country: opt.challengeCountry, pieces: (postcardProgress.countries[opt.challengeCountry] || { pieces: [] }).pieces.slice() } : null;
+    $('intro').hidden = true; $('end').hidden = true; $('map').hidden = true; $('postcards').hidden = true; $('game').hidden = false;
     if ($('goalban')) $('goalban').hidden = true;
     if ($('goalnext')) $('goalnext').hidden = true;
     if (!opt.tutorial) hideTutUi();
     hideRecap();
-    doc.body.classList.remove('onmap', 'oncrush');
+    doc.body.classList.remove('onmap', 'onpostcards', 'oncrush');
+    doc.body.classList.toggle('postcard-game', !!challengeRun);
     if (!opt.tutorial) doc.body.classList.remove('sarah');
-    const fresh = screen !== 'game' || lvNum !== n;
+    const fresh = screen !== 'game' || lvNum !== n || !!challengeRun;
     screen = 'game';
     loadSayClips();
     lvNum = n;
-    const lv = LEVELS[n - 1];
+    const lv = challengeRun
+      ? { n: n, name: 'Postcard Hunt', target: 0, moves: 26, stars: [0, 0, 0], kinds: KINDS }
+      : LEVELS[n - 1];
     doc.body.classList.add('ingame');
     paintScene(n);
     if (fresh) enterScreen($('game'));
@@ -5477,9 +5531,21 @@
     hideHardBan();
     if (hard && !opt.tutorial) showHardBan(hard);
     paintHearts();
-    $('lvname').textContent = 'Level ' + n + ' · ' + lv.name + (hard ? ' · ' + (hard === 2 ? 'Super Hard' : 'Hard') : '');
+    $('lvname').textContent = challengeRun ? (challengeRun.country + ' · Postcard') : ('Level ' + n + ' · ' + lv.name + (hard ? ' · ' + (hard === 2 ? 'Super Hard' : 'Hard') : ''));
+    $('mapbtn').textContent = challengeRun ? 'Postcards' : 'Levels';
+    $('endmap').textContent = challengeRun ? 'Postcard shelf' : 'Levels';
+    $('restartbtn').textContent = challengeRun ? 'Restart hunt' : 'Restart';
     paintGoalStrip(lv);
     st = newGame(opt.board ? { level: lv, board: fromRows(opt.board) } : { level: lv });
+    if (challengeRun) {
+      st.challenge = true;
+      st.postcardFound = challengeRun.pieces.slice();
+      const missing = Array.from({ length: POSTCARD_COUNT }, (_, i) => i).filter(i => !challengeRun.pieces.includes(i));
+      const cells = [];
+      for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (isCandy(st.board[r][c])) cells.push(st.board[r][c]);
+      for (let i = cells.length - 1; i > 0; i--) { const j = Math.floor(st.rand() * (i + 1)); [cells[i], cells[j]] = [cells[j], cells[i]]; }
+      missing.forEach((piece, i) => { if (cells[i]) cells[i].postcardPiece = piece; });
+    }
     if (opt.locks) {
       for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
         if (+(opt.locks[r] && opt.locks[r][c]) && st.board[r][c] && st.board[r][c].c >= 0) st.board[r][c].lock = 1;
@@ -5529,6 +5595,16 @@
     if (lv.liq) bits.push('Liquorice ' + liqLeft(g.board) + ' left');
     return bits.join(' · ');
   }
+  function paintPostcardHud() {
+    const el = $('postcardHud'); if (!el) return;
+    if (!challengeRun) { el.hidden = true; el.innerHTML = ''; return; }
+    const pieces = challengeRun.pieces || [], icon = POSTCARD_ICONS[challengeRun.country] || '🌍';
+    el.hidden = false;
+    el.innerHTML = '<div class="pc-hunt-copy"><b>📮 ' + challengeRun.country + ' postcard</b><span>Match sweets to uncover the hidden pieces.</span><strong class="pc-moves">Moves left: ' + (st ? st.moves : 0) + '</strong></div>' +
+      '<div class="pc-hunt-pieces" aria-label="' + pieces.length + ' of 4 pieces found">' +
+      Array.from({ length: POSTCARD_COUNT }, function (_, i) { return '<span class="pc-fragment' + (pieces.includes(i) ? ' found' : '') + '">' + (pieces.includes(i) ? icon : '✦') + '</span>'; }).join('') +
+      '</div><strong>' + pieces.length + ' / ' + POSTCARD_COUNT + '</strong>';
+  }
   function hud() {
     if (!st) return;
     $('score').textContent = st.score.toLocaleString('en-NZ');
@@ -5540,6 +5616,7 @@
     $('fill').style.width = (p * 100).toFixed(1) + '%';
     stars.forEach((s, i) => { const el = $('st' + i); el.style.left = (s / max * 100) + '%'; el.classList.toggle('got', st.score >= s && (s > 0 || st.won)); });
     paintBoosters();
+    paintPostcardHud();
   }
   function praise(step, i) {
     // Kept as a thin wrapper for older call sites; the on-board line now comes from pickSaying.
@@ -5973,6 +6050,61 @@
     ov.hidden = false;
   }
 
+  function renderPostcards() {
+    const list = $('postcardlist'); if (!list) return;
+    postcardProgress = normalizePostcardProgress(postcardProgress);
+    list.innerHTML = POSTCARD_COUNTRIES.map(function (country) {
+      const entry = postcardProgress.countries[country], icon = POSTCARD_ICONS[country] || '🌍';
+      const fragments = Array.from({ length: POSTCARD_COUNT }, function (_, i) {
+        const found = entry.pieces.includes(i);
+        return '<span class="pc-fragment' + (found ? ' found' : '') + '">' + (found ? icon : '✦') + '</span>';
+      }).join('');
+      const action = entry.complete ? 'Postcard complete' : (entry.pieces.length ? 'Continue hunt' : 'Find the pieces');
+      return '<article class="pc-card' + (entry.complete ? ' done' : '') + '"><div class="pc-preview" aria-label="' + country + ' postcard, ' + entry.pieces.length + ' of 4 pieces found">' + fragments + '</div>' +
+        '<h2>' + country + '</h2><p>' + (entry.complete ? 'Postcard assembled' : entry.pieces.length + ' of 4 pieces found') + '</p>' +
+        '<button type="button" class="' + (entry.complete ? '' : 'pri') + '" data-postcard-country="' + country + '"' + (entry.complete ? ' disabled' : '') + '>' + action + '</button></article>';
+    }).join('');
+  }
+  function showPostcards() {
+    leaveEnd();
+    challengeRun = null;
+    screen = 'postcards';
+    $('game').hidden = true; $('map').hidden = true; $('postcards').hidden = false;
+    if ($('intro')) $('intro').hidden = true;
+    doc.body.classList.remove('onmap', 'ingame', 'sarah', 'oncrush', 'postcard-game', 'hard1', 'hard2');
+    doc.body.classList.add('onpostcards');
+    hideHardBan(); setHammer(false); stopOverlay();
+    renderPostcards();
+    if (musicOn) playKind(wantKind());
+  }
+  function startPostcardChallenge(country) {
+    if (!POSTCARD_COUNTRIES.includes(country)) return;
+    const record = postcardProgress.countries[country];
+    if (!record || record.complete) return;
+    const n = MAP_COUNTRIES.indexOf(country) + 1;
+    if (n < 1) return;
+    bootLevel(n, { challengeCountry: country });
+  }
+  function collectPostcardFinds(steps) {
+    if (!challengeRun || !st || !Array.isArray(steps)) return 0;
+    let found = 0;
+    steps.forEach(function (step) {
+      (step.popped || []).forEach(function (tile) {
+        if (!Number.isInteger(tile.postcardPiece)) return;
+        const before = postcardProgress.countries[challengeRun.country].pieces.length;
+        postcardProgress = addPostcardPiece(postcardProgress, challengeRun.country, tile.postcardPiece);
+        const after = postcardProgress.countries[challengeRun.country].pieces.length;
+        if (after > before) { found++; addText('Postcard piece!', cellXY(tile.r, tile.c)[0], cellXY(tile.r, tile.c)[1], 18, '#ffe066'); }
+      });
+    });
+    if (found) {
+      challengeRun.pieces = postcardProgress.countries[challengeRun.country].pieces.slice();
+      st.postcardFound = challengeRun.pieces.slice();
+      savePostcardProgress(); hud();
+      playRise(found);
+    }
+    return found;
+  }
   function renderMap() {
     const stage = $('mapstage'), path = $('path'), shelf = $('shelf');
     if (stage && !stage.querySelector('svg.nzsvg')) {
@@ -6087,6 +6219,8 @@
   }
   function showMap(opts) {
     settleLife();
+    challengeRun = null;
+    if ($('postcards')) $('postcards').hidden = true;
     if (!(opts && opts.keepSong)) stopEnd();
     const wasScreen = screen;
     screen = 'map';
@@ -6096,7 +6230,7 @@
     const fromGame = wasScreen !== 'map' || !$('map').dataset.seen;
     $('game').hidden = true; $('intro').hidden = true; $('end').hidden = true; $('map').hidden = false;
     $('map').dataset.seen = '1';
-    doc.body.classList.remove('sarah', 'ingame', 'hammering', 'hard1', 'hard2');
+    doc.body.classList.remove('sarah', 'ingame', 'hammering', 'hard1', 'hard2', 'postcard-game', 'onpostcards');
     hideHardBan();
     hammerMode = false;
     doc.body.classList.add('onmap');
@@ -6162,6 +6296,7 @@
     for (let i = 0; i < beltAt; i++) await showStep(res.steps[i], i, { streak: !plain });
     if (res.beltMoves && res.beltMoves.length) await animateBeltMoves(res.beltMoves);
     for (let i = beltAt; i < res.steps.length; i++) await showStep(res.steps[i], i, { streak: !plain });
+    collectPostcardFinds(res.steps);
     if (plain) addStreak(-1);
     if (res.spread) { const t = st.board[res.spread.r][res.spread.c]; if (t) { const s = sprite(t, res.spread.r, res.spread.c); s.grow = now(); } }
     // 1.9.219 Liquorice creeps after two moves in a row that free none; the move before, it gives a warning.
@@ -6426,7 +6561,7 @@
   function boostKey() { return 'ib-sugar-boosters' + memberTag(); }
   function inv() { if (!boosts) boosts = normBoosters(ls.get(boostKey(), null)); return boosts; }
   function saveBoosts() { ls.set(boostKey(), normBoosters(boosts)); }
-  function boostOk() { return !!(screen === 'game' && st && !st.over && !st.tutorial && !(tut && tut.active) && !(crush && crush.active)); }
+  function boostOk() { return !!(screen === 'game' && st && !st.challenge && !st.over && !st.tutorial && !(tut && tut.active) && !(crush && crush.active)); }
   function paintBoosters() {
     const bar = $('boosters'); if (!bar) return;
     const have = inv(), ok = boostOk();
@@ -6749,6 +6884,12 @@
   async function beginGoalFinish() {
     if ((tut && tut.active) || (st && st.tutorial) || (crush && crush.active)) return;
     if (!st || !goalsMet(st)) return;
+    if (st.challenge) {
+      st.won = true; st.over = true; st.stars = POSTCARD_COUNT; busy = true;
+      paintPostcardHud(); playSting(); ovFit(); confetti(64, ovW / 2, ovH * 0.42, { speed: 470 });
+      await wait(reduce ? 80 : 500);
+      await showEnd(); return;
+    }
     st.won = true;
     st.over = true;
     st.crushing = true;
@@ -6808,6 +6949,7 @@
   }
   function finish() {
     if ((tut && tut.active) || (st && st.tutorial)) return;
+    if (st && st.challenge) { showEnd(); return; }
     if (st && st.won && goalsMet(st) && !st.crushing) { beginGoalFinish(); return; }
     const won = st.won;
     if (st.score > (prog.best[st.lv.n - 1] || 0)) { prog.best[st.lv.n - 1] = st.score; saveProg(); }
@@ -6981,6 +7123,20 @@
     if (!st) return;
     opts = opts || {};
     const won = st.won, n = st.stars || 0, lv = st.lv;
+    if (st.challenge) {
+      $('endtitle').textContent = won ? 'Postcard assembled!' : 'Keep searching!';
+      $('endstars').innerHTML = Array.from({ length: POSTCARD_COUNT }, (_, i) => '<span class="' + (i < (challengeRun.pieces || []).length ? 'on' : '') + '">✦</span>').join('');
+      $('endscore').textContent = (challengeRun.pieces || []).length + ' of ' + POSTCARD_COUNT + ' pieces';
+      $('endbadge').hidden = true; $('endbadgecap').hidden = true;
+      $('endchest').hidden = true; $('endloot').hidden = true; $('morebtn').hidden = true;
+      $('endmsg').textContent = won
+        ? 'You found every piece of the ' + challengeRun.country + ' postcard. Your postcard progress is saved separately from the levels.'
+        : 'Your ' + challengeRun.country + ' postcard progress is saved. Find the remaining pieces on your next hunt.';
+      $('againbtn').textContent = won ? 'Postcard shelf' : 'Try again';
+      $('nextbtn').hidden = true; $('endmap').hidden = false; $('endmap').textContent = 'Postcard shelf';
+      $('end').hidden = false;
+      return;
+    }
     const fly = !!(won && opts.animateStars && n > 0);
     $('endtitle').textContent = won ? (lv.theme === 'sarah' ? "Sarah's level complete!" : ('Level ' + lv.n + ' complete!')) : 'So close!';
     if (fly) {
@@ -7063,6 +7219,7 @@
   function leaveEnd() { stopEnd(); $('end').hidden = true; }
   function restart() {
     if (tut && tut.active) return;
+    if (challengeRun) { const country = challengeRun.country; leaveEnd(); startPostcardChallenge(country); return; }
     leaveEnd();
     startLevel(lvNum);
   }
@@ -7074,6 +7231,7 @@
     if (musicOn && !endPlaying) playKind(wantKind());
   }
   function backToMap() {
+    if (challengeRun) { showPostcards(); return; }
     leaveEnd();
     if ($('goalnext')) $('goalnext').hidden = true;
     if (tut) { tut = null; hideTutUi(); hideRecap(); }
@@ -7116,7 +7274,7 @@
   if ($('voicebtn')) $('voicebtn').addEventListener('click', () => setVoice(!voiceOn));
   if ($('mapvoice')) $('mapvoice').addEventListener('click', () => setVoice(!voiceOn));
   $('restartbtn').addEventListener('click', restart);
-  $('againbtn').addEventListener('click', restart);
+  $('againbtn').addEventListener('click', () => { if (challengeRun && challengeRun.pieces.length >= POSTCARD_COUNT) showPostcards(); else restart(); });
   $('nextbtn').addEventListener('click', goNext);
   $('mapbtn').addEventListener('click', backToMap);
   $('endmap').addEventListener('click', backToMap);
@@ -7173,6 +7331,12 @@
   if ($('racechip')) $('racechip').addEventListener('click', () => { unlockAudio(); setRaceOpen(true); });
   if ($('raceboard')) $('raceboard').addEventListener('click', e => {
     if (e.target.closest && e.target.closest('[data-race=close]')) setRaceOpen(false);
+  });
+  if ($('postcardbtn')) $('postcardbtn').addEventListener('click', () => { unlockAudio(); showPostcards(); });
+  if ($('postcardsBack')) $('postcardsBack').addEventListener('click', showMap);
+  if ($('postcardlist')) $('postcardlist').addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('[data-postcard-country]');
+    if (b && !b.disabled) { unlockAudio(); startPostcardChallenge(b.dataset.postcardCountry); }
   });
   if ($('badgebtn')) $('badgebtn').addEventListener('click', () => { unlockAudio(); if ($('badgeov')) $('badgeov').hidden = false; });
   if ($('badgeov')) $('badgeov').addEventListener('click', e => {
