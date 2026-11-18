@@ -1,4 +1,4 @@
-/* Info Book 1.9.249 – Sugar Rush, levels 1–52. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.250 – Sugar Rush, levels 1–57. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -316,7 +316,34 @@
       ice: ['10000001', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '10000001'],
       locks: ['00000000', '00000000', '00000000', '00011000', '00011000', '00000000', '00000000', '00000000'],
       help: 'Clear the wall-shaped jelly, crack the 4 icy corners and free all 4 locked jars in 38 moves.',
-      badge: { id: 'wall', name: 'Great Wall Star', icon: '🐉' } }
+      badge: { id: 'wall', name: 'Great Wall Star', icon: '🐉' } },
+    // 1.9.250 More city stops within China, following the existing Beijing route.
+    { n: 53, name: "Xi'an Terracotta Trail", target: 0, moves: 36, stars: [0, 7100, 14200], kinds: 6,
+      jelly: ['00011000', '00111100', '01100110', '11000011', '11000011', '01100110', '00111100', '00011000'],
+      ice: ['11000011', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '11000011'],
+      help: 'Clear the terracotta-ring jelly and crack all 4 icy corners in 36 moves.',
+      badge: { id: 'terracotta', name: 'Terracotta Lantern', icon: '🏮' } },
+    { n: 54, name: 'Chengdu Panda Picnic', target: 0, moves: 36, stars: [0, 7200, 14400], kinds: 6,
+      jelly: ['00000000', '00111100', '01100110', '01000010', '01000010', '01100110', '00111100', '00000000'],
+      bub: ['00000000', '10000001', '00000000', '00000000', '00000000', '00000000', '10000001', '00000000'],
+      help: 'Clear the panda-garden jelly and pop all 4 sugar bubbles in 36 moves.',
+      badge: { id: 'panda', name: 'Panda Picnic', icon: '🐼' } },
+    { n: 55, name: 'Chongqing Mountain Rail', target: 0, moves: 38, stars: [0, 7400, 14800], kinds: 6,
+      ings: [[0, 2], [0, 5]], ingIcon: '🍊',
+      locks: ['00000000', '00000000', '00011000', '00011000', '00000000', '00000000', '00000000', '00000000'],
+      help: 'Bring both river-market treats down and free all 4 locked jars in 38 moves.',
+      badge: { id: 'mountainrail', name: 'Mountain Rail', icon: '🚇' } },
+    { n: 56, name: 'Shanghai Bund Lights', target: 0, moves: 38, stars: [0, 7500, 15000], kinds: 6,
+      jelly: ['22000022', '11000011', '00000000', '00011000', '00011000', '00000000', '11000011', '22000022'],
+      choco: ['00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '10000001', '00000000'],
+      help: 'Clear the double-layer Bund jelly and keep the chocolate in check in 38 moves.',
+      badge: { id: 'bund', name: 'Bund Skyline', icon: '🌃' } },
+    { n: 57, name: 'Guangzhou Pearl River Blossom', hard: 1, target: 0, moves: 40, stars: [0, 7800, 15600], kinds: 6,
+      jelly: ['00000000', '00111100', '01100110', '11000011', '11000011', '01100110', '00111100', '00000000'],
+      ice: ['11000011', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '11000011'],
+      locks: ['00000000', '00000000', '00000000', '00011000', '00011000', '00000000', '00000000', '00000000'],
+      help: 'Clear the blossom-ring jelly, crack the icy corners and free all 4 locked jars in 40 moves.',
+      badge: { id: 'pearlriver', name: 'Pearl River Blossom', icon: '🌸' } }
   ];
 
 
@@ -373,7 +400,12 @@
     { icon: '🎁', goal: 'Bring both treats down and crack the icing', detail: 'Bring both garden treats down and crack the 4 icing blocks in 34 moves.', tip: 'Match beneath each treat to bring it down; specials can reach the icing.', mechanic: 'market' },
     { icon: '🔒', goal: 'Clear the double jelly and free the jars', detail: 'Clear all the double-layer tilework and free the 4 locked jars in 36 moves.', tip: 'The thick jelly needs two clears. Work the outer corners while the jars wait in the courtyard.', mechanic: 'garden' },
     { icon: '🫧', goal: 'Clear the jelly, pop the bubbles and stop the chocolate', detail: 'Clear the steppe-ring jelly, pop all 4 sugar bubbles and keep the chocolate in check in 36 moves.', tip: 'Pop a corner bubble early; remember that chocolate spreads if you leave it untouched.', mechanic: 'mix' },
-    { icon: '🐉', goal: 'Clear the jelly, crack the icing and free the jars', detail: 'Clear the wall-shaped jelly, crack the 4 icy corners and free all 4 locked jars in 38 moves.', tip: 'Three objectives share the board. Make matches along the jelly wall, then use specials to reach the icy corners.', mechanic: 'mix' }
+    { icon: '🐉', goal: 'Clear the jelly, crack the icing and free the jars', detail: 'Clear the wall-shaped jelly, crack the 4 icy corners and free all 4 locked jars in 38 moves.', tip: 'Three objectives share the board. Make matches along the jelly wall, then use specials to reach the icy corners.', mechanic: 'mix' },
+    { icon: '🏮', goal: 'Clear the terracotta-ring jelly and crack the icing', detail: 'Clear the jelly and crack all 4 icy corners in 36 moves.', tip: "The wall-shaped jelly wraps around the tray. Specials can reach the four corner icing blocks.", mechanic: 'terracotta' },
+    { icon: '🐼', goal: 'Clear the garden jelly and pop the bubbles', detail: 'Clear every jelly and pop all 4 sugar bubbles in 36 moves.', tip: 'Work around the garden ring, then make matches beside the bubbles at the edges.', mechanic: 'panda' },
+    { icon: '🚇', goal: 'Bring both treats down and free the jars', detail: 'Bring both treats down and free all 4 locked jars in 38 moves.', tip: 'The treats and jars need attention in different parts of the board. Make a clear lane beneath each treat.', mechanic: 'mountain-rail' },
+    { icon: '🌃', goal: 'Clear the double jelly and stop the chocolate', detail: 'Clear every double-layer jelly while keeping the chocolate in check in 38 moves.', tip: 'Some jelly needs two clears. Hit the chocolate when you can so it does not spread.', mechanic: 'bund' },
+    { icon: '🌸', goal: 'Clear the jelly, crack the icing and free the jars', detail: 'Clear the jelly, crack the 4 icy corners and free all 4 locked jars in 40 moves.', tip: 'A little of everything in the final city stop: work the jelly ring and use specials to reach the corners.', mechanic: 'pearl-river' }
   ];
   function levelIntro(n, p) {
     const lv = LEVELS[(n | 0) - 1]; if (!lv) return null;
@@ -949,7 +981,13 @@
     { n: 49, x: -499.3, y: 1299.0, place: 'Iran', kind: 'city', label: 'below', lat: 35.6892, lon: 51.3890 },
     { n: 50, x: -315.0, y: 1237.5, place: 'Uzbekistan', kind: 'city', label: 'left', nudged: true, lat: 41.2995, lon: 69.2401, via: [{ x: -347.0, y: 1237.5 }] },
     { n: 51, x: -328.1, y: 1129.2, place: 'Kazakhstan', kind: 'city', label: 'right', lat: 51.1694, lon: 71.4491 },
-    { n: 52, x: 55.5, y: 1252.8, place: 'China', kind: 'city', label: 'right', lat: 39.9042, lon: 116.4074 }
+    { n: 52, x: 55.5, y: 1252.8, place: 'Beijing', kind: 'city', label: 'right', lat: 39.9042, lon: 116.4074 },
+    // 1.9.250 The route stays in China; Chengdu's pin is nudged slightly west to keep it clear of Chongqing.
+    { n: 53, x: -8.2, y: 1313.8, place: "Xi'an", kind: 'city', label: 'right', lat: 34.3416, lon: 108.9398 },
+    { n: 54, x: -100, y: 1360, place: 'Chengdu', kind: 'city', label: 'left', nudged: true, lat: 30.5728, lon: 104.0668, via: [{ x: -49.8, y: 1355.2 }] },
+    { n: 55, x: -28.6, y: 1366.2, place: 'Chongqing', kind: 'city', label: 'right', lat: 29.5630, lon: 106.5516 },
+    { n: 56, x: 98.7, y: 1347.9, place: 'Shanghai', kind: 'city', label: 'right', lat: 31.2304, lon: 121.4737 },
+    { n: 57, x: 28.7, y: 1436.8, place: 'Guangzhou', kind: 'city', label: 'left', lat: 23.1291, lon: 113.2644 }
   ];
   // Country is a separate atlas layer from the level stop (city/island) label.
   const MAP_COUNTRIES = Array(16).fill('New Zealand').concat(
@@ -957,7 +995,8 @@
     Array(6).fill('Australia'),
     ['Papua New Guinea', 'Solomon Islands', 'Vanuatu', 'Fiji', 'New Caledonia', 'Indonesia', 'Australia', 'Australia',
       'Vietnam', 'Malaysia', 'Thailand', 'Myanmar', 'India', 'Nepal', 'Bangladesh', 'Sri Lanka', 'Singapore', 'Cambodia', 'Philippines', 'Laos', 'Bhutan', 'Pakistan',
-      'Afghanistan', 'Iran', 'Uzbekistan', 'Kazakhstan', 'China']
+      'Afghanistan', 'Iran', 'Uzbekistan', 'Kazakhstan', 'China'],
+    Array(5).fill('China')
   );
   function countryForLevel(n) { return MAP_COUNTRIES[(n | 0) - 1] || ''; }
   // Coming soon: other Australian cities. Shown as markers only (no trail), so they never look like the route.
@@ -966,7 +1005,7 @@
     { place: 'Darwin', x: 179, y: 1827, label: 'left', lat: -12.46, lon: 130.84 },
     { place: 'Cairns', x: 306, y: 1876, label: 'left', lat: -16.92, lon: 145.77 }
   ];
-  const LV_COUNT = 52;
+  const LV_COUNT = 57;
   function stopForLevel(n) { return MAP_STOPS[(n | 0) - 1] || null; }
   function icingPath(pts) {
     if (!pts || pts.length < 2) return '';
@@ -1063,6 +1102,10 @@
   function nzMapSvg() {
     const live = ''; // the icing is filled in from the stops this player has already cleared
     const future = ''; // 1.9.222 coming-soon cities are markers only
+    const asiaCandy = ['sr-candy-strawberry', 'sr-candy-peach', 'sr-candy-lemon', 'sr-candy-mint', 'sr-candy-blueberry',
+      'sr-candy-grape', 'sr-candy-lemon', 'sr-candy-mint', 'sr-candy-peach', 'sr-candy-blueberry', 'sr-candy-strawberry',
+      'sr-candy-grape', 'sr-candy-lemon', 'sr-candy-grape', 'sr-candy-peach', 'sr-candy-lemon', 'sr-candy-mint', 'sr-candy-blueberry'];
+    const islandCandy = ['sr-candy-mint', 'sr-candy-blueberry', 'sr-candy-grape', 'sr-candy-strawberry', 'sr-candy-peach', 'sr-candy-lemon'];
     return (
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + MAP_X0 + ' 0 ' + MAP_VW + ' ' + MAP_H + '" width="' + MAP_VW + '" height="' + MAP_H + '" aria-hidden="true" class="nzsvg">' +
       '<defs>' +
@@ -1070,8 +1113,14 @@
       '<stop offset="0" stop-color="#9be7ff"/><stop offset=".45" stop-color="#8fd9f8"/><stop offset="1" stop-color="#b8f3de"/>' +
       '</linearGradient>' +
       '<linearGradient id="sr-land" x1="0" y1="0" x2="1" y2="1">' +
-      '<stop offset="0" stop-color="#fff6fb"/><stop offset=".45" stop-color="#ffd7ea"/><stop offset="1" stop-color="#ffe9c8"/>' +
+      '<stop offset="0" stop-color="#ffd5e7"/><stop offset=".25" stop-color="#ffd2bd"/><stop offset=".5" stop-color="#ffe8a1"/><stop offset=".75" stop-color="#c4efcd"/><stop offset="1" stop-color="#c7e2ff"/>' +
       '</linearGradient>' +
+      '<linearGradient id="sr-candy-strawberry" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff2f7"/><stop offset=".55" stop-color="#ffc5db"/><stop offset="1" stop-color="#ff9fbe"/></linearGradient>' +
+      '<linearGradient id="sr-candy-peach" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff5e8"/><stop offset=".55" stop-color="#ffd2ad"/><stop offset="1" stop-color="#ffb98e"/></linearGradient>' +
+      '<linearGradient id="sr-candy-lemon" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fffbe0"/><stop offset=".55" stop-color="#ffe89c"/><stop offset="1" stop-color="#ffd763"/></linearGradient>' +
+      '<linearGradient id="sr-candy-mint" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#effff3"/><stop offset=".55" stop-color="#b9edc9"/><stop offset="1" stop-color="#8bd9a5"/></linearGradient>' +
+      '<linearGradient id="sr-candy-blueberry" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f0f8ff"/><stop offset=".55" stop-color="#c5e3ff"/><stop offset="1" stop-color="#9ccdf5"/></linearGradient>' +
+      '<linearGradient id="sr-candy-grape" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#faf1ff"/><stop offset=".55" stop-color="#ddc6ff"/><stop offset="1" stop-color="#bc9aea"/></linearGradient>' +
       '<linearGradient id="sr-icing" x1="0" y1="0" x2="0" y2="1">' +
       '<stop offset="0" stop-color="#ff8ab8"/><stop offset=".55" stop-color="#ffb347"/><stop offset="1" stop-color="#ff6fa8"/>' +
       '</linearGradient>' +
@@ -1135,11 +1184,12 @@
       '<path filter="url(#sr-soft)" fill="url(#sr-land)" stroke="#fff" stroke-width="8" stroke-linejoin="round" d="' + AUS_PATH + '"/>' +
       '<path filter="url(#sr-soft)" fill="url(#sr-land)" stroke="#fff" stroke-width="6" stroke-linejoin="round" d="' + TAS_PATH + '"/>' +
       // 1.9.234 Papua New Guinea (mainland + New Britain), from real coast points through ausXY.
-      '<path filter="url(#sr-soft)" fill="#ffd3e4" stroke="#fff" stroke-width="5" stroke-linejoin="round" d="' + ausPath(PNG_PTS) + '"/>' +
-      '<path fill="#ffd3e4" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="' + ausPath(NEW_BRITAIN_PTS) + '"/>' +
+      '<path filter="url(#sr-soft)" fill="url(#sr-candy-strawberry)" stroke="#fff" stroke-width="5" stroke-linejoin="round" d="' + ausPath(PNG_PTS) + '"/>' +
+      '<path fill="url(#sr-candy-strawberry)" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="' + ausPath(NEW_BRITAIN_PTS) + '"/>' +
       '<text x="306" y="1711" text-anchor="middle" font-size="10" font-weight="900" fill="#2f7a4a" font-family="ui-rounded,system-ui,sans-serif">Papua New Guinea</text>' +
-      EAST_ISLES.map(function (q) { const a = ausXY(q[0], q[1]); return '<ellipse cx="' + a.x.toFixed(1) + '" cy="' + a.y.toFixed(1) + '" rx="' + q[2] + '" ry="' + q[3] + '" transform="rotate(' + q[4] + ' ' + a.x.toFixed(1) + ' ' + a.y.toFixed(1) + ')" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>'; }).join('') +
-      ASIA_LAND.map(function (pts) { return '<path filter="url(#sr-soft)" fill="url(#sr-land)" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="' + ausPath(pts) + '"/>'; }).join('') +
+      EAST_ISLES.map(function (q, i) { const a = ausXY(q[0], q[1]); return '<ellipse cx="' + a.x.toFixed(1) + '" cy="' + a.y.toFixed(1) + '" rx="' + q[2] + '" ry="' + q[3] + '" transform="rotate(' + q[4] + ' ' + a.x.toFixed(1) + ' ' + a.y.toFixed(1) + ')" fill="url(#' + islandCandy[i % islandCandy.length] + ')" stroke="#fff" stroke-width="3"/>'; }).join('') +
+      // Asia polygon order: Vietnam, Malaysia, Thailand, Myanmar, India; Pakistan, Bhutan, Laos, Cambodia, Philippines; then the Silk Road countries.
+      ASIA_LAND.map(function (pts, i) { return '<path filter="url(#sr-soft)" fill="url(#' + asiaCandy[i % asiaCandy.length] + ')" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="' + ausPath(pts) + '"/>'; }).join('') +
       '<path d="M120 1960 C150 1940 190 1950 210 1980 C190 1990 150 1990 120 1960 Z" fill="#ffd9a8" opacity=".6"/>' +
       '<path d="M236 1930 C250 1918 270 1922 276 1936 C264 1944 246 1942 236 1930 Z" fill="#ffd9a8" opacity=".55"/>' +
       '<circle class="sr-bob" cx="380" cy="1860" r="6" fill="#ffb347" opacity=".5"/><circle class="sr-bob" cx="30" cy="2160" r="7" fill="#ff8ab8" opacity=".45"/>' +
@@ -1152,6 +1202,7 @@
       '<path id="sr-path-wide" d="' + live + '" fill="none" stroke="url(#sr-icing)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>' +
       '<path id="sr-path-dash" d="' + live + '" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 10" opacity=".9"/>' +
       '<path id="sr-path-win" d="" fill="none" stroke="#fff6a8" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<g id="sr-travel-plane" display="none" pointer-events="none" filter="url(#sr-soft)"><circle r="24" fill="#fff6c8" fill-opacity=".92" stroke="#fff" stroke-width="4"/><circle r="18" fill="none" stroke="#ff6fa8" stroke-width="2.5"/><path d="M0 -14 L3 -4 L14 2 L14 5 L3 2 L2 10 L6 13 L6 15 L0 13 L-6 15 L-6 13 L-2 10 L-3 2 L-14 5 L-14 2 L-3 -4 Z" fill="#fff" stroke="#2878c8" stroke-width="2"/></g>' +
       '</svg>'
     );
   }
@@ -2082,6 +2133,8 @@
   // the SW leaves range requests alone.
   const MEDIA_HASH = {
     'sugar-rush-music.mp3': '39970f66', 'sugar-rush-menu.mp3': '3343a079', 'sugar-rush-win.mp3': '9b0efbad', 'sugar-rush-yum.mp3': 'ac1b2cf5',
+    'sugar-rush-aussie.mp3': '20b03a59',
+    'sugar-rush-india.mp3': '3ff84a23',
     'sugar-rush-l1.mp3': '3fd00f38', 'sugar-rush-l2.mp3': '34c4b4be',
     'sugar-rush-voice-yay.mp3': '6ca043f6', 'sugar-rush-voice-great.mp3': 'c287c114', 'sugar-rush-voice-awesome.mp3': 'a56af295',
     'sugar-rush-voice-sweetas.mp3': '50b435e6', 'sugar-rush-voice-succulent.mp3': '1d5018ba',
@@ -2154,15 +2207,14 @@
     return r < 0.75 ? (last === 'f' ? 'm' : 'f') : last;
   }
   function mediaUrl(file) { return file.replace(/\.(mp3|m4a)$/, '-' + MEDIA_HASH[file] + '.$1'); }
-  // 1.9.223 Shane's songs for the later levels, picked by mood: the most intense for the Hard and Super Hard levels,
-  // the calmest for the Pacific islands, the upbeat one for the rest. 1.9.232: Shane's songs now start at level 3
-  // ("make levels 3 to 10 my music"); Saturday night in Nelson (10) gets the calm one. Levels 1 and 2 keep their own
-  // songs. Each song ships as AAC (.m4a, ~96 kbps) with an .mp3 fallback; a mood with no
-  // file yet simply keeps the usual loop, so this is safe before the songs land.
-  const SONG_PLAN = { intense: [13, 15, 19, 22, 52], calm: [10, 17, 18], upbeat: [3, 4, 5, 6, 7, 8, 9, 11, 12, 14, 16, 20, 21, 23, 24, 25, 26] };
+  // 1.9.223 Shane's songs for later levels, picked by mood. 1.9.250 uses the supplied India MP3 for the
+  // existing South Asia atlas group (India, Nepal, Bhutan, Pakistan: levels 38–39 and 46–47).
+  // The supplied Aussie Oi Oil MP3 covers Australia (20–25 and 32–33); both audio streams remain unmodified.
+  // The calm song suits the Pacific islands; the upbeat one covers the rest. Levels 1 and 2 keep their own songs.
+  const SONG_PLAN = { india: [38, 39, 46, 47], aussie: [20, 21, 22, 23, 24, 25, 32, 33], intense: [13, 15, 19, 52], calm: [10, 17, 18], upbeat: [3, 4, 5, 6, 7, 8, 9, 11, 12, 14, 16, 26] };
   // "Sugar Rush travel" (~136 BPM, the loudest and punchiest) drives the Hard levels; "Sugar Rush Kiss" (~89 BPM,
   // the softest, "let it linger") floats over the Pacific islands; "Sugar Rush" ("now I can't sit still") for the rest.
-  const SONG_FILES = { intense: 'sugar-rush-travel.m4a', calm: 'sugar-rush-kiss.m4a', upbeat: 'sugar-rush-song.m4a' };
+  const SONG_FILES = { india: 'sugar-rush-india.mp3', aussie: 'sugar-rush-aussie.mp3', intense: 'sugar-rush-travel.m4a', calm: 'sugar-rush-kiss.m4a', upbeat: 'sugar-rush-song.m4a' };
   const SONG_FROM = 3;
   function songMood(level) {
     if (!(level >= SONG_FROM)) return null;
@@ -3587,7 +3639,76 @@
           '<path d="M25 526 L51 504 L78 526 Z M144 520 L170 498 L196 520 Z M280 506 L306 484 L332 506 Z" fill="#a94037"/>' +
           '<path d="M0 768 Q100 744 196 768 T390 762 V844 H0 Z" fill="#729b57"/>';
       },
-      sprites: [{ x: 18, y: 19, w: 8, cls: 'sc-drift', d: 12, svg: 'gull' }, { x: 82, y: 69, w: 9, cls: 'sc-bob', d: 4.2, emoji: '🏮' }] }
+      sprites: [{ x: 18, y: 19, w: 8, cls: 'sc-drift', d: 12, svg: 'gull' }, { x: 82, y: 69, w: 9, cls: 'sc-bob', d: 4.2, emoji: '🏮' }] },
+    { n: 53, id: 'xian', place: "Xi'an", title: 'Terracotta lane, Xi’an', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#78c4e8'], [0.58, '#f7e8ca'], [1, '#ffd0a4']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(286, 76, 0.78, 0.8) +
+          '<path d="M0 520 L58 420 L112 476 L174 350 L236 470 L308 392 L390 502 V640 H0 Z" fill="#9b9b82"/>' +
+          '<rect y="590" width="390" height="254" fill="#b9b07f"/>' +
+          '<path d="M0 590 V500 H75 V590 M315 590 V500 H390 V590" fill="#cf754c" stroke="#a6503a" stroke-width="5"/>' +
+          '<path d="M72 548 V476 Q195 390 318 476 V548 Z" fill="#d76b47" stroke="#a84b3a" stroke-width="6"/>' +
+          '<path d="M112 548 V500 Q195 430 278 500 V548 Z" fill="#f0bf73"/>' +
+          '<path d="M0 706 Q98 682 196 706 T390 700 V844 H0 Z" fill="#8baa61"/>' +
+          '<path d="M30 760 H360 M44 784 H346" stroke="#f3d59a" stroke-width="7" opacity=".8"/>';
+      },
+      sprites: [{ x: 12, y: 70, w: 8, cls: 'sc-bob', d: 4.4, emoji: '🏮' }, { x: 76, y: 17, w: 8, cls: 'sc-drift', d: 11, svg: 'gull' }] },
+    { n: 54, id: 'chengdu', place: 'Chengdu', title: 'Panda garden, Chengdu', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#a8def0'], [0.5, '#e8f1c9'], [1, '#ffe5ba']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' +
+          '<path d="M0 494 Q84 434 164 484 T326 470 T440 486 V650 H0 Z" fill="#75a979"/>' +
+          '<path d="M0 570 Q90 540 192 570 T390 560 V844 H0 Z" fill="#9cca78"/>' +
+          '<path d="M48 610 V330 M82 600 V290 M322 606 V310 M354 618 V362" stroke="#438957" stroke-width="14" stroke-linecap="round"/>' +
+          '<path d="M40 390 Q18 358 20 330 M88 356 Q110 328 110 298 M316 378 Q290 350 290 320 M356 414 Q380 385 382 360" stroke="#75bd75" stroke-width="10" fill="none"/>' +
+          '<circle cx="196" cy="572" r="100" fill="#fffaf0" stroke="#dfdfd6" stroke-width="6"/>' +
+          '<circle cx="124" cy="506" r="32" fill="#252b2b"/><circle cx="268" cy="506" r="32" fill="#252b2b"/>' +
+          '<ellipse cx="164" cy="570" rx="22" ry="30" transform="rotate(28 164 570)" fill="#252b2b"/><ellipse cx="228" cy="570" rx="22" ry="30" transform="rotate(-28 228 570)" fill="#252b2b"/>' +
+          '<circle cx="166" cy="570" r="7" fill="#fff"/><circle cx="226" cy="570" r="7" fill="#fff"/><ellipse cx="196" cy="607" rx="15" ry="10" fill="#252b2b"/>' +
+          '<path d="M178 625 Q196 643 214 625" stroke="#8d5c55" stroke-width="4" fill="none" stroke-linecap="round"/>';
+      },
+      sprites: [{ x: 76, y: 70, w: 12, cls: 'sc-bob', d: 4.2, emoji: '🐼' }, { x: 12, y: 20, w: 8, cls: 'sc-drift', d: 12, svg: 'softcloud' }] },
+    { n: 55, id: 'chongqing', place: 'Chongqing', title: 'Riverside lights, Chongqing', night: true,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#232b61'], [0.58, '#62518d'], [1, '#f29b9e']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' +
+          '<circle cx="316" cy="116" r="42" fill="#fff0bd" opacity=".84"/>' +
+          '<path d="M0 536 L46 466 L84 500 L132 424 L180 488 L236 420 L280 482 L332 438 L390 516 V680 H0 Z" fill="#475273"/>' +
+          '<path d="M0 610 H390 V844 H0 Z" fill="#394b77"/>' +
+          '<path d="M0 742 Q68 674 132 732 T258 720 T390 732 V844 H0 Z" fill="#377cb5"/>' +
+          '<path d="M0 770 Q72 702 140 762 T270 748 T390 758" stroke="#a8e8ff" stroke-width="5" fill="none" opacity=".75"/>' +
+          '<path d="M20 610 V520 H62 V610 M70 610 V478 H112 V610 M128 610 V548 H164 V610 M230 610 V500 H270 V610 M278 610 V458 H320 V610 M328 610 V526 H370 V610" fill="#4b4c76" stroke="#f3a8b9" stroke-width="3"/>' +
+          '<path d="M40 540 V554 M90 500 V514 M248 520 V536 M298 480 V496 M348 548 V562" stroke="#ffe29a" stroke-width="6" stroke-linecap="round"/>' +
+          '<path d="M182 600 V444 Q196 414 210 444 V600" fill="#7bd4dc" stroke="#fff1c6" stroke-width="4"/>';
+      },
+      sprites: [{ x: 80, y: 68, w: 15, cls: 'sc-roll', d: 10, svg: 'boat' }, { x: 12, y: 16, w: 7, cls: 'sc-bob', d: 4.8, emoji: '✨' }] },
+    { n: 56, id: 'shanghai', place: 'Shanghai', title: 'Bund skyline, Shanghai', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#9ed9ee'], [0.55, '#f5e6d8'], [1, '#ffcaa7']]) + scGrad('rv', [[0, '#56b9dc'], [1, '#2e87bf']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(90, 80, 0.85, 0.8) + '<circle cx="322" cy="120" r="35" fill="#fff1ba"/>' +
+          '<rect y="622" width="390" height="222" fill="url(#rv)"/>' +
+          '<path d="M0 620 H390" stroke="#f8e3c1" stroke-width="8"/>' +
+          '<path d="M18 620 V470 H74 V620 M82 620 V510 H126 V620 M136 620 V430 H168 V620 M216 620 V490 H250 V620 M260 620 V455 H292 V620 M300 620 V512 H370 V620" fill="#e8d0b8" stroke="#fff0dc" stroke-width="4"/>' +
+          '<path d="M176 620 V360 H210 V620" fill="#d9d5cf" stroke="#fff1da" stroke-width="4"/><path d="M176 360 L193 320 L210 360 Z" fill="#e8b76b"/>' +
+          '<path d="M193 346 V576 M177 400 H209 M177 460 H209 M177 520 H209" stroke="#88c5d4" stroke-width="5"/>' +
+          '<circle cx="193" cy="404" r="15" fill="#ee7b79" stroke="#fff0d8" stroke-width="4"/><circle cx="193" cy="452" r="10" fill="#f3b97b" stroke="#fff0d8" stroke-width="3"/>' +
+          '<path d="M0 704 Q80 688 156 704 T312 700 T430 704" stroke="#a6e8f5" stroke-width="5" fill="none" opacity=".75"/>';
+      },
+      sprites: [{ x: 74, y: 70, w: 9, cls: 'sc-bob', d: 4.5, emoji: '✨' }, { x: 12, y: 17, w: 8, cls: 'sc-drift', d: 12, svg: 'gull' }] },
+    { n: 57, id: 'guangzhou', place: 'Guangzhou', title: 'Pearl River blossom, Guangzhou', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#92d5ee'], [0.58, '#ffefce'], [1, '#ffc2a3']]) + scGrad('rv', [[0, '#6cc8dc'], [1, '#328eb8']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(280, 78, 0.8, 0.8) +
+          '<path d="M0 600 Q84 560 170 600 T340 586 T430 604 V710 H0 Z" fill="#8fb77d"/>' +
+          '<rect y="680" width="390" height="164" fill="url(#rv)"/>' +
+          '<path d="M0 680 H390" stroke="#f7d8aa" stroke-width="8"/>' +
+          '<path d="M42 680 V526 H96 V680 M104 680 V480 H154 V680 M256 680 V500 H300 V680 M306 680 V542 H364 V680" fill="#f3d6bb" stroke="#fff0d8" stroke-width="4"/>' +
+          '<path d="M180 680 Q195 620 190 542 Q186 474 204 414 Q222 474 218 542 Q214 620 230 680 Z" fill="#f5a7a0" stroke="#fff0db" stroke-width="5"/>' +
+          '<path d="M196 414 Q204 362 212 414 M198 468 L210 468 M194 526 L216 526 M190 586 L220 586" stroke="#fff3d9" stroke-width="5" fill="none" stroke-linecap="round"/>' +
+          '<path d="M0 730 Q90 712 178 730 T350 728 T430 730" stroke="#c5f1ef" stroke-width="5" fill="none" opacity=".8"/>' +
+          [[44, 472], [74, 444], [320, 456], [352, 480]].map(function (p) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="9" fill="#ff92ad"/><circle cx="' + p[0] + '" cy="' + p[1] + '" r="3" fill="#fff7d1"/>'; }).join('');
+      },
+      sprites: [{ x: 12, y: 70, w: 9, cls: 'sc-bob', d: 4.2, emoji: '🌸' }, { x: 78, y: 17, w: 8, cls: 'sc-drift', d: 12, svg: 'gull' }] }
   ];
   // 1.9.234 "Some clouds": every daytime outdoor scene gets one more soft cloud drifting slowly across the top of the sky
   // (pink-gold at sunset). Night scenes keep their clear skies.
@@ -6619,11 +6740,119 @@
     await wait(reduce ? 80 : 750);
     me.classList.remove('hopping');
   }
+  async function cinematicTravel(fromN, toN) {
+    const view = $('mapview'), stage = $('mapstage'), svg = stage && stage.querySelector('svg.nzsvg');
+    const plane = svg && svg.querySelector('#sr-travel-plane');
+    const a = MAP_STOPS[fromN - 1], b = MAP_STOPS[toN - 1];
+    if (reduce || !view || !stage || !svg || !plane || !a || !b || toN <= fromN) return false;
+    const track = doc.createElementNS('http://www.w3.org/2000/svg', 'path');
+    track.setAttribute('d', icingPath([a, b]));
+    track.setAttribute('fill', 'none');
+    track.setAttribute('stroke', '#ff6fa8');
+    track.setAttribute('stroke-width', '9');
+    track.setAttribute('stroke-linecap', 'round');
+    track.setAttribute('opacity', '.8');
+    track.setAttribute('stroke-dasharray', '1');
+    track.setAttribute('stroke-dashoffset', '1');
+    track.style.filter = 'drop-shadow(0 2px 4px rgba(72,67,112,.38))';
+    svg.insertBefore(track, plane);
+    let length = 0;
+    try { length = track.getTotalLength(); } catch (e) { }
+    if (!(length > 0)) { track.remove(); return false; }
+    const saved = {
+      transform: stage.style.transform, transition: stage.style.transition,
+      origin: stage.style.transformOrigin, pointer: stage.style.pointerEvents,
+      overflow: view.style.overflow, touchAction: view.style.touchAction,
+      planeDisplay: plane.getAttribute('display'), travelClass: stage.classList.contains('travel-shot')
+    };
+    let completed = false;
+    try {
+      stage.classList.add('travel-shot');
+      view.style.overflow = 'hidden';
+      view.style.touchAction = 'none';
+      stage.style.pointerEvents = 'none';
+      view.scrollLeft = 0; view.scrollTop = 0;
+      stage.style.transformOrigin = '0 0';
+      stage.style.transition = 'none';
+      stage.style.transform = 'none';
+      const sw = stage.clientWidth, sh = stage.clientHeight, vw = view.clientWidth, vh = view.clientHeight;
+      if (!sw || !sh || !vw || !vh) return false;
+      const sx = sw / MAP_VW, sy = sh / MAP_H;
+      const toStage = function (p) { return { x: (p.x - MAP_X0) * sx, y: p.y * sy }; };
+      const camera = function (scale, p) {
+        const tx = vw / 2 - p.x * scale, ty = vh / 2 - p.y * scale;
+        stage.style.transform = 'translate3d(' + tx.toFixed(1) + 'px,' + ty.toFixed(1) + 'px,0) scale(' + scale.toFixed(3) + ')';
+      };
+      const setPlane = function (p, p1, p2) {
+        const dx = p2.x - p1.x, dy = p2.y - p1.y;
+        const deg = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+        plane.setAttribute('transform', 'translate(' + p.x.toFixed(2) + ' ' + p.y.toFixed(2) + ') rotate(' + deg.toFixed(1) + ')');
+      };
+      const first = track.getPointAtLength(0), last = track.getPointAtLength(length);
+      const farScale = Math.min(vw / sw, vh / sh) * .92, closeScale = 1.45;
+      stage.style.transform = 'translate3d(0,0,0) scale(1)';
+      void stage.offsetWidth;
+      stage.style.transition = 'transform 460ms cubic-bezier(.2,.8,.2,1)';
+      camera(farScale, { x: sw / 2, y: sh / 2 });
+      await wait(650);
+      plane.setAttribute('display', 'inline');
+      setPlane(first, first, track.getPointAtLength(Math.min(length, 5)));
+      stage.style.transition = 'transform 420ms cubic-bezier(.2,.8,.2,1)';
+      camera(closeScale, toStage(first));
+      await wait(450);
+      stage.style.transition = 'none';
+      track.setAttribute('stroke-dasharray', String(length));
+      track.setAttribute('stroke-dashoffset', String(length));
+      await new Promise(function (resolve) {
+        const raf = root.requestAnimationFrame || function (fn) { return setTimeout(function () { fn(Date.now()); }, 16); };
+        let started = null;
+        function frame(stamp) {
+          if (started == null) started = stamp;
+          const t = Math.min(1, Math.max(0, (stamp - started) / 1250));
+          const eased = t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+          const d = length * eased, p = track.getPointAtLength(d);
+          const p1 = track.getPointAtLength(Math.max(0, d - 5)), p2 = track.getPointAtLength(Math.min(length, d + 5));
+          setPlane(p, p1, p2);
+          track.setAttribute('stroke-dashoffset', String(length * (1 - eased)));
+          camera(closeScale, toStage(p));
+          if (t < 1) raf(frame); else resolve();
+        }
+        raf(frame);
+      });
+      stage.style.transition = 'transform 520ms cubic-bezier(.2,.75,.25,1)';
+      camera(1, toStage(last));
+      await wait(550);
+      completed = true;
+    } catch (e) {
+      completed = false;
+    } finally {
+      stage.style.transition = saved.transition;
+      stage.style.transform = saved.transform;
+      stage.style.transformOrigin = saved.origin;
+      stage.style.pointerEvents = saved.pointer;
+      if (!saved.travelClass) stage.classList.remove('travel-shot');
+      view.style.overflow = saved.overflow;
+      view.style.touchAction = saved.touchAction;
+      if (saved.planeDisplay == null) plane.removeAttribute('display');
+      else plane.setAttribute('display', saved.planeDisplay);
+      plane.removeAttribute('transform');
+      track.remove();
+    }
+    if (completed) scrollMapTo(toN, { behavior: 'auto' });
+    return completed;
+  }
   async function celebrateOnMap(fromN, toN) {
-    showMap({ scroll: toN || 'start', behavior: reduce ? 'auto' : 'smooth', keepSong: true });
+    const traveling = !!(fromN && toN && toN > fromN && toN <= LV_COUNT);
+    const cinematic = traveling && !reduce;
+    showMap({ scroll: cinematic ? 'start' : (toN || 'start'), behavior: cinematic || reduce ? 'auto' : 'smooth', keepSong: true });
     await wait(reduce ? 60 : 280);
-    animatePathSegment(fromN > 1 ? fromN - 1 : fromN, fromN);
-    await hopRacer(fromN, toN);
+    animatePathSegment(traveling ? fromN : (fromN > 1 ? fromN - 1 : fromN), traveling ? toN : fromN);
+    if (cinematic) {
+      const result = await Promise.all([cinematicTravel(fromN, toN), hopRacer(fromN, toN)]);
+      if (!result[0]) scrollMapTo(toN, { behavior: 'smooth' });
+    } else {
+      await hopRacer(fromN, toN);
+    }
     const ov = $('goalnext');
     if (ov && toN && toN <= LV_COUNT && fromN < LV_COUNT) {
       $('goalnexttitle').textContent = 'On to ' + (stopForLevel(toN) && stopForLevel(toN).place || ('level ' + toN));
