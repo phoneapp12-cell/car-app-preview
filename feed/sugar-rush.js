@@ -1,4 +1,4 @@
-/* Info Book 1.9.251 – Sugar Rush, levels 1–57. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.252 – Sugar Rush, levels 1–57. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -1101,6 +1101,18 @@
       '<path d="M-6 22 L-4 27 M6 22 L4 27" fill="none" stroke="#9a5b72" stroke-width="1.6"/><rect x="-5" y="27" width="10" height="7" rx="2" fill="#d99a5e" stroke="#fff" stroke-width="1.5"/>' +
       '</g></g></g>';
   }
+  // 1.9.252 Gentle tide rings in open water; drawn beneath coastlines, routes, and stop labels.
+  const MAP_RIPPLES = [[420, 465, 0.9], [410, 760, 1], [32, 850, 0.8], [430, 1090, 1.05], [420, 1550, 0.8], [600, 2030, 0.9]];
+  function mapRipples() {
+    const rx = [10, 18, 27], ry = [3.4, 6, 8.6];
+    return '<g class="sr-ripples" aria-hidden="true" pointer-events="none">' + MAP_RIPPLES.map(function (r, i) {
+      return '<g transform="translate(' + r[0] + ' ' + r[1] + ') scale(' + r[2] + ')">' +
+        rx.map(function (x, j) {
+          const delay = (-j * 1.65 - i * 0.38).toFixed(2), duration = (5.2 + (i % 3) * 0.55).toFixed(2);
+          return '<ellipse class="sr-ripple-ring" cx="0" cy="0" rx="' + x + '" ry="' + ry[j] + '" style="--d:' + duration + 's;--dl:' + delay + 's"/>';
+      }).join('') + '</g>';
+    }).join('') + '</g>';
+  }
   function atlasPill(x, y, w, kicker, title, note) {
     const cx = w / 2;
     return '<g transform="translate(' + x + ' ' + y + ')" pointer-events="none">' +
@@ -1150,6 +1162,7 @@
       '</filter>' +
       '</defs>' +
       '<rect x="' + MAP_X0 + '" width="' + MAP_VW + '" height="' + MAP_H + '" fill="url(#sr-sea)"/>' +
+      mapRipples() +
       '<circle class="sr-bob" cx="250" cy="60" r="7" fill="#ff8ab8" opacity=".55"/>' +
       '<circle class="sr-bob" cx="264" cy="74" r="5" fill="#ffe066" opacity=".65"/>' +
       '<circle class="sr-bob" cx="372" cy="200" r="6" fill="#7ee0a8" opacity=".5"/>' +
