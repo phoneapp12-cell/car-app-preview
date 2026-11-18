@@ -1,4 +1,4 @@
-/* Info Book 1.9.243 – Sugar Rush, levels 1–31. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.245 – Sugar Rush, levels 1–42. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -239,7 +239,30 @@
       jelly: ['00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '11111111', '11111111'],
       ice: ['11000011', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000'],
       help: 'Clear the jelly along the market and crack the 4 icing blocks by the gate in 34 moves.',
-      badge: { id: 'indiagate', name: 'India Gate', icon: '🪔' } }
+      badge: { id: 'indiagate', name: 'India Gate', icon: '🪔' } },
+    // 1.9.245 Conveyor chapter: sweets on marked lanes slide one tile after every valid move.
+    { n: 39, name: 'Kathmandu Prayer Flags', target: 0, moves: 28, stars: [0, 5700, 11400], kinds: 6,
+      belts: [{ row: 3, dir: 1 }],
+      jelly: ['00000000', '00111100', '01111110', '01111110', '01111110', '00111100', '00000000', '00000000'],
+      help: 'Clear the courtyard jelly in 28 moves. The sweets on the turquoise lane slide one space to the right after every move and loop around the end.',
+      badge: { id: 'prayerflag', name: 'Prayer Flag', icon: '🎏' } },
+    { n: 40, name: 'Dhaka River Lights', target: 0, moves: 30, stars: [0, 5800, 11600], kinds: 6,
+      belts: [{ row: 2, dir: 1 }, { row: 5, dir: -1 }],
+      bub: ['00000000', '00000000', '00111100', '00000000', '00000000', '00111100', '00000000', '00000000'],
+      help: 'Pop all 8 sugar bubbles in 30 moves. Two conveyor lanes carry sweets in opposite directions; a bubbled sweet rides along with its bubble.',
+      badge: { id: 'launch', name: 'River Launch', icon: '🚤' } },
+    { n: 41, name: 'Colombo Monsoon Current', target: 0, moves: 34, stars: [0, 5900, 11800], kinds: 6,
+      belts: [{ row: 1, dir: 1 }, { row: 6, dir: -1 }], reverseBelts: true,
+      ings: [[0, 2], [0, 5]], ingIcon: '🍍',
+      ice: ['00000000', '00000000', '00011000', '00000000', '00000000', '00011000', '00000000', '00000000'],
+      help: 'Bring both pineapple treats down and crack the icing in 34 moves. The reversing current carries candies and pineapple treats along both conveyor lanes.',
+      badge: { id: 'monsoon', name: 'Monsoon Pearl', icon: '🌧️' } },
+    { n: 42, name: 'Singapore Garden Express', target: 0, moves: 36, stars: [0, 6000, 12000], kinds: 6,
+      belts: [{ row: 2, dir: 1 }, { row: 5, dir: -1 }], reverseBelts: true,
+      jelly: ['00000000', '00111100', '00000000', '00011000', '00011000', '00000000', '00111100', '00000000'],
+      locks: ['00000000', '00000000', '00000000', '00100100', '00100100', '00000000', '00000000', '00000000'],
+      help: 'Clear the garden jelly and free all 4 locked jars in 36 moves. The two conveyor lanes reverse direction after every move.',
+      badge: { id: 'gardenexpress', name: 'Garden Express', icon: '🌿' } }
   ];
 
 
@@ -282,7 +305,11 @@
     { icon: '🌙', goal: 'Clear the market jelly and crack the icing', detail: 'Clear the jelly by the market gates and crack the 4 icing blocks in 32 moves.', tip: 'The jelly sits in the four corners, like the gates. The icing is just inside each pair.', mechanic: 'gates' },
     { icon: '🪷', goal: 'Clear the river jelly, pop the bubbles and free the jars', detail: 'Clear the jelly along the river steps, pop 4 sugar bubbles and free 2 locked jars in 24 moves.', tip: 'The jelly sits along the bottom two rows. The jars are in the middle.', mechanic: 'village' },
     { icon: '🌼', goal: 'Bring both flowers down and crack the icing', detail: 'Bring both flowers down to the pagoda and crack the 4 icing blocks in 32 moves.', tip: 'Match under each flower to drop it. The icing sits in two pairs on the way down.', mechanic: 'market' },
-    { icon: '🪔', goal: 'Clear the market jelly and crack the gate icing', detail: 'Clear the jelly along the market and crack the 4 icing blocks by the gate in 34 moves.', tip: 'The icing sits in the top corners, like the gate. The jelly is the market along the bottom.', mechanic: 'wharf' }
+    { icon: '🪔', goal: 'Clear the market jelly and crack the gate icing', detail: 'Clear the jelly along the market and crack the 4 icing blocks by the gate in 34 moves.', tip: 'The icing sits in the top corners, like the gate. The jelly is the market along the bottom.', mechanic: 'wharf' },
+    { icon: '🎏', goal: 'Clear the courtyard jelly', detail: 'Clear every jelly in 28 moves.', tip: 'The turquoise row is a conveyor: after each move its sweets slide one place to the right and loop around. You can use the moving line to set up matches.', mechanic: 'conveyor' },
+    { icon: '🚤', goal: 'Pop all the sugar bubbles', detail: 'Pop every sugar bubble in 30 moves.', tip: 'Two lanes run in opposite directions. Bubbled sweets travel with the conveyor, but still need a match beside them or a special to pop.', mechanic: 'opposing-belts' },
+    { icon: '🍍', goal: 'Bring both pineapple treats down and crack the icing', detail: 'Bring both treats down and clear all the icing in 34 moves.', tip: 'Both lanes reverse after each move. Watch the arrows before you swap, then clear the icing out of the way.', mechanic: 'reversing-current' },
+    { icon: '🌿', goal: 'Clear the jelly and free the jars', detail: 'Clear every jelly and free all the locked jars in 36 moves.', tip: 'The garden lanes reverse after every turn. Keep an eye on both the jelly and the four jars as the sweets travel.', mechanic: 'garden-express' }
   ];
   function levelIntro(n, p) {
     const lv = LEVELS[(n | 0) - 1]; if (!lv) return null;
@@ -737,7 +764,15 @@
     37: [{ id: 'recap37', kind: 'recap', title: 'Myanmar', bubble: 'Yangon: flowers on the way to the pagoda.',
       items: [{ icon: '🌼', text: 'Bring both flowers down' }, { icon: '🧁', text: 'Crack the icing' }] }],
     38: [{ id: 'recap38', kind: 'recap', title: 'India', bubble: 'Delhi: sweets by the gate.',
-      items: [{ icon: '💜', text: 'Clear the market jelly' }, { icon: '🧁', text: 'Crack the gate icing' }] }]
+      items: [{ icon: '💜', text: 'Clear the market jelly' }, { icon: '🧁', text: 'Crack the gate icing' }] }],
+    39: [{ id: 'recap39', kind: 'recap', title: 'Kathmandu', bubble: 'A new kind of sweet shop: the conveyor moves after every turn.',
+      items: [{ icon: '➡️', text: 'The highlighted lane carries sweets one space right, looping around' }, { icon: '💜', text: 'Clear all of the courtyard jelly' }] }],
+    40: [{ id: 'recap40', kind: 'recap', title: 'Dhaka', bubble: 'Two river lanes carry sweets in opposite directions.',
+      items: [{ icon: '➡️', text: 'The upper lane moves right; the lower lane moves left' }, { icon: '🫧', text: 'Bubbled sweets travel too; pop every bubble' }] }],
+    41: [{ id: 'recap41', kind: 'recap', title: 'Colombo', bubble: 'The monsoon current changes course after every move.',
+      items: [{ icon: '↔️', text: 'Both lanes carry candies and pineapple treats, then reverse direction' }, { icon: '🍍', text: 'Bring both treats down and crack the icing' }] }],
+    42: [{ id: 'recap42', kind: 'recap', title: 'Singapore', bubble: 'The Garden Express combines moving lanes with two objectives.',
+      items: [{ icon: '↔️', text: 'Two conveyor lanes reverse after every move' }, { icon: '💜', text: 'Clear the jelly and free all four jars' }] }]
   };
   function tutorialFor(n) { return TUTORIALS[n] || null; }
 
@@ -813,7 +848,12 @@
     { n: 35, x: -70.1, y: 1656.1, place: "Malaysia", kind: 'city', label: 'left', lat: 3.139, lon: 101.6869 },
     { n: 36, x: -80.2, y: 1539.6, place: "Thailand", kind: 'city', label: 'right', lat: 13.7563, lon: 100.5018 },
     { n: 37, x: -117.2, y: 1505.8, place: "Myanmar", kind: 'city', label: 'left', lat: 16.8409, lon: 96.1735 },
-    { n: 38, x: -279, y: 1376.6, place: "India", kind: 'city', label: 'right', lat: 28.6139, lon: 77.209, via: [{ x: -190, y: 1520 }, { x: -240, y: 1460 }] }
+    { n: 38, x: -279, y: 1376.6, place: "India", kind: 'city', label: 'right', lat: 28.6139, lon: 77.209, via: [{ x: -190, y: 1520 }, { x: -240, y: 1460 }] },
+    // 1.9.245 Continue east from Delhi through the Himalayan foothills and the Bay of Bengal.
+    { n: 39, x: -209.7, y: 1386.5, place: 'Nepal', kind: 'city', label: 'left', lat: 27.7172, lon: 85.3240, via: [{ x: -236, y: 1376 }] },
+    { n: 40, x: -166.3, y: 1429.3, place: 'Bangladesh', kind: 'city', label: 'right', lat: 23.8103, lon: 90.4125, via: [{ x: -184, y: 1408 }] },
+    { n: 41, x: -256.3, y: 1614.6, place: 'Sri Lanka', kind: 'island', label: 'left', lat: 6.9271, lon: 79.8612, via: [{ x: -205, y: 1508 }, { x: -246, y: 1570 }] },
+    { n: 42, x: -51.9, y: 1675.7, place: 'Singapore', kind: 'city', label: 'right', lat: 1.3521, lon: 103.8198, via: [{ x: -200, y: 1658 }, { x: -104, y: 1670 }] }
   ];
   // Coming soon: other Australian cities. Shown as markers only (no trail), so they never look like the route.
   // Brisbane is a stop since 1.9.233. Canberra and Hobart are stops since 1.9.243.
@@ -821,7 +861,7 @@
     { place: 'Darwin', x: 179, y: 1827, label: 'left', lat: -12.46, lon: 130.84 },
     { place: 'Cairns', x: 306, y: 1876, label: 'left', lat: -16.92, lon: 145.77 }
   ];
-  const LV_COUNT = 38;
+  const LV_COUNT = 42;
   function stopForLevel(n) { return MAP_STOPS[(n | 0) - 1] || null; }
   function icingPath(pts) {
     if (!pts || pts.length < 2) return '';
@@ -1472,6 +1512,29 @@
     b[i][j] = Object.assign(mk(-5), { choco: 1 });
     return { r: i, c: j };
   }
+  function beltDirection(lv, lane, turns) {
+    let dir = lane.dir < 0 ? -1 : 1;
+    if (lv && lv.reverseBelts && ((turns | 0) % 2 === 1)) dir *= -1;
+    return dir;
+  }
+  function shiftBelts(st, turns) {
+    const moves = [], lv = st.lv || {}, b = st.board;
+    for (const lane of lv.belts || []) {
+      const r = lane.row | 0, cols = lane.cols || Array.from({ length: N }, function (_, c) { return c; });
+      if (r < 0 || r >= N || cols.length < 2) continue;
+      const tiles = cols.map(function (c) { return b[r][c]; });
+      const carryable = function (t) { return isBomb(t) || isIng(t) || !!(t && t.c >= 0 && !t.ice && !t.choco && !t.ing); };
+      // A solid lane moves as a loop. Fixed blockers stop it rather than letting sweets jump over them.
+      if (tiles.some(function (t) { return !carryable(t); })) continue;
+      const dir = beltDirection(lv, lane, turns);
+      tiles.forEach(function (t, i) {
+        const from = cols[i], to = cols[(i + dir + cols.length) % cols.length];
+        if (from !== to) moves.push({ t: t, from: { r: r, c: from }, to: { r: r, c: to } });
+      });
+      tiles.forEach(function (t, i) { b[r][cols[(i + dir + cols.length) % cols.length]] = t; });
+    }
+    return moves;
+  }
   function starsFor(score, lv) { lv = lv || LEVEL; return lv.stars.filter(s => score >= s).length; }
   function starsOf(st) {
     if (!st.won) return 0;
@@ -1490,7 +1553,7 @@
       jelly: parseDigits(lv.jelly),
       collected: new Array(KINDS).fill(0),
       ingsLeft: countIngs(board),
-      score: 0, moves: lv.moves, target: lv.target || 0, over: false, won: false, stars: 0
+      score: 0, moves: lv.moves, target: lv.target || 0, turns: 0, over: false, won: false, stars: 0
     };
   }
   function isScoreOnly(lv) {
@@ -1565,6 +1628,13 @@
       applyStep(b, s, st.rand, st.kinds, cascade++, st);
       steps.push(s); st.score += s.points;
     }
+    const beltStepIndex = steps.length, beltTurns = st.turns || 0;
+    const beltMoves = (st.lv && st.lv.belts) ? shiftBelts(st, beltTurns) : [];
+    if (st.lv && st.lv.belts) {
+      st.turns = beltTurns + 1;
+      const beltSteps = settleBoard(st, cascade);
+      beltSteps.forEach(function (s) { steps.push(s); st.score += s.points; });
+    }
     let shuffled = false;
     if (!st.tutorial && !hasMove(b, mask)) { shuffle(b, st.rand, st.kinds, mask); shuffled = true; }
     const chocoHit = steps.some(s => s.chocoHit);
@@ -1580,7 +1650,7 @@
     // 1.9.219 A spread can take the last swap away; shuffle so the board never gets stuck.
     if (!st.tutorial && !shuffled && (spread || liqSpread) && !hasMove(b, mask)) { shuffle(b, st.rand, st.kinds, mask); shuffled = true; }
     if (!st.tutorial) finishIfDone(st);
-    return { valid: true, steps, shuffled, swapped: [A, Z], spread, liqSpread };
+    return { valid: true, steps, shuffled, swapped: [A, Z], spread, liqSpread, beltMoves, beltStepIndex };
   }
 
 
@@ -1671,7 +1741,7 @@
       lv: st.lv,
       jelly: st.jelly ? st.jelly.map(r => r.slice()) : null,
       collected: st.collected.slice(),
-      ingsLeft: st.ingsLeft, liqIdle: st.liqIdle || 0,
+      ingsLeft: st.ingsLeft, liqIdle: st.liqIdle || 0, turns: st.turns || 0,
       score: st.score, moves: st.moves, target: st.target, over: st.over, won: st.won, stars: st.stars
     };
   }
@@ -3190,7 +3260,60 @@
           '<path d="M160 520 L195 430 L230 520 Z" fill="#f0c040"/>' +
           '<rect x="40" y="470" width="18" height="50" fill="#6aaa48"/><rect x="330" y="480" width="18" height="40" fill="#6aaa48"/>';
       },
-      sprites: [{ x: 8, y: 16, w: 8, cls: 'sc-drift', d: 10, svg: 'gull' }, { x: 50, y: 6, w: 26, cls: 'sc-drift', d: 24, svg: 'cloud' }] }
+      sprites: [{ x: 8, y: 16, w: 8, cls: 'sc-drift', d: 10, svg: 'gull' }, { x: 50, y: 6, w: 26, cls: 'sc-drift', d: 24, svg: 'cloud' }] },
+    // 1.9.245 Kathmandu: the Himalaya behind a white stupa and colourful prayer flags.
+    { n: 39, id: 'kathmandu', place: 'Nepal', title: 'Stupa and prayer flags, Kathmandu', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#78b9e8'], [0.55, '#e5f4ff'], [1, '#fff1d2']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(80, 80, 0.75, 0.8) +
+          '<path d="M0 500 L65 360 L110 430 L178 250 L240 420 L300 320 L390 500 Z" fill="#8296a4"/>' +
+          '<path d="M178 250 L200 300 L158 292 Z M300 320 L322 366 L280 358 Z" fill="#f8fbff"/>' +
+          '<path d="M0 520 H390 V844 H0 Z" fill="#8fb85c"/>' +
+          '<rect x="145" y="555" width="100" height="100" rx="48" fill="#f4e8d0"/><path d="M130 558 Q195 495 260 558 Z" fill="#f3d36a"/>' +
+          '<rect x="181" y="515" width="28" height="42" fill="#f7e8c8"/><path d="M195 515 L195 450 M195 452 L232 466 L195 480 M195 480 L229 493 L195 505" stroke="#b54048" stroke-width="3" fill="#e45b52"/>' +
+          '<path d="M0 760 C100 744 200 778 300 752 C350 744 376 750 390 752 L390 844 L0 844 Z" fill="#6d984d"/>';
+      },
+      sprites: [{ x: 48, y: 48, w: 8, cls: 'sc-bob', d: 4, emoji: '🎏' }, { x: 70, y: 12, w: 8, cls: 'sc-drift', d: 11, svg: 'gull' }] },
+    // 1.9.245 Dhaka: river ferries crossing in front of a lively city skyline.
+    { n: 40, id: 'dhaka', place: 'Bangladesh', title: 'River lights, Dhaka', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#e9a77a'], [0.55, '#ffe0b8'], [1, '#fff4dc']]) + scGrad('rv', [[0, '#4c9fbd'], [1, '#245d80']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(280, 90, 0.75, 0.8) +
+          '<circle cx="68" cy="92" r="28" fill="#ffe08a"/>' +
+          '<path d="M0 540 H390 V844 H0 Z" fill="#85a85e"/>' +
+          '<rect x="38" y="370" width="46" height="170" fill="#d6a06d"/><rect x="92" y="420" width="54" height="120" fill="#b98068"/>' +
+          '<rect x="156" y="340" width="54" height="200" fill="#d3b17d"/><rect x="220" y="395" width="48" height="145" fill="#a87e65"/><rect x="276" y="355" width="72" height="185" fill="#d0a370"/>' +
+          '<path d="M0 570 Q80 550 160 570 T320 570 T480 570 V760 H0 Z" fill="url(#rv)"/>' +
+          '<path d="M72 635 H190 L178 662 H88 Z" fill="#f8f0df"/><rect x="104" y="612" width="48" height="23" fill="#e75c53"/><path d="M114 612 L128 592 L145 612 Z" fill="#f3d46e"/>' +
+          '<path d="M0 770 C90 754 190 782 290 758 C340 750 376 754 390 756 L390 844 L0 844 Z" fill="#689750"/>';
+      },
+      sprites: [{ x: 20, y: 70, w: 18, cls: 'sc-roll', d: 12, svg: 'boat' }, { x: 12, y: 16, w: 8, cls: 'sc-drift', d: 10, svg: 'gull' }] },
+    // 1.9.245 Colombo: the old lighthouse, Indian Ocean surf and palms.
+    { n: 41, id: 'colombo', place: 'Sri Lanka', title: 'Lighthouse by the sea, Colombo', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#71c4f0'], [0.55, '#e2f7ff'], [1, '#fff4d9']]) + scGrad('oc', [[0, '#3fc2cf'], [1, '#126789']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(220, 84, 0.8, 0.8) +
+          '<circle cx="310" cy="82" r="30" fill="#fff0a0"/>' +
+          '<path d="M0 560 Q60 530 120 560 T240 560 T360 560 T480 560 V844 H0 Z" fill="url(#oc)"/>' +
+          '<path d="M0 610 Q75 592 150 610 T300 610 T450 610 M0 665 Q70 647 140 665 T280 665 T420 665" stroke="#b9f4ed" stroke-width="4" fill="none" opacity=".8"/>' +
+          '<rect x="260" y="350" width="42" height="210" fill="#fff0d2" stroke="#d9c39e" stroke-width="3"/><path d="M252 352 H310 L300 320 H262 Z" fill="#d84a4a"/><path d="M258 320 H304 L296 304 H266 Z" fill="#fff2d4"/>' +
+          '<rect x="270" y="386" width="22" height="38" fill="#ffdf69" opacity=".8"/><path d="M0 760 C100 746 200 780 300 754 C350 744 376 750 390 752 L390 844 L0 844 Z" fill="#e9cd91"/>';
+      },
+      sprites: [{ x: 8, y: 72, w: 14, cls: 'sc-sway', d: 4, svg: 'palm' }, { x: 22, y: 76, w: 18, cls: 'sc-bob', d: 4, svg: 'vaka' }, { x: 70, y: 14, w: 8, cls: 'sc-drift', d: 10, svg: 'gull' }] },
+    // 1.9.245 Singapore: the bay, skyline and garden Supertrees.
+    { n: 42, id: 'singapore', place: 'Singapore', title: 'Garden city lights, Singapore', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#89c9ef'], [0.6, '#e1f4f5'], [1, '#fff4da']]) + scGrad('bay', [[0, '#4db9ca'], [1, '#176e93']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(70, 76, 0.8, 0.8) +
+          '<circle cx="310" cy="86" r="28" fill="#fff1a0"/>' +
+          '<rect x="46" y="410" width="42" height="150" fill="#9fb8b9"/><rect x="94" y="360" width="54" height="200" fill="#b9c9c4"/><rect x="154" y="430" width="42" height="130" fill="#93afb4"/>' +
+          '<rect x="218" y="350" width="28" height="210" rx="12" fill="#e8eee5"/><rect x="250" y="350" width="28" height="210" rx="12" fill="#e8eee5"/><rect x="282" y="350" width="28" height="210" rx="12" fill="#e8eee5"/><path d="M214 348 Q264 322 314 348 L310 362 H218 Z" fill="#61a66b"/>' +
+          '<rect y="560" width="390" height="190" fill="url(#bay)"/><path d="M0 615 Q70 600 140 615 T280 615 T420 615 M20 672 Q90 657 160 672 T300 672" stroke="#a9e7df" stroke-width="4" fill="none" opacity=".75"/>' +
+          '<path d="M54 760 V610 M56 650 Q15 620 32 584 Q66 600 56 650 M56 666 Q94 628 98 592 Q60 604 56 666 M180 760 V600 M182 646 Q142 616 155 582 Q188 602 182 646 M182 662 Q218 620 226 590 Q190 602 182 662" stroke="#4d854f" stroke-width="8" fill="none" stroke-linecap="round"/>' +
+          '<circle cx="55" cy="584" r="24" fill="#80c878"/><circle cx="100" cy="592" r="25" fill="#8cd180"/><circle cx="158" cy="582" r="22" fill="#9bd98c"/><circle cx="226" cy="590" r="24" fill="#7bc472"/>' +
+          '<path d="M0 770 C90 754 190 780 290 756 C340 748 376 752 390 754 L390 844 L0 844 Z" fill="#68a250"/>';
+      },
+      sprites: [{ x: 20, y: 72, w: 16, cls: 'sc-glide', d: 11, svg: 'citycat' }, { x: 16, y: 12, w: 8, cls: 'sc-drift', d: 10, svg: 'gull' }] }
   ];
   // 1.9.234 "Some clouds": every daytime outdoor scene gets one more soft cloud drifting slowly across the top of the sky
   // (pink-gold at sunset). Night scenes keep their clear skies.
@@ -3417,7 +3540,7 @@
     return true;
   }
 
-  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_X0, MAP_VW, MAP_STOPS, FUTURE_STOPS, NZ_PROJ, nzXY, WHANGAREI_INSET, insetXY, pacXY, ausXY, westPacXY, LV_COUNT, lvId, levelIds, stopId, LEGACY_220_IDS, migrateProg, stopForLevel, icingPath, beenPath, aheadPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, bubLeft, liqLeft, spreadLiq, LIQ_IDLE, goalCounts, cloneState, bestMove, hintMoveFor, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
+  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_X0, MAP_VW, MAP_STOPS, FUTURE_STOPS, NZ_PROJ, nzXY, WHANGAREI_INSET, insetXY, pacXY, ausXY, westPacXY, LV_COUNT, lvId, levelIds, stopId, LEGACY_220_IDS, migrateProg, stopForLevel, icingPath, beenPath, aheadPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, bubLeft, liqLeft, spreadLiq, beltDirection, shiftBelts, LIQ_IDLE, goalCounts, cloneState, bestMove, hintMoveFor, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
     allowed: () => true, // 1.9.228 open to every family member
     SAY_REST_MS, SAY_BIG, sayBig, COMBO_KINDS, COMBO_BONUS, comboKind, comboSwap, adjacentSpecials, isSpecialTile, HARD_LINES, hardLine, CANDY_STYLES, candySfxPlan, playCandySfx, SAY_SHOW_MS, SAY_AFTER_MS, sayShowGap, SPEAK_GAP, SPEAK_PITCH, SPEAK_RATE, SPEAK_VOL, pickSpeechVoice, speechGender, speakWorthy, SAY_SPRITES, SAY_CLIPS, sayClip, nextSayVoice, SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL, XF,
     VOICE_FILES, VOICE_RANK, MEDIA_HASH, mediaUrl, gameTrack, SONG_PLAN, SONG_FILES, SONG_FROM, songMood, attachSfxBus, playTone, playChime, playMovesWarnChime, playClip, voiceForStep,
@@ -4100,6 +4223,30 @@
     ctx.fillStyle = 'rgba(255,255,255,.55)';
     rr(x + s * .16, y + s * .07, s * .66, s * .1, s * .05); ctx.fill();
   }
+  function drawBeltLane(lane, dir) {
+    const row = lane.row | 0, cols = lane.cols || Array.from({ length: N }, function (_, c) { return c; });
+    if (row < 0 || row >= N) return;
+    ctx.save();
+    cols.forEach(function (c) {
+      if (c < 0 || c >= N) return;
+      const x = c * CS, y = row * CS, cy = y + CS * .91;
+      ctx.fillStyle = 'rgba(22, 174, 190, .13)';
+      rr(x + 1.5, y + 1.5, CS - 3, CS - 3, CS * .18); ctx.fill();
+      ctx.strokeStyle = 'rgba(8, 112, 136, .78)';
+      ctx.lineWidth = Math.max(1.4, CS * .045);
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.beginPath();
+      if (dir > 0) {
+        ctx.moveTo(x + CS * .27, cy); ctx.lineTo(x + CS * .72, cy);
+        ctx.moveTo(x + CS * .60, cy - CS * .09); ctx.lineTo(x + CS * .72, cy); ctx.lineTo(x + CS * .60, cy + CS * .09);
+      } else {
+        ctx.moveTo(x + CS * .73, cy); ctx.lineTo(x + CS * .28, cy);
+        ctx.moveTo(x + CS * .40, cy - CS * .09); ctx.lineTo(x + CS * .28, cy); ctx.lineTo(x + CS * .40, cy + CS * .09);
+      }
+      ctx.stroke();
+    });
+    ctx.restore();
+  }
   function frame() {
     if (screen === 'game' && st) {
       const t = sparkleHoldT != null ? sparkleHoldT : now();
@@ -4113,6 +4260,7 @@
         }
         drawTile(c * CS, r * CS, CS, st.jelly ? (st.jelly[r][c] || 0) : 0, (r + c) % 2);
       }
+      if (st.lv && st.lv.belts) st.lv.belts.forEach(function (lane) { drawBeltLane(lane, beltDirection(st.lv, lane, st.turns)); });
       if (sel && !busy) { ctx.strokeStyle = '#ff4f9a'; ctx.lineWidth = 3 * DPR; rr(sel[1] * CS + 3, sel[0] * CS + 3, CS - 6, CS - 6, CS * .2); ctx.stroke(); }
       for (const f of fx) if (f.type === 'beam') {
         const p = Math.min(1, (t - f.t0) / f.dur); ctx.fillStyle = 'rgba(255,255,255,' + (0.7 * (1 - p)) + ')';
@@ -5430,6 +5578,15 @@
     bootLevel(n);
   }
 
+  async function animateBeltMoves(moves) {
+    if (!moves || !moves.length) return;
+    for (const m of moves) {
+      const s = sprites.get(m.t.id);
+      if (s) moveTo(s, m.to.r, m.to.c, 210);
+    }
+    await wait(230);
+  }
+
   async function attempt(a, z) {
     if (busy || !st || st.over) return;
     if (tut && tut.active && tut.step && tut.step.kind === 'move' && !sameTutMove(a, z, tut.step.move)) {
@@ -5454,7 +5611,10 @@
     if (!res.valid) { if (A) moveTo(A, a[0], a[1], 180); if (Z) moveTo(Z, z[0], z[1], 180); await wait(190); busy = false; return; }
     hud();
     const plain = streakGain(res.steps) < 0;
-    for (let i = 0; i < res.steps.length; i++) await showStep(res.steps[i], i, { streak: !plain });
+    const beltAt = Number.isInteger(res.beltStepIndex) ? res.beltStepIndex : res.steps.length;
+    for (let i = 0; i < beltAt; i++) await showStep(res.steps[i], i, { streak: !plain });
+    if (res.beltMoves && res.beltMoves.length) await animateBeltMoves(res.beltMoves);
+    for (let i = beltAt; i < res.steps.length; i++) await showStep(res.steps[i], i, { streak: !plain });
     if (plain) addStreak(-1);
     if (res.spread) { const t = st.board[res.spread.r][res.spread.c]; if (t) { const s = sprite(t, res.spread.r, res.spread.c); s.grow = now(); } }
     // 1.9.219 Liquorice creeps after two moves in a row that free none; the move before, it gives a warning.
