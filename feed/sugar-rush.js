@@ -1,4 +1,4 @@
-/* Info Book 1.9.247 – Sugar Rush, levels 1–47. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.248 – Sugar Rush, levels 1–47. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -902,6 +902,14 @@
     { n: 46, x: -172.9, y: 1389.2, place: 'Bhutan', kind: 'city', label: 'right', lat: 27.4728, lon: 89.6390, via: [{ x: -137, y: 1430 }] },
     { n: 47, x: -314.4, y: 1321.0, place: 'Pakistan', kind: 'city', label: 'left', lat: 33.6844, lon: 73.0551 }
   ];
+  // Country is a separate atlas layer from the level stop (city/island) label.
+  const MAP_COUNTRIES = Array(16).fill('New Zealand').concat(
+    ['Cook Islands', 'Tonga', 'Samoa'],
+    Array(6).fill('Australia'),
+    ['Papua New Guinea', 'Solomon Islands', 'Vanuatu', 'Fiji', 'New Caledonia', 'Indonesia', 'Australia', 'Australia',
+      'Vietnam', 'Malaysia', 'Thailand', 'Myanmar', 'India', 'Nepal', 'Bangladesh', 'Sri Lanka', 'Singapore', 'Cambodia', 'Philippines', 'Laos', 'Bhutan', 'Pakistan']
+  );
+  function countryForLevel(n) { return MAP_COUNTRIES[(n | 0) - 1] || ''; }
   // Coming soon: other Australian cities. Shown as markers only (no trail), so they never look like the route.
   // Brisbane is a stop since 1.9.233. Canberra and Hobart are stops since 1.9.243.
   const FUTURE_STOPS = [
@@ -977,6 +985,24 @@
         '<ellipse cx="0" cy="0" rx="34" ry="11" fill="#fff"/><ellipse cx="-13" cy="-7" rx="15" ry="11" fill="#fff"/><ellipse cx="11" cy="-10" rx="18" ry="13" fill="#fff"/></g></g>';
     }).join('') + '</g>';
   }
+  function atlasPill(x, y, w, kicker, title, note) {
+    const cx = w / 2;
+    return '<g transform="translate(' + x + ' ' + y + ')" pointer-events="none">' +
+      '<rect class="sr-atlas-box" x="0" y="0" width="' + w + '" height="48" rx="11"/>' +
+      '<text class="sr-atlas-kicker" x="' + cx + '" y="12">' + kicker + '</text>' +
+      '<text class="sr-atlas-title" x="' + cx + '" y="29">' + title + '</text>' +
+      '<text class="sr-atlas-note" x="' + cx + '" y="41">' + note + '</text></g>';
+  }
+  function mapAtlasType() {
+    return '<g class="sr-atlas" aria-hidden="true">' +
+      atlasPill(386, 790, 176, '01 / AOTEAROA', 'NEW ZEALAND', 'LEVELS 01–16') +
+      atlasPill(104, 1212, 192, '02 / OCEANIA', 'Pacific Islands', 'COOK ISLANDS · TONGA · SAMOA') +
+      atlasPill(405, 1708, 198, '03 / WEST PACIFIC', 'MELANESIA', 'PAPUA NEW GUINEA · SOLOMONS · FIJI') +
+      atlasPill(104, 1745, 192, '04 / AUSTRALASIA', 'AUSTRALIA', 'LEVELS 20–25 · 32–33') +
+      atlasPill(-350, 1695, 195, '05 / ISLAND SOUTHEAST ASIA', 'SOUTHEAST ASIA', 'INDONESIA · MALAYSIA · SINGAPORE') +
+      atlasPill(-350, 1254, 148, '06 / HIMALAYAS', 'SOUTH ASIA', 'INDIA · NEPAL · BHUTAN · PAKISTAN') +
+      '</g>';
+  }
   function nzMapSvg() {
     const live = ''; // the icing is filled in from the stops this player has already cleared
     const future = ''; // 1.9.222 coming-soon cities are markers only
@@ -1033,8 +1059,6 @@
       // 1.9.220 Pacific Islands inset: a lagoon-blue panel with Rarotonga, Tonga and Samoa.
       '<g class="sr-pacific">' +
       '<rect x="16" y="1236" width="368" height="448" rx="30" fill="#7fe6dc" opacity=".55" stroke="#fff" stroke-width="4" stroke-dasharray="10 8"/>' +
-      '<rect x="120" y="1222" width="160" height="30" rx="15" fill="#fff" stroke="#3fc1b0" stroke-width="3"/>' +
-      '<text x="200" y="1243" text-anchor="middle" font-size="15" font-weight="900" fill="#1b8a7c" font-family="ui-rounded,system-ui,sans-serif">Pacific Islands</text>' +
       // 1.9.227 Islands at their real relative positions (see pacXY): Samoa north, Tonga and Rarotonga side by side.
       // Samoa: Savai\'i and Upolu
       '<ellipse cx="122" cy="1348" rx="30" ry="20" fill="#bff5ec" opacity=".8"/><ellipse cx="110" cy="1345" rx="13" ry="8" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
@@ -1051,8 +1075,6 @@
       // A little plane on the flight out of Dunedin
       // 1.9.222 Australia: same full-screen style as New Zealand, with Tasmania and a heading pill.
       '<g class="sr-aus">' +
-      '<rect x="130" y="1752" width="140" height="30" rx="15" fill="#fff" stroke="#ff9f43" stroke-width="3"/>' +
-      '<text x="200" y="1773" text-anchor="middle" font-size="15" font-weight="900" fill="#c0601a" font-family="ui-rounded,system-ui,sans-serif">Australia</text>' +
       '<path filter="url(#sr-soft)" fill="url(#sr-land)" stroke="#fff" stroke-width="8" stroke-linejoin="round" d="' + AUS_PATH + '"/>' +
       '<path filter="url(#sr-soft)" fill="url(#sr-land)" stroke="#fff" stroke-width="6" stroke-linejoin="round" d="' + TAS_PATH + '"/>' +
       // 1.9.234 Papua New Guinea (mainland + New Britain), from real coast points through ausXY.
@@ -1067,6 +1089,7 @@
       '</g>' +
       planeAt(220, 1712, 172) + planeAt(180, 2003, -106) + planeAt(330, 2140, 110) +
       mapClouds() +
+      mapAtlasType() +
       '<g class="sr-plane" transform="translate(219 1195) rotate(166)"><path d="M0 -14 L3 -4 L14 2 L14 5 L3 2 L2 10 L6 13 L6 15 L0 13 L-6 15 L-6 13 L-2 10 L-3 2 L-14 5 L-14 2 L-3 -4 Z" fill="#fff" stroke="#3d8bfd" stroke-width="1.5"/></g>' +
       '<path id="sr-future" d="' + future + '" fill="none" stroke="#1565b0" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="2.4 8" opacity=".95"/>' +
       '<path id="sr-path-wide" d="' + live + '" fill="none" stroke="url(#sr-icing)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>' +
@@ -3676,6 +3699,8 @@
     SPARKLE_MIN_MS, SPARKLE_MAX_MS, SPARKLE_MAX, SPARKLE_MAX_REDUCE, SHIMMER_MS, sparkleCap, sparkleEase, shimmerAt, drawStarGlint, drawCandyShine,
     SCENES, sceneFor, sceneSvg, sceneSprites, STREAK_STEP, STREAK_MAX_TIER, STREAK_NAMES, streakStepGain, streakGain, streakNext, streakTier, streakFill, shakeLevel,
     BOOSTERS, EXTRA_MOVES, normBoosters, addPrize, takeBooster, SPIN_PRIZES, nzDay, canSpin, spinPick, spinAngle, prizeAt, chestReward, boosterInfo, hammerAt, shuffleBooster, LIVES_MAX, LIFE_MS, regenLives, changeLives, nextLifeMs, mmss };
+  root.SugarRush.MAP_COUNTRIES = MAP_COUNTRIES;
+  root.SugarRush.countryForLevel = countryForLevel;
 
   if (!root.document) return;
   const doc = root.document;
@@ -5615,20 +5640,22 @@
     path.innerHTML = '';
     const here = Math.min(LV_COUNT, Math.max(1, prog.open));
     LEVELS.forEach((lv, i) => {
-      const n = i + 1, open = n <= prog.open, stars = prog.stars[i] || 0, stop = MAP_STOPS[i];
+      const n = i + 1, open = n <= prog.open, stars = prog.stars[i] || 0, stop = MAP_STOPS[i], country = countryForLevel(n);
+      const countryStop = country && country.toLowerCase() === stop.place.toLowerCase();
       const b = doc.createElement('button');
       b.type = 'button';
-      b.className = 'lv lab-' + (stop.label || 'right') + (stop.lift ? ' lift' : '') + (lv.theme === 'sarah' ? ' sarah' : '') + (lv.hard ? ' hard hard' + lv.hard : '') + (open ? ' open' : '') + (stars ? ' done' : '') + (n === here ? ' here' : '') + ' kind-' + (stop.kind || 'town');
+      b.className = 'lv lab-' + (stop.label || 'right') + (stop.lift ? ' lift' : '') + (lv.theme === 'sarah' ? ' sarah' : '') + (lv.hard ? ' hard hard' + lv.hard : '') + (countryStop ? ' country-stop' : '') + (open ? ' open' : '') + (stars ? ' done' : '') + (n === here ? ' here' : '') + ' kind-' + (stop.kind || 'town');
       b.disabled = !open;
       b.dataset.n = String(n);
+      b.dataset.country = country;
       b.style.left = mapXPct(stop.x);
       b.style.top = (stop.y / MAP_H * 100) + '%';
       const mark = stop.kind === 'house' ? '🏠' : (stop.kind === 'post' ? '✉️' : (stop.kind === 'station' ? '🚂' : (stop.kind === 'island' ? '🌴' : '')));
       const starHtml = [0, 1, 2].map(k => '<span class="' + (k < stars ? 'on' : '') + '">★</span>').join('');
       const badge = prog.badges[i] && lv.badge ? '<span class="gotbadge" aria-hidden="true">' + lv.badge.icon + '</span>' : '';
       b.innerHTML = '<span class="pin"><span class="no">' + n + '</span>' + (mark ? '<span class="mark" aria-hidden="true">' + mark + '</span>' : '') + (lv.hard ? '<span class="hardmark" aria-hidden="true">🔥</span>' : '') + '</span><span class="st">' + starHtml + '</span>' +
-        '<span class="meta"><b>' + stop.place + '</b><em>' + lv.name + '</em></span>' + badge;
-      b.setAttribute('aria-label', (open ? 'Play ' : 'Locked: ') + 'level ' + n + ', ' + lv.name + ', ' + stop.place + (lv.hard ? ', ' + hardLabel(lv.hard) : '') + (stars ? ', ' + stars + ' stars' : '') + (prog.badges[i] && lv.badge ? ', badge ' + lv.badge.name : ''));
+        '<span class="meta"><b>' + stop.place + '</b><em>' + lv.name + '</em>' + (country && !countryStop ? '<i class="country">' + country + '</i>' : '') + '</span>' + badge;
+      b.setAttribute('aria-label', (open ? 'Play ' : 'Locked: ') + 'level ' + n + ', ' + lv.name + ', ' + stop.place + (country && !countryStop ? ', ' + country : '') + (lv.hard ? ', ' + hardLabel(lv.hard) : '') + (stars ? ', ' + stars + ' stars' : '') + (prog.badges[i] && lv.badge ? ', badge ' + lv.badge.name : ''));
       if (open) b.addEventListener('click', () => { unlockAudio(); openLevel(n); });
       path.appendChild(b);
     });

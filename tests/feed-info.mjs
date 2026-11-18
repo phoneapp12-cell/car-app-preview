@@ -418,7 +418,7 @@ assert.equal(artB.length, 1);
 assert.notEqual(artB[0].id, artA.id);
 seenArt.wasSeen = () => true;
 assert.equal(seenArt.ibArt.cards(0).length, 0);
-assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.247'"));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.248'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'art3d.js?v=' + VERSION"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'portal.js?v=' + VERSION"));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.247'));
@@ -4518,7 +4518,7 @@ console.log('1.9.220 pacific levels ok');
   assert.ok(SR.MAP_STOPS.slice(33, 43).every(s => s.x > SR.MAP_X0 + 20 && s.x < 20) && SR.MAP_STOPS.slice(44).every(s => s.x > SR.MAP_X0 + 20 && s.x < 20), 'mainland stops sit west of Indonesia');
   assert.ok(SR.MAP_STOPS[43].x > 45 && SR.MAP_STOPS[43].x < SR.MAP_W - 20, 'the Philippines sits east of Indonesia');
   const svg = SR.nzMapSvg();
-  assert.ok(svg.includes('sr-aus') && svg.includes('>Australia<') && (svg.match(/class="sr-plane"/g) || []).length >= 3, 'Australia section with planes');
+  assert.ok(svg.includes('sr-aus') && svg.includes('AUSTRALIA') && (svg.match(/class="sr-plane"/g) || []).length >= 3, 'Australia section with planes');
   assert.ok(!svg.includes('id="sr-future" d="M'), 'coming-soon cities have no trail');
   assert.strictEqual(SR.raceStop({ open: 99 }), 47);
   // Level ids: progress follows the level, not its number.
@@ -4984,9 +4984,9 @@ console.log('1.9.227 echo and 3 s pace ok');
   assert.deepStrictEqual(Array.from(SR.LEVELS.slice(26, 31).map(l => l.name)), ['Honiara Reef', 'Port Vila Waterfront', 'Bula Beach', 'Nouméa Bay', 'Bali Beach Market']);
   assert.ok(!SR.FUTURE_STOPS.some(s => /Solomon|Vanuatu|Fiji|Caledonia|Indonesia|Bali/.test(s.place)));
   const map = SR.nzMapSvg();
-  assert.ok(!map.includes('sr-countries') && !map.includes('>New countries<') && map.includes('viewBox="-360 0 1000 2240"'));
+  assert.ok(map.includes('class="sr-atlas"') && map.includes('AOTEAROA') && map.includes('Pacific Islands') && map.includes('SOUTHEAST ASIA') && map.includes('viewBox="-360 0 1000 2240"'));
   SR.MAP_STOPS.slice(26, 31).forEach(function (s) { assert.ok(Math.hypot(s.x - SR.ausXY(s.lat, s.lon).x, s.y - SR.ausXY(s.lat, s.lon).y) < 1.5, s.place + ' sits where it belongs beside Australia'); });
-  assert.ok(html.includes('sugar-rush.js?v=1.9.247'));
+  assert.ok(html.includes('sugar-rush.js?v=1.9.248'));
   for (const n of [27, 28, 29, 30, 31]) {
     const lv = SR.LEVELS[n - 1];
     assert.ok(!lv.target && !lv.hard);
@@ -5091,8 +5091,8 @@ console.log('1.9.227 echo and 3 s pace ok');
   assert.strictEqual(game.turns, 1);
   assert.strictEqual(SR.cloneState(game).turns, 1, 'simulation clones preserve conveyor direction');
   assert.ok(src.includes('function drawBeltLane') && src.includes('beltDirection(st.lv, lane, st.turns)'), 'the board shows its lane and next direction');
-  assert.ok(html.includes('sugar-rush.js?v=1.9.247') && html.includes('scores.js?v=1.9.247'));
-  assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.247'"));
+  assert.ok(html.includes('sugar-rush.js?v=1.9.248') && html.includes('scores.js?v=1.9.248'));
+  assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.248'"));
   console.log('1.9.245 conveyor levels and mechanics ok');
 }
 
@@ -5123,4 +5123,18 @@ console.log('1.9.227 echo and 3 s pace ok');
   assert.deepStrictEqual(Array.from(SR.goalCounts(SR.LEVELS[45]).map(g => g.kind)), ['jelly', 'locks']);
   assert.deepStrictEqual(Array.from(SR.goalCounts(SR.LEVELS[46]).map(g => g.kind)), ['jelly', 'ice', 'locks']);
   console.log('1.9.247 five additional country levels ok');
+}
+
+// 1.9.248 Atlas typography and explicit country mapping for every level.
+{
+  const SR = load('feed/sugar-rush.js').SugarRush;
+  const html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
+  const map = SR.nzMapSvg();
+  assert.strictEqual(SR.MAP_COUNTRIES.length, 47);
+  assert.deepStrictEqual([1, 17, 20, 26, 31, 34, 47].map(SR.countryForLevel), ['New Zealand', 'Cook Islands', 'Australia', 'Papua New Guinea', 'Indonesia', 'Vietnam', 'Pakistan']);
+  assert.deepStrictEqual(Array.from(SR.MAP_COUNTRIES.slice(42)), ['Cambodia', 'Philippines', 'Laos', 'Bhutan', 'Pakistan']);
+  assert.strictEqual(SR.countryForLevel(48), '');
+  for (const label of ['AOTEAROA', 'Pacific Islands', 'MELANESIA', 'AUSTRALIA', 'SOUTHEAST ASIA', 'SOUTH ASIA']) assert.ok(map.includes(label), 'atlas label ' + label);
+  assert.ok(html.includes('.nzsvg .sr-atlas-title') && html.includes('.stops .meta .country') && html.includes('.country-stop'));
+  console.log('1.9.248 Sugar Rush country atlas and typographic layers ok');
 }
