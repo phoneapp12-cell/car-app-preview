@@ -1,4 +1,4 @@
-/* Info Book 1.9.245 – Sugar Rush, levels 1–42. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.246 – Sugar Rush, levels 1–42. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -3593,7 +3593,7 @@
   }
   function saveProg() { prog.ids = levelIds(); ls.set('ib-sugar-progress', prog); }
   const prog = loadProg();
-  let race = { racers: [], offline: true, mine: null };
+  let race = { racers: [], friends: [], friendCount: 0, group: 'family', offline: true, mine: null };
   let raceDemo = false; // test / screenshot only: never POST to the family backend
   let raceLw = 0; // 1.9.222 the level just won, sent once with the next race post
 
@@ -5192,40 +5192,81 @@
     const board = $('raceboard'), list = $('racelist'), note = $('racenote');
     if (!board || !list) return;
     const rows = rankRacers(race.racers && race.racers.length ? race.racers : (race.mine ? [race.mine] : []));
-    list.innerHTML = '';
-    rows.forEach(function (r, i) {
-      const ic = raceIcon(r.icon) || RACE_ICONS[0];
-      const stop = stopForLevel(r.stop) || { place: 'Start' };
-      const li = doc.createElement('li');
-      if (r.mine) li.className = 'me';
-      li.innerHTML = '<span class="rk">' + (i + 1) + '</span><span class="face" style="--ic:' + ic.color + '">' + ic.emoji + '</span><span class="who">' + racerFirst(r.name) + (r.mine ? ' <em>you</em>' : '') + '</span><span class="at">' + stop.place + '</span><span class="rs">' + (r.stars || 0) + '★</span>';
-      list.appendChild(li);
-    });
+    const friendsOnly = race.group === 'friends';
+    const heading = $('raceheading');
+    if (heading) heading.textContent = friendsOnly ? '🤝 Friends progress' : '🏁 Family progress';
+    board.setAttribute('aria-label', friendsOnly ? 'Friends progress' : 'Family and friends progress');
+    function paintRows(target, entries, showLevel) {
+      if (!target) return;
+      target.replaceChildren();
+      entries.forEach(function (r, i) {
+        const ic = raceIcon(r.icon) || RACE_ICONS[0];
+        const li = doc.createElement('li');
+        if (r.mine) li.className = 'me';
+        const rank = doc.createElement('span'); rank.className = 'rk'; rank.textContent = String(i + 1); li.appendChild(rank);
+        const face = doc.createElement('span'); face.className = 'face'; face.style.setProperty('--ic', ic.color); face.textContent = ic.emoji; li.appendChild(face);
+        const who = doc.createElement('span'); who.className = 'who'; who.appendChild(doc.createTextNode(racerFirst(r.name)));
+        if (r.mine) { const you = doc.createElement('em'); you.textContent = 'you'; who.appendChild(you); }
+        li.appendChild(who);
+        const at = doc.createElement('span'); at.className = 'at'; at.textContent = 'Level ' + Math.max(1, r.stop | 0); li.appendChild(at);
+        const stars = doc.createElement('span'); stars.className = 'rs'; stars.textContent = (r.stars || 0) + '★'; li.appendChild(stars);
+        target.appendChild(li);
+      });
+    }
+    paintRows(list, rows, false);
     if (note) {
       note.hidden = !race.offline;
       note.textContent = race.offline ? 'Just you on this phone (offline).' : '';
+    }
+    const friendboard = $('friendboard'), friendlist = $('friendlist'), friendnote = $('friendnote');
+    if (friendboard) {
+      const showFriends = !race.offline && !raceDemo && !friendsOnly;
+      friendboard.hidden = !showFriends;
+      if (showFriends) {
+        let linked = (race.friends || []).slice();
+        if (!linked.some(function (r) { return r.mine; })) linked.push(race.mine || myLocalRacer());
+        else linked = linked.map(function (r) { return r.mine ? Object.assign({}, r, race.mine || myLocalRacer()) : r; });
+        paintRows(friendlist, rankRacers(linked), true);
+        if (friendnote) {
+          const others = linked.filter(function (r) { return !r.mine; }).length;
+          friendnote.hidden = false;
+          friendnote.textContent = race.friendCount < 1
+            ? 'No friends are linked to you yet.'
+            : others ? 'Only you and your linked friends can see this progress.' : 'Your linked friends have not shared Sugar Rush progress yet.';
+        }
+      }
     }
     const chip = $('racechip');
     if (chip) {
       const lead = rows[0];
       const ic = lead && (raceIcon(lead.icon) || RACE_ICONS[0]);
       if (lead && ic) {
-        chip.innerHTML = '<span class="face" style="--ic:' + ic.color + '">' + ic.emoji + '</span><span>🏁 ' + racerFirst(lead.name) + ' ' + (lead.stars || 0) + '★</span>';
-        chip.setAttribute('aria-label', 'Family race, ' + racerFirst(lead.name) + ' is in the lead with ' + (lead.stars || 0) + ' stars. Tap to open.');
+        chip.replaceChildren();
+        const face = doc.createElement('span'); face.className = 'face'; face.style.setProperty('--ic', ic.color); face.textContent = ic.emoji; chip.appendChild(face);
+        const label = doc.createElement('span'); label.textContent = '🏁 ' + racerFirst(lead.name) + ' ' + (lead.stars || 0) + '★'; chip.appendChild(label);
+        chip.setAttribute('aria-label', (friendsOnly ? 'Friends progress' : 'Family progress') + ', ' + racerFirst(lead.name) + ' is in the lead with ' + (lead.stars || 0) + ' stars. Tap to open.');
       } else {
         chip.innerHTML = '🏁 Race';
-        chip.setAttribute('aria-label', 'Family race');
+        chip.setAttribute('aria-label', friendsOnly ? 'Friends progress' : 'Family progress');
       }
     }
   }
   function applyRace(data, offline) {
     const self = myLocalRacer();
+    const group = data && data.group === 'friends' ? 'friends' : 'family';
     let racers = (data && Array.isArray(data.racers)) ? data.racers.map(function (r) {
       return { name: r.name, icon: r.icon, stop: r.stop, stars: r.stars, mine: !!r.mine };
     }) : [];
     if (!racers.some(function (r) { return r.mine; })) racers.push(self);
     else racers = racers.map(function (r) { return r.mine ? Object.assign({}, r, self) : r; });
-    race = { racers: racers, offline: !!offline, mine: self, event: raceDemo ? race.event : ((!offline && data && data.event) || null) };
+    let friends = group === 'family' && data && Array.isArray(data.friends) ? data.friends.map(function (r) {
+      return { name: r.name, icon: r.icon, stop: r.stop, stars: r.stars, mine: !!r.mine };
+    }) : [];
+    if (group === 'family') {
+      if (!friends.some(function (r) { return r.mine; })) friends.push(self);
+      else friends = friends.map(function (r) { return r.mine ? Object.assign({}, r, self) : r; });
+    }
+    race = { racers: racers, friends: friends, friendCount: Math.max(0, Number(data && data.friendCount) || 0), group: group, offline: !!offline, mine: self, event: raceDemo ? race.event : ((!offline && data && data.event) || null) };
     renderRacers();
     renderRaceBoard();
     renderRaceEvent(true);

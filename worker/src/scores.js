@@ -2,7 +2,7 @@
    members, so a score always belongs to the member whose token sent it: the name shown is that member's name from the
    server, never one typed into the game. Bounds are generous for real play and refuse made-up numbers. */
 // 1.9.230 friends: boards, races and lives only show people in this member's group (see circle.js)
-import { gameIds, seeRows, raceGroup, memberRow, sees } from './circle.js';
+import { gameIds, seeRows, raceGroup, memberRow, sees, isFriend, circleIds } from './circle.js';
 export const GAMES = ['tetris', 'scrabble'];
 export const LIMITS = { tetrisScore: 9999999, tetrisLines: 9999, scrabbleScore: 1500 };
 export const RATE = { gapMs: 15e3, perDay: 60 }; // a game takes longer than 15 seconds; 60 games a day per member per game is plenty
@@ -334,10 +334,18 @@ export function saveRace(sql, me, body, now = Date.now()) {
 
 export function raceBoard(sql, me, now = Date.now(), notes = []) {
   expireRaces(sql, now, notes);
-  const ids = gameIds(sql, meRow(sql, me));
+  const member = meRow(sql, me);
+  const ids = gameIds(sql, member);
   const racers = rows(sql, `SELECT r.mid, m.name, r.icon, r.stop, r.stars, r.at FROM sugar_race r JOIN members m ON m.id=r.mid AND m.removed=0 WHERE r.mid IN (${inList(ids)}) ORDER BY r.stop DESC, r.stars DESC, m.name ASC`, ...ids)
     .map(r => ({ name: r.name, icon: r.icon, stop: r.stop, stars: r.stars, at: r.at, mine: r.mid === me.id }));
-  return { status: 200, body: { me: me.name, racers, event: raceEventView(sql, me, now) }, notes };
+  const group = isFriend(member) ? 'friends' : 'family';
+  if (group === 'friends') return { status: 200, body: { me: me.name, group, racers, event: raceEventView(sql, me, now) }, notes };
+  // A family member's extra friends list is only their own host circle. Never expose another member's friend circle.
+  const friendIds = circleIds(sql, member.id);
+  const friends = rows(sql, `SELECT r.mid, m.name, r.icon, r.stop, r.stars, r.at FROM sugar_race r JOIN members m ON m.id=r.mid AND m.removed=0 WHERE r.mid IN (${inList(friendIds)}) ORDER BY r.stop DESC, r.stars DESC, m.name ASC`, ...friendIds)
+    .map(r => ({ name: r.name, icon: r.icon, stop: r.stop, stars: r.stars, at: r.at, mine: r.mid === me.id }));
+  const friendCount = (rows(sql, `SELECT COUNT(*) n FROM members WHERE removed=0 AND role='friend' AND host=?`, member.id)[0] || {}).n || 0;
+  return { status: 200, body: { me: me.name, group, racers, friends, friendCount, event: raceEventView(sql, me, now) }, notes };
 }
 
 /* ---- 1.9.222 Sugar Rush lives: the phone keeps its own 3-a-day count; the Worker only carries family gifts and asks. ---- */
