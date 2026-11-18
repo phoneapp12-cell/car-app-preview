@@ -1,4 +1,4 @@
-/* Info Book 1.9.246 – Sugar Rush, levels 1–42. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.247 – Sugar Rush, levels 1–47. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -262,7 +262,33 @@
       jelly: ['00000000', '00111100', '00000000', '00011000', '00011000', '00000000', '00111100', '00000000'],
       locks: ['00000000', '00000000', '00000000', '00100100', '00100100', '00000000', '00000000', '00000000'],
       help: 'Clear the garden jelly and free all 4 locked jars in 36 moves. The two conveyor lanes reverse direction after every move.',
-      badge: { id: 'gardenexpress', name: 'Garden Express', icon: '🌿' } }
+      badge: { id: 'gardenexpress', name: 'Garden Express', icon: '🌿' } },
+    // 1.9.247 Five more Asian countries: Cambodia, the Philippines, Laos, Bhutan and Pakistan.
+    { n: 43, name: 'Phnom Penh River Lights', target: 0, moves: 32, stars: [0, 6100, 12200], kinds: 6,
+      jelly: ['00000000', '00111100', '01100110', '01000010', '01000010', '01100110', '00111100', '00000000'],
+      locks: ['00000000', '00000000', '00011000', '00000000', '00000000', '00011000', '00000000', '00000000'],
+      help: 'Clear the riverfront jelly and free all 4 locked jars in 32 moves.',
+      badge: { id: 'mekonglantern', name: 'Mekong Lantern', icon: '🏮' } },
+    { n: 44, name: 'Manila Bay Lanterns', target: 0, moves: 32, stars: [0, 6200, 12400], kinds: 6,
+      bub: ['00000000', '01000010', '00100100', '00011000', '00011000', '00100100', '01000010', '00000000'],
+      help: 'Pop all 8 sugar bubbles around Manila Bay in 32 moves.',
+      badge: { id: 'parol', name: 'Parol Star', icon: '⭐' } },
+    { n: 45, name: 'Vientiane Golden Stupa', target: 0, moves: 34, stars: [0, 6300, 12600], kinds: 6,
+      ings: [[0, 2], [0, 5]], ingIcon: '🥭',
+      ice: ['00000000', '00000000', '00011000', '00000000', '00000000', '00011000', '00000000', '00000000'],
+      help: 'Bring both mango treats down to the riverside market and crack the 4 icing blocks in 34 moves.',
+      badge: { id: 'goldenstupa', name: 'Golden Stupa', icon: '🛕' } },
+    { n: 46, name: 'Thimphu Dzong Garden', target: 0, moves: 34, stars: [0, 6400, 12800], kinds: 6,
+      jelly: ['11000011', '11000011', '00000000', '00011000', '00011000', '00000000', '11000011', '11000011'],
+      locks: ['00000000', '00000000', '00100100', '00000000', '00000000', '00100100', '00000000', '00000000'],
+      help: 'Clear the garden-path jelly and free all 4 locked jars in 34 moves.',
+      badge: { id: 'dzong', name: 'Dzong Garden', icon: '🏯' } },
+    { n: 47, name: 'Islamabad Garden Gate', target: 0, moves: 36, stars: [0, 6500, 13000], kinds: 6,
+      jelly: ['00000000', '00111100', '00100100', '00000000', '00000000', '00100100', '00111100', '00000000'],
+      ice: ['11000011', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '11000011'],
+      locks: ['00000000', '00000000', '00000000', '00011000', '00011000', '00000000', '00000000', '00000000'],
+      help: 'Clear the garden jelly, crack the 4 icy corners and free all 4 locked jars in 36 moves.',
+      badge: { id: 'faisal', name: 'Garden Crescent', icon: '🌙' } }
   ];
 
 
@@ -309,7 +335,12 @@
     { icon: '🎏', goal: 'Clear the courtyard jelly', detail: 'Clear every jelly in 28 moves.', tip: 'The turquoise row is a conveyor: after each move its sweets slide one place to the right and loop around. You can use the moving line to set up matches.', mechanic: 'conveyor' },
     { icon: '🚤', goal: 'Pop all the sugar bubbles', detail: 'Pop every sugar bubble in 30 moves.', tip: 'Two lanes run in opposite directions. Bubbled sweets travel with the conveyor, but still need a match beside them or a special to pop.', mechanic: 'opposing-belts' },
     { icon: '🍍', goal: 'Bring both pineapple treats down and crack the icing', detail: 'Bring both treats down and clear all the icing in 34 moves.', tip: 'Both lanes reverse after each move. Watch the arrows before you swap, then clear the icing out of the way.', mechanic: 'reversing-current' },
-    { icon: '🌿', goal: 'Clear the jelly and free the jars', detail: 'Clear every jelly and free all the locked jars in 36 moves.', tip: 'The garden lanes reverse after every turn. Keep an eye on both the jelly and the four jars as the sweets travel.', mechanic: 'garden-express' }
+    { icon: '🌿', goal: 'Clear the jelly and free the jars', detail: 'Clear every jelly and free all the locked jars in 36 moves.', tip: 'The garden lanes reverse after every turn. Keep an eye on both the jelly and the four jars as the sweets travel.', mechanic: 'garden-express' },
+    { icon: '🏮', goal: 'Clear the riverfront jelly and free the jars', detail: 'Clear the riverfront jelly and free all 4 locked jars in 32 moves.', tip: 'Work along the river edge first, then free the jars in the middle.', mechanic: 'mekong' },
+    { icon: '⭐', goal: 'Pop all the sugar bubbles', detail: 'Pop all 8 sugar bubbles around Manila Bay in 32 moves.', tip: 'Bubbles touching each other pop together. Start near the middle of the cluster.', mechanic: 'bub' },
+    { icon: '🥭', goal: 'Bring both mangoes down and crack the icing', detail: 'Bring both mango treats down and crack the 4 icing blocks in 34 moves.', tip: 'Match underneath the mangoes to bring them down, and use specials to reach the icing.', mechanic: 'market' },
+    { icon: '🏯', goal: 'Clear the garden jelly and free the jars', detail: 'Clear the garden-path jelly and free all 4 locked jars in 34 moves.', tip: 'The jelly is in the outer corners; work inward toward the jars.', mechanic: 'gates' },
+    { icon: '🌙', goal: 'Clear the jelly, crack the icing and free the jars', detail: 'Clear the garden jelly, crack the 4 icy corners and free all 4 locked jars in 36 moves.', tip: 'The corner icing and the central jars both need attention. Specials can help reach the edges.', mechanic: 'mix' }
   ];
   function levelIntro(n, p) {
     const lv = LEVELS[(n | 0) - 1]; if (!lv) return null;
@@ -772,7 +803,17 @@
     41: [{ id: 'recap41', kind: 'recap', title: 'Colombo', bubble: 'The monsoon current changes course after every move.',
       items: [{ icon: '↔️', text: 'Both lanes carry candies and pineapple treats, then reverse direction' }, { icon: '🍍', text: 'Bring both treats down and crack the icing' }] }],
     42: [{ id: 'recap42', kind: 'recap', title: 'Singapore', bubble: 'The Garden Express combines moving lanes with two objectives.',
-      items: [{ icon: '↔️', text: 'Two conveyor lanes reverse after every move' }, { icon: '💜', text: 'Clear the jelly and free all four jars' }] }]
+      items: [{ icon: '↔️', text: 'Two conveyor lanes reverse after every move' }, { icon: '💜', text: 'Clear the jelly and free all four jars' }] }],
+    43: [{ id: 'recap43', kind: 'recap', title: 'Cambodia', bubble: 'Phnom Penh: lanterns glow along the Mekong riverfront.',
+      items: [{ icon: '💜', text: 'Clear the riverfront jelly' }, { icon: '🔒', text: 'Free all four locked jars' }] }],
+    44: [{ id: 'recap44', kind: 'recap', title: 'Philippines', bubble: 'Manila Bay: pop the bubbles beneath the evening lights.',
+      items: [{ icon: '🫧', text: 'Pop all eight sugar bubbles' }] }],
+    45: [{ id: 'recap45', kind: 'recap', title: 'Laos', bubble: 'Vientiane: mango treats travel toward the golden stupa.',
+      items: [{ icon: '🥭', text: 'Bring both mangoes down' }, { icon: '🧁', text: 'Crack the four icing blocks' }] }],
+    46: [{ id: 'recap46', kind: 'recap', title: 'Bhutan', bubble: 'Thimphu: a mountain dzong and its garden paths.',
+      items: [{ icon: '💜', text: 'Clear the garden-path jelly' }, { icon: '🔒', text: 'Free all four locked jars' }] }],
+    47: [{ id: 'recap47', kind: 'recap', title: 'Pakistan', bubble: 'Islamabad: gardens, fountains and the Faisal Mosque.',
+      items: [{ icon: '💜', text: 'Clear the garden jelly' }, { icon: '🧁', text: 'Crack the icy corners' }, { icon: '🔒', text: 'Free all four locked jars' }] }]
   };
   function tutorialFor(n) { return TUTORIALS[n] || null; }
 
@@ -853,7 +894,13 @@
     { n: 39, x: -209.7, y: 1386.5, place: 'Nepal', kind: 'city', label: 'left', lat: 27.7172, lon: 85.3240, via: [{ x: -236, y: 1376 }] },
     { n: 40, x: -166.3, y: 1429.3, place: 'Bangladesh', kind: 'city', label: 'right', lat: 23.8103, lon: 90.4125, via: [{ x: -184, y: 1408 }] },
     { n: 41, x: -256.3, y: 1614.6, place: 'Sri Lanka', kind: 'island', label: 'left', lat: 6.9271, lon: 79.8612, via: [{ x: -205, y: 1508 }, { x: -246, y: 1570 }] },
-    { n: 42, x: -51.9, y: 1675.7, place: 'Singapore', kind: 'city', label: 'right', lat: 1.3521, lon: 103.8198, via: [{ x: -200, y: 1658 }, { x: -104, y: 1670 }] }
+    { n: 42, x: -51.9, y: 1675.7, place: 'Singapore', kind: 'city', label: 'right', lat: 1.3521, lon: 103.8198, via: [{ x: -200, y: 1658 }, { x: -104, y: 1670 }] },
+    // 1.9.247 North from Singapore through mainland Southeast Asia, then west along the Himalaya.
+    { n: 43, x: -42.4, y: 1563.8, place: 'Cambodia', kind: 'city', label: 'left', lat: 11.5564, lon: 104.9282, via: [{ x: -32, y: 1620 }] },
+    { n: 44, x: 94.6, y: 1530.4, place: 'Philippines', kind: 'island', label: 'right', lat: 14.5995, lon: 120.9842 },
+    { n: 45, x: -62.0, y: 1493.4, place: 'Laos', kind: 'city', label: 'left', lat: 17.9757, lon: 102.6331 },
+    { n: 46, x: -172.9, y: 1389.2, place: 'Bhutan', kind: 'city', label: 'right', lat: 27.4728, lon: 89.6390, via: [{ x: -137, y: 1430 }] },
+    { n: 47, x: -314.4, y: 1321.0, place: 'Pakistan', kind: 'city', label: 'left', lat: 33.6844, lon: 73.0551 }
   ];
   // Coming soon: other Australian cities. Shown as markers only (no trail), so they never look like the route.
   // Brisbane is a stop since 1.9.233. Canberra and Hobart are stops since 1.9.243.
@@ -861,7 +908,7 @@
     { place: 'Darwin', x: 179, y: 1827, label: 'left', lat: -12.46, lon: 130.84 },
     { place: 'Cairns', x: 306, y: 1876, label: 'left', lat: -16.92, lon: 145.77 }
   ];
-  const LV_COUNT = 42;
+  const LV_COUNT = 47;
   function stopForLevel(n) { return MAP_STOPS[(n | 0) - 1] || null; }
   function icingPath(pts) {
     if (!pts || pts.length < 2) return '';
@@ -909,7 +956,16 @@
     [[1.2, 103.6], [1.5, 104.2], [3.2, 103.4], [5.4, 103.0], [6.4, 101.8], [6.2, 100.2], [4.2, 100.6], [2.4, 101.3], [1.3, 102.9]],
     [[7.2, 100.3], [10.2, 99.2], [13.2, 100.1], [16.4, 102.4], [19.2, 100.2], [16.8, 98.2], [13.0, 99.6], [9.4, 98.6], [7.6, 98.8]],
     [[10.2, 98.3], [14.2, 98.0], [16.8, 96.2], [19.4, 93.6], [23.6, 94.2], [25.2, 97.4], [21.4, 99.2], [16.2, 98.4], [12.2, 98.5]],
-    [[8.1, 77.5], [15.2, 73.9], [19.2, 72.8], [23.0, 68.8], [23.4, 72.8], [28.8, 76.2], [30.2, 78.2], [27.2, 80.4], [22.4, 86.2], [16.2, 82.2], [8.9, 78.0]]
+    [[8.1, 77.5], [15.2, 73.9], [19.2, 72.8], [23.0, 68.8], [23.4, 72.8], [28.8, 76.2], [30.2, 78.2], [27.2, 80.4], [22.4, 86.2], [16.2, 82.2], [8.9, 78.0]],
+    // Simplified country coastlines for the new stops (lat, lon): Pakistan, Bhutan, Laos, Cambodia and the Philippines.
+    [[23.5, 68.1], [24.7, 66.8], [26.8, 67.1], [28.7, 68.2], [30.7, 68.5], [32.5, 69.5], [34.4, 71.1], [36.2, 72.9], [37.0, 74.1], [35.8, 75.2], [33.7, 74.5], [31.7, 72.6], [29.4, 71.5], [27.1, 70.5], [25.0, 69.4]],
+    [[26.7, 88.7], [27.3, 88.8], [28.2, 89.8], [28.1, 91.1], [27.4, 92.0], [26.8, 91.9], [26.5, 90.4]],
+    [[14.1, 100.8], [16.0, 100.6], [18.0, 100.1], [20.3, 100.0], [22.4, 101.0], [22.5, 102.9], [21.3, 104.0], [19.8, 104.7], [18.2, 105.2], [16.4, 105.8], [14.8, 105.6], [14.0, 104.5]],
+    [[10.4, 103.0], [11.8, 102.4], [13.5, 102.7], [14.7, 104.2], [14.5, 106.0], [13.4, 107.2], [11.8, 107.4], [10.5, 106.0]],
+    [[18.5, 120.0], [20.4, 121.0], [20.8, 122.0], [19.2, 123.2], [17.2, 122.5], [16.0, 123.4], [14.5, 122.2], [13.0, 121.8], [13.7, 120.4], [15.3, 119.7], [16.9, 120.8]],
+    [[13.5, 120.5], [13.8, 121.3], [13.2, 121.8], [12.3, 121.2], [12.6, 120.5]],
+    [[11.8, 119.8], [11.0, 120.4], [10.0, 120.0], [9.3, 118.8], [10.0, 117.0], [9.5, 116.0], [10.1, 114.9], [11.5, 115.4], [12.1, 117.2]],
+    [[11.0, 124.0], [9.3, 125.0], [7.0, 125.5], [5.5, 125.2], [5.5, 124.0], [6.5, 123.0], [8.3, 123.6], [9.6, 123.7]]
   ];
   function ausPath(pts) { return pts.map(function (q, i) { const a = ausXY(q[0], q[1]); return (i ? 'L' : 'M') + a.x.toFixed(1) + ' ' + a.y.toFixed(1); }).join(' ') + ' Z'; }
   // 1.9.234 Soft clouds drifting slowly over the map (CSS .sr-cloud; still under reduced motion). Over sea, clear of the pins.
@@ -3313,7 +3369,79 @@
           '<circle cx="55" cy="584" r="24" fill="#80c878"/><circle cx="100" cy="592" r="25" fill="#8cd180"/><circle cx="158" cy="582" r="22" fill="#9bd98c"/><circle cx="226" cy="590" r="24" fill="#7bc472"/>' +
           '<path d="M0 770 C90 754 190 780 290 756 C340 748 376 752 390 754 L390 844 L0 844 Z" fill="#68a250"/>';
       },
-      sprites: [{ x: 20, y: 72, w: 16, cls: 'sc-glide', d: 11, svg: 'citycat' }, { x: 16, y: 12, w: 8, cls: 'sc-drift', d: 10, svg: 'gull' }] }
+      sprites: [{ x: 20, y: 72, w: 16, cls: 'sc-glide', d: 11, svg: 'citycat' }, { x: 16, y: 12, w: 8, cls: 'sc-drift', d: 10, svg: 'gull' }] },
+    // 1.9.247 Cambodia: riverfront lights and the Royal Palace in Phnom Penh.
+    { n: 43, id: 'phnompenh', place: 'Cambodia', title: 'Riverfront lights, Phnom Penh', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#ffb47c'], [0.55, '#ffe3b5'], [1, '#fff4dc']]) + scGrad('rv', [[0, '#44a8c2'], [1, '#245f83']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(90, 86, 0.75, 0.8) +
+          '<circle cx="312" cy="88" r="28" fill="#ffe08a"/>' +
+          '<path d="M0 550 H390 V650 H0 Z" fill="#82ad63"/>' +
+          '<path d="M70 550 V430 L100 382 L130 430 V550 M150 550 V395 L195 330 L240 395 V550 M260 550 V438 L288 390 L316 438 V550" fill="#f1d49a" stroke="#c98f52" stroke-width="4"/>' +
+          '<path d="M92 390 L100 360 L108 390 M183 340 L195 292 L207 340 M280 398 L288 368 L296 398" fill="#d84c47"/>' +
+          '<rect y="630" width="390" height="156" fill="url(#rv)"/>' +
+          '<path d="M0 684 Q60 666 120 684 T240 684 T360 684 T480 684 M10 730 Q80 714 150 730 T290 730" stroke="#b9eee4" stroke-width="4" fill="none" opacity=".8"/>' +
+          '<path d="M0 780 C90 764 190 790 290 770 C340 762 376 766 390 768 L390 844 L0 844 Z" fill="#e7cf9b"/>';
+      },
+      sprites: [{ x: 14, y: 74, w: 17, cls: 'sc-roll', d: 12, svg: 'boat' }, { x: 40, y: 18, w: 8, cls: 'sc-drift', d: 10, svg: 'gull' }] },
+    // Manila Bay at dusk: ferry silhouettes and colourful star lanterns.
+    { n: 44, id: 'manila', place: 'Philippines', title: 'Lanterns over Manila Bay', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#f58e83'], [0.52, '#ffd2a1'], [1, '#fff0d0']]) + scGrad('bay', [[0, '#42b5c3'], [1, '#17628a']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(250, 76, 0.8, 0.75) +
+          '<circle cx="78" cy="96" r="30" fill="#ffe08a"/>' +
+          '<path d="M0 560 H390 V640 H0 Z" fill="#8da967"/>' +
+          '<rect x="36" y="426" width="48" height="134" fill="#8daab0"/><rect x="92" y="376" width="54" height="184" fill="#a8b8b5"/><rect x="154" y="445" width="44" height="115" fill="#788f9d"/><rect x="206" y="398" width="56" height="162" fill="#a1ada8"/><rect x="270" y="430" width="74" height="130" fill="#879da3"/>' +
+          '<rect y="630" width="390" height="174" fill="url(#bay)"/>' +
+          '<path d="M74 692 H190 L176 714 H90 Z" fill="#fff0d7"/><rect x="112" y="672" width="42" height="20" fill="#e95b50"/><path d="M122 672 L134 650 L148 672 Z" fill="#f5d76b"/>' +
+          '<path d="M0 740 Q80 724 160 740 T320 740 T480 740" stroke="#b5eee5" stroke-width="4" fill="none" opacity=".8"/>' +
+          '<path d="M0 790 C90 772 190 800 290 778 C340 770 376 774 390 776 L390 844 L0 844 Z" fill="#e8d3a3"/>';
+      },
+      sprites: [{ x: 28, y: 72, w: 18, cls: 'sc-roll', d: 12, svg: 'boat' }, { x: 62, y: 28, w: 9, cls: 'sc-bob', d: 4.2, emoji: '⭐' }] },
+    // 1.9.247 Laos: the golden That Luang stupa above Vientiane's riverside.
+    { n: 45, id: 'vientiane', place: 'Laos', title: 'Golden stupa, Vientiane', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#81c9ec'], [0.55, '#e5f5f3'], [1, '#fff0c9']]) + scGrad('rv', [[0, '#45b8bd'], [1, '#1c7087']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(74, 82, 0.8, 0.75) +
+          '<circle cx="312" cy="84" r="29" fill="#fff0a0"/>' +
+          '<path d="M0 556 H390 V650 H0 Z" fill="#82ad5e"/>' +
+          '<path d="M110 556 Q110 520 140 510 Q145 458 170 445 Q180 415 195 385 Q210 415 220 445 Q245 458 250 510 Q280 520 280 556 Z" fill="#f4c84e" stroke="#d99d31" stroke-width="4"/>' +
+          '<path d="M168 465 Q195 440 222 465 M145 520 Q195 500 245 520 M125 545 H265" stroke="#fff1a7" stroke-width="5" fill="none"/>' +
+          '<rect y="650" width="390" height="150" fill="url(#rv)"/>' +
+          '<path d="M0 692 Q70 676 140 692 T280 692 T420 692 M30 744 Q100 730 170 744 T310 744" stroke="#afe9dd" stroke-width="4" fill="none"/>' +
+          '<path d="M0 788 C90 770 190 802 290 780 C340 772 376 776 390 778 L390 844 L0 844 Z" fill="#81aa59"/>';
+      },
+      sprites: [{ x: 20, y: 74, w: 18, cls: 'sc-roll', d: 12, svg: 'boat' }, { x: 26, y: 18, w: 8, cls: 'sc-drift', d: 10, svg: 'gull' }] },
+    // 1.9.247 Bhutan: Tashichho Dzong framed by the Himalayan foothills.
+    { n: 46, id: 'thimphu', place: 'Bhutan', title: 'Dzong garden, Thimphu', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#8ac8e6'], [0.6, '#e9f4ec'], [1, '#fff0d4']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(280, 76, 0.75, 0.8) +
+          '<path d="M0 520 L56 420 L104 474 L170 330 L230 450 L292 360 L390 510 V600 H0 Z" fill="#718e8d"/>' +
+          '<path d="M170 330 L190 372 L152 365 Z M292 360 L310 404 L276 395 Z" fill="#f7fbff"/>' +
+          '<path d="M0 560 Q95 526 190 560 T390 552 V844 H0 Z" fill="#82ad61"/>' +
+          '<rect x="104" y="456" width="182" height="118" fill="#c5573d" stroke="#9d4035" stroke-width="4"/><rect x="124" y="476" width="142" height="98" fill="#f0d4a2"/>' +
+          '<path d="M94 458 H296 L278 420 H112 Z" fill="#d69b41"/><path d="M150 420 L195 392 L240 420 Z" fill="#bd4b3e"/>' +
+          '<rect x="146" y="500" width="20" height="32" fill="#6b91a1"/><rect x="184" y="500" width="22" height="32" fill="#6b91a1"/><rect x="224" y="500" width="20" height="32" fill="#6b91a1"/>' +
+          '<path d="M0 774 C90 758 190 786 290 766 C340 758 376 762 390 764 L390 844 L0 844 Z" fill="#6e984d"/>';
+      },
+      sprites: [{ x: 40, y: 68, w: 9, cls: 'sc-bob', d: 4.5, emoji: '🎏' }, { x: 16, y: 15, w: 8, cls: 'sc-drift', d: 10, svg: 'gull' }] },
+    // 1.9.247 Pakistan: the Faisal Mosque and Margalla Hills above Islamabad.
+    { n: 47, id: 'islamabad', place: 'Pakistan', title: 'Garden crescent, Islamabad', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#73bce8'], [0.55, '#e0f1f0'], [1, '#fff1d0']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(80, 82, 0.8, 0.75) +
+          '<circle cx="310" cy="86" r="28" fill="#fff0a0"/>' +
+          '<path d="M0 510 L55 420 L104 478 L164 348 L230 480 L290 390 L390 510 V620 H0 Z" fill="#718f78"/>' +
+          '<path d="M82 590 L195 408 L308 590 Z" fill="#f2ead8" stroke="#d7c9ac" stroke-width="4"/>' +
+          '<path d="M112 590 L195 446 L278 590 Z" fill="#d7e2de"/>' +
+          '<path d="M122 575 L195 450 L268 575" stroke="#f9f8ec" stroke-width="6" fill="none"/>' +
+          '<rect x="116" y="530" width="8" height="66" fill="#eee8d8"/><rect x="266" y="530" width="8" height="66" fill="#eee8d8"/>' +
+          '<path d="M0 620 H390 V780 H0 Z" fill="#78aa5b"/>' +
+          '<path d="M0 690 Q95 668 195 690 T390 690 M0 732 Q95 710 195 732 T390 732" stroke="#b7d67a" stroke-width="5" fill="none"/>' +
+          '<path d="M0 780 C90 764 190 792 290 770 C340 762 376 766 390 768 L390 844 L0 844 Z" fill="#64934c"/>';
+      },
+      sprites: [{ x: 74, y: 76, w: 12, cls: 'sc-sway', d: 4.5, svg: 'palm' }, { x: 10, y: 16, w: 8, cls: 'sc-drift', d: 11, svg: 'gull' }] }
   ];
   // 1.9.234 "Some clouds": every daytime outdoor scene gets one more soft cloud drifting slowly across the top of the sky
   // (pink-gold at sunset). Night scenes keep their clear skies.
