@@ -1,4 +1,4 @@
-/* Info Book 1.9.252 – Sugar Rush, levels 1–57. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.253 – Sugar Rush, levels 1–57. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -3964,6 +3964,23 @@
     if (!hasMove(b, st.mask)) { shuffle(b, st.rand, st.kinds, st.mask); shuffled = true; }
     return { valid: true, steps, shuffled, at: [r, c] };
   }
+  const SESSION_UNLOCK_TAPS = 5;
+  function createSessionLevelAccess() {
+    let allOpen = false, taps = 0;
+    return {
+      allows(n, savedOpen) { return allOpen || n <= savedOpen; },
+      tap() {
+        if (!allOpen) {
+          taps = Math.min(SESSION_UNLOCK_TAPS, taps + 1);
+          if (taps >= SESSION_UNLOCK_TAPS) allOpen = true;
+        }
+        return { unlocked: allOpen, taps };
+      },
+      clearTaps() { if (!allOpen) taps = 0; },
+      reset() { allOpen = false; taps = 0; },
+      isUnlocked() { return allOpen; }
+    };
+  }
   function shuffleBooster(st) {
     if (!st || st.over || st.tutorial) return false;
     shuffle(st.board, st.rand, st.kinds, st.mask);
@@ -3980,6 +3997,7 @@
     BOOSTERS, EXTRA_MOVES, normBoosters, addPrize, takeBooster, SPIN_PRIZES, nzDay, canSpin, spinPick, spinAngle, prizeAt, chestReward, boosterInfo, hammerAt, shuffleBooster, LIVES_MAX, LIFE_MS, regenLives, changeLives, nextLifeMs, mmss };
   root.SugarRush.MAP_COUNTRIES = MAP_COUNTRIES;
   root.SugarRush.countryForLevel = countryForLevel;
+  root.SugarRush.createSessionLevelAccess = createSessionLevelAccess;
 
   if (!root.document) return;
   const doc = root.document;
@@ -3989,6 +4007,9 @@
     set(k, v) { try { root.localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } }
   };
   if (!root.SugarRush.allowed()) { $('soon').hidden = false; return; }
+  const sessionLevelAccess = createSessionLevelAccess();
+  const SESSION_EXIT_DELAY_MS = 700, SESSION_UNLOCK_FEEDBACK_MS = 2400;
+  let mapExitTimer = 0, mapExitFeedbackTimer = 0;
 
   const reduce = root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const SP = reduce ? 0.35 : 1;
@@ -4930,7 +4951,42 @@
     if (board) board.hidden = !on;
     if (chip) { chip.hidden = !!on; chip.setAttribute('aria-expanded', on ? 'true' : 'false'); }
   }
+  function restoreMapExitButton() {
+    const b = $('mapexit');
+    if (b) { b.textContent = 'Exit'; b.setAttribute('aria-label', 'Exit'); }
+  }
+  function resetSessionUnlock() {
+    clearTimeout(mapExitTimer); clearTimeout(mapExitFeedbackTimer);
+    mapExitTimer = mapExitFeedbackTimer = 0;
+    sessionLevelAccess.reset();
+    restoreMapExitButton();
+  }
+  function handleMapExitTap() {
+    const b = $('mapexit');
+    unlockAudio();
+    if (sessionLevelAccess.isUnlocked()) { resetSessionUnlock(); requestCloseSugar(); return; }
+    const result = sessionLevelAccess.tap();
+    clearTimeout(mapExitTimer);
+    mapExitTimer = 0;
+    if (result.unlocked) {
+      clearTimeout(mapExitFeedbackTimer);
+      renderMap();
+      if (b) { b.textContent = 'All levels open!'; b.setAttribute('aria-label', 'All levels unlocked for this session'); }
+      mapExitFeedbackTimer = setTimeout(restoreMapExitButton, SESSION_UNLOCK_FEEDBACK_MS);
+      return;
+    }
+    if (b) {
+      b.textContent = 'Exit ' + result.taps + '/' + SESSION_UNLOCK_TAPS;
+      b.setAttribute('aria-label', 'Exit, ' + result.taps + ' of ' + SESSION_UNLOCK_TAPS + ' taps');
+    }
+    mapExitTimer = setTimeout(() => {
+      sessionLevelAccess.clearTaps();
+      resetSessionUnlock();
+      requestCloseSugar();
+    }, SESSION_EXIT_DELAY_MS);
+  }
   function requestCloseSugar() {
+    resetSessionUnlock();
     try { settleLife(); } catch (e) { }
     try { stopAllMusic(); } catch (e) { }
     try {
@@ -5919,7 +5975,7 @@
     path.innerHTML = '';
     const here = Math.min(LV_COUNT, Math.max(1, prog.open));
     LEVELS.forEach((lv, i) => {
-      const n = i + 1, open = n <= prog.open, stars = prog.stars[i] || 0, stop = MAP_STOPS[i], country = countryForLevel(n);
+      const n = i + 1, open = sessionLevelAccess.allows(n, prog.open), stars = prog.stars[i] || 0, stop = MAP_STOPS[i], country = countryForLevel(n);
       const countryStop = country && country.toLowerCase() === stop.place.toLowerCase();
       const b = doc.createElement('button');
       b.type = 'button';
@@ -6040,7 +6096,7 @@
     if (musicOn) playKind(wantKind());
   }
   function openLevel(n) {
-    const lv = LEVELS[n - 1]; if (!lv || n > prog.open) return;
+    const lv = LEVELS[n - 1]; if (!lv || !sessionLevelAccess.allows(n, prog.open)) return;
     pendingLv = n;
     showIntro(n);
   }
@@ -7091,7 +7147,13 @@
   if ($('raceon')) $('raceon').addEventListener('click', e => {
     if (e.target === $('raceon') || e.target === $('raceonbtn')) $('raceon').hidden = true;
   });
-  if ($('mapexit')) $('mapexit').addEventListener('click', () => { unlockAudio(); requestCloseSugar(); });
+  if ($('mapexit')) $('mapexit').addEventListener('click', handleMapExitTap);
+  if (root.addEventListener) {
+    root.addEventListener('pagehide', resetSessionUnlock);
+    root.addEventListener('pageshow', e => {
+      if (e.persisted) { resetSessionUnlock(); if (!$('map').hidden) renderMap(); }
+    });
+  }
   if ($('racechip')) $('racechip').addEventListener('click', () => { unlockAudio(); setRaceOpen(true); });
   if ($('raceboard')) $('raceboard').addEventListener('click', e => {
     if (e.target.closest && e.target.closest('[data-race=close]')) setRaceOpen(false);
