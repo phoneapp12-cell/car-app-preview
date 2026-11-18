@@ -1,4 +1,4 @@
-/* Info Book 1.9.248 – Sugar Rush, levels 1–47. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.249 – Sugar Rush, levels 1–52. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -288,7 +288,35 @@
       ice: ['11000011', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '11000011'],
       locks: ['00000000', '00000000', '00000000', '00011000', '00011000', '00000000', '00000000', '00000000'],
       help: 'Clear the garden jelly, crack the 4 icy corners and free all 4 locked jars in 36 moves.',
-      badge: { id: 'faisal', name: 'Garden Crescent', icon: '🌙' } }
+      badge: { id: 'faisal', name: 'Garden Crescent', icon: '🌙' } },
+    // 1.9.249 Five more countries along the Silk Road: Afghanistan, Iran, Uzbekistan, Kazakhstan and China.
+    { n: 48, name: 'Kabul Mountain Market', target: 0, moves: 34, stars: [0, 6600, 13200], kinds: 6,
+      jelly: ['00000000', '00111100', '01100110', '01000010', '01000010', '01100110', '00111100', '00000000'],
+      bub: ['00000000', '00000000', '01000010', '00000000', '00000000', '01000010', '00000000', '00000000'],
+      help: 'Clear the market-courtyard jelly and pop all 4 sugar bubbles in 34 moves.',
+      badge: { id: 'kabul', name: 'Blue Minaret', icon: '🕌' } },
+    { n: 49, name: 'Tehran Rose Garden', target: 0, moves: 34, stars: [0, 6700, 13400], kinds: 6,
+      ings: [[0, 2], [0, 5]], ingIcon: '🍎',
+      ice: ['00000000', '00000000', '00011000', '00000000', '00000000', '00011000', '00000000', '00000000'],
+      help: 'Bring both garden treats down and crack the 4 icing blocks in 34 moves.',
+      badge: { id: 'rose', name: 'Persian Rose', icon: '🌹' } },
+    { n: 50, name: 'Tashkent Tile Courtyard', target: 0, moves: 36, stars: [0, 6800, 13600], kinds: 6,
+      jelly: ['22000022', '11000011', '00000000', '00011000', '00011000', '00000000', '11000011', '22000022'],
+      locks: ['00000000', '00000000', '00100100', '00000000', '00000000', '00100100', '00000000', '00000000'],
+      help: 'Clear the double-layer tilework and free all 4 locked jars in 36 moves.',
+      badge: { id: 'tile', name: 'Turquoise Tile', icon: '🟦' } },
+    { n: 51, name: 'Astana Steppe Lights', target: 0, moves: 36, stars: [0, 6900, 13800], kinds: 6,
+      jelly: ['00000000', '00111100', '00011000', '00000000', '00000000', '00011000', '00111100', '00000000'],
+      bub: ['10000001', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '10000001'],
+      choco: ['00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '10000001'],
+      help: 'Clear the steppe-ring jelly, pop all 4 sugar bubbles and keep the chocolate in check in 36 moves.',
+      badge: { id: 'steppe', name: 'Steppe Star', icon: '⭐' } },
+    { n: 52, name: 'Beijing Great Wall', hard: 1, target: 0, moves: 38, stars: [0, 7000, 14000], kinds: 6,
+      jelly: ['00000000', '00111100', '01100110', '11000011', '11000011', '01100110', '00111100', '00000000'],
+      ice: ['10000001', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '10000001'],
+      locks: ['00000000', '00000000', '00000000', '00011000', '00011000', '00000000', '00000000', '00000000'],
+      help: 'Clear the wall-shaped jelly, crack the 4 icy corners and free all 4 locked jars in 38 moves.',
+      badge: { id: 'wall', name: 'Great Wall Star', icon: '🐉' } }
   ];
 
 
@@ -340,7 +368,12 @@
     { icon: '⭐', goal: 'Pop all the sugar bubbles', detail: 'Pop all 8 sugar bubbles around Manila Bay in 32 moves.', tip: 'Bubbles touching each other pop together. Start near the middle of the cluster.', mechanic: 'bub' },
     { icon: '🥭', goal: 'Bring both mangoes down and crack the icing', detail: 'Bring both mango treats down and crack the 4 icing blocks in 34 moves.', tip: 'Match underneath the mangoes to bring them down, and use specials to reach the icing.', mechanic: 'market' },
     { icon: '🏯', goal: 'Clear the garden jelly and free the jars', detail: 'Clear the garden-path jelly and free all 4 locked jars in 34 moves.', tip: 'The jelly is in the outer corners; work inward toward the jars.', mechanic: 'gates' },
-    { icon: '🌙', goal: 'Clear the jelly, crack the icing and free the jars', detail: 'Clear the garden jelly, crack the 4 icy corners and free all 4 locked jars in 36 moves.', tip: 'The corner icing and the central jars both need attention. Specials can help reach the edges.', mechanic: 'mix' }
+    { icon: '🌙', goal: 'Clear the jelly, crack the icing and free the jars', detail: 'Clear the garden jelly, crack the 4 icy corners and free all 4 locked jars in 36 moves.', tip: 'The corner icing and the central jars both need attention. Specials can help reach the edges.', mechanic: 'mix' },
+    { icon: '💜', goal: 'Clear the courtyard jelly and pop the bubbles', detail: 'Clear the market-courtyard jelly and pop all 4 sugar bubbles in 34 moves.', tip: 'Work around the courtyard ring, then pop the bubbles in the middle.', mechanic: 'mekong' },
+    { icon: '🎁', goal: 'Bring both treats down and crack the icing', detail: 'Bring both garden treats down and crack the 4 icing blocks in 34 moves.', tip: 'Match beneath each treat to bring it down; specials can reach the icing.', mechanic: 'market' },
+    { icon: '🔒', goal: 'Clear the double jelly and free the jars', detail: 'Clear all the double-layer tilework and free the 4 locked jars in 36 moves.', tip: 'The thick jelly needs two clears. Work the outer corners while the jars wait in the courtyard.', mechanic: 'garden' },
+    { icon: '🫧', goal: 'Clear the jelly, pop the bubbles and stop the chocolate', detail: 'Clear the steppe-ring jelly, pop all 4 sugar bubbles and keep the chocolate in check in 36 moves.', tip: 'Pop a corner bubble early; remember that chocolate spreads if you leave it untouched.', mechanic: 'mix' },
+    { icon: '🐉', goal: 'Clear the jelly, crack the icing and free the jars', detail: 'Clear the wall-shaped jelly, crack the 4 icy corners and free all 4 locked jars in 38 moves.', tip: 'Three objectives share the board. Make matches along the jelly wall, then use specials to reach the icy corners.', mechanic: 'mix' }
   ];
   function levelIntro(n, p) {
     const lv = LEVELS[(n | 0) - 1]; if (!lv) return null;
@@ -813,7 +846,17 @@
     46: [{ id: 'recap46', kind: 'recap', title: 'Bhutan', bubble: 'Thimphu: a mountain dzong and its garden paths.',
       items: [{ icon: '💜', text: 'Clear the garden-path jelly' }, { icon: '🔒', text: 'Free all four locked jars' }] }],
     47: [{ id: 'recap47', kind: 'recap', title: 'Pakistan', bubble: 'Islamabad: gardens, fountains and the Faisal Mosque.',
-      items: [{ icon: '💜', text: 'Clear the garden jelly' }, { icon: '🧁', text: 'Crack the icy corners' }, { icon: '🔒', text: 'Free all four locked jars' }] }]
+      items: [{ icon: '💜', text: 'Clear the garden jelly' }, { icon: '🧁', text: 'Crack the icy corners' }, { icon: '🔒', text: 'Free all four locked jars' }] }],
+    48: [{ id: 'recap48', kind: 'recap', title: 'Afghanistan', bubble: 'Kabul: a mountain valley, market courtyards and blue minarets.',
+      items: [{ icon: '💜', text: 'Clear the courtyard jelly' }, { icon: '🫧', text: 'Pop all four sugar bubbles' }] }],
+    49: [{ id: 'recap49', kind: 'recap', title: 'Iran', bubble: 'Tehran: rose gardens beneath the Alborz mountains.',
+      items: [{ icon: '🍎', text: 'Bring both garden treats down' }, { icon: '🧁', text: 'Crack the four icing blocks' }] }],
+    50: [{ id: 'recap50', kind: 'recap', title: 'Uzbekistan', bubble: 'Tashkent: a courtyard bright with turquoise tilework.',
+      items: [{ icon: '💜', text: 'Clear the double-layer tilework' }, { icon: '🔒', text: 'Free all four locked jars' }] }],
+    51: [{ id: 'recap51', kind: 'recap', title: 'Kazakhstan', bubble: 'Astana: steppe skies, river lights and a bright city tower.',
+      items: [{ icon: '💜', text: 'Clear the steppe-ring jelly' }, { icon: '🫧', text: 'Pop all four sugar bubbles' }, { icon: '🍫', text: 'Keep the chocolate in check' }] }],
+    52: [{ id: 'recap52', kind: 'recap', title: 'China', bubble: 'Beijing: the Great Wall winds across the mountain ridges.',
+      items: [{ icon: '💜', text: 'Clear the wall-shaped jelly' }, { icon: '🧁', text: 'Crack the four icy corners' }, { icon: '🔒', text: 'Free all four locked jars' }] }]
   };
   function tutorialFor(n) { return TUTORIALS[n] || null; }
 
@@ -842,8 +885,8 @@
   function westPacXY(lat, lon) { return { x: 60 + (lon - 156) * 280 / 24, y: 1580 + (-lat - 8) * 88 / 15 }; }
   function pacXY(lat, lon) { return { x: 70 + 16.86 * (((lon % 360) + 360) % 360 - 184.8), y: 1350 + 21.6 * (-lat - 13.83) }; }
   function ausXY(lat, lon) { return { x: 8.533 * lon - 937.8, y: 1808 + 10.97 * (-lat - 10.707) }; }
-  // 1.9.243 The map grows west so Vietnam, Malaysia, Thailand, Myanmar and India sit on this same scale.
-  const MAP_X0 = -360, MAP_W = 640, MAP_H = 2240, MAP_VW = MAP_W - MAP_X0;
+  // 1.9.249 The map grows farther west for Iran and north for the Silk Road route, on the same geographic scale.
+  const MAP_X0 = -580, MAP_W = 640, MAP_H = 2240, MAP_VW = MAP_W - MAP_X0;
   function mapXPct(x) { return ((x - MAP_X0) / MAP_VW * 100) + '%'; }
   const MAP_STOPS = [
     { n: 1, x: 148, y: 432, place: "Onerahi", kind: 'town', label: 'left', lat: -35.77, lon: 174.37, inset: 'whangarei' },
@@ -900,14 +943,21 @@
     { n: 44, x: 94.6, y: 1530.4, place: 'Philippines', kind: 'island', label: 'right', lat: 14.5995, lon: 120.9842 },
     { n: 45, x: -62.0, y: 1493.4, place: 'Laos', kind: 'city', label: 'left', lat: 17.9757, lon: 102.6331 },
     { n: 46, x: -172.9, y: 1389.2, place: 'Bhutan', kind: 'city', label: 'right', lat: 27.4728, lon: 89.6390, via: [{ x: -137, y: 1430 }] },
-    { n: 47, x: -314.4, y: 1321.0, place: 'Pakistan', kind: 'city', label: 'left', lat: 33.6844, lon: 73.0551 }
+    { n: 47, x: -314.4, y: 1321.0, place: 'Pakistan', kind: 'city', label: 'left', lat: 33.6844, lon: 73.0551 },
+    // 1.9.249 From Islamabad through the Silk Road, with each capital on the existing Asia projection.
+    { n: 48, x: -347.3, y: 1277.5, place: 'Afghanistan', kind: 'city', label: 'right', nudged: true, lat: 34.5553, lon: 69.2075, via: [{ x: -347.3, y: 1311.5 }] },
+    { n: 49, x: -499.3, y: 1299.0, place: 'Iran', kind: 'city', label: 'below', lat: 35.6892, lon: 51.3890 },
+    { n: 50, x: -315.0, y: 1237.5, place: 'Uzbekistan', kind: 'city', label: 'left', nudged: true, lat: 41.2995, lon: 69.2401, via: [{ x: -347.0, y: 1237.5 }] },
+    { n: 51, x: -328.1, y: 1129.2, place: 'Kazakhstan', kind: 'city', label: 'right', lat: 51.1694, lon: 71.4491 },
+    { n: 52, x: 55.5, y: 1252.8, place: 'China', kind: 'city', label: 'right', lat: 39.9042, lon: 116.4074 }
   ];
   // Country is a separate atlas layer from the level stop (city/island) label.
   const MAP_COUNTRIES = Array(16).fill('New Zealand').concat(
     ['Cook Islands', 'Tonga', 'Samoa'],
     Array(6).fill('Australia'),
     ['Papua New Guinea', 'Solomon Islands', 'Vanuatu', 'Fiji', 'New Caledonia', 'Indonesia', 'Australia', 'Australia',
-      'Vietnam', 'Malaysia', 'Thailand', 'Myanmar', 'India', 'Nepal', 'Bangladesh', 'Sri Lanka', 'Singapore', 'Cambodia', 'Philippines', 'Laos', 'Bhutan', 'Pakistan']
+      'Vietnam', 'Malaysia', 'Thailand', 'Myanmar', 'India', 'Nepal', 'Bangladesh', 'Sri Lanka', 'Singapore', 'Cambodia', 'Philippines', 'Laos', 'Bhutan', 'Pakistan',
+      'Afghanistan', 'Iran', 'Uzbekistan', 'Kazakhstan', 'China']
   );
   function countryForLevel(n) { return MAP_COUNTRIES[(n | 0) - 1] || ''; }
   // Coming soon: other Australian cities. Shown as markers only (no trail), so they never look like the route.
@@ -916,7 +966,7 @@
     { place: 'Darwin', x: 179, y: 1827, label: 'left', lat: -12.46, lon: 130.84 },
     { place: 'Cairns', x: 306, y: 1876, label: 'left', lat: -16.92, lon: 145.77 }
   ];
-  const LV_COUNT = 47;
+  const LV_COUNT = 52;
   function stopForLevel(n) { return MAP_STOPS[(n | 0) - 1] || null; }
   function icingPath(pts) {
     if (!pts || pts.length < 2) return '';
@@ -973,7 +1023,13 @@
     [[18.5, 120.0], [20.4, 121.0], [20.8, 122.0], [19.2, 123.2], [17.2, 122.5], [16.0, 123.4], [14.5, 122.2], [13.0, 121.8], [13.7, 120.4], [15.3, 119.7], [16.9, 120.8]],
     [[13.5, 120.5], [13.8, 121.3], [13.2, 121.8], [12.3, 121.2], [12.6, 120.5]],
     [[11.8, 119.8], [11.0, 120.4], [10.0, 120.0], [9.3, 118.8], [10.0, 117.0], [9.5, 116.0], [10.1, 114.9], [11.5, 115.4], [12.1, 117.2]],
-    [[11.0, 124.0], [9.3, 125.0], [7.0, 125.5], [5.5, 125.2], [5.5, 124.0], [6.5, 123.0], [8.3, 123.6], [9.6, 123.7]]
+    [[11.0, 124.0], [9.3, 125.0], [7.0, 125.5], [5.5, 125.2], [5.5, 124.0], [6.5, 123.0], [8.3, 123.6], [9.6, 123.7]],
+    // Central Asia and the Silk Road countries, simplified in lat/lon for the same map projection.
+    [[29.4, 60.5], [31.7, 60.3], [33.8, 62.2], [35.5, 65.1], [37.4, 66.6], [38.5, 70.0], [37.4, 74.9], [35.1, 74.5], [33.1, 72.0], [31.0, 69.0], [29.5, 65.0]],
+    [[25.0, 60.0], [26.7, 56.1], [28.9, 50.9], [30.5, 48.2], [33.3, 47.6], [36.4, 44.1], [38.5, 46.0], [39.8, 48.3], [39.1, 54.8], [37.9, 58.2], [35.8, 61.0], [31.8, 61.8], [29.0, 61.3]],
+    [[37.0, 56.0], [40.0, 55.9], [43.0, 58.2], [45.6, 58.4], [45.5, 64.0], [43.8, 68.0], [42.0, 71.2], [39.5, 70.0], [37.5, 66.0]],
+    [[40.5, 46.5], [44.0, 47.0], [49.0, 50.0], [53.8, 54.0], [55.2, 61.0], [54.0, 70.0], [50.5, 79.0], [47.0, 86.0], [44.0, 81.0], [42.0, 74.0], [40.0, 67.0], [40.5, 59.0]],
+    [[22.0, 101.0], [21.0, 108.0], [19.0, 110.0], [21.0, 115.0], [24.0, 119.0], [29.0, 121.0], [34.0, 120.0], [37.0, 122.0], [40.0, 121.0], [42.0, 124.0], [47.0, 131.0], [50.0, 127.0], [53.0, 122.0], [49.0, 118.0], [49.0, 110.0], [47.0, 106.0], [45.0, 99.0], [44.0, 95.0], [41.0, 91.0], [39.0, 87.0], [40.0, 80.0], [37.0, 75.0], [34.0, 78.0], [30.0, 80.0], [27.0, 85.0], [24.0, 89.0]]
   ];
   function ausPath(pts) { return pts.map(function (q, i) { const a = ausXY(q[0], q[1]); return (i ? 'L' : 'M') + a.x.toFixed(1) + ' ' + a.y.toFixed(1); }).join(' ') + ' Z'; }
   // 1.9.234 Soft clouds drifting slowly over the map (CSS .sr-cloud; still under reduced motion). Over sea, clear of the pins.
@@ -1000,7 +1056,8 @@
       atlasPill(405, 1708, 198, '03 / WEST PACIFIC', 'MELANESIA', 'PAPUA NEW GUINEA · SOLOMONS · FIJI') +
       atlasPill(104, 1745, 192, '04 / AUSTRALASIA', 'AUSTRALIA', 'LEVELS 20–25 · 32–33') +
       atlasPill(-350, 1695, 195, '05 / ISLAND SOUTHEAST ASIA', 'SOUTHEAST ASIA', 'INDONESIA · MALAYSIA · SINGAPORE') +
-      atlasPill(-350, 1254, 148, '06 / HIMALAYAS', 'SOUTH ASIA', 'INDIA · NEPAL · BHUTAN · PAKISTAN') +
+      atlasPill(-560, 1350, 195, '06 / HIMALAYAS', 'SOUTH ASIA', 'INDIA · NEPAL · BHUTAN · PAKISTAN') +
+      atlasPill(-565, 1137, 190, '07 / THE SILK ROAD', 'CENTRAL ASIA', 'AFGHANISTAN · IRAN · UZBEKISTAN') +
       '</g>';
   }
   function nzMapSvg() {
@@ -2102,7 +2159,7 @@
   // ("make levels 3 to 10 my music"); Saturday night in Nelson (10) gets the calm one. Levels 1 and 2 keep their own
   // songs. Each song ships as AAC (.m4a, ~96 kbps) with an .mp3 fallback; a mood with no
   // file yet simply keeps the usual loop, so this is safe before the songs land.
-  const SONG_PLAN = { intense: [13, 15, 19, 22], calm: [10, 17, 18], upbeat: [3, 4, 5, 6, 7, 8, 9, 11, 12, 14, 16, 20, 21, 23, 24, 25, 26] };
+  const SONG_PLAN = { intense: [13, 15, 19, 22, 52], calm: [10, 17, 18], upbeat: [3, 4, 5, 6, 7, 8, 9, 11, 12, 14, 16, 20, 21, 23, 24, 25, 26] };
   // "Sugar Rush travel" (~136 BPM, the loudest and punchiest) drives the Hard levels; "Sugar Rush Kiss" (~89 BPM,
   // the softest, "let it linger") floats over the Pacific islands; "Sugar Rush" ("now I can't sit still") for the rest.
   const SONG_FILES = { intense: 'sugar-rush-travel.m4a', calm: 'sugar-rush-kiss.m4a', upbeat: 'sugar-rush-song.m4a' };
@@ -3464,7 +3521,73 @@
           '<path d="M0 690 Q95 668 195 690 T390 690 M0 732 Q95 710 195 732 T390 732" stroke="#b7d67a" stroke-width="5" fill="none"/>' +
           '<path d="M0 780 C90 764 190 792 290 770 C340 762 376 766 390 768 L390 844 L0 844 Z" fill="#64934c"/>';
       },
-      sprites: [{ x: 74, y: 76, w: 12, cls: 'sc-sway', d: 4.5, svg: 'palm' }, { x: 10, y: 16, w: 8, cls: 'sc-drift', d: 11, svg: 'gull' }] }
+      sprites: [{ x: 74, y: 76, w: 12, cls: 'sc-sway', d: 4.5, svg: 'palm' }, { x: 10, y: 16, w: 8, cls: 'sc-drift', d: 11, svg: 'gull' }] },
+    // 1.9.249 Five soft illustrated scenes continue north and west along the Silk Road.
+    { n: 48, id: 'kabul', place: 'Afghanistan', title: 'Mountain market, Kabul', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#76bde2'], [0.55, '#e7e8d4'], [1, '#ffe2b1']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(275, 82, 0.8, 0.8) + '<circle cx="68" cy="105" r="31" fill="#fff0a4"/>' +
+          '<path d="M0 500 L46 418 L90 478 L150 360 L202 474 L270 390 L326 480 L372 420 L390 454 V640 H0 Z" fill="#8b927e"/>' +
+          '<path d="M0 580 Q100 546 196 576 T390 564 V844 H0 Z" fill="#98b66f"/>' +
+          '<path d="M0 594 H390 V760 H0 Z" fill="#d99b68"/>' +
+          '<path d="M26 594 V520 H88 V594 M103 594 V490 H174 V594 M204 594 V526 H270 V594 M286 594 V508 H366 V594" fill="#f3d1a0" stroke="#b97755" stroke-width="5"/>' +
+          '<path d="M147 594 V480 Q147 452 165 452 Q183 452 183 480 V594 Z" fill="#55a6b5" stroke="#f7e7c9" stroke-width="5"/>' +
+          '<path d="M157 452 Q165 424 173 452 Z" fill="#3e8f9f"/><path d="M0 760 Q90 742 190 764 T390 754 V844 H0 Z" fill="#789c55"/>' +
+          '<path d="M44 844 Q76 774 104 844 M300 844 Q330 778 360 844" stroke="#e7bd72" stroke-width="8" fill="none"/>';
+      },
+      sprites: [{ x: 74, y: 72, w: 9, cls: 'sc-bob', d: 4.5, emoji: '🪻' }, { x: 18, y: 18, w: 8, cls: 'sc-drift', d: 12, svg: 'gull' }] },
+    { n: 49, id: 'tehran', place: 'Iran', title: 'Rose garden, Tehran', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#75c5eb'], [0.55, '#f1edda'], [1, '#ffe7bd']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(88, 76, 0.85, 0.8) +
+          '<path d="M0 506 L50 444 L112 474 L174 370 L240 480 L302 410 L390 496 V640 H0 Z" fill="#93a28c"/>' +
+          '<path d="M0 590 Q95 554 195 586 T390 578 V844 H0 Z" fill="#87b56b"/>' +
+          '<path d="M76 610 V500 Q76 420 195 404 Q314 420 314 500 V610 Z" fill="#f3dbad" stroke="#d2a866" stroke-width="6"/>' +
+          '<path d="M116 610 V520 Q116 470 195 454 Q274 470 274 520 V610 Z" fill="#62b7c3"/>' +
+          '<path d="M100 501 Q195 352 290 501 Q242 470 195 464 Q148 470 100 501 Z" fill="#3e9cae" stroke="#e6d4a7" stroke-width="7"/>' +
+          '<path d="M160 610 V552 Q195 504 230 552 V610 Z" fill="#f7e8c9"/>' +
+          '<path d="M0 712 Q98 684 195 712 T390 706 V844 H0 Z" fill="#6f9e56"/>' +
+          '<path d="M0 772 Q98 738 195 772 T390 766" stroke="#f1d798" stroke-width="10" fill="none"/><circle cx="52" cy="718" r="8" fill="#e75b77"/><circle cx="338" cy="704" r="9" fill="#e75b77"/>';
+      },
+      sprites: [{ x: 16, y: 74, w: 9, cls: 'sc-bob', d: 4.8, emoji: '🌹' }, { x: 78, y: 72, w: 9, cls: 'sc-bob', d: 5.2, emoji: '🌷' }] },
+    { n: 50, id: 'tashkent', place: 'Uzbekistan', title: 'Tile courtyard, Tashkent', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#84c8e8'], [0.6, '#f3ecd4'], [1, '#ffdfb4']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(290, 78, 0.75, 0.85) +
+          '<path d="M0 574 H390 V844 H0 Z" fill="#d8b67f"/>' +
+          '<path d="M48 574 V458 H342 V574 Z" fill="#e8cb9b" stroke="#b98952" stroke-width="6"/>' +
+          '<path d="M82 574 V490 Q82 440 125 440 Q168 440 168 490 V574 Z M222 574 V490 Q222 440 265 440 Q308 440 308 490 V574 Z" fill="#48aabb" stroke="#f1d9a7" stroke-width="7"/>' +
+          '<path d="M62 462 Q125 356 188 462 Q150 435 125 435 Q100 435 62 462 Z M202 462 Q265 356 328 462 Q290 435 265 435 Q240 435 202 462 Z" fill="#398fa6" stroke="#f3dca9" stroke-width="6"/>' +
+          '<path d="M170 574 V510 Q195 478 220 510 V574 Z" fill="#f8e8c4"/>' +
+          '<path d="M95 505 l30 -24 30 24 -30 24 Z M235 505 l30 -24 30 24 -30 24 Z" fill="#f5d079"/>' +
+          '<path d="M0 744 L195 640 L390 744 V844 H0 Z" fill="#9fc875"/><path d="M195 640 V844 M0 744 H390" stroke="#f4dfae" stroke-width="9"/>';
+      },
+      sprites: [{ x: 20, y: 17, w: 8, cls: 'sc-drift', d: 13, svg: 'gull' }, { x: 78, y: 75, w: 9, cls: 'sc-bob', d: 4.4, emoji: '🟦' }] },
+    { n: 51, id: 'astana', place: 'Kazakhstan', title: 'Steppe lights, Astana', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#5faed8'], [0.55, '#d7edf1'], [1, '#ffe1ab']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(90, 78, 0.8, 0.8) + '<circle cx="322" cy="114" r="35" fill="#fff0aa"/>' +
+          '<path d="M0 554 Q90 520 190 552 T390 544 V844 H0 Z" fill="#94bd72"/>' +
+          '<path d="M0 632 Q98 610 196 632 T390 626 V844 H0 Z" fill="#6cb3c4"/>' +
+          '<path d="M0 678 Q95 650 195 678 T390 670 V844 H0 Z" fill="#62a9b9" opacity=".8"/>' +
+          '<path d="M46 632 V480 H82 V632 M100 632 V430 H140 V632 M160 632 V500 H196 V632 M220 632 V450 H266 V632 M288 632 V492 H338 V632" fill="#e9dfc4" stroke="#b2c4c0" stroke-width="4"/>' +
+          '<path d="M237 450 Q244 365 252 450 Z" fill="#f5c74e"/><rect x="240" y="448" width="24" height="158" rx="11" fill="#f8d45f" stroke="#fff0b0" stroke-width="5"/>' +
+          '<path d="M0 760 Q100 736 196 760 T390 754 V844 H0 Z" fill="#729b58"/><path d="M38 703 Q100 690 154 703 M268 706 Q324 692 370 705" stroke="#fff" stroke-width="4" fill="none" opacity=".65"/>';
+      },
+      sprites: [{ x: 78, y: 75, w: 10, cls: 'sc-bob', d: 4.6, emoji: '⭐' }, { x: 16, y: 17, w: 8, cls: 'sc-drift', d: 11, svg: 'gull' }] },
+    { n: 52, id: 'beijing', place: 'China', title: 'Great Wall, Beijing', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#81c6e7'], [0.58, '#f1e9d2'], [1, '#ffdda8']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(270, 74, 0.8, 0.8) + '<circle cx="70" cy="104" r="30" fill="#fff0aa"/>' +
+          '<path d="M0 520 L60 404 L110 470 L176 344 L236 462 L310 374 L390 492 V640 H0 Z" fill="#8caa83"/>' +
+          '<path d="M0 600 Q95 568 194 600 T390 590 V844 H0 Z" fill="#9dbc78"/>' +
+          '<path d="M0 604 Q54 536 106 576 T210 570 T312 554 T390 570" stroke="#c94e3e" stroke-width="21" fill="none"/>' +
+          '<path d="M0 596 Q54 528 106 568 T210 562 T312 546 T390 562" stroke="#f1d28a" stroke-width="8" fill="none"/>' +
+          '<path d="M35 570 V526 H67 V570 M154 568 V520 H186 V568 M290 555 V506 H322 V555" fill="#c84d3d" stroke="#f0d28b" stroke-width="5"/>' +
+          '<path d="M25 526 L51 504 L78 526 Z M144 520 L170 498 L196 520 Z M280 506 L306 484 L332 506 Z" fill="#a94037"/>' +
+          '<path d="M0 768 Q100 744 196 768 T390 762 V844 H0 Z" fill="#729b57"/>';
+      },
+      sprites: [{ x: 18, y: 19, w: 8, cls: 'sc-drift', d: 12, svg: 'gull' }, { x: 82, y: 69, w: 9, cls: 'sc-bob', d: 4.2, emoji: '🏮' }] }
   ];
   // 1.9.234 "Some clouds": every daytime outdoor scene gets one more soft cloud drifting slowly across the top of the sky
   // (pink-gold at sunset). Night scenes keep their clear skies.
