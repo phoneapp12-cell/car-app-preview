@@ -1,4 +1,4 @@
-/* Info Book 1.9.250 – Sugar Rush, levels 1–57. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.251 – Sugar Rush, levels 1–57. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -1071,14 +1071,35 @@
     [[22.0, 101.0], [21.0, 108.0], [19.0, 110.0], [21.0, 115.0], [24.0, 119.0], [29.0, 121.0], [34.0, 120.0], [37.0, 122.0], [40.0, 121.0], [42.0, 124.0], [47.0, 131.0], [50.0, 127.0], [53.0, 122.0], [49.0, 118.0], [49.0, 110.0], [47.0, 106.0], [45.0, 99.0], [44.0, 95.0], [41.0, 91.0], [39.0, 87.0], [40.0, 80.0], [37.0, 75.0], [34.0, 78.0], [30.0, 80.0], [27.0, 85.0], [24.0, 89.0]]
   ];
   function ausPath(pts) { return pts.map(function (q, i) { const a = ausXY(q[0], q[1]); return (i ? 'L' : 'M') + a.x.toFixed(1) + ' ' + a.y.toFixed(1); }).join(' ') + ' Z'; }
-  // 1.9.234 Soft clouds drifting slowly over the map (CSS .sr-cloud; still under reduced motion). Over sea, clear of the pins.
-  const MAP_CLOUDS = [[330, 140, 1, 26], [40, 640, 0.8, 34], [350, 860, 0.9, 30], [60, 1120, 1.1, 38], [330, 1200, 0.8, 28], [64, 1722, 0.7, 32], [40, 1880, 0.9, 36], [370, 2200, 0.8, 30]];
+  // 1.9.251: add airy drift and tiny travel-day accents, kept in open sea away from route pins.
+  const MAP_CLOUDS = [[330, 140, 1, 26], [40, 640, 0.8, 34], [350, 860, 0.9, 30], [60, 1120, 1.1, 38], [330, 1200, 0.8, 28], [64, 1722, 0.7, 32], [40, 1880, 0.9, 36], [370, 2200, 0.8, 30], [540, 320, 0.68, 35], [510, 500, 0.75, 39], [535, 980, 0.72, 36], [510, 1360, 0.7, 40], [540, 1550, 0.76, 33], [520, 1740, 0.8, 38], [535, 1985, 0.75, 41], [500, 2160, 0.72, 34], [-540, 820, 0.6, 38], [-535, 1810, 0.7, 35]];
+  const MAP_WINDS = [[500, 725, 0.85, -7, 38], [530, 1390, 0.7, 12, 42], [-520, 1695, 0.75, -13, 36], [500, 2040, 0.78, 9, 46]];
   function mapClouds() {
     return '<g class="sr-clouds" pointer-events="none">' + MAP_CLOUDS.map(function (c, i) {
       const x = c[0], y = c[1], k = c[2];
       return '<g class="sr-cloud" style="--d:' + c[3] + 's;--dl:' + (-i * 4) + 's"><g transform="translate(' + x + ' ' + y + ') scale(' + k + ')" opacity=".62">' +
         '<ellipse cx="0" cy="0" rx="34" ry="11" fill="#fff"/><ellipse cx="-13" cy="-7" rx="15" ry="11" fill="#fff"/><ellipse cx="11" cy="-10" rx="18" ry="13" fill="#fff"/></g></g>';
     }).join('') + '</g>';
+  }
+  function mapWindSwirls() {
+    return '<g class="sr-winds">' + MAP_WINDS.map(function (w, i) {
+      return '<g class="sr-wind" style="--d:' + w[4] + 's;--dl:' + (-i * 7) + 's"><g transform="translate(' + w[0] + ' ' + w[1] + ') rotate(' + w[3] + ') scale(' + w[2] + ')">' +
+        '<path class="sr-wind-line" d="M-43 -6 C-30 -17 -12 -18 0 -9 C12 0 7 10 -3 7 C-11 4 -8 -4 0 -4"/>' +
+        '<path class="sr-wind-line sr-wind-second" d="M-38 10 C-23 19 -6 17 10 8 C23 1 35 3 43 11"/>' +
+        '<path class="sr-wind-line sr-wind-short" d="M-24 -23 C-10 -28 7 -26 20 -21"/></g></g>';
+    }).join('') + '</g>';
+  }
+  function mapAtmosphere() {
+    const star = 'M0 -8 L2.2 -2.2 L8 0 L2.2 2.2 L0 8 L-2.2 2.2 L-8 0 L-2.2 -2.2 Z';
+    return '<g class="sr-map-atmosphere" aria-hidden="true" pointer-events="none">' + mapWindSwirls() +
+      '<g class="sr-map-spark" style="--dl:-1s"><g transform="translate(505 1185) scale(.75)"><path d="' + star + '"/><circle cx="12" cy="-7" r="1.7"/></g></g>' +
+      '<g class="sr-map-spark" style="--dl:-2.8s"><g transform="translate(-520 730) scale(.9)"><path d="' + star + '"/><circle cx="-13" cy="8" r="1.5"/></g></g>' +
+      '<g class="sr-map-spark" style="--dl:-4.2s"><g transform="translate(470 1870)"><path d="' + star + '"/><circle cx="12" cy="10" r="1.6"/></g></g>' +
+      '<g class="sr-map-balloon" style="--dl:-2s"><g transform="translate(-500 520)">' +
+      '<path d="M0 -22 C-15 -22 -20 -8 -15 6 C-11 14 -6 19 -5 22 L5 22 C6 18 11 13 15 6 C20 -8 15 -22 0 -22 Z" fill="#ff8ab8" stroke="#fff" stroke-width="2.2"/>' +
+      '<path d="M-8 -16 C-4 -8 -3 1 -4 12 M0 -20 C4 -8 5 2 4 16" fill="none" stroke="#fff5c8" stroke-width="3" stroke-linecap="round"/>' +
+      '<path d="M-6 22 L-4 27 M6 22 L4 27" fill="none" stroke="#9a5b72" stroke-width="1.6"/><rect x="-5" y="27" width="10" height="7" rx="2" fill="#d99a5e" stroke="#fff" stroke-width="1.5"/>' +
+      '</g></g></g>';
   }
   function atlasPill(x, y, w, kicker, title, note) {
     const cx = w / 2;
@@ -1196,6 +1217,7 @@
       '</g>' +
       planeAt(220, 1712, 172) + planeAt(180, 2003, -106) + planeAt(330, 2140, 110) +
       mapClouds() +
+      mapAtmosphere() +
       mapAtlasType() +
       '<g class="sr-plane" transform="translate(219 1195) rotate(166)"><path d="M0 -14 L3 -4 L14 2 L14 5 L3 2 L2 10 L6 13 L6 15 L0 13 L-6 15 L-6 13 L-2 10 L-3 2 L-14 5 L-14 2 L-3 -4 Z" fill="#fff" stroke="#3d8bfd" stroke-width="1.5"/></g>' +
       '<path id="sr-future" d="' + future + '" fill="none" stroke="#1565b0" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="2.4 8" opacity=".95"/>' +
