@@ -1,4 +1,4 @@
-/* Info Book 1.9.254 – Sugar Rush, levels 1–57. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.255 – Sugar Rush, levels 1–57. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -3966,7 +3966,7 @@
   }
   const SESSION_UNLOCK_TAPS = 5;
   function createSessionLevelAccess() {
-    let allOpen = false, taps = 0;
+    let allOpen = false, unlimitedLives = false, taps = 0;
     return {
       allows(n, savedOpen) { return allOpen || n <= savedOpen; },
       tap() {
@@ -3976,11 +3976,12 @@
         return { unlocked: allOpen, taps };
       },
       authorizeOwner(isOwner) {
-        if (!allOpen && isOwner && taps >= SESSION_UNLOCK_TAPS) allOpen = true;
+        if (!allOpen && isOwner && taps >= SESSION_UNLOCK_TAPS) { allOpen = true; unlimitedLives = true; }
         return { unlocked: allOpen, taps };
       },
       clearTaps() { if (!allOpen) taps = 0; },
-      reset() { allOpen = false; taps = 0; },
+      reset() { allOpen = false; unlimitedLives = false; taps = 0; },
+      hasUnlimitedLives() { return unlimitedLives; },
       isUnlocked() { return allOpen; }
     };
   }
@@ -4011,8 +4012,8 @@
   };
   if (!root.SugarRush.allowed()) { $('soon').hidden = false; return; }
   const sessionLevelAccess = createSessionLevelAccess();
-  const SESSION_EXIT_DELAY_MS = 700, SESSION_UNLOCK_FEEDBACK_MS = 2400;
-  let mapExitTimer = 0, mapExitFeedbackTimer = 0, mapExitVerifyEpoch = 0, mapExitVerifyPending = false;
+  const SESSION_LIFE_GESTURE_WINDOW_MS = 650;
+  let lifeGestureTimer = 0, lifeVerifyEpoch = 0, lifeVerifyPending = false;
 
   const reduce = root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const SP = reduce ? 0.35 : 1;
@@ -4954,54 +4955,14 @@
     if (board) board.hidden = !on;
     if (chip) { chip.hidden = !!on; chip.setAttribute('aria-expanded', on ? 'true' : 'false'); }
   }
-  function restoreMapExitButton() {
-    const b = $('mapexit');
-    if (b) { b.textContent = 'Exit'; b.setAttribute('aria-label', 'Exit'); b.removeAttribute('aria-busy'); }
-  }
-  function resetSessionUnlock() {
-    clearTimeout(mapExitTimer); clearTimeout(mapExitFeedbackTimer);
-    mapExitTimer = mapExitFeedbackTimer = 0;
-    mapExitVerifyEpoch++; mapExitVerifyPending = false;
+  function resetSessionBenefits() {
+    clearTimeout(lifeGestureTimer); lifeGestureTimer = 0;
+    lifeVerifyEpoch++; lifeVerifyPending = false;
     sessionLevelAccess.reset();
-    restoreMapExitButton();
-  }
-  function handleMapExitTap() {
-    const b = $('mapexit');
-    unlockAudio();
-    if (mapExitVerifyPending) return;
-    if (sessionLevelAccess.isUnlocked()) { resetSessionUnlock(); requestCloseSugar(); return; }
-    const result = sessionLevelAccess.tap();
-    clearTimeout(mapExitTimer);
-    mapExitTimer = 0;
-    if (result.taps >= SESSION_UNLOCK_TAPS) {
-      const verifyEpoch = ++mapExitVerifyEpoch;
-      mapExitVerifyPending = true;
-      if (b) b.setAttribute('aria-busy', 'true');
-      Promise.resolve()
-        .then(() => root.IBScores && typeof root.IBScores.isVerifiedShane === 'function' ? root.IBScores.isVerifiedShane() : false)
-        .catch(() => false)
-        .then(isOwner => {
-          if (verifyEpoch !== mapExitVerifyEpoch) return;
-          mapExitVerifyPending = false;
-          if (b) b.removeAttribute('aria-busy');
-          const unlocked = sessionLevelAccess.authorizeOwner(!!isOwner);
-          if (!unlocked.unlocked) { requestCloseSugar(); return; }
-          clearTimeout(mapExitFeedbackTimer);
-          renderMap();
-          if (b) { b.textContent = 'All levels open!'; b.setAttribute('aria-label', 'All levels unlocked for this session'); }
-          mapExitFeedbackTimer = setTimeout(restoreMapExitButton, SESSION_UNLOCK_FEEDBACK_MS);
-        });
-      return;
-    }
-    mapExitTimer = setTimeout(() => {
-      sessionLevelAccess.clearTaps();
-      resetSessionUnlock();
-      requestCloseSugar();
-    }, SESSION_EXIT_DELAY_MS);
   }
   function requestCloseSugar() {
-    resetSessionUnlock();
     try { settleLife(); } catch (e) { }
+    resetSessionBenefits();
     try { stopAllMusic(); } catch (e) { }
     try {
       if (root.parent && root.parent !== root) root.parent.postMessage({ type: 'ib-sugar-close' }, '*');
@@ -5015,33 +4976,35 @@
   let livesDemo = false, livesTimer = 0, livesInfo = null, heartsTimer = 0;
   function livesKey() { return 'ib-sugar-lives' + memberTag(); }
   function livesState() { const v = regenLives(ls.get(livesKey(), null)); ls.set(livesKey(), v); return v; }
-  function lives() { return livesState().n; }
-  function addLives(delta) { ls.set(livesKey(), changeLives(ls.get(livesKey(), null), delta)); paintHearts(); }
-  function setLives(n) { const cur = livesState(); addLives((n | 0) - cur.n); }
-  function nextLife() { return nextLifeMs(ls.get(livesKey(), null)); }
+  function lives() { return sessionLevelAccess.hasUnlimitedLives() ? LIVES_MAX : livesState().n; }
+  function addLives(delta) { if (sessionLevelAccess.hasUnlimitedLives()) { paintHearts(); return; } ls.set(livesKey(), changeLives(ls.get(livesKey(), null), delta)); paintHearts(); }
+  function setLives(n) { if (sessionLevelAccess.hasUnlimitedLives()) return; const cur = livesState(); addLives((n | 0) - cur.n); }
+  function nextLife() { return sessionLevelAccess.hasUnlimitedLives() ? 0 : nextLifeMs(ls.get(livesKey(), null)); }
   function settleLife() {
     if (!st || st.tutorial || st.won || st.lifeDone) return;
     if (!(st.played || st.over)) return;
     st.lifeDone = true;
-    addLives(-1);
+    if (!sessionLevelAccess.hasUnlimitedLives()) addLives(-1);
   }
   function paintHearts() {
-    const n = lives(), ms = nextLife();
+    const unlimited = sessionLevelAccess.hasUnlimitedLives(), n = lives(), ms = nextLife(), count = unlimited ? '∞' : String(n);
     ['maphearts', 'hearts2'].forEach(function (id) {
       const el = $(id); if (!el) return;
-      el.innerHTML = (n ? '<i aria-hidden="true">❤️</i>' : '<i aria-hidden="true">💔</i>') + '<b>' + n + '</b>' + (ms ? '<em class="hn">' + mmss(ms) + '</em>' : '');
+      el.innerHTML = (n ? '<i aria-hidden="true">❤️</i>' : '<i aria-hidden="true">💔</i>') + '<b>' + count + '</b>' + (ms ? '<em class="hn">' + mmss(ms) + '</em>' : '');
       el.classList.toggle('out', !n);
-      el.setAttribute('aria-label', n + (n === 1 ? ' life' : ' lives') + ' left' + (ms ? '. Next life in ' + Math.ceil(ms / 60000) + ' minutes.' : ''));
+      el.setAttribute('aria-label', unlimited ? 'Unlimited lives for this session' : n + (n === 1 ? ' life' : ' lives') + ' left' + (ms ? '. Next life in ' + Math.ceil(ms / 60000) + ' minutes.' : ''));
     });
+    if (unlimited && heartsTimer) { clearInterval(heartsTimer); heartsTimer = 0; }
     // Tick the mm:ss countdown once a second while a life is on its way.
     if (ms && !heartsTimer) heartsTimer = setInterval(function () { if (!nextLife()) { clearInterval(heartsTimer); heartsTimer = 0; } paintHearts(); }, 1000);
   }
   function livesApi() { const S = root.IBScores; return !livesDemo && S && S.who && S.who() && S.loadLives && S.postLives ? S : null; }
   // On each open of the map: collect any lives the family has sent.
   async function syncLives() {
-    const S = livesApi(); if (!S) return;
+    const S = livesApi(); if (!S || sessionLevelAccess.hasUnlimitedLives()) return;
     let info = null;
     try { info = await S.loadLives(); } catch (e) { info = null; }
+    if (sessionLevelAccess.hasUnlimitedLives()) return;
     if (info) livesInfo = info;
     if (!info || !info.pending) return;
     let got = null;
@@ -5061,7 +5024,9 @@
     const ov = $('livesov'), card = $('livescard'); if (!ov || !card) return;
     data = data || {};
     clearInterval(livesTimer);
-    const n = lives(), info = data.info || livesInfo;
+    const unlimited = sessionLevelAccess.hasUnlimitedLives();
+    if (unlimited && mode === 'out') mode = 'send';
+    const n = lives(), count = unlimited ? '∞' : String(n), info = data.info || livesInfo;
     let html = '';
     if (mode === 'out') {
       html = '<div class="lv-big" aria-hidden="true">💔</div><h2>Out of lives</h2>' +
@@ -5075,12 +5040,12 @@
       const from = data.from || [];
       const who = from.length ? Array.from(new Set(from)).join(' and ') : 'The family';
       html = '<div class="lv-big gift" aria-hidden="true">💝</div><h2>' + who + (from.length > 1 ? ' sent you lives!' : ' sent you a life!') + '</h2>' +
-        '<p class="lv-plus">+' + (data.claimed || 1) + ' ❤️</p><p>You now have ' + n + (n === 1 ? ' life' : ' lives') + '.</p>' +
+        '<p class="lv-plus">+' + (data.claimed || 1) + ' ❤️</p><p>You now have ' + count + (unlimited ? ' lives this session.' : n === 1 ? ' life.' : ' lives.') + '</p>' +
         '<button type="button" class="pri" data-lives="close">Thanks!</button>';
       ov.className = 'ov livesov gift';
     } else {
-      html = '<div class="lv-hd"><span class="lv-hearts">' + (n ? '❤️' : '💔') + ' <b>' + n + '</b></span><h2>Lives</h2></div>' +
-        '<p>Up to ' + LIVES_MAX + ' lives, with a new one every hour' + (nextLife() ? ' (next in ' + mmss(nextLife()) + ')' : '') + '. Losing or leaving a level uses one; tutorials and +3 moves never do.</p>' +
+      html = '<div class="lv-hd"><span class="lv-hearts">' + (n ? '❤️' : '💔') + ' <b>' + count + '</b></span><h2>Lives</h2></div>' +
+        (unlimited ? '<p>Unlimited lives are active for this session. Your saved lives stay unchanged.</p>' : '<p>Up to ' + LIVES_MAX + ' lives, with a new one every hour' + (nextLife() ? ' (next in ' + mmss(nextLife()) + ')' : '') + '. Losing or leaving a level uses one; tutorials and +3 moves never do.</p>') +
         '<h3>Send a life</h3><p class="lv-sub">One life a day to each family member.</p>' + familyRows(info) +
         (n ? '' : '<button type="button" class="pri" id="askbtn"' + (info && info.asked ? ' disabled' : '') + '>' + (info && info.asked ? 'Asked today ✓' : '🙏 Ask family for lives') + '</button>') +
         '<p class="lv-msg" id="livesmsg" aria-live="polite">' + (data.msg || '') + '</p>' +
@@ -5099,6 +5064,43 @@
     showLives('send');
     const S = livesApi(); if (!S) return;
     try { const info = await S.loadLives(); if (info) { livesInfo = info; if (!$('livesov').hidden && $('livesov').classList.contains('send')) showLives('send'); } } catch (e) { }
+  }
+  function openLivesButtonPanel() {
+    if (screen === 'map') openLivesPanel();
+    else showLives(lives() ? 'send' : 'out');
+  }
+  function handleLivesButtonTap() {
+    unlockAudio();
+    if (lifeVerifyPending) return;
+    if (sessionLevelAccess.hasUnlimitedLives()) { openLivesButtonPanel(); return; }
+    const result = sessionLevelAccess.tap();
+    clearTimeout(lifeGestureTimer);
+    lifeGestureTimer = 0;
+    if (result.taps >= SESSION_UNLOCK_TAPS) {
+      const verifyEpoch = ++lifeVerifyEpoch;
+      lifeVerifyPending = true;
+      Promise.resolve()
+        .then(() => root.IBScores && typeof root.IBScores.isVerifiedShane === 'function' ? root.IBScores.isVerifiedShane() : false)
+        .catch(() => false)
+        .then(isOwner => {
+          if (verifyEpoch !== lifeVerifyEpoch) return;
+          lifeVerifyPending = false;
+          const granted = sessionLevelAccess.authorizeOwner(!!isOwner);
+          if (granted.unlocked) {
+            if (screen === 'map') renderMap();
+            paintHearts();
+            return;
+          }
+          sessionLevelAccess.clearTaps();
+          openLivesButtonPanel();
+        });
+      return;
+    }
+    lifeGestureTimer = setTimeout(() => {
+      lifeGestureTimer = 0;
+      sessionLevelAccess.clearTaps();
+      openLivesButtonPanel();
+    }, SESSION_LIFE_GESTURE_WINDOW_MS);
   }
   async function livesAction(btn) {
     const msg = function (t) { const el = $('livesmsg'); if (el) el.textContent = t; };
@@ -7157,15 +7159,15 @@
     const b = t.closest && t.closest('#askbtn, [data-life-to]');
     if (b && !b.disabled) { unlockAudio(); livesAction(b); }
   });
-  ['maphearts', 'hearts2'].forEach(id => { if ($(id)) $(id).addEventListener('click', () => { unlockAudio(); if (screen === 'map') openLivesPanel(); else showLives(lives() ? 'send' : 'out'); }); });
+  ['maphearts', 'hearts2'].forEach(id => { if ($(id)) $(id).addEventListener('click', handleLivesButtonTap); });
   if ($('raceon')) $('raceon').addEventListener('click', e => {
     if (e.target === $('raceon') || e.target === $('raceonbtn')) $('raceon').hidden = true;
   });
-  if ($('mapexit')) $('mapexit').addEventListener('click', handleMapExitTap);
+  if ($('mapexit')) $('mapexit').addEventListener('click', requestCloseSugar);
   if (root.addEventListener) {
-    root.addEventListener('pagehide', resetSessionUnlock);
+    root.addEventListener('pagehide', resetSessionBenefits);
     root.addEventListener('pageshow', e => {
-      if (e.persisted) { resetSessionUnlock(); if (!$('map').hidden) renderMap(); }
+      if (e.persisted) { resetSessionBenefits(); if (!$('map').hidden) { renderMap(); paintHearts(); } }
     });
   }
   if ($('racechip')) $('racechip').addEventListener('click', () => { unlockAudio(); setRaceOpen(true); });
