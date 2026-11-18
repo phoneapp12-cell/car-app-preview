@@ -1,4 +1,4 @@
-/* Info Book 1.9.253 – Sugar Rush, levels 1–57. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.254 – Sugar Rush, levels 1–57. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -3972,8 +3972,11 @@
       tap() {
         if (!allOpen) {
           taps = Math.min(SESSION_UNLOCK_TAPS, taps + 1);
-          if (taps >= SESSION_UNLOCK_TAPS) allOpen = true;
         }
+        return { unlocked: allOpen, taps };
+      },
+      authorizeOwner(isOwner) {
+        if (!allOpen && isOwner && taps >= SESSION_UNLOCK_TAPS) allOpen = true;
         return { unlocked: allOpen, taps };
       },
       clearTaps() { if (!allOpen) taps = 0; },
@@ -4009,7 +4012,7 @@
   if (!root.SugarRush.allowed()) { $('soon').hidden = false; return; }
   const sessionLevelAccess = createSessionLevelAccess();
   const SESSION_EXIT_DELAY_MS = 700, SESSION_UNLOCK_FEEDBACK_MS = 2400;
-  let mapExitTimer = 0, mapExitFeedbackTimer = 0;
+  let mapExitTimer = 0, mapExitFeedbackTimer = 0, mapExitVerifyEpoch = 0, mapExitVerifyPending = false;
 
   const reduce = root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const SP = reduce ? 0.35 : 1;
@@ -4953,31 +4956,42 @@
   }
   function restoreMapExitButton() {
     const b = $('mapexit');
-    if (b) { b.textContent = 'Exit'; b.setAttribute('aria-label', 'Exit'); }
+    if (b) { b.textContent = 'Exit'; b.setAttribute('aria-label', 'Exit'); b.removeAttribute('aria-busy'); }
   }
   function resetSessionUnlock() {
     clearTimeout(mapExitTimer); clearTimeout(mapExitFeedbackTimer);
     mapExitTimer = mapExitFeedbackTimer = 0;
+    mapExitVerifyEpoch++; mapExitVerifyPending = false;
     sessionLevelAccess.reset();
     restoreMapExitButton();
   }
   function handleMapExitTap() {
     const b = $('mapexit');
     unlockAudio();
+    if (mapExitVerifyPending) return;
     if (sessionLevelAccess.isUnlocked()) { resetSessionUnlock(); requestCloseSugar(); return; }
     const result = sessionLevelAccess.tap();
     clearTimeout(mapExitTimer);
     mapExitTimer = 0;
-    if (result.unlocked) {
-      clearTimeout(mapExitFeedbackTimer);
-      renderMap();
-      if (b) { b.textContent = 'All levels open!'; b.setAttribute('aria-label', 'All levels unlocked for this session'); }
-      mapExitFeedbackTimer = setTimeout(restoreMapExitButton, SESSION_UNLOCK_FEEDBACK_MS);
+    if (result.taps >= SESSION_UNLOCK_TAPS) {
+      const verifyEpoch = ++mapExitVerifyEpoch;
+      mapExitVerifyPending = true;
+      if (b) b.setAttribute('aria-busy', 'true');
+      Promise.resolve()
+        .then(() => root.IBScores && typeof root.IBScores.isVerifiedShane === 'function' ? root.IBScores.isVerifiedShane() : false)
+        .catch(() => false)
+        .then(isOwner => {
+          if (verifyEpoch !== mapExitVerifyEpoch) return;
+          mapExitVerifyPending = false;
+          if (b) b.removeAttribute('aria-busy');
+          const unlocked = sessionLevelAccess.authorizeOwner(!!isOwner);
+          if (!unlocked.unlocked) { requestCloseSugar(); return; }
+          clearTimeout(mapExitFeedbackTimer);
+          renderMap();
+          if (b) { b.textContent = 'All levels open!'; b.setAttribute('aria-label', 'All levels unlocked for this session'); }
+          mapExitFeedbackTimer = setTimeout(restoreMapExitButton, SESSION_UNLOCK_FEEDBACK_MS);
+        });
       return;
-    }
-    if (b) {
-      b.textContent = 'Exit ' + result.taps + '/' + SESSION_UNLOCK_TAPS;
-      b.setAttribute('aria-label', 'Exit, ' + result.taps + ' of ' + SESSION_UNLOCK_TAPS + ' taps');
     }
     mapExitTimer = setTimeout(() => {
       sessionLevelAccess.clearTaps();

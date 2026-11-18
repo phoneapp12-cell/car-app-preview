@@ -48,6 +48,14 @@ const boot = await fam.fetch(new Request(H + '/bootstrap?key=test-seed&name=Shan
 const SH = await boot.json();
 const sarah = ok(await call(SH.token, '/members', 'POST', { name: 'Sarah Demo' }));
 const aranea = ok(await call(SH.token, '/members', 'POST', { name: 'Aranea Demo' }));
+const shaneIdentity = ok(await call(SH.token, '/me'));
+assert.equal(shaneIdentity.id, SH.id);
+assert.equal(shaneIdentity.role, 'admin');
+assert.equal(shaneIdentity.shane, 1, 'the verified admin receives the server-side owner marker');
+const sarahIdentity = ok(await call(sarah.token, '/me'));
+assert.equal(sarahIdentity.id, sarah.id);
+assert.equal(sarahIdentity.role, 'member');
+assert.equal(sarahIdentity.shane, undefined, 'a regular member does not receive the owner marker');
 // a fake push subscription for everyone, so rt.note queues notes we can inspect
 const sub = mid => sql.exec(`INSERT INTO subs (endpoint, mid, at) VALUES (?,?,?)`, 'https://push.example/' + mid, mid, 1);
 const notesFor = mid => sql.exec(`SELECT type, text, card FROM notes WHERE mid=?`, mid).toArray();

@@ -24,6 +24,19 @@
     if (SHANE_IDS.length && SHANE_IDS.indexOf(me.id) >= 0) return true;
     return /^Shane$/i.test(me.first);
   }
+  // The local member record can be edited. Only trust the family service's token-validated /me owner marker.
+  async function isVerifiedShane() {
+    const me = who();
+    if (!me || !root.fetch || !root.AbortController) return false;
+    const ctl = new root.AbortController(), timer = root.setTimeout(() => ctl.abort(), 4500);
+    try {
+      const r = await root.fetch(API + '/me', { cache: 'no-store', signal: ctl.signal, headers: { Authorization: 'Bearer ' + me.tok } });
+      if (!r.ok) return false;
+      const actual = await r.json().catch(() => null), current = who();
+      return !!(actual && String(actual.id) === me.id && actual.role === 'admin' && actual.shane === 1 && current && current.id === me.id && current.tok === me.tok);
+    } catch (e) { return false; }
+    finally { root.clearTimeout(timer); }
+  }
   function nzDate(ms) {
     if (!ms) return '';
     const o = { timeZone: 'Pacific/Auckland', day: 'numeric', month: 'short' };
@@ -222,5 +235,5 @@
     } catch (e) { return false; }
   }
   clearTetrisScoresOnce207();
-  root.IBScores = { fill, API, who, isShane, submit, load, loadRace, saveRace, loadLives, postLives, open, close, localBests, nzDate, isOpen: () => !!cur, clearShaneLocalBestOnce, clearTetrisScoresOnce207, TETRIS_SCORES_CLEAR_207, personalBests, uniqueBest, leaderRows, html };
+  root.IBScores = { fill, API, who, isShane, isVerifiedShane, submit, load, loadRace, saveRace, loadLives, postLives, open, close, localBests, nzDate, isOpen: () => !!cur, clearShaneLocalBestOnce, clearTetrisScoresOnce207, TETRIS_SCORES_CLEAR_207, personalBests, uniqueBest, leaderRows, html };
 })(typeof window !== 'undefined' ? window : globalThis);

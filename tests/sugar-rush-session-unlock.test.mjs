@@ -25,7 +25,10 @@ test('five taps open every level only in the current in-memory session', () => {
     assert.equal(access.allows(LV_COUNT, savedProgress.open), false, `level remains locked after tap ${tap}`);
   }
 
-  assert.deepEqual({ ...access.tap() }, { unlocked: true, taps: 5 });
+  assert.deepEqual({ ...access.tap() }, { unlocked: false, taps: 5 });
+  assert.deepEqual({ ...access.authorizeOwner(false) }, { unlocked: false, taps: 5 });
+  assert.equal(access.allows(LV_COUNT, savedProgress.open), false, 'five taps without verified owner identity remain locked');
+  assert.deepEqual({ ...access.authorizeOwner(true) }, { unlocked: true, taps: 5 });
   for (let n = 1; n <= LV_COUNT; n++) assert.equal(access.allows(n, savedProgress.open), true, `level ${n} opens`);
   assert.equal(JSON.stringify(savedProgress), savedSnapshot, 'the unlock does not change saved progression');
 
@@ -45,7 +48,8 @@ test('an interrupted tap sequence clears, and a new session starts locked', () =
   assert.equal(access.tap().unlocked, false);
   assert.equal(access.tap().unlocked, false);
   assert.equal(access.tap().unlocked, false);
-  assert.equal(access.tap().unlocked, true);
+  assert.equal(access.tap().unlocked, false);
+  assert.equal(access.authorizeOwner(false).unlocked, false);
 
   const nextSession = createSessionLevelAccess();
   assert.equal(nextSession.isUnlocked(), false);
@@ -55,6 +59,9 @@ test('an interrupted tap sequence clears, and a new session starts locked', () =
 test('the map Exit button is the gesture target and runtime access is never persisted', () => {
   assert.match(gameHtml, /class="pri" id="mapexit" aria-label="Exit"/);
   assert.match(gameJs, /addEventListener\('click', handleMapExitTap\)/);
+  assert.match(gameJs, /root\.IBScores\.isVerifiedShane\(\)/);
+  assert.match(gameJs, /sessionLevelAccess\.authorizeOwner\(!!isOwner\)/);
+  assert.doesNotMatch(gameJs, /Exit ' \+ result\.taps|result\.taps \+ ' of '/, 'tap count is not exposed to other players');
   assert.match(gameJs, /open = sessionLevelAccess\.allows\(n, prog\.open\)/);
   assert.match(gameJs, /!sessionLevelAccess\.allows\(n, prog\.open\)/);
   assert.match(gameJs, /root\.addEventListener\('pagehide', resetSessionUnlock\)/);
