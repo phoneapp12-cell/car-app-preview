@@ -33,6 +33,13 @@ test('levels 71–75 extend the route, atlas, and progression cap', () => {
   assert.equal(SR.MAP_COUNTRIES.length, 75);
   assert.equal(SR.LV_COUNT, 75);
   assert.equal(new Set(SR.levelIds()).size, 75);
+  assert.deepEqual(Array.from(SR.MAP_STOPS.slice(68).map(stop => stop.place)), [
+    'Busan', 'Seoul', 'Koror', 'Palikir', 'Majuro', 'Yaren', 'South Tarawa'
+  ]);
+  assert.deepEqual(Array.from(SR.MAP_COUNTRIES.slice(68)), [
+    'South Korea', 'South Korea', 'Palau', 'Federated States of Micronesia',
+    'Marshall Islands', 'Nauru', 'Kiribati'
+  ]);
 
   for (const expected of NEW_STOPS) {
     const stop = SR.stopForLevel(expected.n);
@@ -86,7 +93,7 @@ test('Postcard Hunt and established Australia/India audio mappings remain unchan
   assert.deepEqual(Array.from(SR.SONG_PLAN.intense), [13, 15, 19, 52, 75]);
   for (const n of SR.SONG_PLAN.aussie) assert.equal(SR.gameTrack(n), 'sugar-rush-aussie.mp3');
   for (const n of SR.SONG_PLAN.india) assert.equal(SR.gameTrack(n), 'sugar-rush-india.mp3');
-  for (const n of [71, 72, 73, 74]) {
+  for (const n of [69, 70, 71, 72, 73, 74]) {
     assert.equal(SR.songMood(n), 'upbeat');
     assert.equal(SR.gameTrack(n), 'sugar-rush-song.m4a');
   }

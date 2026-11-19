@@ -398,15 +398,15 @@
       ice: ['00000000', '00000000', '00000000', '00011000', '00011000', '00000000', '00000000', '00000000'],
       help: 'Bring both mochi treats down and crack the four icy blocks in 34 moves.',
       badge: { id: 'fukuokamochi', name: 'Mochi Delivery', icon: '🍡' } },
-    { n: 69, name: 'Seoul Palace Garden', target: 0, moves: 34, stars: [0, 7900, 15800], kinds: 6,
+    { n: 69, name: 'Busan Harbor Star Parade', target: 0, scoreGoal: 14500, moves: 34, stars: [0, 16000, 24000], kinds: 6,
+      help: 'Score 14,500 points in 34 moves as the lights shimmer across Busan Harbor.',
+      badge: { id: 'busanstars', name: 'Harbor Star Parade', icon: '🌟' } },
+    { n: 70, name: 'Seoul Palace Garden', target: 0, moves: 34, stars: [0, 7900, 15800], kinds: 6,
       collect: { color: 2, n: 12 },
       locks: ['00000000', '00000000', '00000000', '00011000', '00011000', '00000000', '00000000', '00000000'],
       help: 'Collect 12 lemon drops and free the four locked jars in the palace garden in 34 moves.',
       badge: { id: 'seoulgarden', name: 'Palace Garden', icon: '🌿' } },
-    { n: 70, name: 'Tokyo Star Parade', target: 0, scoreGoal: 14500, moves: 34, stars: [0, 16000, 24000], kinds: 6,
-      help: 'Score 14,500 points before your 34 moves run out.',
-      badge: { id: 'tokyostars', name: 'Star Parade', icon: '🌟' } },
-    // 1.9.260: five new stops hop east from Japan through Micronesia and Kiribati.
+    // 1.9.260: five new stops continue east from Seoul through Micronesia and Kiribati.
     { n: 71, name: 'Koror Jelly Lagoon', target: 0, moves: 36, stars: [0, 8200, 16400], kinds: 6,
       jelly: ['00000000', '00111100', '01100110', '01000010', '01000010', '01100110', '00111100', '00000000'],
       bub: ['00000000', '01000010', '00100100', '00000000', '00000000', '00100100', '01000010', '00000000'],
@@ -506,8 +506,8 @@
     { icon: '🏮', goal: 'Collect blueberry gems and pop the bubbles', detail: 'Collect 12 blueberry gems and pop the four sugar bubbles in 32 moves.', tip: 'The bubbles are tucked into the corners. Make matches nearby while you gather the blueberry gems.', mechanic: 'collect-bubbles' },
     { icon: '🐠', goal: 'Clear the coral-ring jelly', detail: 'Clear the reef-shaped jelly in 34 moves.', tip: 'Work around the outer ring, then clear the last pieces in the corners.', mechanic: 'jelly' },
     { icon: '🍡', goal: 'Bring both mochi treats down and crack the icing', detail: 'Bring both treats down and clear the four blocks of icing in 34 moves.', tip: 'Match underneath each treat to bring it down; nearby matches will chip away at the icing.', mechanic: 'ingredients' },
-    { icon: '🌿', goal: 'Collect lemon drops and free the jars', detail: 'Collect 12 lemon drops and free the four locked jars in 34 moves.', tip: 'A match that includes a locked jar frees it. Keep collecting lemon drops as you work through the middle.', mechanic: 'collect-locks' },
-    { icon: '🌟', goal: 'Reach the star score', detail: 'Score 14,500 points before your 34 moves run out.', tip: 'Long matches and special sweets score more. Chain matches together to light up the Tokyo night.', mechanic: 'score' },
+    { icon: '🌟', goal: 'Reach the star score', detail: 'Score 14,500 points before your 34 moves run out.', tip: 'Long matches and special sweets score more. Chain matches together to light up Busan Harbor.', mechanic: 'score' },
+    { icon: '🌿', goal: 'Collect lemon drops and free the jars', detail: 'Collect 12 lemon drops and free the four locked jars in 34 moves.', tip: 'A match that includes a locked jar frees it. Keep collecting lemon drops as you work through Seoul’s palace garden.', mechanic: 'collect-locks' },
     { icon: '🐠', goal: 'Clear the reef jelly and pop the lagoon bubbles', detail: 'Clear the reef-ring jelly and pop all 8 sugar bubbles in 36 moves.', tip: 'Work around the jelly ring, then match beside the bubbled sweets. Bubbles touching each other pop together.', mechanic: 'reef-bubbles' },
     { icon: '🥥', goal: 'Bring both coconuts down and clear the icing', detail: 'Bring both coconut treats down and clear all 4 blocks of icing in 36 moves.', tip: 'Match underneath each coconut to bring it down; nearby matches or specials will crack the icing.', mechanic: 'ingredients-ice' },
     { icon: '📜', goal: 'Fill the atoll recipe and make a wrapped sweet', detail: 'Collect 10 orange jellies and 8 blueberry gems, then make one wrapped sweet in 36 moves.', tip: 'A T- or L-shaped match creates a wrapped sweet. The recipe counts both colours and the special as soon as you make them.', mechanic: 'recipe' },
@@ -1107,8 +1107,8 @@
     { n: 66, x: 99.5, y: 1415.9, place: 'Taipei', kind: 'city', label: 'left', lat: 25.0330, lon: 121.5654 },
     { n: 67, x: 151.7, y: 1403.0, place: 'Naha', kind: 'city', label: 'right', lat: 26.2124, lon: 127.6809 },
     { n: 68, x: 174.9, y: 1322.1, place: 'Fukuoka', kind: 'city', label: 'right', lat: 33.5902, lon: 130.4017 },
-    { n: 69, x: 145.7, y: 1278.4, place: 'Seoul', kind: 'city', label: 'left', lat: 37.5665, lon: 126.9780 },
-    { n: 70, x: 253.8, y: 1299.2, place: 'Tokyo', kind: 'city', label: 'right', lat: 35.6762, lon: 139.6503 },
+    { n: 69, x: 163.6, y: 1304.6, place: 'Busan', kind: 'city', label: 'left', lat: 35.1796, lon: 129.0756 },
+    { n: 70, x: 145.7, y: 1278.4, place: 'Seoul', kind: 'city', label: 'left', lat: 37.5665, lon: 126.9780 },
     { n: 71, x: 209.7, y: 1610.0, place: 'Koror', kind: 'city', label: 'left', lat: 7.3426, lon: 134.4789 },
     { n: 72, x: 411.8, y: 1614.6, place: 'Palikir', kind: 'city', label: 'below', lat: 6.9248, lon: 158.1610 },
     { n: 73, x: 524.6, y: 1612.8, place: 'Majuro', kind: 'city', label: 'right', lat: 7.0897, lon: 171.3803 },
@@ -1123,7 +1123,7 @@
       'Vietnam', 'Malaysia', 'Thailand', 'Myanmar', 'India', 'Nepal', 'Bangladesh', 'Sri Lanka', 'Singapore', 'Cambodia', 'Philippines', 'Laos', 'Bhutan', 'Pakistan',
       'Afghanistan', 'Iran', 'Uzbekistan', 'Kazakhstan', 'China'],
     Array(13).fill('China'),
-    ['Taiwan', 'Japan', 'Japan', 'South Korea', 'Japan'],
+    ['Taiwan', 'Japan', 'Japan', 'South Korea', 'South Korea'],
     ['Palau', 'Federated States of Micronesia', 'Marshall Islands', 'Nauru', 'Kiribati']
   );
   function countryForLevel(n) { return MAP_COUNTRIES[(n | 0) - 1] || ''; }
@@ -4055,6 +4055,37 @@
           [[44, 472], [74, 444], [320, 456], [352, 480]].map(function (p) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="9" fill="#ff92ad"/><circle cx="' + p[0] + '" cy="' + p[1] + '" r="3" fill="#fff7d1"/>'; }).join('');
       },
       sprites: [{ x: 12, y: 70, w: 9, cls: 'sc-bob', d: 4.2, emoji: '🌸' }, { x: 78, y: 17, w: 8, cls: 'sc-drift', d: 12, svg: 'gull' }] },
+    { n: 69, id: 'busan', place: 'Busan', title: 'Gwangalli lights, Busan', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#88d0ed'], [0.5, '#f4c7c9'], [1, '#ffdc9e']]) + scGrad('sea', [[0, '#54c9d8'], [1, '#247eae']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(284, 76, 0.82, 0.8) +
+          '<circle cx="76" cy="152" r="38" fill="#fff0ac" opacity=".9"/>' +
+          '<path d="M0 498 L46 426 L90 470 L144 398 L198 468 L258 414 L314 476 L362 430 L410 490 V594 H0 Z" fill="#7caa8b"/>' +
+          '<rect y="520" width="390" height="324" fill="url(#sea)"/>' +
+          '<path d="M0 596 Q74 572 148 596 T296 592 T430 594 M0 704 Q82 682 164 704 T328 700 T430 702 M0 778 Q88 758 176 778 T350 774 T430 776" stroke="#b8f5ec" stroke-width="7" fill="none" opacity=".82"/>' +
+          '<path d="M0 548 Q96 536 195 548 T390 546" stroke="#f7d7b0" stroke-width="12" fill="none"/>' +
+          '<path d="M72 546 V414 M318 546 V414 M72 418 Q195 302 318 418" stroke="#fff0d1" stroke-width="7" fill="none"/>' +
+          '<path d="M78 424 Q195 320 312 424 M92 440 Q195 350 298 440 M106 458 Q195 382 284 458" stroke="#ff9db4" stroke-width="3" fill="none" opacity=".9"/>' +
+          '<path d="M34 548 V478 H66 V548 M326 546 V464 H362 V546 M138 546 V492 H164 V546 M224 546 V482 H252 V546" fill="#f5bd9c" stroke="#fff0d6" stroke-width="4"/>' +
+          '<circle cx="112" cy="560" r="5" fill="#fff6c3"/><circle cx="196" cy="560" r="5" fill="#fff6c3"/><circle cx="278" cy="560" r="5" fill="#fff6c3"/>';
+      },
+      sprites: [{ x: 61, y: 76, w: 12, cls: 'sc-drift', d: 15, svg: 'boat' }, { x: 82, y: 62, w: 8, cls: 'sc-bob', d: 4.8, emoji: '🌟' }, { x: 12, y: 19, w: 8, cls: 'sc-drift', d: 12, svg: 'gull' }] },
+    { n: 70, id: 'seoul', place: 'Seoul', title: 'Palace garden, Seoul', night: false,
+      art: function () {
+        return '<defs>' + scGrad('sk', [[0, '#8ed2ec'], [0.56, '#e5f1d8'], [1, '#ffddb3']]) + scGrad('pond', [[0, '#70d5d8'], [1, '#2b8eb2']]) + '</defs>' +
+          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(82, 78, 0.82, 0.8) +
+          '<path d="M0 500 L52 408 L108 470 L172 350 L232 464 L302 396 L366 472 L410 422 V610 H0 Z" fill="#799e82"/>' +
+          '<path d="M0 596 Q88 566 178 594 T360 588 T430 594 V844 H0 Z" fill="#78b078"/>' +
+          '<path d="M0 662 Q98 642 196 662 T390 658 V844 H0 Z" fill="url(#pond)"/>' +
+          '<path d="M0 666 Q90 648 180 666 T360 662 T430 664 M0 746 Q96 726 192 746 T384 742" stroke="#c4fff0" stroke-width="6" fill="none" opacity=".82"/>' +
+          '<path d="M72 592 V464 H114 V592 M276 592 V464 H318 V592" fill="#c75549" stroke="#8e3d43" stroke-width="5"/>' +
+          '<path d="M56 468 Q95 412 132 468 Q116 458 94 458 Q74 458 56 468 Z M260 468 Q297 412 334 468 Q318 458 297 458 Q278 458 260 468 Z" fill="#42516d" stroke="#f5d9aa" stroke-width="5"/>' +
+          '<path d="M88 528 H302 V578 H88 Z" fill="#e5b96f" stroke="#f8e2b5" stroke-width="5"/>' +
+          '<path d="M74 526 Q195 452 316 526 Q270 508 195 508 Q120 508 74 526 Z" fill="#bd4c47" stroke="#ffe7ba" stroke-width="6"/>' +
+          '<path d="M104 538 V576 M145 538 V576 M195 538 V576 M245 538 V576 M286 538 V576" stroke="#fff1d1" stroke-width="5"/>' +
+          '<path d="M120 594 V626 M270 594 V626" stroke="#e8c98e" stroke-width="8"/><circle cx="121" cy="632" r="8" fill="#ffe38f"/><circle cx="270" cy="632" r="8" fill="#ff93b4"/>';
+      },
+      sprites: [{ x: 76, y: 70, w: 9, cls: 'sc-bob', d: 4.4, emoji: '🌸' }, { x: 14, y: 18, w: 8, cls: 'sc-drift', d: 12, svg: 'gull' }] },
     { n: 71, id: 'koror', place: 'Koror', title: 'Rock Islands lagoon, Koror', night: false,
       art: function () {
         return '<defs>' + scGrad('sk', [[0, '#8bd9f3'], [0.5, '#d8f2e8'], [1, '#ffe4b8']]) + scGrad('sea', [[0, '#51c8d4'], [1, '#1686b6']]) + '</defs>' +
