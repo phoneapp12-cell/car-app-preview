@@ -17,7 +17,7 @@ const emptyStep = (clear = new Set(), hit = new Set()) => ({ clear, hit, made: [
 const testRows = Array.from({ length: game.N }, (_, r) => Array.from({ length: game.N }, (_, c) => String((r + c) % game.KINDS)).join(''));
 
 test('the eight new campaign levels are mapped and carry the intended order recipes', () => {
-  assert.equal(game.LV_COUNT, 70);
+  assert.equal(game.LV_COUNT, 75);
   assert.deepEqual(Array.from(game.LEVELS.slice(57, 65).map(level => level.n)), [58, 59, 60, 61, 62, 63, 64, 65]);
   assert.equal(game.stopForLevel(65).place, 'Haikou');
   assert.ok(game.LEVELS[57].recipe.candies.length >= 2, 'first recipe requests several candy colours');
@@ -25,7 +25,7 @@ test('the eight new campaign levels are mapped and carry the intended order reci
   assert.ok(game.LEVELS[59].recipe.combos.some(item => item.kind === 'crisscross'), 'double-stripe order requires a real special swap');
   assert.ok(game.LEVELS[60].hard && game.LEVELS[60].timer === 90, 'the scarce countdown is marked Hard and lasts 90 seconds');
   assert.match(game.levelIntro(63).tip, /Popper.*3×3 blast/i);
-  assert.match(html, /sugar-rush\.js\?v=1\.9\.259/);
+  assert.match(html, /sugar-rush\.js\?v=1\.9\.260/);
 });
 
 test('a recipe only wins after the requested colours and a wrapped sweet have both been collected/made', () => {

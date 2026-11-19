@@ -12,15 +12,15 @@ vm.runInContext(source, context, { filename: 'feed/sugar-rush.js' });
 const game = context.SugarRush;
 
 test('East Asia extends the campaign after Haikou with accurate city stops and country labels', () => {
-  assert.equal(game.LV_COUNT, 70);
-  assert.equal(game.LEVELS.length, 70);
-  assert.equal(game.MAP_STOPS.length, 70);
+  assert.equal(game.LV_COUNT, 75);
+  assert.equal(game.LEVELS.length, 75);
+  assert.equal(game.MAP_STOPS.length, 75);
   assert.deepEqual(
-    Array.from(game.MAP_STOPS.slice(65).map(stop => stop.place)),
+    Array.from(game.MAP_STOPS.slice(65, 70).map(stop => stop.place)),
     ['Taipei', 'Naha', 'Fukuoka', 'Seoul', 'Tokyo']
   );
   assert.deepEqual(
-    Array.from(game.MAP_COUNTRIES.slice(65)),
+    Array.from(game.MAP_COUNTRIES.slice(65, 70)),
     ['Taiwan', 'Japan', 'Japan', 'South Korea', 'Japan']
   );
   assert.deepEqual(
@@ -28,7 +28,7 @@ test('East Asia extends the campaign after Haikou with accurate city stops and c
     ['Taiwan', 'Japan', 'Japan', 'South Korea', 'Japan']
   );
 
-  for (const stop of game.MAP_STOPS.slice(65)) {
+  for (const stop of game.MAP_STOPS.slice(65, 70)) {
     const projected = game.ausXY(stop.lat, stop.lon);
     assert.ok(Math.abs(projected.x - stop.x) < 0.1, `${stop.place} longitude projection`);
     assert.ok(Math.abs(projected.y - stop.y) < 0.1, `${stop.place} latitude projection`);
