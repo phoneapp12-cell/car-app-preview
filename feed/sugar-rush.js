@@ -1,4 +1,4 @@
-/* Info Book 1.9.270 – Sugar Rush, levels 1–75. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.271 – Sugar Rush, levels 1–75. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -1317,22 +1317,22 @@
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + MAP_X0 + ' 0 ' + MAP_VW + ' ' + MAP_H + '" width="' + MAP_VW + '" height="' + MAP_H + '" aria-hidden="true" class="nzsvg">' +
       '<defs>' +
       '<linearGradient id="sr-sea" x1="0" y1="0" x2="0" y2="1">' +
-      '<stop offset="0" stop-color="#9be7ff"/><stop offset=".45" stop-color="#8fd9f8"/><stop offset="1" stop-color="#b8f3de"/>' +
+      '<stop offset="0" stop-color="#7ee8f5"/><stop offset=".45" stop-color="#8fe8f0"/><stop offset="1" stop-color="#b6f3e6"/>' +
       '</linearGradient>' +
       '<linearGradient id="sr-land" x1="0" y1="0" x2="1" y2="1">' +
       '<stop offset="0" stop-color="#ffd5e7"/><stop offset=".25" stop-color="#ffd2bd"/><stop offset=".5" stop-color="#ffe8a1"/><stop offset=".75" stop-color="#c4efcd"/><stop offset="1" stop-color="#c7e2ff"/>' +
       '</linearGradient>' +
-      '<linearGradient id="sr-candy-strawberry" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff2f7"/><stop offset=".55" stop-color="#ffc5db"/><stop offset="1" stop-color="#ff9fbe"/></linearGradient>' +
-      '<linearGradient id="sr-candy-peach" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff5e8"/><stop offset=".55" stop-color="#ffd2ad"/><stop offset="1" stop-color="#ffb98e"/></linearGradient>' +
-      '<linearGradient id="sr-candy-lemon" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fffbe0"/><stop offset=".55" stop-color="#ffe89c"/><stop offset="1" stop-color="#ffd763"/></linearGradient>' +
-      '<linearGradient id="sr-candy-mint" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#effff3"/><stop offset=".55" stop-color="#b9edc9"/><stop offset="1" stop-color="#8bd9a5"/></linearGradient>' +
-      '<linearGradient id="sr-candy-blueberry" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f0f8ff"/><stop offset=".55" stop-color="#c5e3ff"/><stop offset="1" stop-color="#9ccdf5"/></linearGradient>' +
-      '<linearGradient id="sr-candy-grape" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#faf1ff"/><stop offset=".55" stop-color="#ddc6ff"/><stop offset="1" stop-color="#bc9aea"/></linearGradient>' +
+      '<linearGradient id="sr-candy-strawberry" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff6f2"/><stop offset=".55" stop-color="#f8d4c4"/><stop offset="1" stop-color="#f0c0ae"/></linearGradient>' +
+      '<linearGradient id="sr-candy-peach" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff8f4"/><stop offset=".55" stop-color="#f7d8c8"/><stop offset="1" stop-color="#efc4b4"/></linearGradient>' +
+      '<linearGradient id="sr-candy-lemon" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f7fff9"/><stop offset=".55" stop-color="#cfead8"/><stop offset="1" stop-color="#b7dfc6"/></linearGradient>' +
+      '<linearGradient id="sr-candy-mint" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f4fff8"/><stop offset=".55" stop-color="#c8ead4"/><stop offset="1" stop-color="#b4e0c4"/></linearGradient>' +
+      '<linearGradient id="sr-candy-blueberry" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#faf6ff"/><stop offset=".55" stop-color="#e4d4f0"/><stop offset="1" stop-color="#d4c0e6"/></linearGradient>' +
+      '<linearGradient id="sr-candy-grape" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fbf7ff"/><stop offset=".55" stop-color="#e6d6f2"/><stop offset="1" stop-color="#d8c4e8"/></linearGradient>' +
       '<linearGradient id="sr-icing" x1="0" y1="0" x2="0" y2="1">' +
       '<stop offset="0" stop-color="#ff8ab8"/><stop offset=".55" stop-color="#ffb347"/><stop offset="1" stop-color="#ff6fa8"/>' +
       '</linearGradient>' +
       '<filter id="sr-soft" x="-6%" y="-6%" width="112%" height="112%">' +
-      '<feDropShadow dx="0" dy="2" stdDeviation="2.2" flood-color="#4a90b8" flood-opacity=".28"/>' +
+      '<feDropShadow dx="0" dy="3" stdDeviation="3.2" flood-color="#5aa0c0" flood-opacity=".32"/>' +
       '</filter>' +
       '</defs>' +
       '<rect x="' + MAP_X0 + '" width="' + MAP_VW + '" height="' + MAP_H + '" fill="url(#sr-sea)"/>' +

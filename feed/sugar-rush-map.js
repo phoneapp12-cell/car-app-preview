@@ -1,54 +1,54 @@
-/* Sugar Rush map extras. Small file so the big game file stays untouched.
-   Country medallions, a country card, quieter pins, a clearer path,
-   and a car inside a country / plane between countries. */
+/* Sugar Rush map look. Small file so the big game stays untouched.
+   Candy-atlas style: soft land, country medallions, a three-thing card,
+   a pink ribbon path, and a car inside a country / plane between. */
 (function () {
   'use strict';
 
   var COUNTRIES = {
-    'new zealand': ['🥝', 'kiwi · fern · harbours'],
-    'cook islands': ['🌺', 'lagoon · hibiscus · outrigger'],
-    tonga: ['🥥', 'coconut · whales · royal'],
-    samoa: ['🌴', 'two islands · fale · sunset'],
-    australia: ['🦘', 'kangaroo · reef · opera'],
-    'papua new guinea': ['🐦', 'bird of paradise · highlands · masks'],
-    'solomon islands': ['🐚', 'shells · reefs · canoes'],
-    vanuatu: ['🌋', 'volcano · waterfall · kava'],
-    fiji: ['🌊', 'reef · palm · bula'],
-    'new caledonia': ['🐠', 'lagoon · pine · reef'],
-    indonesia: ['🛕', 'temples · rice · islands'],
-    vietnam: ['🏮', 'lanterns · river · ao dai'],
-    malaysia: ['🦋', 'towers · rainforest · butterfly'],
-    thailand: ['🐘', 'temples · elephant · longtail'],
-    myanmar: ['🏯', 'pagodas · gold · river'],
-    india: ['🪷', 'lotus · tigers · gates'],
-    nepal: ['🏔️', 'mountains · flags · temples'],
-    bangladesh: ['🛺', 'rivers · rickshaw · tea'],
-    'sri lanka': ['🍵', 'tea · elephants · fort'],
-    singapore: ['🌆', 'gardens · skyline · merlion'],
-    cambodia: ['🛕', 'temples · river · lotus'],
-    philippines: ['⛵', 'islands · jeepney · boats'],
-    laos: ['🌿', 'river · stupas · mango'],
-    bhutan: ['🐉', 'mountains · dzong · dragon'],
-    pakistan: ['🏔️', 'mountains · tea · truck art'],
-    afghanistan: ['🪁', 'mountains · bazaar · kites'],
-    iran: ['🌷', 'roses · tiles · bazaar'],
-    uzbekistan: ['🕌', 'blue tiles · silk · mosques'],
-    kazakhstan: ['🐎', 'steppe · horses · eagles'],
-    china: ['🐉', 'dragon · wall · lanterns'],
-    taiwan: ['🧋', 'night markets · tea · bubble tea'],
-    japan: ['🗻', 'fuji · torii · cherry'],
-    'south korea': ['🎌', 'palace · hanbok · kimchi'],
-    korea: ['🎌', 'palace · hanbok · kimchi'],
-    palau: ['🪼', 'rock islands · jellyfish lake'],
-    'federated states of micronesia': ['🪸', 'reef · ancient city'],
-    'marshall islands': ['🛶', 'atolls · canoe · ocean'],
-    nauru: ['🌴', 'palm · ocean · island'],
-    kiribati: ['🌅', 'sunrise · atolls · canoe']
+    'new zealand': ['🥝', [['🌿', 'silver fern'], ['🌊', 'harbours'], ['🥝', 'kiwi']]],
+    'cook islands': ['🌺', [['🏝️', 'lagoon'], ['🌺', 'hibiscus'], ['🛶', 'outrigger']]],
+    tonga: ['🥥', [['🥥', 'coconut'], ['🐋', 'whales'], ['👑', 'royal']]],
+    samoa: ['🌴', [['🏝️', 'two islands'], ['🏠', 'fale'], ['🌅', 'sunset']]],
+    australia: ['🦘', [['🦘', 'kangaroo'], ['🐠', 'reef'], ['🎭', 'opera']]],
+    'papua new guinea': ['🐦', [['🐦', 'bird of paradise'], ['⛰️', 'highlands'], ['🎭', 'masks']]],
+    'solomon islands': ['🐚', [['🐚', 'shells'], ['🐠', 'reefs'], ['🛶', 'canoes']]],
+    vanuatu: ['🌋', [['🌋', 'volcano'], ['💦', 'waterfall'], ['🌿', 'kava']]],
+    fiji: ['🌊', [['🐠', 'reef'], ['🌴', 'palm'], ['🌺', 'bula']]],
+    'new caledonia': ['🐠', [['🏝️', 'lagoon'], ['🌲', 'pine'], ['🐠', 'reef']]],
+    indonesia: ['🛕', [['🛕', 'temples'], ['🌾', 'rice'], ['🏝️', 'islands']]],
+    vietnam: ['🏮', [['🏮', 'lanterns'], ['🛶', 'river'], ['👘', 'ao dai']]],
+    malaysia: ['🦋', [['🏙️', 'towers'], ['🌳', 'rainforest'], ['🦋', 'butterfly']]],
+    thailand: ['🐘', [['🛕', 'temples'], ['🐘', 'elephant'], ['🛶', 'longtail']]],
+    myanmar: ['🏯', [['🏯', 'pagodas'], ['✨', 'gold'], ['🛶', 'river']]],
+    india: ['🪷', [['🪷', 'lotus'], ['🐯', 'tigers'], ['🚪', 'gates']]],
+    nepal: ['🏔️', [['🏔️', 'mountains'], ['🚩', 'prayer flags'], ['🛕', 'temples']]],
+    bangladesh: ['🛺', [['🛶', 'rivers'], ['🛺', 'rickshaw'], ['🍵', 'tea']]],
+    'sri lanka': ['🍵', [['🍵', 'tea'], ['🐘', 'elephants'], ['🏰', 'fort']]],
+    singapore: ['🌆', [['🌿', 'gardens'], ['🌆', 'skyline'], ['🦁', 'merlion']]],
+    cambodia: ['🛕', [['🛕', 'temples'], ['🛶', 'river'], ['🪷', 'lotus']]],
+    philippines: ['⛵', [['🏝️', 'islands'], ['🚌', 'jeepney'], ['⛵', 'boats']]],
+    laos: ['🌿', [['🛶', 'river'], ['🛕', 'stupas'], ['🥭', 'mango']]],
+    bhutan: ['🐉', [['🏔️', 'mountains'], ['🏯', 'dzong'], ['🐉', 'dragon']]],
+    pakistan: ['🏔️', [['🏔️', 'mountains'], ['🍵', 'tea'], ['🚛', 'truck art']]],
+    afghanistan: ['🪁', [['🏔️', 'mountains'], ['🏪', 'bazaar'], ['🪁', 'kites']]],
+    iran: ['🌷', [['🌷', 'roses'], ['🟦', 'tiles'], ['🏪', 'bazaar']]],
+    uzbekistan: ['🕌', [['🟦', 'blue tiles'], ['🧵', 'silk'], ['🕌', 'mosques']]],
+    kazakhstan: ['🐎', [['🌾', 'steppe'], ['🐎', 'horses'], ['🦅', 'eagles']]],
+    china: ['🐉', [['🐉', 'dragon'], ['🧱', 'great wall'], ['🏮', 'lanterns']]],
+    taiwan: ['🧋', [['🌃', 'night markets'], ['🍵', 'tea'], ['🧋', 'bubble tea']]],
+    japan: ['🗻', [['🌸', 'cherry blossoms'], ['⛩️', 'ancient temples'], ['🌊', 'coastlines']]],
+    'south korea': ['🎌', [['🏯', 'palace'], ['👘', 'hanbok'], ['🥬', 'kimchi']]],
+    korea: ['🎌', [['🏯', 'palace'], ['👘', 'hanbok'], ['🥬', 'kimchi']]],
+    palau: ['🪼', [['🪨', 'rock islands'], ['🪼', 'jellyfish lake'], ['🌊', 'ocean']]],
+    'federated states of micronesia': ['🪸', [['🪸', 'reef'], ['🏛️', 'ancient city'], ['🌊', 'ocean']]],
+    'marshall islands': ['🛶', [['⭕', 'atolls'], ['🛶', 'canoe'], ['🌊', 'ocean']]],
+    nauru: ['🌴', [['🌴', 'palm'], ['🌊', 'ocean'], ['🏝️', 'island']]],
+    kiribati: ['🌅', [['🌅', 'sunrise'], ['⭕', 'atolls'], ['🛶', 'canoe']]]
   };
 
   function info(country) {
     var key = String(country || '').trim().toLowerCase();
-    return COUNTRIES[key] || ['📍', 'a new stop on the trail'];
+    return COUNTRIES[key] || ['📍', [['📍', 'a new stop'], ['🗺️', 'on the trail'], ['🍬', 'sweet shop']]];
   }
 
   function injectStyle() {
@@ -56,26 +56,30 @@
     var css = document.createElement('style');
     css.id = 'sr-map-extra-style';
     css.textContent = [
-      '.stops .lv .pin{width:34px;height:34px;border-width:2.5px;box-shadow:0 2px 0 #f4a0c4,0 4px 8px rgba(180,40,90,.12)}',
-      '.stops .lv .pin .no{font-size:13px}',
-      '.stops .lv.here .pin{width:40px;height:40px;border-width:3px}',
-      '.stops .lv.here .pin .no{font-size:15px}',
-      '.stops .lv.done .pin{border-color:#e8b84a;background:linear-gradient(180deg,#fff,#fff6d8)}',
-      '.stops .lv .meta{opacity:0;max-height:0;overflow:hidden;pointer-events:none}',
-      '.stops .lv.sr-show .meta,.stops .lv.here .meta{opacity:1;max-height:40px}',
-      '.sr-medal{position:absolute;z-index:3;transform:translate(-50%,-128%);display:flex;flex-direction:column;align-items:center;pointer-events:none;filter:drop-shadow(0 2px 0 rgba(255,255,255,.9))}',
-      '.sr-medal i{width:30px;height:30px;border-radius:50%;background:#fff;border:2px solid #ffb3d3;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:16px;box-shadow:0 2px 0 #f4a0c4}',
-      '.sr-medal b{margin-top:2px;padding:1px 6px;border-radius:8px;background:rgba(255,255,255,.92);color:#7a1f4c;font:800 9px/1.2 ui-rounded,system-ui,sans-serif;letter-spacing:.02em;white-space:nowrap}',
-      '.stops .lv.here .sr-medal i{border-color:#f0c14b;box-shadow:0 0 0 3px rgba(255,180,0,.35),0 2px 0 #f4a0c4}',
-      '.sr-country-card{position:absolute;left:50%;top:54px;transform:translateX(-50%);z-index:9;display:flex;align-items:center;gap:8px;max-width:min(92%,340px);padding:6px 12px 6px 6px;border-radius:18px;background:rgba(255,255,255,.96);border:2px solid #ff9cc6;box-shadow:0 3px 0 #f4a0c4;pointer-events:none}',
+      '.mapview{background:#7ee8f5}',
+      '.nzsvg .sr-atlas,.nzsvg .sr-bob{display:none}',
+      '.nzsvg path{stroke:#fff;stroke-linejoin:round}',
+      '.stops .lv .pin{width:18px;height:18px;border:2px solid #fff;background:#fff;box-shadow:0 1px 0 rgba(180,40,90,.12);color:#d6246e}',
+      '.stops .lv .pin .no{font-size:0}',
+      '.stops .lv .pin .mark,.stops .lv .pin .hardmark{display:none}',
+      '.stops .lv.done .pin{background:#fff6d8;border-color:#f0c14b}',
+      '.stops .lv.here .pin{width:22px;height:22px;background:#fff;border-color:#f0c14b;box-shadow:0 0 0 6px rgba(255,180,0,.35)}',
+      '.stops .lv .meta,.stops .st{opacity:0;max-height:0;overflow:hidden;pointer-events:none}',
+      '.sr-medal{position:absolute;z-index:3;left:50%;top:50%;transform:translate(-50%,-58%);display:flex;flex-direction:column;align-items:center;pointer-events:none}',
+      '.sr-medal i{width:42px;height:42px;border-radius:50%;background:#fff;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:22px;box-shadow:0 3px 0 rgba(180,90,120,.12),0 6px 12px rgba(90,140,170,.18)}',
+      '.sr-medal b{margin-top:3px;padding:2px 7px;border-radius:9px;background:rgba(255,255,255,.94);color:#3d4a62;font:800 10px/1.15 ui-rounded,system-ui,sans-serif;white-space:nowrap;box-shadow:0 1px 0 rgba(255,255,255,.8)}',
+      '.stops .lv.here .sr-medal i{box-shadow:0 0 0 4px rgba(255,180,0,.4),0 4px 10px rgba(90,140,170,.2)}',
+      '.sr-country-card{position:absolute;left:50%;top:58px;transform:translateX(-50%);z-index:9;width:min(92%,340px);padding:10px 14px 12px;border-radius:22px;background:rgba(255,255,255,.97);box-shadow:0 6px 16px rgba(90,140,170,.18);pointer-events:none;text-align:center}',
       '.sr-country-card[hidden]{display:none}',
       'body:not(.onmap) .sr-country-card{display:none}',
-      '.sr-country-card i{width:36px;height:36px;border-radius:50%;background:#fff4f8;border:1.5px solid #ffb3d3;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:20px;flex:0 0 auto}',
-      '.sr-country-card b{display:block;font:900 13px/1.15 ui-rounded,system-ui,sans-serif;color:#d6246e}',
-      '.sr-country-card span{display:block;margin-top:1px;font:700 11px/1.2 ui-rounded,system-ui,sans-serif;color:#7a4a62}',
-      '#sr-path-wide{stroke:#ff8ab8;stroke-width:9}',
-      '#sr-path-dash{stroke:#fff;stroke-width:2.6;opacity:.95}',
-      '#sr-future{stroke:#fff;stroke-width:5;stroke-dasharray:7 11;opacity:.8}'
+      '.sr-country-card .sr-cname{display:block;font:900 22px/1.1 ui-rounded,system-ui,sans-serif;color:#f25d8a;margin:0 0 8px}',
+      '.sr-country-card .sr-bits{display:flex;justify-content:space-between;gap:6px}',
+      '.sr-country-card .sr-bit{flex:1 1 0;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0}',
+      '.sr-country-card .sr-bit i{font-style:normal;font-size:16px;line-height:1}',
+      '.sr-country-card .sr-bit span{font:700 10px/1.15 ui-rounded,system-ui,sans-serif;color:#5c6b82;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}',
+      '#sr-path-wide{stroke:#f48fb1;stroke-width:10}',
+      '#sr-path-dash{stroke:#fff;stroke-width:2.4;opacity:.9}',
+      '#sr-future{stroke:#fff;stroke-width:5;stroke-dasharray:8 12;opacity:.75}'
     ].join('');
     document.head.appendChild(css);
   }
@@ -84,7 +88,6 @@
     var seen = {};
     var pins = document.querySelectorAll('.stops .lv[data-country]');
     pins.forEach(function (pin) {
-      pin.classList.remove('sr-show');
       var country = pin.dataset.country || '';
       var key = country.toLowerCase();
       var prefer = pin.classList.contains('country-stop');
@@ -102,13 +105,6 @@
       medal.innerHTML = '<i aria-hidden="true">' + pair[0] + '</i><b>' + country + '</b>';
       pin.appendChild(medal);
     });
-    var here = document.querySelector('.stops .lv.here');
-    if (here) {
-      here.classList.add('sr-show');
-      var n = parseInt(here.dataset.n, 10);
-      var next = n ? document.querySelector('.stops .lv[data-n="' + (n + 1) + '"]') : null;
-      if (next) next.classList.add('sr-show');
-    }
   }
 
   function showCard() {
@@ -120,7 +116,7 @@
       card.id = 'sr-country-card';
       card.className = 'sr-country-card';
       card.hidden = true;
-      card.innerHTML = '<i></i><div><b></b><span></span></div>';
+      card.innerHTML = '<b class="sr-cname"></b><div class="sr-bits"></div>';
       map.appendChild(card);
     }
     var here = document.querySelector('.stops .lv.here');
@@ -129,15 +125,16 @@
       card.hidden = true;
       return;
     }
-    var pair = info(country);
     if (card.dataset.country === country) {
       card.hidden = false;
       return;
     }
+    var pair = info(country);
     card.dataset.country = country;
-    card.querySelector('i').textContent = pair[0];
-    card.querySelector('b').textContent = country;
-    card.querySelector('span').textContent = pair[1];
+    card.querySelector('.sr-cname').textContent = country;
+    card.querySelector('.sr-bits').innerHTML = pair[1].map(function (bit) {
+      return '<div class="sr-bit"><i aria-hidden="true">' + bit[0] + '</i><span>' + bit[1] + '</span></div>';
+    }).join('');
     card.hidden = false;
   }
 
@@ -147,10 +144,10 @@
   }
 
   function carBits() {
-    return '<rect class="sr-car-bit" x="-13" y="-6" width="26" height="12" rx="3.2" fill="#ff5a6a" stroke="#fff" stroke-width="1.3"/>' +
-      '<rect class="sr-car-bit" x="-8" y="-11" width="15" height="7" rx="2" fill="#ffe9a0" stroke="#fff" stroke-width="1"/>' +
-      '<circle class="sr-car-bit" cx="-7" cy="7" r="3.1" fill="#243044"/>' +
-      '<circle class="sr-car-bit" cx="7" cy="7" r="3.1" fill="#243044"/>';
+    return '<rect class="sr-car-bit" x="-14" y="-6" width="28" height="13" rx="4" fill="#e23b4a" stroke="#fff" stroke-width="1.4"/>' +
+      '<rect class="sr-car-bit" x="-8" y="-11" width="16" height="7" rx="2.5" fill="#7ec8ff" stroke="#fff" stroke-width="1"/>' +
+      '<circle class="sr-car-bit" cx="-7" cy="7" r="3.2" fill="#243044"/>' +
+      '<circle class="sr-car-bit" cx="8" cy="7" r="3.2" fill="#243044"/>';
   }
 
   function rememberPlane(plane) {
