@@ -22,8 +22,7 @@
   body.ingame .awning { display: block; }
   html.sr-wait, html.sr-wait body { background: #16010c !important; }
   html.sr-wait .wrap { visibility: hidden; }
-  html.sr-wait:not(.sr-after-intro) body { background: #16010c url("img/sugar-rush/sugar-rush-intro-poster-75cbb408.jpg") center/cover no-repeat !important; }
-  html.sr-wait.sr-first-long:not(.sr-after-intro):not(.sr-resume) body { background: #16010c url("img/sugar-rush/sugar-rush-intro-long-5dab8424-poster.jpg") center/cover no-repeat !important; }
+  html.sr-wait:not(.sr-after-intro) body { background: #16010c url("img/sugar-rush/sugar-rush-intro-long-5dab8424-poster.jpg") center/cover no-repeat !important; }
   .wrapc { position: absolute; width: 54px; height: 24px; border-radius: 7px; background: linear-gradient(180deg, var(--hi) 0%, var(--mid) 48%, var(--lo) 100%); transform: rotate(var(--r, -12deg)); box-shadow: 0 3px 0 rgba(90,20,50,.16); animation: wrapbob 3.4s ease-in-out infinite alternate; }
   .wrapc::before, .wrapc::after { content: ""; position: absolute; top: 2px; bottom: 2px; width: 14px; background: linear-gradient(180deg, #fff, var(--hi)); }
   .wrapc::before { left: -11px; clip-path: polygon(100% 0, 0 50%, 100% 100%); }
@@ -860,25 +859,17 @@
     d.documentElement.classList.add('sr-wait');
     if (q.has('resume')) d.documentElement.classList.add('sr-resume');
     if (q.has('afterIntro')) d.documentElement.classList.add('sr-after-intro');
-    try {
-      var seen = false, i, k;
-      for (i = 0; i < localStorage.length; i++) {
-        k = localStorage.key(i);
-        if (k && k.indexOf('sr-long-intro-seen') === 0 && localStorage.getItem(k) === '1') seen = true;
-      }
-      if (!seen && !q.has('resume') && !q.has('afterIntro')) d.documentElement.classList.add('sr-first-long');
-    } catch (err2) { }
   } catch (e) { try { d.documentElement.classList.add('sr-wait'); } catch (err) { } }
 })(document, location);
 </script>
 </head>
 <body>
   <div id="sr-open-intro" hidden role="dialog" aria-label="Sugar Rush intro">
-    <video id="sr-intro-video" playsinline webkit-playsinline preload="auto" poster="img/sugar-rush/sugar-rush-intro-poster-75cbb408.jpg">
-      <source src="img/sugar-rush/sugar-rush-intro-95641ff8.webm" type="video/webm">
-      <source src="img/sugar-rush/sugar-rush-intro-95641ff8.mp4" type="video/mp4">
+    <video id="sr-intro-video" playsinline webkit-playsinline preload="none" poster="img/sugar-rush/sugar-rush-intro-long-5dab8424-poster.jpg">
+      <source src="img/sugar-rush/sugar-rush-intro-long-5dab8424.webm" type="video/webm">
+      <source src="img/sugar-rush/sugar-rush-intro-long-5dab8424.mp4" type="video/mp4">
     </video>
-    <img class="sr-intro-poster" src="img/sugar-rush/sugar-rush-intro-poster-75cbb408.jpg" alt="" aria-hidden="true">
+    <img class="sr-intro-poster" src="img/sugar-rush/sugar-rush-intro-long-5dab8424-poster.jpg" alt="" aria-hidden="true">
     <button type="button" id="sr-intro-skip">Skip</button>
     <audio id="sr-intro-song" preload="auto"></audio>
   </div>
