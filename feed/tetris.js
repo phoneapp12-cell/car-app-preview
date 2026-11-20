@@ -1090,8 +1090,9 @@
     else if (seagullLoading) seagullLoading.then(function (b) { if (b && soundOn && ac) { ensureSeagullGain(); start(b); } });
   }
   // 1.9.199 Food landing / clear bites: synthesised, CC0-free originals. 300 Hz–3.5 kHz, mellow, louder than the music but gentle.
-  const FOOD_HASH = { munch: '25db313e', crunch: '5b730569', squish: '6f68e879', chomp: 'f2449c85', boom: '70ec46f6' };
-  const FOOD_VOL = { munch: 0.66, crunch: 0.68, squish: 0.64, chomp: 0.72, boom: 0.76 };
+  // 1.9.297 Cherry bomb and banana blasts use Shane's mellow deep boom (81b9bd0a) instead of food-boom-70ec46f6.
+  const FOOD_HASH = { munch: '25db313e', crunch: '5b730569', squish: '6f68e879', chomp: 'f2449c85', boom: '81b9bd0a' };
+  const FOOD_VOL = { munch: 0.66, crunch: 0.68, squish: 0.64, chomp: 0.72, boom: 0.40 };
   const FOOD_SPRITES = { src: 'tetris-bg/food-sprites-e3977dde.webp', cell: 96, bleed: 2, hash: 'e3977dde', layout: {"1:0":{"x":4,"y":4,"w":384,"h":384,"cols":4,"rows":4},"1:1":{"x":392,"y":4,"w":384,"h":384,"cols":4,"rows":4},"1:2":{"x":780,"y":4,"w":384,"h":384,"cols":4,"rows":4},"1:3":{"x":1168,"y":4,"w":384,"h":384,"cols":4,"rows":4},"2:0":{"x":4,"y":392,"w":288,"h":288,"cols":3,"rows":3},"2:1":{"x":296,"y":392,"w":288,"h":288,"cols":3,"rows":3},"2:2":{"x":588,"y":392,"w":288,"h":288,"cols":3,"rows":3},"2:3":{"x":880,"y":392,"w":288,"h":288,"cols":3,"rows":3},"3:0":{"x":4,"y":684,"w":288,"h":288,"cols":3,"rows":3},"3:1":{"x":296,"y":684,"w":288,"h":288,"cols":3,"rows":3},"3:2":{"x":588,"y":684,"w":288,"h":288,"cols":3,"rows":3},"3:3":{"x":880,"y":684,"w":288,"h":288,"cols":3,"rows":3},"4:0":{"x":4,"y":976,"w":192,"h":192,"cols":2,"rows":2},"4:1":{"x":200,"y":976,"w":192,"h":192,"cols":2,"rows":2},"4:2":{"x":396,"y":976,"w":192,"h":192,"cols":2,"rows":2},"4:3":{"x":592,"y":976,"w":192,"h":192,"cols":2,"rows":2},"5:0":{"x":4,"y":1172,"w":288,"h":288,"cols":3,"rows":3},"5:1":{"x":296,"y":1172,"w":288,"h":288,"cols":3,"rows":3},"5:2":{"x":588,"y":1172,"w":288,"h":288,"cols":3,"rows":3},"5:3":{"x":880,"y":1172,"w":288,"h":288,"cols":3,"rows":3},"6:0":{"x":4,"y":1464,"w":288,"h":288,"cols":3,"rows":3},"6:1":{"x":296,"y":1464,"w":288,"h":288,"cols":3,"rows":3},"6:2":{"x":588,"y":1464,"w":288,"h":288,"cols":3,"rows":3},"6:3":{"x":880,"y":1464,"w":288,"h":288,"cols":3,"rows":3},"7:0":{"x":4,"y":1756,"w":288,"h":288,"cols":3,"rows":3},"7:1":{"x":296,"y":1756,"w":288,"h":288,"cols":3,"rows":3},"7:2":{"x":588,"y":1756,"w":288,"h":288,"cols":3,"rows":3},"7:3":{"x":880,"y":1756,"w":288,"h":288,"cols":3,"rows":3},"8:0":{"x":4,"y":2048,"w":96,"h":96,"cols":1,"rows":1},"8:1":{"x":104,"y":2048,"w":96,"h":96,"cols":1,"rows":1},"8:2":{"x":204,"y":2048,"w":96,"h":96,"cols":1,"rows":1},"8:3":{"x":304,"y":2048,"w":96,"h":96,"cols":1,"rows":1}} };
   let foodSpriteImg = null, foodSpriteReady = false;
   function loadFoodSprites() {
@@ -1147,13 +1148,20 @@
       const src = ac.createBufferSource();
       src.buffer = buf;
       src.playbackRate.value = rate;
-      const hp = ac.createBiquadFilter();
-      hp.type = 'highpass'; hp.frequency.value = 300; hp.Q.value = 0.7;
-      const lp = ac.createBiquadFilter();
-      lp.type = 'lowpass'; lp.frequency.value = 3500; lp.Q.value = 0.5;
       const g0 = ac.createGain();
       g0.gain.value = FOOD_VOL[kind] || 0.66;
-      src.connect(hp); hp.connect(lp); lp.connect(g0); g0.connect(foodGain);
+      if (kind === 'boom') {
+        // Shane's boom lives mostly below 200 Hz; a 300 Hz high-pass would strip it.
+        const lp = ac.createBiquadFilter();
+        lp.type = 'lowpass'; lp.frequency.value = 3600; lp.Q.value = 0.5;
+        src.connect(lp); lp.connect(g0); g0.connect(foodGain);
+      } else {
+        const hp = ac.createBiquadFilter();
+        hp.type = 'highpass'; hp.frequency.value = 300; hp.Q.value = 0.7;
+        const lp = ac.createBiquadFilter();
+        lp.type = 'lowpass'; lp.frequency.value = 3500; lp.Q.value = 0.5;
+        src.connect(hp); hp.connect(lp); lp.connect(g0); g0.connect(foodGain);
+      }
       src.start(ac.currentTime);
     };
     if (foodBufs[kind]) start(foodBufs[kind]);
