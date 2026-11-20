@@ -1,0 +1,266 @@
+{
+  "updated": "2026-11-21",
+  "note": "Verified upcoming Auckland concerts from Live Nation / Spark Arena and official venue pages. No invented dates. Sport, comedy and children’s theatre are left out.",
+  "events": [
+    {
+      "id": "akl-fotc-2026-11-21",
+      "artist": "Flight of the Conchords",
+      "title": "Flight of the Conchords",
+      "venue": "Spark Arena",
+      "date": "2026-11-21",
+      "dates": [
+        "2026-11-21"
+      ],
+      "image": "https://dynamicmedia.livenationinternational.com/t/n/f/6739752d-3fbf-4aca-8514-f10b35d8ce06.jpg?format=jpg&width=1080&quality=75",
+      "url": "https://www.sparkarena.co.nz/all-events/flight-of-the-conchords-tickets-ae102022",
+      "source": "Spark Arena"
+    },
+    {
+      "id": "1676406",
+      "artist": "Rise Against",
+      "title": "Rise Against",
+      "venue": "Spark Arena",
+      "date": "2026-11-24",
+      "dates": [
+        "2026-11-24"
+      ],
+      "image": "https://dynamicmedia.livenationinternational.com/l/x/z/e79b7fdb-0703-4683-8925-fc78717cec48.jpg",
+      "url": "https://www.livenation.co.nz/event/rise-against-auckland-tickets-edp1676406",
+      "source": "Live Nation / Spark Arena"
+    },
+    {
+      "id": "akl-robbie-2026-11-24",
+      "artist": "Robbie Williams",
+      "title": "Robbie Williams",
+      "venue": "Eden Park",
+      "date": "2026-11-24",
+      "dates": [
+        "2026-11-24"
+      ],
+      "image": "https://edenpark.co.nz/wp-content/uploads/2026/08/ROWI26-North-East-Internal-Screen-832x864-1.jpg",
+      "url": "https://edenpark.co.nz/events/robbie-williams-tuesday-24-november-2026/",
+      "source": "Eden Park"
+    },
+    {
+      "id": "akl-tdcc-2026-11-27",
+      "artist": "Two Door Cinema Club",
+      "title": "Two Door Cinema Club",
+      "venue": "Spark Arena",
+      "date": "2026-11-27",
+      "dates": [
+        "2026-11-27"
+      ],
+      "image": "https://dynamicmedia.livenationinternational.com/h/s/z/85196007-ee02-4d17-9a78-d3a1a14f3425.png?format=jpg&width=1080&quality=75",
+      "url": "https://www.sparkarena.co.nz/all-events/two-door-cinema-club-tickets-ae78105",
+      "source": "Spark Arena"
+    },
+    {
+      "id": "1670670",
+      "artist": "Dermot Kennedy",
+      "title": "Dermot Kennedy",
+      "venue": "Spark Arena",
+      "date": "2026-11-28",
+      "dates": [
+        "2026-11-28"
+      ],
+      "image": "https://dynamicmedia.livenationinternational.com/u/h/w/79166fe4-19d8-4bdb-8867-e40244fbea0f.jpg",
+      "url": "https://www.livenation.co.nz/event/dermot-kennedy-the-weight-of-the-woods-tour-auckland-tickets-edp1670670",
+      "source": "Live Nation / Spark Arena"
+    },
+    {
+      "id": "akl-b2m-2026-12-01",
+      "artist": "Boyz II Men",
+      "title": "Boyz II Men",
+      "venue": "Spark Arena",
+      "date": "2026-12-01",
+      "dates": [
+        "2026-12-01"
+      ],
+      "image": "https://dynamicmedia.livenationinternational.com/z/i/y/0f9a3c33-e4ed-4c74-ab76-f524916ce2fd.jpg?format=jpg&width=1080&quality=75",
+      "url": "https://www.sparkarena.co.nz/all-events/boyz-ii-men-tickets-ae3769",
+      "source": "Spark Arena"
+    },
+    {
+      "id": "1653034",
+      "artist": "J. Cole",
+      "title": "J. Cole",
+      "venue": "Spark Arena",
+      "date": "2026-12-05",
+      "dates": [
+        "2026-12-05"
+      ],
+      "image": "https://dynamicmedia.livenationinternational.com/e/m/r/a6fbc21e-1e91-4f5e-b182-94f407eae39c.jpg",
+      "url": "https://www.livenation.co.nz/event/j-cole-the-fall-off-tour-auckland-tickets-edp1653034",
+      "source": "Live Nation / Spark Arena"
+    },
+    {
+      "id": "1654162",
+      "artist": "J. Cole",
+      "title": "J. Cole",
+      "venue": "Spark Arena",
+      "date": "2026-12-06",
+      "dates": [
+        "2026-12-06"
+      ],
+      "image": "https://dynamicmedia.livenationinternational.com/e/m/r/a6fbc21e-1e91-4f5e-b182-94f407eae39c.jpg",
+      "url": "https://www.livenation.co.nz/event/j-cole-the-fall-off-tour-auckland-tickets-edp1654162",
+      "source": "Live Nation / Spark Arena"
+    },
+    {
+      "id": "1681119",
+      "artist": "BABYMONSTER",
+      "title": "BABYMONSTER",
+      "venue": "Spark Arena",
+      "date": "2026-12-08",
+      "dates": [
+        "2026-12-08"
+      ],
+      "image": "https://dynamicmedia.livenationinternational.com/n/i/u/242e7075-69bf-49f8-86bb-8a107c55238f.jpg",
+      "url": "https://www.livenation.co.nz/event/babymonster-world-tour-춤-choom-in-auckland-auckland-tickets-edp1681119",
+      "source": "Live Nation / Spark Arena"
+    },
+    {
+      "id": "1704286",
+      "artist": "A$AP Rocky",
+      "title": "A$AP Rocky",
+      "venue": "Spark Arena",
+      "date": "2026-12-12",
+      "dates": [
+        "2026-12-12"
+      ],
+      "image": "https://dynamicmedia.livenationinternational.com/j/l/e/68d42509-c329-47ae-a019-0c1fa1d9b568.jpg",
+      "url": "https://www.livenation.co.nz/event/a-ap-rocky-don-t-be-dumb-world-tour-auckland-tickets-edp1704286",
+      "source": "Live Nation / Spark Arena"
+    },
+    {
+      "id": "1659424",
+      "artist": "A Perfect Circle",
+      "title": "A Perfect Circle",
+      "venue": "Spark Arena",
+      "date": "2026-12-13",
+      "dates": [
+        "2026-12-13"
+      ],
+      "image": "https://dynamicmedia.livenationinternational.com/h/w/j/70d94ad7-265f-40e5-a719-ba986a3b4068.png",
+      "url": "https://www.livenation.co.nz/event/a-perfect-circle-auckland-tickets-edp1659424",
+      "source": "Live Nation / Spark Arena"
+    },
+    {
+      "id": "akl-gnr-2026-12-17",
+      "artist": "Guns N' Roses",
+      "title": "Guns N' Roses",
+      "venue": "Eden Park",
+      "date": "2026-12-17",
+      "dates": [
+        "2026-12-17"
+      ],
+      "image": "https://edenpark.co.nz/wp-content/uploads/2026/03/GunsNRoses-1080x1080_AKL.jpg",
+      "url": "https://edenpark.co.nz/events/guns-n-roses-thursday-17-december-2026/",
+      "source": "Eden Park"
+    },
+    {
+      "id": "1686963",
+      "artist": "Queens of the Stone Age",
+      "title": "Queens of the Stone Age",
+      "venue": "Spark Arena",
+      "date": "2026-12-20",
+      "dates": [
+        "2026-12-20"
+      ],
+      "image": "https://dynamicmedia.livenationinternational.com/s/w/o/5c9064c8-c1bf-4096-acab-c88f452b841d.jpg",
+      "url": "https://www.livenation.co.nz/event/queens-of-the-stone-age-auckland-tickets-edp1686963",
+      "source": "Live Nation / Spark Arena"
+    },
+    {
+      "id": "1678469",
+      "artist": "Bryson Tiller",
+      "title": "Bryson Tiller",
+      "venue": "Spark Arena",
+      "date": "2027-01-27",
+      "dates": [
+        "2027-01-27"
+      ],
+      "image": "https://dynamicmedia.livenationinternational.com/t/u/n/522748fd-b422-4a0b-bcad-c7ef8f3988f0.jpg",
+      "url": "https://www.livenation.co.nz/event/bryson-tiller-the-neo-trapsoul-tour--auckland-tickets-edp1678469",
+      "source": "Live Nation / Spark Arena"
+    },
+    {
+      "id": "1708888",
+      "artist": "KATSEYE",
+      "title": "KATSEYE",
+      "venue": "Spark Arena",
+      "date": "2027-03-05",
+      "dates": [
+        "2027-03-05"
+      ],
+      "image": "https://dynamicmedia.livenationinternational.com/e/u/v/c697caba-c595-4187-8999-74c73aa1b06a.jpg",
+      "url": "https://www.livenation.co.nz/event/katseye-the-wildworld-tour-auckland-tickets-edp1708888",
+      "source": "Live Nation / Spark Arena"
+    },
+    {
+      "id": "1711357",
+      "artist": "KATSEYE",
+      "title": "KATSEYE",
+      "venue": "Spark Arena",
+      "date": "2027-03-06",
+      "dates": [
+        "2027-03-06"
+      ],
+      "image": "https://dynamicmedia.livenationinternational.com/e/u/v/c697caba-c595-4187-8999-74c73aa1b06a.jpg",
+      "url": "https://www.livenation.co.nz/event/katseye-the-wildworld-tour-auckland-tickets-edp1711357",
+      "source": "Live Nation / Spark Arena"
+    },
+    {
+      "id": "1678976",
+      "artist": "Evanescence",
+      "title": "Evanescence",
+      "venue": "Spark Arena",
+      "date": "2027-03-20",
+      "dates": [
+        "2027-03-20"
+      ],
+      "image": "https://dynamicmedia.livenationinternational.com/n/h/s/2a465527-c83a-420d-9d3e-5ee558c84f49.jpg",
+      "url": "https://www.livenation.co.nz/event/evanescence-auckland-tickets-edp1678976",
+      "source": "Live Nation / Spark Arena"
+    },
+    {
+      "id": "1707279",
+      "artist": "Disturbed",
+      "title": "Disturbed",
+      "venue": "Spark Arena",
+      "date": "2027-04-22",
+      "dates": [
+        "2027-04-22"
+      ],
+      "image": "https://dynamicmedia.livenationinternational.com/j/s/k/4f722ca5-99e7-410a-ab0f-11c7d9d3a878.png",
+      "url": "https://www.livenation.co.nz/event/disturbed-the-sickness-and-the-greatest-hits-auckland-tickets-edp1707279",
+      "source": "Live Nation / Spark Arena"
+    },
+    {
+      "id": "1671938",
+      "artist": "Westlife",
+      "title": "Westlife",
+      "venue": "Spark Arena",
+      "date": "2027-07-28",
+      "dates": [
+        "2027-07-28"
+      ],
+      "image": "https://dynamicmedia.livenationinternational.com/x/t/a/f868fd4b-afa3-4943-ac01-0f1900d6c2f3.jpg",
+      "url": "https://www.livenation.co.nz/event/westlife-25-the-anniversary-world-tour-auckland-tickets-edp1671938",
+      "source": "Live Nation / Spark Arena"
+    },
+    {
+      "id": "1678720",
+      "artist": "Westlife",
+      "title": "Westlife",
+      "venue": "Spark Arena",
+      "date": "2027-07-29",
+      "dates": [
+        "2027-07-29"
+      ],
+      "image": "https://dynamicmedia.livenationinternational.com/x/t/a/f868fd4b-afa3-4943-ac01-0f1900d6c2f3.jpg",
+      "url": "https://www.livenation.co.nz/event/westlife-25-the-anniversary-world-tour-auckland-tickets-edp1678720",
+      "source": "Live Nation / Spark Arena"
+    }
+  ]
+}

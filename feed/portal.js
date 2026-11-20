@@ -1,10 +1,17 @@
-/* 1.9.171 Opening portal. Once per app open, not on scroll or topic changes.
-   Skipped only when the phone asks for less motion (logged with ?portaldebug=1).
-   The rise is a CSS animation on plain copies that sit above the rings. Nothing
-   clips them, and their parents are not transformed, so a phone can paint it.
-   The class is added on a later frame, after the copies have been drawn. */
+/* 1.9.171 Opening intro, once per app open (not on scroll or topic changes).
+   Preview: the ring stage is replaced by the 3s infobook-intro-9f25b444 film.
+   A crisp HTML “Info Book” wordmark (Fraunces 700, ink #1B1916) sits under the
+   logo from about 2.4s. Muted, playsinline autoplay; tap to skip. If the film
+   cannot play, the poster is shown, then we fade into the feed.
+   Skipped only when the phone asks for less motion (logged with ?portaldebug=1),
+   aside from a brief static poster + wordmark so the brand is still seen. */
 (function (root) {
   const KEY = 'ibPortal';
+  const MP4 = 'img/infobook-intro-9f25b444.mp4';
+  const WEBM = 'img/infobook-intro-9f25b444.webm';
+  const POSTER = 'img/infobook-intro-9f25b444-poster.jpg';
+  const WORD_AT = 2.4;
+
   function reduced() {
     try { return !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; }
   }
@@ -19,13 +26,10 @@
       else console.log('[portal] start', detail == null ? '' : detail);
     } catch (e) {}
   }
-  root.ibPortal = { KEY, reduced };
+  root.ibPortal = { KEY, reduced, POSTER, MP4, WEBM };
   root.ibPortalRise = function () {};
   if (!root.document || !root.sessionStorage) return;
-  if (reduced()) {
-    dbg('start', { skip: 'reduced-motion' });
-    return;
-  }
+
   try {
     if (root.sessionStorage.getItem(KEY) === '1') return;
     root.sessionStorage.setItem(KEY, '1');
@@ -36,36 +40,45 @@
   doc.documentElement.classList.add('portal-on');
   const el = doc.createElement('div');
   el.id = 'ibportal';
-  el.setAttribute('aria-hidden', 'true');
-  const beams = [18, 36, 50, 64, 82].map((x, i) => `<i class="beam" style="left:${x}%;animation-delay:${(i * 0.16).toFixed(2)}s"></i>`).join('');
-  const sparks = [24, 42, 58, 76, 33, 67].map((x, i) => `<i class="spark" style="left:${x}%;animation-delay:${(0.08 + i * 0.17).toFixed(2)}s"></i>`).join('');
-  el.innerHTML = `<div class="stage">${beams}${sparks}<i class="ring a"></i><i class="ring b"></i><i class="ring c"></i></div>`;
-  const layer = doc.createElement('div');
-  layer.id = 'ibrise';
-  layer.setAttribute('aria-hidden', 'true');
-  (doc.body || doc.documentElement).append(el, layer);
+  el.className = 'ib-intro-film';
+  el.setAttribute('aria-label', 'Info Book');
+  el.innerHTML = '<video id="ib-intro-video" playsinline webkit-playsinline muted autoplay preload="auto" poster="' + POSTER + '">'
+    + '<source src="' + WEBM + '" type="video/webm">'
+    + '<source src="' + MP4 + '" type="video/mp4">'
+    + '</video>'
+    + '<img class="ib-intro-poster" src="' + POSTER + '" alt="" aria-hidden="true">'
+    + '<p class="ib-intro-word" id="ib-intro-word">Info Book</p>'
+    + '<button type="button" class="ib-intro-skip" id="ib-intro-skip">Skip</button>';
+  (doc.body || doc.documentElement).append(el);
 
-  let done = false, started = false, tries = 0;
-  let timer = 0, hard = 0, bye = 0, left = 0;
-  const cards = () => doc.querySelectorAll('#feed > .card, #feed > .hrow');
+  const video = el.querySelector('video');
+  const poster = el.querySelector('.ib-intro-poster');
+  const word = el.querySelector('#ib-intro-word');
+  let done = false, bye = 0, hard = 0, wordT = 0, failT = 0;
 
+  function showWord() {
+    if (word) word.classList.add('on');
+  }
   function kill() {
     if (done) return;
     done = true;
-    clearTimeout(timer);
-    clearTimeout(hard);
     clearTimeout(bye);
+    clearTimeout(hard);
+    clearTimeout(wordT);
+    clearTimeout(failT);
     doc.removeEventListener('pointerdown', skip, true);
-    if (layer.parentNode) layer.remove();
+    try { if (video) video.pause(); } catch (e) {}
     if (el.parentNode) el.remove();
     doc.documentElement.classList.remove('portal-on');
     doc.querySelectorAll('.portal-rise').forEach(n => {
       n.classList.add('portal-rose');
       n.classList.remove('portal-rise');
     });
+    dbg('finish', { name: 'intro' });
   }
   function fade() {
     if (done || el.classList.contains('out')) return;
+    showWord();
     el.classList.add('out');
     dbg('start', { name: 'portalFade' });
     el.addEventListener('animationend', ev => {
@@ -77,111 +90,59 @@
     });
     bye = setTimeout(kill, 700);
   }
-  function reveal() {
+  function skip(ev) {
     if (done) return;
+    if (ev && ev.target && ev.target.id === 'ib-intro-skip') ev.preventDefault();
     fade();
-  }
-  function skip() {
-    if (done) return;
-    kill();
   }
   doc.addEventListener('pointerdown', skip, true);
 
-  function ringBox() {
-    const ring = el.querySelector('.ring.a');
-    const b = ring && ring.getBoundingClientRect();
-    if (b && b.width > 20 && b.height > 8) return b;
-    const w = root.innerWidth || 390, h = root.innerHeight || 800;
-    return { left: w * 0.08, width: w * 0.84, top: h * 0.62, height: Math.max(40, h * 0.12) };
+  function armWord(from) {
+    clearTimeout(wordT);
+    const wait = Math.max(0, (WORD_AT - (from || 0)) * 1000);
+    wordT = setTimeout(showWord, wait);
   }
-  function begin(list) {
-    const ring = ringBox();
-    const ringCy = ring.top + ring.height / 2;
-    const ghosts = [];
-    list.forEach((card, i) => {
-      if (!card.isConnected) return;
-      const end = card.getBoundingClientRect();
-      const viewH = root.innerHeight || 800;
-      const w = end.width > 40 ? end.width : Math.max(160, (root.innerWidth || 390) - 24);
-      // A face of the card, not the whole article. A very tall card would sit
-      // on the ring already and would not look like it was rising out of it.
-      const h = Math.min(Math.max(end.height || 0, 260), Math.round(viewH * 0.5));
-      const left = end.width > 40 ? end.left : 12;
-      const top = end.top > 0 && end.top < viewH ? end.top : (92 + i * 12);
-      const dy = Math.round(ringCy - (top + h / 2));
-      const ghost = card.cloneNode(true);
-      ghost.removeAttribute('id');
-      ghost.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
-      ghost.querySelectorAll('iframe, video, audio').forEach(node => node.remove());
-      ghost.classList.add('ib-ghost');
-      ghost.style.position = 'fixed';
-      ghost.style.boxSizing = 'border-box';
-      ghost.style.left = left + 'px';
-      ghost.style.top = top + 'px';
-      ghost.style.width = w + 'px';
-      ghost.style.height = h + 'px';
-      ghost.style.margin = '0';
-      ghost.style.zIndex = '100';
-      ghost.style.visibility = 'visible';
-      ghost.style.setProperty('--dy', dy + 'px');
-      ghost.style.setProperty('--rise', (i * 0.3) + 's');
-      ghost.style.transform = 'translateY(' + dy + 'px) scale(0.4)';
-      ghost.style.opacity = '0.6';
-      layer.appendChild(ghost);
-      ghosts.push(ghost);
+
+  function usePosterThenFade(ms) {
+    if (poster) poster.hidden = false;
+    if (video) video.style.opacity = '0';
+    showWord();
+    clearTimeout(failT);
+    failT = setTimeout(fade, ms == null ? 1500 : ms);
+  }
+
+  if (reduced()) {
+    dbg('start', { skip: 'reduced-motion' });
+    usePosterThenFade(1200);
+    hard = setTimeout(() => { if (!done && el.isConnected) fade(); }, 2500);
+    return;
+  }
+
+  if (video) {
+    video.muted = true;
+    video.defaultMuted = true;
+    video.playsInline = true;
+    video.setAttribute('muted', '');
+    video.setAttribute('playsinline', '');
+    video.setAttribute('webkit-playsinline', '');
+    video.setAttribute('autoplay', '');
+    try { video.currentTime = 0; } catch (e) {}
+    video.addEventListener('timeupdate', () => {
+      if (video.currentTime >= WORD_AT) showWord();
     });
-    if (!ghosts.length) {
-      started = false;
-      if (tries++ < 8 && !done) {
-        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(stamp);
-        else setTimeout(stamp, 32);
-      }
-      return;
+    video.addEventListener('playing', () => {
+      if (poster) poster.hidden = true;
+      armWord(video.currentTime || 0);
+    });
+    video.addEventListener('ended', fade);
+    video.addEventListener('error', () => usePosterThenFade(1500));
+    const start = video.play();
+    if (start && start.catch) {
+      start.catch(() => usePosterThenFade(1500));
     }
-    const arm = () => {
-      if (done) return;
-      clearTimeout(hard);
-      left = ghosts.length;
-      ghosts.forEach((ghost, i) => {
-        if (!ghost.isConnected) { left--; return; }
-        ghost.classList.add('ib-go');
-        dbg('start', { card: i, animation: 'ibRise', delay: (i * 0.3) + 's' });
-        ghost.addEventListener('animationend', ev => {
-          if (ev.target !== ghost) return;
-          if (ev.animationName && ev.animationName !== 'ibRise') return;
-          dbg('finish', { card: i, animation: 'ibRise' });
-          left--;
-          if (left <= 0) reveal();
-        });
-      });
-      if (left <= 0) { reveal(); return; }
-      timer = setTimeout(reveal, 2100);
-    };
-    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(arm));
-    else setTimeout(arm, 32);
+    armWord(0);
+  } else {
+    usePosterThenFade(1500);
   }
-  function stamp() {
-    if (done || started || !el.isConnected) return;
-    const picked = Array.prototype.slice.call(cards(), 0, 3);
-    if (!picked.length) return;
-    started = true;
-    const go = () => {
-      if (done) return;
-      const live = picked.filter(n => n.isConnected);
-      const use = live.length ? live : Array.prototype.slice.call(cards(), 0, 3);
-      if (!use.length) { started = false; return; }
-      begin(use);
-    };
-    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(go);
-    else go();
-  }
-  root.ibPortalRise = stamp;
-  const feed = doc.getElementById('feed');
-  if (feed && typeof MutationObserver === 'function') {
-    const mo = new MutationObserver(() => { if (!started) stamp(); });
-    mo.observe(feed, { childList: true });
-    setTimeout(() => mo.disconnect(), 6000);
-  }
-  stamp();
-  hard = setTimeout(() => { if (!done && el.isConnected) kill(); }, 6000);
+  hard = setTimeout(() => { if (!done && el.isConnected) fade(); }, 5000);
 })(typeof window !== 'undefined' ? window : globalThis);
