@@ -347,9 +347,12 @@ html.candy .hrhd h2{color:#c2448a}
 @media (prefers-color-scheme:dark){#feed > .card.xc:not(:has(.media,.pimg,.fph,.bdpic,.hero))::before{filter:saturate(.9) brightness(.78)}}
 /* Ask cards: no tall 16/6 rainbow band, so Yes/No stay on a phone screen under the Today hero. */
 #feed > .card.xc.relask::before,#feed > .card.xc.sportask::before{display:none!important;content:none!important;aspect-ratio:auto!important;height:0!important}
-#feed > .card.relask .bd,#feed > .card.sportask .bd{padding-bottom:14px}
-#feed > .card.relask .xbtns,#feed > .card.sportask .xbtns{display:flex;flex-wrap:nowrap;gap:8px;margin:12px 0 4px;align-items:stretch}
+#feed > .card.relask .hd,html.today-look #feed > .card.relask .hd{padding:6px 14px 0}
+#feed > .card.relask .bd,html.today-look #feed > .card.relask .bd{padding-top:2px;padding-bottom:10px}
+#feed > .card.relask .bd h3{margin:0 0 8px}
+#feed > .card.relask .xbtns,#feed > .card.sportask .xbtns{display:flex;flex-wrap:nowrap;gap:8px;margin:0 0 8px;align-items:stretch}
 #feed > .card.relask .xbtns .btn,#feed > .card.sportask .xbtns .btn{flex:1 1 0;width:auto;min-width:0;min-height:44px;margin-top:0}
+#feed > .card.relask .bd p{margin:0}
 
 .pinbox .pbtn,.pbtn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:11px 18px;border-radius:14px;background:linear-gradient(135deg,#ff7eb6,#ffa24c);box-shadow:0 4px 14px rgba(255,126,182,.35),inset 0 -3px 0 rgba(0,0,0,.12);text-shadow:0 1px 1px rgba(0,0,0,.15)}
 .xbtns .btn,.pbtn{min-height:44px;font-size:1rem}

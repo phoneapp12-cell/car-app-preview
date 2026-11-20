@@ -557,6 +557,8 @@ assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.2
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('whg.js?v=1.9.297'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('ib-preview.js?v=1.9.297'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('#feed > .card.xc.relask::before') && fs.readFileSync('feed/index.html', 'utf8').includes('flex-wrap:nowrap'), 'religion Yes/No stay on screen');
+assert.ok(fs.readFileSync('feed/ib-preview.js', 'utf8').indexOf('data-ib-religion="yes"') < fs.readFileSync('feed/ib-preview.js', 'utf8').indexOf('Optional stories about traditional practices'), 'Yes/No sit above the blurb so they fit on a phone');
+
 assert.ok(fs.existsSync('feed/ib-preview.js') && fs.existsSync('feed/akl-concerts.json') && fs.existsSync('feed/top40-local.json') && fs.existsSync('feed/religion-local.json'));
 assert.ok(fs.existsSync('feed/img/infobook-intro-9f25b444.mp4') && fs.existsSync('feed/img/infobook-intro-9f25b444.webm') && fs.existsSync('feed/img/infobook-intro-9f25b444-poster.jpg'));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'whg.js?v=' + VERSION"));

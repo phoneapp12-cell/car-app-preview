@@ -66,8 +66,8 @@
     const xh = typeof root.xHead === 'function' ? root.xHead('🕯️', 'A question for you', 'An optional topic in your feed', 'Religion') : '';
     return `<article class="card xc relask" data-id="${esc((i && i.id) || 'ib-rel-ask')}" data-topic="religion" style="--c1:#6d28d9;--c2:#0f766e">${xh}
       <div class="bd"><h3>Want Religion in your feed?</h3>
-      <p>Optional stories about traditional practices and beliefs — including Māori tikanga and wairua, rongoā and other traditional methods — and informational history and news about religions and cults. It stays respectful and is hidden until you say yes. You can change this later in Settings → Interests.</p>
       <div class="xbtns"><button type="button" class="btn pri" data-ib-religion="yes">Yes</button><button type="button" class="btn" data-ib-religion="no">No</button></div>
+      <p>Optional stories about traditional practices and beliefs — including Māori tikanga and wairua, rongoā and other traditional methods — and informational history and news about religions and cults. It stays respectful and is hidden until you say yes. You can change this later in Settings → Interests.</p>
       </div></article>`;
   }
   function religionCard(i) {
