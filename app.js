@@ -12219,7 +12219,7 @@ function More() {
     ['local', '📍 Local & Outdoors', ['walks', 'weather', 'bridge', 'roadworks', 'bus', 'events', 'news', 'planning', 'parlbills', 'garden']],
     ['explore', '🎓 Entertainment & Learning', ['media', 'learn', 'aitech', 'science', 'diy', 'coding', 'astronomy', 'gardening', 'space', 'travel', 'ideas', 'tv', 'videos', 'top40', 'radio', 'podcasts', 'blogging', 'books', 'about']],
     ['home', '🏠 Home & Daily', ['calendar', 'todo', 'tidy', 'reminders', 'food', 'meals', 'recipes', 'shopping', 'gflist', 'projects', 'flagged', 'birthdays', 'countdown', 'diary', 'notes', 'photos', 'lights', 'heat', 'alarm']],
-    ['money', '💰 Money & Bills', ['bills', 'budget', 'cashflow', 'roster', 'commission', 'loans']],
+    ['money', '💰 Money & Bills', ['bills', 'budget', 'cashflow', 'currencies', 'roster', 'commission', 'loans']],
     ['cars', '🚗 Cars & Pets', ['cars', 'pets']]
   ];
   const curCat = window.moreCat || 'all';
@@ -12242,7 +12242,7 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   reminders: ['bell', 'rem', 'Reminders', 'Reminders'], commission: ['cash', 'comm', 'Commission', 'Commission'], loans: ['coins', 'loan', 'Loans', 'Loans'], events: ['ticket', 'ev', 'Events', 'Events'], news: ['news', 'ln', 'Local news', 'News'],
   tv: ['tv', 'tv', 'TV guide', 'TV'], livetv: ['tv', 'tv', 'Live TV', 'Live TV'],
   meals: ['meal', 'meal', 'Meal planner', 'Meals'], recipes: ['book', 'recipe', 'Recipes', 'Recipes'], shopping: ['cart', 'shop', 'Shopping list', 'Shopping'], pets: ['paw', 'pet', 'Pets &amp; Vet', 'Pets'], garden: ['leaf', 'garden', 'Gardening', 'Garden'], health: ['medkit', 'health', 'Health', 'Health'], watch: ['heart', 'health', 'Watch', 'Watch'], about: ['info', 'about', 'About you', 'About'],
-  bridge: ['bridge', 'br', 'Lifting bridge', 'Bridge'], bills: ['bill', 'bill', 'Bills', 'Bills'], budget: ['cash', 'loan', 'Budget', 'Budget'], cashflow: ['coins', 'loan', 'Cash flow', 'Cash flow'], finance: ['cash', 'loan', 'Shares & Mortgages', 'Finance'], birthdays: ['cake', 'bday', 'Birthdays', 'Birthdays'], ideas: ['bulb', 'idea', 'Ideas', 'Ideas'],
+  bridge: ['bridge', 'br', 'Lifting bridge', 'Bridge'], bills: ['bill', 'bill', 'Bills', 'Bills'], budget: ['cash', 'loan', 'Budget', 'Budget'], cashflow: ['coins', 'loan', 'Cash flow', 'Cash flow'], currencies: ['globe', 'loan', 'World currencies', 'Currencies'], finance: ['cash', 'loan', 'Shares & Mortgages', 'Finance'], birthdays: ['cake', 'bday', 'Birthdays', 'Birthdays'], ideas: ['bulb', 'idea', 'Ideas', 'Ideas'],
   videos: ['play', 'vid', 'Videos', 'Videos'],
   top40: ['music', 't40', 'Top 40', 'Top 40'],
   blogging: ['pen', 'blog', 'Blogging', 'Blog'],
@@ -12300,7 +12300,7 @@ const NAV_GROUPS = [
   { id: 'near', title: 'Local', keys: ['weather', 'walks', 'bridge', 'roadworks', 'bus', 'planning', 'parlbills', 'garden', 'events', 'news'] },
   { id: 'media', title: 'Entertainment & Learning', keys: ['media', 'books', 'freemovies', 'discover', 'webcams', 'livetv', 'tv', 'radio', 'top40', 'videos', 'podcasts', 'learn', 'aitech', 'science', 'diy', 'space', 'ideas'] },
   { id: 'life', title: 'Smart Home', keys: ['lights', 'heat', 'alarm'] },
-  { id: 'money', title: 'Money', keys: ['bills', 'accounts', 'budget', 'cashflow', 'finance', 'roster', 'commission', 'loans'] },
+  { id: 'money', title: 'Money', keys: ['bills', 'accounts', 'budget', 'cashflow', 'currencies', 'finance', 'roster', 'commission', 'loans'] },
   { id: 'cars', title: 'Cars & Pets', keys: ['cars', 'fuel', 'pets'] }
 ];
 function navOrder() {
@@ -22267,7 +22267,7 @@ function render() {
   if (/^#roster(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#work'); renderedHash = '#work'; } // 2.26.90: old link → Money › Work
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   try { if (render.habH !== h) { render.habH = h; if (r && !/^(home|alerts|archive|settings|more|meds|sleep|roster|work|pets|health|watch|gym|claims)$/.test(r)) hab('page:' + r); } } catch (e) { } // 2.27.60
-  const map = { guide: () => GuidePage(), accounts: () => AccountsPage(), books: () => BooksPage(), freemovies: () => FreeMoviesPage(), discover: () => DiscoverPage(), webcams: () => WebcamsPage(), photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, bus: OnerahiBusPage, parlbills: ParlBillsPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, finance: FinancePage, cars: Cars, fuel: FuelHistoryPage, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, localnews: LocalNewsBoard, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, livetv: LiveTvPage, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, aitech: () => lbPage('ai'), diy: () => lbPage('dy'), science: () => lbPage('sc'), coding: () => lbPage('cd'), astronomy: () => lbPage('as'), gardening: () => lbPage('gd'), lists: ListsHubPage, money: MoneyHubPage, wellbeing: WellbeingHubPage, local: LocalHubPage, homelife: HomeLifeHubPage, walks: WalksPage, tidy: TidyPage, gflist: GfListPage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { guide: () => GuidePage(), accounts: () => AccountsPage(), books: () => BooksPage(), freemovies: () => FreeMoviesPage(), discover: () => DiscoverPage(), webcams: () => WebcamsPage(), photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, bus: OnerahiBusPage, parlbills: ParlBillsPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, finance: FinancePage, cars: Cars, fuel: FuelHistoryPage, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, localnews: LocalNewsBoard, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, livetv: LiveTvPage, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, aitech: () => lbPage('ai'), diy: () => lbPage('dy'), science: () => lbPage('sc'), coding: () => lbPage('cd'), astronomy: () => lbPage('as'), gardening: () => lbPage('gd'), lists: ListsHubPage, money: MoneyHubPage, currencies: CurrenciesPage, wellbeing: WellbeingHubPage, local: LocalHubPage, homelife: HomeLifeHubPage, walks: WalksPage, tidy: TidyPage, gflist: GfListPage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -25033,7 +25033,7 @@ function habScore(e, mode) {
   const dt = (habOff() ? e.o : e.w) / Math.max(1, e.o + e.w);
   return Math.log2(1 + e.n) * Math.pow(0.5, days / 14) * (0.3 + tm) * (0.5 + dt);
 }
-const HAB_PAGES = { podcasts: 'Podcasts', radio: 'Radio', tv: 'the TV guide', videos: 'Videos', top40: 'the Top 40', blogging: 'Blogs', news: 'the news', media: 'Entertainment', travel: 'Travel', lang: 'Word of the day', bills: 'Bills', cashflow: 'Cash flow', budget: 'Budget' };
+const HAB_PAGES = { podcasts: 'Podcasts', radio: 'Radio', tv: 'the TV guide', videos: 'Videos', top40: 'the Top 40', blogging: 'Blogs', news: 'the news', media: 'Entertainment', travel: 'Travel', lang: 'Word of the day', bills: 'Bills', cashflow: 'Cash flow', budget: 'Budget', currencies: 'World currencies' };
 const habHr = h => (h % 12 || 12) + (h < 12 ? 'am' : 'pm');
 function habCands() {
   const o = habSt(), K = o.k, C = [], d = new Date(), hr = d.getHours(), today = todayISO();
@@ -25819,7 +25819,7 @@ function cfItemised(D) {
 function nm2(D, id) { const a = D.accounts.find(x => x.id === id); return a ? cfAName(a) : ''; }
 async function cfSetMain(id) { S.settings.cfMain = id; await save(); render(); }
 async function cfRefresh() { toast('Asking the banks for the latest…'); await cfLoad(true); if (CFerr) toast(CFerr); }
-function moneyTabs(cur) { return `<div class="seg moneytabs" role="tablist">${[['money', '📋 Board'], ['bills', 'Bills'], ['budget', 'Budget'], ['cashflow', 'Cash flow'], ['notbills', 'Not bills'], ['work', 'Work'], ['power', 'Power'], ['loans', 'Loans']].map(([k, t]) => `<button type="button" role="tab" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}" onclick="go('#${k}')">${t}</button>`).join('')}</div>`; }
+function moneyTabs(cur) { return `<div class="seg moneytabs" role="tablist">${[['money', '📋 Board'], ['currencies', '💱 Currencies'], ['bills', 'Bills'], ['budget', 'Budget'], ['cashflow', 'Cash flow'], ['notbills', 'Not bills'], ['work', 'Work'], ['power', 'Power'], ['loans', 'Loans']].map(([k, t]) => `<button type="button" role="tab" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}" onclick="go('#${k}')">${t}</button>`).join('')}</div>`; }
 function CashFlow() {
   const head = moneyTabs('cashflow') + header('Cash flow', 'Your bank balances, and what’s left before payday');
   if (!cfKey() && !CFmock) return head + `<div class="card empty cfempty"><div class="t">Connect your bank to see cash flow</div><div class="s">Balances from your ASB, ANZ and Kiwibank accounts and the ASB credit card, money in and out this pay fortnight, and whether any account runs short before payday. Read-only, through Akahu.</div><button class="btn primary" style="flex:none;padding:12px 22px" onclick="cfGoSettings()">Connect in Settings</button></div>`;
@@ -32451,6 +32451,318 @@ ProjectsPage = function () {
     `<div class="foot">Swipe sideways between project boards, or tap a pill above to open that project page.</div>`;
 };
 
+/* ---- 2.29.26 World currencies: live rates against the NZ dollar ---- */
+const FX_LIST = [
+  { code: 'USD', name: 'US dollar', flag: '🇺🇸' },
+  { code: 'AUD', name: 'Australian dollar', flag: '🇦🇺' },
+  { code: 'GBP', name: 'Pound sterling', flag: '🇬🇧' },
+  { code: 'EUR', name: 'Euro', flag: '🇪🇺' },
+  { code: 'JPY', name: 'Japanese yen', flag: '🇯🇵' },
+  { code: 'CNY', name: 'Chinese yuan', flag: '🇨🇳' },
+  { code: 'FJD', name: 'Fiji dollar', flag: '🇫🇯' },
+  { code: 'CAD', name: 'Canadian dollar', flag: '🇨🇦' },
+  { code: 'SGD', name: 'Singapore dollar', flag: '🇸🇬' },
+  { code: 'THB', name: 'Thai baht', flag: '🇹🇭' },
+  { code: 'KRW', name: 'South Korean won', flag: '🇰🇷' },
+  { code: 'PHP', name: 'Philippine peso', flag: '🇵🇭' },
+  { code: 'IDR', name: 'Indonesian rupiah', flag: '🇮🇩' },
+  { code: 'PGK', name: 'Papua New Guinean kina', flag: '🇵🇬' },
+  { code: 'WST', name: 'Samoan tālā', flag: '🇼🇸' },
+  { code: 'TOP', name: 'Tongan paʻanga', flag: '🇹🇴' },
+  { code: 'VUV', name: 'Vanuatu vatu', flag: '🇻🇺' },
+  { code: 'SBD', name: 'Solomon Islands dollar', flag: '🇸🇧' },
+  { code: 'XPF', name: 'CFP franc', flag: '🇳🇨' },
+  { code: 'HKD', name: 'Hong Kong dollar', flag: '🇭🇰' },
+  { code: 'MYR', name: 'Malaysian ringgit', flag: '🇲🇾' },
+  { code: 'INR', name: 'Indian rupee', flag: '🇮🇳' },
+  { code: 'VND', name: 'Vietnamese dong', flag: '🇻🇳' },
+  { code: 'TWD', name: 'New Taiwan dollar', flag: '🇹🇼' }
+];
+const FX_SYM = { USD: 'US$', AUD: 'A$', GBP: '£', EUR: '€', JPY: '¥', CNY: 'CN¥', CAD: 'C$', SGD: 'S$', HKD: 'HK$', THB: '฿', KRW: '₩', PHP: '₱', IDR: 'Rp', INR: '₹', VND: '₫', MYR: 'RM', FJD: 'FJ$', TWD: 'NT$', WST: 'WS$', TOP: 'T$', PGK: 'K', VUV: 'Vt', SBD: 'SI$', XPF: 'CFPF ', NZD: 'NZ$' };
+const FX_ZERO_DEC = /^(JPY|KRW|IDR|VND|VUV|XPF)$/;
+const FX_CACHE_KEY = 'fxRatesV1';
+const FX_TTL_MS = 60 * 60 * 1000;
+const FX_ER_URL = 'https://open.er-api.com/v6/latest/NZD';
+const FX_FRANK_LATEST = 'https://api.frankfurter.dev/v1/latest?base=NZD';
+const FX_FRANK_DAY = d => 'https://api.frankfurter.dev/v1/' + d + '?base=NZD';
+let FX = null, fxAmt = 1, fxCode = 'USD', fxBusy = false;
+
+function fxNzDate(ms = Date.now()) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(ms)).map(x => [x.type, x.value]));
+  return p.year + '-' + p.month + '-' + p.day;
+}
+function fxPrevWeekday(iso) {
+  let d = new Date(String(iso || '') + 'T12:00:00Z');
+  if (!Number.isFinite(d.getTime())) return '';
+  for (let i = 0; i < 8; i++) {
+    d = new Date(d.getTime() - 864e5);
+    const wd = d.getUTCDay();
+    if (wd !== 0 && wd !== 6) return d.toISOString().slice(0, 10);
+  }
+  return '';
+}
+function fxInvert(rates) {
+  const out = {};
+  if (!rates || typeof rates !== 'object') return out;
+  for (const c of Object.keys(rates)) {
+    const n = Number(rates[c]);
+    if (c && c !== 'NZD' && Number.isFinite(n) && n > 0) out[c] = 1 / n;
+  }
+  return out;
+}
+function fxMergeRates(a, b) {
+  const out = Object.assign({}, a || {});
+  if (b) for (const c of Object.keys(b)) if (!(c in out) && Number(b[c]) > 0) out[c] = b[c];
+  return out;
+}
+function fxUnit(nzd) {
+  if (!(nzd > 0)) return 1;
+  if (nzd < 0.001) return 10000;
+  if (nzd < 0.01) return 1000;
+  if (nzd < 0.1) return 100;
+  return 1;
+}
+function fxFmtNzd(n, asAmount) {
+  if (n == null || !Number.isFinite(n)) return '–';
+  const abs = Math.abs(n);
+  let d = 2;
+  if (asAmount) d = abs < 0.01 ? 4 : 2;
+  else if (abs < 0.001) d = 6;
+  else if (abs < 0.01) d = 5;
+  else if (abs < 1) d = 4;
+  else if (abs < 10) d = 3;
+  return 'NZ$' + n.toLocaleString('en-NZ', { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+function fxFmtForeign(n, code) {
+  if (n == null || !Number.isFinite(n)) return '–';
+  const zero = FX_ZERO_DEC.test(code);
+  const d = zero ? 0 : (Math.abs(n) < 1 ? 4 : 2);
+  return n.toLocaleString('en-NZ', { minimumFractionDigits: d, maximumFractionDigits: d }) + ' ' + code;
+}
+function fxSym(code, n) {
+  const s = FX_SYM[code] || (code + ' ');
+  if (n == null) return s;
+  const zero = FX_ZERO_DEC.test(code);
+  const d = zero ? 0 : (Math.abs(n) < 1 ? 4 : 2);
+  return s + n.toLocaleString('en-NZ', { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+function fxChange(now, prev) {
+  if (!(now > 0) || !(prev > 0)) return { dir: '', pct: 0, label: '' };
+  const pct = ((now - prev) / prev) * 100;
+  if (!Number.isFinite(pct) || Math.abs(pct) < 0.005) return { dir: 'flat', pct: 0, label: 'no change' };
+  const dir = pct > 0 ? 'up' : 'down';
+  const n = Math.abs(pct).toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return { dir, pct, label: (dir === 'up' ? '▲ ' : '▼ ') + n + '%' };
+}
+function fxConvert(amount, code, rates) {
+  const n = Number(amount), rate = rates && rates[code];
+  if (!Number.isFinite(n) || !(rate > 0)) return null;
+  return n * rate;
+}
+function fxParseEr(d) {
+  if (!d || d.result !== 'success' || !d.rates) return null;
+  const at = (Number(d.time_last_update_unix) || 0) * 1000 || Date.now();
+  return { rates: fxInvert(d.rates), at, source: 'open.er-api.com', date: fxNzDate(at) };
+}
+function fxParseFrank(d, sourceDate) {
+  if (!d || !d.rates) return null;
+  const date = String(d.date || sourceDate || '');
+  return { rates: fxInvert(d.rates), at: date ? Date.parse(date + 'T16:00:00Z') || Date.now() : Date.now(), source: 'Frankfurter (ECB)', date: date || fxNzDate() };
+}
+function fxUpdatedLabel(st) {
+  if (!st || !st.at) return '';
+  const d = new Date(st.at);
+  const when = new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', weekday: 'long', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }).format(d);
+  const prefix = st.offline ? 'Showing saved rates from ' : 'Updated ';
+  return prefix + when + ' (NZ time)';
+}
+function fxLoadCache() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(FX_CACHE_KEY) || 'null');
+    if (raw && raw.v === 1 && raw.rates && typeof raw.rates === 'object') return raw;
+  } catch (e) { }
+  return null;
+}
+function fxSaveCache(st) {
+  try {
+    localStorage.setItem(FX_CACHE_KEY, JSON.stringify({ v: 1, rates: st.rates, prev: st.prev || {}, prevDate: st.prevDate || '', date: st.date, at: st.at, source: st.source }));
+  } catch (e) { }
+}
+function fxPromotePrev(cached, latest) {
+  let prev = {}, prevDate = '';
+  if (cached && cached.rates && cached.date && latest && latest.date && cached.date < latest.date) {
+    prev = Object.assign({}, cached.rates);
+    prevDate = cached.date;
+  } else if (cached && cached.prev) {
+    prev = Object.assign({}, cached.prev);
+    prevDate = cached.prevDate || '';
+  }
+  return { prev, prevDate };
+}
+
+/* ---- end world currencies helpers ---- */
+function fxStateOrCache() {
+  if (FX && FX.rates) return FX;
+  const c = fxLoadCache();
+  if (c) return Object.assign({ offline: false }, c);
+  return null;
+}
+function fxRowHtml(item, rates, prev) {
+  const nzd = rates && rates[item.code];
+  if (!(nzd > 0)) return '';
+  const unit = fxUnit(nzd);
+  const ch = fxChange(nzd, prev && prev[item.code]);
+  const chHtml = ch.dir ? `<span class="fxchg ${esc(ch.dir)}" title="Change from the previous day">${esc(ch.label)}</span>` : '';
+  return `<div class="fxrow" role="listitem">
+    <div class="fxflag" aria-hidden="true">${item.flag}</div>
+    <div class="fxmeta"><div class="t">${esc(item.code)} · ${esc(item.name)}</div><div class="s">${unit === 1 ? '1 ' + esc(item.code) : fxFmtForeign(unit, item.code)} = ${esc(fxFmtNzd(nzd * unit))}</div></div>
+    <div class="fxvals"><div class="t">${esc(fxFmtNzd(nzd * unit))}</div><div class="s">NZ$1 = ${esc(fxFmtForeign(1 / nzd, item.code))}</div>${chHtml}</div>
+  </div>`;
+}
+function fxCardHtml() {
+  const st = fxStateOrCache();
+  const rates = st && st.rates;
+  const prev = st && st.prev;
+  const usd = rates && rates.USD;
+  const usdCh = fxChange(usd, prev && prev.USD);
+  const amt = Number(fxAmt);
+  const nzdOut = rates ? fxConvert(Number.isFinite(amt) ? amt : 0, fxCode, rates) : null;
+  const cur = FX_LIST.find(x => x.code === fxCode) || FX_LIST[0];
+  const opts = FX_LIST.map(x => `<option value="${x.code}"${x.code === fxCode ? ' selected' : ''}>${x.flag} ${x.code} · ${esc(x.name)}</option>`).join('');
+  let body;
+  if (!st) {
+    body = `<div class="fxoff">${fxBusy ? 'Loading live rates…' : 'Can’t load rates just now. Check the connection and tap Refresh.'}</div>`;
+  } else {
+    const usdHero = usd > 0 ? `<div class="fxhero">
+      <div class="fxflag" aria-hidden="true">🇺🇸</div>
+      <div style="flex:1;min-width:0"><div class="fxbig">US$1 = ${esc(fxFmtNzd(usd))}</div><div class="fxrev">NZ$1 = ${esc(fxSym('USD', 1 / usd))}</div></div>
+      ${usdCh.dir ? `<span class="fxchg ${esc(usdCh.dir)}">${esc(usdCh.label)}</span>` : ''}
+    </div>` : '';
+    const rows = FX_LIST.map(x => fxRowHtml(x, rates, prev)).filter(Boolean).join('');
+    const missing = !rates ? '' : FX_LIST.filter(x => !(rates[x.code] > 0)).map(x => x.code).join(', ');
+    body = `${st.offline ? `<div class="fxoff">${esc(fxUpdatedLabel(st))}. These are the last rates saved on this phone.</div>` : ''}
+      ${usdHero}
+      <div class="fxconv">
+        <label class="field" style="flex:1.2;margin:0"><span>Amount</span><input id="fxAmt" type="text" inputmode="decimal" autocomplete="off" value="${esc(String(fxAmt))}" aria-label="Amount to convert" oninput="fxSetAmt(this.value)"></label>
+        <label class="field" style="flex:1.4;margin:0"><span>Currency</span><select id="fxCode" class="sel" aria-label="Currency" onchange="fxSetCode(this.value)">${opts}</select></label>
+        <div class="fxresult" aria-live="polite"><span class="muted" style="font-size:.72rem">In New Zealand dollars</span><b>${nzdOut == null ? '–' : esc(fxFmtNzd(nzdOut, true))}</b></div>
+      </div>
+      <div class="fxrows" role="list" aria-label="World currencies against the NZ dollar">${rows || '<div class="fxoff">No rates in this update for the listed currencies.</div>'}</div>
+      ${missing ? `<div class="s muted" style="margin-top:8px">Not in this update: ${esc(missing)}</div>` : ''}`;
+  }
+  const updated = st && !st.offline ? fxUpdatedLabel(st) : (st ? '' : '');
+  return `<div class="card fxcard" id="fxcard">
+    <div class="fxhead">
+      <h2>World currencies</h2>
+      <button type="button" class="btn small" onclick="fxRefresh(true)" ${fxBusy ? 'disabled' : ''}>${I('refresh')} Refresh</button>
+    </div>
+    <div class="fxsub">Against the New Zealand dollar · mid-market guide only</div>
+    ${body}
+    <div class="fxfoot">${updated ? esc(updated) : ''}${st && st.source ? (updated ? ' · ' : '') + 'Source: ' + esc(String(st.source).replace(/-/g, '‑')) : ''}</div>
+  </div>`;
+}
+function fxPatchCard() {
+  const el = document.getElementById('fxcard');
+  if (!el) return false;
+  const wrap = document.createElement('div');
+  wrap.innerHTML = fxCardHtml();
+  const next = wrap.firstElementChild;
+  if (next) el.replaceWith(next);
+  return true;
+}
+function fxSetAmt(v) {
+  const s = String(v == null ? '' : v).replace(/,/g, '').trim();
+  const n = s === '' ? 0 : Number(s);
+  fxAmt = s === '' ? '' : (Number.isFinite(n) ? (s.endsWith('.') || /^-?\d+\.$/.test(s) ? s : n) : fxAmt);
+  if (document.getElementById('fxAmt') === document.activeElement) {
+    const b = document.querySelector('#fxcard .fxresult b');
+    const rates = fxStateOrCache() && fxStateOrCache().rates;
+    const out = rates ? fxConvert(Number(s === '' ? 0 : s), fxCode, rates) : null;
+    if (b) b.textContent = out == null ? '–' : fxFmtNzd(out, true);
+    return;
+  }
+  fxPatchCard();
+}
+function fxSetCode(c) {
+  if (FX_LIST.some(x => x.code === c)) fxCode = c;
+  fxPatchCard();
+  const inp = document.getElementById('fxAmt');
+  if (inp) try { inp.focus(); } catch (e) { }
+}
+async function fxFetchJson(url) {
+  const r = await fetch(url, { cache: 'no-store' });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+async function fxFetchLatest() {
+  try {
+    const d = fxParseEr(await fxFetchJson(FX_ER_URL));
+    if (d && d.rates && d.rates.USD) return d;
+  } catch (e) { }
+  const d = fxParseFrank(await fxFetchJson(FX_FRANK_LATEST));
+  if (d && d.rates && Object.keys(d.rates).length) return d;
+  throw new Error('No rates');
+}
+async function fxFetchPrevRates(beforeDate) {
+  let date = fxPrevWeekday(beforeDate);
+  for (let i = 0; i < 4 && date; i++) {
+    try {
+      const d = fxParseFrank(await fxFetchJson(FX_FRANK_DAY(date)), date);
+      if (d && d.rates && Object.keys(d.rates).length) return d;
+    } catch (e) { }
+    date = fxPrevWeekday(date);
+  }
+  return null;
+}
+async function fxRefresh(force) {
+  const hash = (location.hash || '#home').replace(/^#/, '').split('/')[0];
+  const onPage = hash === 'money' || hash === 'currencies';
+  const cached = fxLoadCache();
+  if (!FX && cached) FX = Object.assign({ offline: false }, cached);
+  if (!force && FX && FX.rates && Date.now() - (FX.at || 0) < FX_TTL_MS) {
+    if (onPage) fxPatchCard();
+    return;
+  }
+  if (fxBusy) return;
+  fxBusy = true;
+  if (onPage) fxPatchCard();
+  try {
+    const latest = await fxFetchLatest();
+    const promoted = fxPromotePrev(cached || FX, latest);
+    let prev = promoted.prev, prevDate = promoted.prevDate;
+    const needFrank = FX_LIST.some(x => !(prev && prev[x.code] > 0) && /^(USD|AUD|GBP|EUR|JPY|CNY|CAD|SGD|THB|KRW|PHP|IDR|HKD|MYR|INR)$/.test(x.code));
+    if (needFrank) {
+      try {
+        const hist = await fxFetchPrevRates(latest.date);
+        if (hist && hist.rates) {
+          prev = fxMergeRates(prev, hist.rates);
+          if (!prevDate) prevDate = hist.date;
+        }
+      } catch (e) { }
+    }
+    FX = { rates: latest.rates, prev, prevDate, date: latest.date, at: latest.at || Date.now(), source: latest.source, offline: false };
+    fxSaveCache(FX);
+  } catch (e) {
+    if (cached && cached.rates) FX = Object.assign({}, cached, { offline: true });
+    else FX = { rates: null, prev: {}, at: 0, offline: true, err: true };
+  }
+  fxBusy = false;
+  if (onPage && !sheetOpen) fxPatchCard();
+}
+function CurrenciesPage() {
+  fxRefresh(false);
+  return `<button class="back" onclick="go('#money')">${I('left')} Money</button>` +
+    moneyTabs('currencies') +
+    header('World currencies', 'Live rates against the New Zealand dollar') +
+    fxCardHtml();
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  const h = (location.hash || '').replace(/^#/, '').split('/')[0];
+  if (h === 'money' || h === 'currencies') fxRefresh(false);
+});
+/* ---- end world currencies ---- */
+
 /* ---- 3. MONEY & WORK HUB (#money): Bills, Budget, Cash flow, Not bills, Power, Work, Commission, Wage, Loans ---- */
 function moneyHubMenu(k) {
   const m = { bills: '#bills', cf: '#cashflow', pwr: '#power', work: '#work', loans: '#loans' }[k] || '#bills';
@@ -32497,10 +32809,12 @@ function MoneyHubPage() {
     tbList('loans', 'Loans', loans.length || 1, loanCards, false, 'moneyHub')
   ].join('');
 
+  fxRefresh(false);
   return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` +
     moneyTabs('money') +
+    fxCardHtml() +
     `<div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#064e3b,#047857 50%,#0f172a)"></div>
-    <div class="tbtop"><div><h1>Money &amp; Work</h1><div style="font-size:.82rem;opacity:.9">Bills, fortnightly budget, cash flow, SolarZero power, roster, commission &amp; loans</div></div><button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div>
+    <div class="tbtop"><div><h1>Money &amp; Work</h1><div style="font-size:.82rem;opacity:.9">Bills, fortnightly budget, cash flow, world currencies, SolarZero power, roster, commission &amp; loans</div></div><button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div>
     <div class="tblists">${cols}</div></div>
     <div class="foot">Swipe sideways between Money &amp; Work columns, or use the tabs above to open any section.</div>`;
 }
