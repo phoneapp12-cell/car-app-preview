@@ -1178,6 +1178,28 @@
     }
     return d;
   }
+  function flightPath(a, b) {
+    if (!a || !b) return '';
+    const bend = Math.min(190, Math.max(36, Math.hypot(b.x - a.x, b.y - a.y) * .16));
+    return 'M ' + a.x + ' ' + a.y + ' Q ' + ((a.x + b.x) / 2) + ' ' + ((a.y + b.y) / 2 - bend) + ' ' + b.x + ' ' + b.y;
+  }
+  function journeyPath(stops, firstLevel) {
+    if (!stops || stops.length < 2) return '';
+    firstLevel = firstLevel || 1;
+    const parts = [];
+    let road = [stops[0]];
+    for (let i = 1; i < stops.length; i++) {
+      const fromN = firstLevel + i - 1, toN = fromN + 1;
+      if (countryForLevel(fromN) !== countryForLevel(toN)) {
+        const d = icingPath(road);
+        if (d) parts.push(d);
+        parts.push(flightPath(stops[i - 1], stops[i]));
+        road = [stops[i]];
+      } else road.push(stops[i]);
+    }
+    if (road.length > 1) parts.push(icingPath(road));
+    return parts.filter(Boolean).join(' ');
+  }
   // The icing only covers stops already cleared. The road still to come is a faint dotted line.
   function clearedCount(stars) {
     stars = stars || [];
@@ -1186,12 +1208,12 @@
     return n;
   }
   function beenPath(stars) {
-    return icingPath(MAP_STOPS.slice(0, clearedCount(stars)));
+    return journeyPath(MAP_STOPS.slice(0, clearedCount(stars)), 1);
   }
   function aheadPath(stars) {
     const n = clearedCount(stars);
     if (n >= MAP_STOPS.length) return '';
-    return icingPath(MAP_STOPS.slice(Math.max(0, n - 1)));
+    return journeyPath(MAP_STOPS.slice(Math.max(0, n - 1)), Math.max(1, n));
   }
   // 1.9.222 Australia outline (from real coastline points; x = lon, y = lat, scaled into the map).
   const AUS_PATH = 'M 28 1932 L 32 1960 L 33 1976 L 38 2004 L 41 2020 L 47 2040 L 47 2058 L 41 2067 L 54 2075 L 67 2075 L 84 2063 L 114 2063 L 136 2045 L 162 2038 L 179 2036 L 196 2043 L 206 2052 L 218 2073 L 226 2062 L 236 2053 L 237 2071 L 243 2073 L 242 2082 L 252 2097 L 261 2108 L 273 2112 L 286 2117 L 296 2109 L 304 2114 L 311 2120 L 321 2108 L 341 2102 L 344 2082 L 353 2062 L 364 2044 L 370 2026 L 373 2005 L 370 1989 L 368 1970 L 355 1954 L 349 1938 L 335 1921 L 325 1910 L 310 1897 L 307 1877 L 303 1860 L 302 1850 L 291 1846 L 285 1828 L 278 1808 L 273 1822 L 270 1840 L 269 1860 L 263 1882 L 252 1881 L 239 1873 L 226 1864 L 218 1855 L 221 1840 L 229 1824 L 220 1822 L 205 1821 L 193 1815 L 181 1823 L 172 1833 L 167 1854 L 155 1858 L 144 1846 L 132 1850 L 120 1868 L 115 1880 L 103 1887 L 95 1903 L 76 1910 L 58 1917 L 46 1921 L 34 1931 Z';
@@ -1306,6 +1328,25 @@
       atlasPill(344, 1492, 246, '09 / MICRONESIA', 'WESTERN PACIFIC', 'LEVELS 71–75 · FIVE NEW COUNTRIES') +
       '</g>';
   }
+  function mapTerrain() {
+    const hills = [[311, 158, .72], [106, 1000, .62], [177, 1948, 1.05], [224, 1916, .74], [-270, 1238, .72], [-132, 1520, .58], [288, 1240, .62]];
+    const groves = [[326, 210, .55], [318, 251, .48], [93, 980, .55], [194, 1927, .68], [148, 1980, .62], [252, 1867, .5], [-148, 1548, .52], [281, 1460, .48]];
+    const hillSvg = hills.map(function (p, i) {
+      const fill = ['#9ed9a7', '#b7e5a7', '#a9dfb2'][i % 3];
+      return '<g transform="translate(' + p[0] + ' ' + p[1] + ') scale(' + p[2] + ')" opacity=".72">' +
+        '<path d="M-34 12 C-28 -1 -19 -9 -9 -6 C-1 -22 12 -20 19 -6 C29 -12 38 -3 40 12 Z" fill="' + fill + '" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/>' +
+        '<path d="M-20 5 Q-8 -2 3 5 T27 5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity=".8"/></g>';
+    }).join('');
+    const groveSvg = groves.map(function (p, i) {
+      return '<g transform="translate(' + p[0] + ' ' + p[1] + ') scale(' + p[2] + ')" opacity=".84">' +
+        '<ellipse cx="0" cy="8" rx="19" ry="4" fill="#5e9977" opacity=".2"/>' +
+        '<circle cx="-9" cy="1" r="8" fill="#72c89a" stroke="#fff" stroke-width="1.8"/><circle cx="1" cy="-4" r="10" fill="' + (i % 2 ? '#80d3a2' : '#63bd8d') + '" stroke="#fff" stroke-width="1.8"/><circle cx="12" cy="2" r="7" fill="#9bdfaa" stroke="#fff" stroke-width="1.8"/>' +
+        '<circle cx="-2" cy="-7" r="2.2" fill="#d9f7ce" opacity=".9"/></g>';
+    }).join('');
+    return '<g class="sr-terrain" aria-hidden="true" pointer-events="none">' + hillSvg + groveSvg +
+      '<g transform="translate(-226 1300)" opacity=".82"><path d="M-42 20 L-19 -19 L0 13 L19 -31 L48 20 Z" fill="#efc99b" stroke="#fff" stroke-width="3" stroke-linejoin="round"/><path d="M-26 -7 L-19 -19 L-12 -7 L-18 -10 Z M11 -17 L19 -31 L28 -13 L19 -19 Z" fill="#fff"/><path d="M-35 21 Q0 10 40 21" fill="none" stroke="#c7e8ba" stroke-width="6" stroke-linecap="round"/></g>' +
+      '</g>';
+  }
   function nzMapSvg() {
     const live = ''; // the icing is filled in from the stops this player has already cleared
     const future = ''; // 1.9.222 coming-soon cities are markers only
@@ -1317,7 +1358,7 @@
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + MAP_X0 + ' 0 ' + MAP_VW + ' ' + MAP_H + '" width="' + MAP_VW + '" height="' + MAP_H + '" aria-hidden="true" class="nzsvg">' +
       '<defs>' +
       '<linearGradient id="sr-sea" x1="0" y1="0" x2="0" y2="1">' +
-      '<stop offset="0" stop-color="#9be7ff"/><stop offset=".45" stop-color="#8fd9f8"/><stop offset="1" stop-color="#b8f3de"/>' +
+      '<stop offset="0" stop-color="#8fe7e1"/><stop offset=".45" stop-color="#7bdad6"/><stop offset="1" stop-color="#b8f3de"/>' +
       '</linearGradient>' +
       '<linearGradient id="sr-land" x1="0" y1="0" x2="1" y2="1">' +
       '<stop offset="0" stop-color="#ffd5e7"/><stop offset=".25" stop-color="#ffd2bd"/><stop offset=".5" stop-color="#ffe8a1"/><stop offset=".75" stop-color="#c4efcd"/><stop offset="1" stop-color="#c7e2ff"/>' +
@@ -1399,6 +1440,7 @@
       // Asia polygon order: Southeast/South Asia and Silk Road countries, followed by East Asia.
       ASIA_LAND.map(function (pts, i) { return '<path filter="url(#sr-soft)" fill="url(#' + asiaCandy[i % asiaCandy.length] + ')" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="' + ausPath(pts) + '"/>'; }).join('') +
       ASIA_EAST_LAND.map(function (pts, i) { return '<path filter="url(#sr-soft)" fill="url(#' + asiaCandy[(i + 3) % asiaCandy.length] + ')" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="' + ausPath(pts) + '"/>'; }).join('') +
+      mapTerrain() +
       '<path d="M120 1960 C150 1940 190 1950 210 1980 C190 1990 150 1990 120 1960 Z" fill="#ffd9a8" opacity=".6"/>' +
       '<path d="M236 1930 C250 1918 270 1922 276 1936 C264 1944 246 1942 236 1930 Z" fill="#ffd9a8" opacity=".55"/>' +
       '<circle class="sr-bob" cx="380" cy="1860" r="6" fill="#ffb347" opacity=".5"/><circle class="sr-bob" cx="30" cy="2160" r="7" fill="#ff8ab8" opacity=".45"/>' +
@@ -1408,11 +1450,13 @@
       mapAtmosphere() +
       mapAtlasType() +
       '<g class="sr-plane" transform="translate(219 1195) rotate(166)"><path d="M0 -14 L3 -4 L14 2 L14 5 L3 2 L2 10 L6 13 L6 15 L0 13 L-6 15 L-6 13 L-2 10 L-3 2 L-14 5 L-14 2 L-3 -4 Z" fill="#fff" stroke="#3d8bfd" stroke-width="1.5"/></g>' +
-      '<path id="sr-future" d="' + future + '" fill="none" stroke="#1565b0" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="2.4 8" opacity=".95"/>' +
+      '<path id="sr-future-border" d="' + future + '" fill="none" stroke="#fff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 8" opacity=".92"/>' +
+      '<path id="sr-future" d="' + future + '" fill="none" stroke="#ff6fa8" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 8" opacity=".96"/>' +
       '<path id="sr-path-wide" d="' + live + '" fill="none" stroke="url(#sr-icing)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>' +
       '<path id="sr-path-dash" d="' + live + '" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 10" opacity=".9"/>' +
       '<path id="sr-path-win" d="" fill="none" stroke="#fff6a8" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>' +
       '<g id="sr-travel-plane" display="none" pointer-events="none" filter="url(#sr-soft)"><circle r="24" fill="#fff6c8" fill-opacity=".92" stroke="#fff" stroke-width="4"/><circle r="18" fill="none" stroke="#ff6fa8" stroke-width="2.5"/><path d="M0 -14 L3 -4 L14 2 L14 5 L3 2 L2 10 L6 13 L6 15 L0 13 L-6 15 L-6 13 L-2 10 L-3 2 L-14 5 L-14 2 L-3 -4 Z" fill="#fff" stroke="#2878c8" stroke-width="2"/></g>' +
+      '<g id="sr-travel-car" display="none" pointer-events="none" filter="url(#sr-soft)"><ellipse cx="0" cy="11" rx="27" ry="6" fill="#3e6674" opacity=".28"/><path d="M-25 5 L-23 -4 Q-22 -7 -17 -8 L-10 -10 L-4 -20 Q-2 -22 2 -22 L12 -22 Q16 -21 18 -17 L24 -8 L29 -5 Q31 -3 31 2 L29 7 Q28 10 24 10 L-20 10 Q-25 9 -25 5 Z" fill="#ee4055" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/><path d="M-8 -10 L-3 -18 Q-2 -19 1 -19 L5 -19 L5 -10 Z M8 -19 L12 -19 Q14 -18 16 -15 L19 -10 L8 -10 Z" fill="#bceeff" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/><path d="M-22 -2 L-17 -5 M24 -2 L28 0" fill="none" stroke="#fff6c8" stroke-width="2.3" stroke-linecap="round"/><circle cx="-15" cy="9" r="6" fill="#3e3844" stroke="#fff" stroke-width="1.7"/><circle cx="18" cy="9" r="6" fill="#3e3844" stroke="#fff" stroke-width="1.7"/><circle cx="-15" cy="9" r="2.5" fill="#dcebf0"/><circle cx="18" cy="9" r="2.5" fill="#dcebf0"/><path d="M-9 -21 Q2 -24 12 -21" fill="none" stroke="#ffb0b4" stroke-width="2" stroke-linecap="round"/></g>' +
       '</svg>'
     );
   }
@@ -4413,6 +4457,8 @@
   root.SugarRush.normalizePostcardProgress = normalizePostcardProgress;
   root.SugarRush.addPostcardPiece = addPostcardPiece;
   root.SugarRush.countryForLevel = countryForLevel;
+  root.SugarRush.flightPath = flightPath;
+  root.SugarRush.journeyPath = journeyPath;
   root.SugarRush.createSessionLevelAccess = createSessionLevelAccess;
 
   if (!root.document) return;
@@ -6544,17 +6590,20 @@
     const wide = stage && stage.querySelector('#sr-path-wide');
     const dash = stage && stage.querySelector('#sr-path-dash');
     const fut = stage && stage.querySelector('#sr-future');
+    const futBorder = stage && stage.querySelector('#sr-future-border');
     if (wide) wide.setAttribute('d', live);
     if (dash) dash.setAttribute('d', live);
     if (fut) fut.setAttribute('d', future);
+    if (futBorder) futBorder.setAttribute('d', future);
     path.innerHTML = '';
     const here = Math.min(LV_COUNT, Math.max(1, prog.open));
     LEVELS.forEach((lv, i) => {
       const n = i + 1, open = sessionLevelAccess.allows(n, prog.open), stars = prog.stars[i] || 0, stop = MAP_STOPS[i], country = countryForLevel(n);
       const countryStop = country && country.toLowerCase() === stop.place.toLowerCase();
+      const countryStart = country && country !== countryForLevel(n - 1);
       const b = doc.createElement('button');
       b.type = 'button';
-      b.className = 'lv lab-' + (stop.label || 'right') + (stop.lift ? ' lift' : '') + (lv.theme === 'sarah' ? ' sarah' : '') + (lv.hard ? ' hard hard' + lv.hard : '') + (countryStop ? ' country-stop' : '') + (open ? ' open' : '') + (stars ? ' done' : '') + (n === here ? ' here' : '') + ' kind-' + (stop.kind || 'town');
+      b.className = 'lv lab-' + (stop.label || 'right') + (stop.lift ? ' lift' : '') + (lv.theme === 'sarah' ? ' sarah' : '') + (lv.hard ? ' hard hard' + lv.hard : '') + (countryStop ? ' country-stop' : '') + (countryStart ? ' country-start' : '') + (open ? ' open' : '') + (stars ? ' done' : '') + (n === here ? ' here' : '') + ' kind-' + (stop.kind || 'town');
       b.disabled = !open;
       b.dataset.n = String(n);
       b.dataset.country = country;
@@ -7396,7 +7445,7 @@
   function animatePathSegment(fromN, toN) {
     const el = doc.querySelector('#sr-path-win');
     if (!el || !fromN || !toN || toN <= fromN) return;
-    const d = icingPath([MAP_STOPS[fromN - 1], MAP_STOPS[toN - 1]]);
+    const d = journeyPath(MAP_STOPS.slice(fromN - 1, toN), fromN);
     el.setAttribute('d', d);
     el.classList.add('on');
     try {
@@ -7427,19 +7476,22 @@
   async function cinematicTravel(fromN, toN) {
     const view = $('mapview'), stage = $('mapstage'), svg = stage && stage.querySelector('svg.nzsvg');
     const plane = svg && svg.querySelector('#sr-travel-plane');
+    const car = svg && svg.querySelector('#sr-travel-car');
+    const isFlight = countryForLevel(fromN) !== countryForLevel(toN);
+    const vehicle = isFlight ? plane : car;
     const a = MAP_STOPS[fromN - 1], b = MAP_STOPS[toN - 1];
-    if (reduce || !view || !stage || !svg || !plane || !a || !b || toN <= fromN) return false;
+    if (reduce || !view || !stage || !svg || !plane || !car || !vehicle || !a || !b || toN <= fromN) return false;
     const track = doc.createElementNS('http://www.w3.org/2000/svg', 'path');
-    track.setAttribute('d', icingPath([a, b]));
+    track.setAttribute('d', journeyPath(MAP_STOPS.slice(fromN - 1, toN), fromN));
     track.setAttribute('fill', 'none');
-    track.setAttribute('stroke', '#ff6fa8');
-    track.setAttribute('stroke-width', '9');
+    track.setAttribute('stroke', isFlight ? '#77d2e5' : '#ff6fa8');
+    track.setAttribute('stroke-width', isFlight ? '5.5' : '11');
     track.setAttribute('stroke-linecap', 'round');
-    track.setAttribute('opacity', '.8');
+    track.setAttribute('opacity', isFlight ? '.94' : '.88');
     track.setAttribute('stroke-dasharray', '1');
     track.setAttribute('stroke-dashoffset', '1');
-    track.style.filter = 'drop-shadow(0 2px 4px rgba(72,67,112,.38))';
-    svg.insertBefore(track, plane);
+    track.style.filter = isFlight ? 'drop-shadow(0 1px 4px rgba(44,120,152,.34))' : 'drop-shadow(0 2px 4px rgba(72,67,112,.38))';
+    svg.insertBefore(track, vehicle);
     let length = 0;
     try { length = track.getTotalLength(); } catch (e) { }
     if (!(length > 0)) { track.remove(); return false; }
@@ -7447,7 +7499,7 @@
       transform: stage.style.transform, transition: stage.style.transition,
       origin: stage.style.transformOrigin, pointer: stage.style.pointerEvents,
       overflow: view.style.overflow, touchAction: view.style.touchAction,
-      planeDisplay: plane.getAttribute('display'), travelClass: stage.classList.contains('travel-shot')
+      planeDisplay: plane.getAttribute('display'), carDisplay: car.getAttribute('display'), travelClass: stage.classList.contains('travel-shot')
     };
     let completed = false;
     try {
@@ -7467,10 +7519,10 @@
         const tx = vw / 2 - p.x * scale, ty = vh / 2 - p.y * scale;
         stage.style.transform = 'translate3d(' + tx.toFixed(1) + 'px,' + ty.toFixed(1) + 'px,0) scale(' + scale.toFixed(3) + ')';
       };
-      const setPlane = function (p, p1, p2) {
+      const setVehicle = function (p, p1, p2) {
         const dx = p2.x - p1.x, dy = p2.y - p1.y;
-        const deg = Math.atan2(dy, dx) * 180 / Math.PI + 90;
-        plane.setAttribute('transform', 'translate(' + p.x.toFixed(2) + ' ' + p.y.toFixed(2) + ') rotate(' + deg.toFixed(1) + ')');
+        const deg = Math.atan2(dy, dx) * 180 / Math.PI + (isFlight ? 90 : 0);
+        vehicle.setAttribute('transform', 'translate(' + p.x.toFixed(2) + ' ' + p.y.toFixed(2) + ') rotate(' + deg.toFixed(1) + ')');
       };
       const first = track.getPointAtLength(0), last = track.getPointAtLength(length);
       const farScale = Math.min(vw / sw, vh / sh) * .92, closeScale = 1.45;
@@ -7479,8 +7531,8 @@
       stage.style.transition = 'transform 460ms cubic-bezier(.2,.8,.2,1)';
       camera(farScale, { x: sw / 2, y: sh / 2 });
       await wait(650);
-      plane.setAttribute('display', 'inline');
-      setPlane(first, first, track.getPointAtLength(Math.min(length, 5)));
+      vehicle.setAttribute('display', 'inline');
+      setVehicle(first, first, track.getPointAtLength(Math.min(length, 5)));
       stage.style.transition = 'transform 420ms cubic-bezier(.2,.8,.2,1)';
       camera(closeScale, toStage(first));
       await wait(450);
@@ -7496,7 +7548,7 @@
           const eased = t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
           const d = length * eased, p = track.getPointAtLength(d);
           const p1 = track.getPointAtLength(Math.max(0, d - 5)), p2 = track.getPointAtLength(Math.min(length, d + 5));
-          setPlane(p, p1, p2);
+          setVehicle(p, p1, p2);
           track.setAttribute('stroke-dashoffset', String(length * (1 - eased)));
           camera(closeScale, toStage(p));
           if (t < 1) raf(frame); else resolve();
@@ -7519,7 +7571,10 @@
       view.style.touchAction = saved.touchAction;
       if (saved.planeDisplay == null) plane.removeAttribute('display');
       else plane.setAttribute('display', saved.planeDisplay);
+      if (saved.carDisplay == null) car.removeAttribute('display');
+      else car.setAttribute('display', saved.carDisplay);
       plane.removeAttribute('transform');
+      car.removeAttribute('transform');
       track.remove();
     }
     if (completed) scrollMapTo(toN, { behavior: 'auto' });
