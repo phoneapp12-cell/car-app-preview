@@ -265,20 +265,35 @@
     return `<div class="today-drow">${avHtml(x.name, i)}<div class="who"><b>${esc(x.name)}</b><small>${esc(x.sub || '')}</small></div><div class="when">${esc(when)}</div></div>`;
   }
 
+  function gameBest(kind) {
+    try {
+      if (kind === 'sugar') {
+        const lv = sugarLevel();
+        return lv > 1 ? 'Level ' + lv : '';
+      }
+      const list = (typeof IBScores !== 'undefined' && IBScores.localBests) ? IBScores.localBests(kind) : [];
+      let n = 0;
+      (list || []).forEach(x => { if (+x.score > n) n = +x.score; });
+      return n ? 'Best ' + n.toLocaleString('en-NZ') : '';
+    } catch (e) { return ''; }
+  }
   function gameTiles() {
     const lv = sugarLevel();
+    const sugarBest = gameBest('sugar');
+    const scrabBest = gameBest('scrabble');
+    const tetBest = gameBest('tetris');
     const sugar = (typeof sugarOk !== 'function' || sugarOk())
-      ? `<button type="button" class="today-game sr" data-art="sugar"><b>🍬  Sugar Rush</b><small>You’re on level ${lv} · Play</small></button>`
-      : `<button type="button" class="today-game sr" disabled><b>🍬  Sugar Rush</b><small>Coming soon</small></button>`;
+      ? `<button type="button" class="today-game today-gtile sr" data-art="sugar"><span class="gtile-art" aria-hidden="true"><span class="gtile-candy c1"></span><span class="gtile-candy c2"></span><span class="gtile-candy c3"></span></span><span class="gtile-body"><b class="gtile-name">Sugar Rush</b><small class="gtile-hook">Match sweets on a map from Onerahi to Asia.</small>${sugarBest ? '<small class="gtile-best">' + sugarBest + '</small>' : ''}<span class="gtile-play" data-gplay="sugar">Play</span></span></button>`
+      : `<button type="button" class="today-game today-gtile sr" disabled><span class="gtile-art" aria-hidden="true"><span class="gtile-candy c1"></span><span class="gtile-candy c2"></span><span class="gtile-candy c3"></span></span><span class="gtile-body"><b class="gtile-name">Sugar Rush</b><small class="gtile-hook">Coming soon</small></span></button>`;
     return `${sugar}
-      <button type="button" class="today-game sc" data-art="scrabble"><b>🔤  Scrabble</b><small>Play a game</small></button>
-      <button type="button" class="today-game te" data-art="tetris"><b>🧱  Tetris</b><small>Play a game</small></button>`;
+      <button type="button" class="today-game today-gtile sc" data-art="scrabble"><span class="gtile-art" aria-hidden="true"><span class="gtile-letter">S</span><span class="gtile-letter">C</span><span class="gtile-letter">R</span></span><span class="gtile-body"><b class="gtile-name">Scrabble</b><small class="gtile-hook">Make words. Play a friend or the computer.</small>${scrabBest ? '<small class="gtile-best">' + scrabBest + '</small>' : ''}<span class="gtile-play" data-gplay="scrabble">Play</span></span></button>
+      <button type="button" class="today-game today-gtile te" data-art="tetris"><span class="gtile-art" aria-hidden="true"><img src="img/play/tetris.svg" alt=""></span><span class="gtile-body"><b class="gtile-name">Tetris</b><small class="gtile-hook">Drop, rotate, clear the line.</small>${tetBest ? '<small class="gtile-best">' + tetBest + '</small>' : ''}<span class="gtile-play" data-gplay="tetris">Play</span></span></button>`;
   }
   function drawGamesPage() {
     const m = $('#feed'); if (!m) return;
-    m.innerHTML = `<div class="today-page"><h1>Let’s play.</h1>
+    m.innerHTML = `<div class="today-page today-games-page"><h1>Let’s play.</h1>
       <p class="lede">Pick a game. Sugar Rush, Scrabble and Tetris all open from here.</p>
-      <div class="today-games">${gameTiles()}</div></div>`;
+      <div class="today-games today-games-hero">${gameTiles()}</div></div>`;
   }
   function drawYouPage() {
     const m = $('#feed'); if (!m) return;

@@ -12,11 +12,17 @@
   [hidden] { display: none !important; }
   .wrap { max-width: 460px; margin: 0 auto; }
   .awning { height: 16px; margin: -12px -12px 10px; background: repeating-linear-gradient(90deg, #ff6fa8 0 22px, #fff 22px 44px); border-radius: 0 0 14px 14px; box-shadow: 0 3px 0 rgba(160,30,90,.15); }
-  /* 1.9.243 Bright wrapped sweets in the sky behind the Sugar Rush banner. */
-  .candy-sky { position: fixed; top: 0; left: 0; right: 0; height: 168px; z-index: 0; pointer-events: none; overflow: hidden; }
-  body.ingame .candy-sky { z-index: 1; }
+  /* 1.9.243 Bright wrapped sweets in the sky behind the Sugar Rush banner.
+     Hidden until a level is on screen so they never flash before the intro or a resume. */
+  .candy-sky { display: none; position: fixed; top: 0; left: 0; right: 0; height: 168px; z-index: 0; pointer-events: none; overflow: hidden; }
+  body.ingame .candy-sky { display: block; z-index: 1; }
   body.ingame .wrap { z-index: 2; }
   body.onmap .candy-sky { display: none; }
+  .awning { display: none; }
+  body.ingame .awning { display: block; }
+  html.sr-wait, html.sr-wait body { background: #16010c !important; }
+  html.sr-wait .wrap { visibility: hidden; }
+  html.sr-wait:not(.sr-after-intro) body { background: #16010c url("img/sugar-rush/sugar-rush-intro-poster-75cbb408.jpg") center/cover no-repeat !important; }
   .wrapc { position: absolute; width: 54px; height: 24px; border-radius: 7px; background: linear-gradient(180deg, var(--hi) 0%, var(--mid) 48%, var(--lo) 100%); transform: rotate(var(--r, -12deg)); box-shadow: 0 3px 0 rgba(90,20,50,.16); animation: wrapbob 3.4s ease-in-out infinite alternate; }
   .wrapc::before, .wrapc::after { content: ""; position: absolute; top: 2px; bottom: 2px; width: 14px; background: linear-gradient(180deg, #fff, var(--hi)); }
   .wrapc::before { left: -11px; clip-path: polygon(100% 0, 0 50%, 100% 100%); }
@@ -155,13 +161,19 @@
   .nzsvg .sr-bob { transform-box: fill-box; transform-origin: center; animation: srbob 3.6s ease-in-out infinite; }
   .nzsvg .sr-ripple-ring { fill: none; stroke: #fff; stroke-width: 2.6; stroke-opacity: .9; opacity: 0; transform-box: fill-box; transform-origin: center; animation: srripple var(--d, 5.2s) ease-out var(--dl, 0s) infinite; }
 
-  .mapbar { position: absolute; top: 0; left: 0; right: 0; z-index: 8; display: flex; align-items: center; gap: 4px; padding: calc(6px + env(safe-area-inset-top, 0px)) 6px 8px max(6px, env(safe-area-inset-left, 0px)); padding-right: max(6px, env(safe-area-inset-right, 0px)); background: linear-gradient(180deg, rgba(255,214,232,.94) 0%, rgba(255,214,232,.78) 62%, rgba(255,214,232,0) 100%); pointer-events: none; }
+  .mapbar { position: absolute; top: 0; left: 0; right: 0; z-index: 30; display: flex; align-items: center; gap: 4px; padding: calc(6px + env(safe-area-inset-top, 0px)) 6px 8px max(6px, env(safe-area-inset-left, 0px)); padding-right: max(6px, env(safe-area-inset-right, 0px)); background: linear-gradient(180deg, rgba(255,214,232,.94) 0%, rgba(255,214,232,.78) 62%, rgba(255,214,232,0) 100%); pointer-events: none; }
   .mapbar > * { pointer-events: auto; }
   .mapbar h1 { flex: 0 1 auto; min-width: 0; font-size: 16px; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .mapbar h1 small { font-size: 11px; }
   @media (max-width: 420px) { .mapbar h1 small { display: none; } }
   .mapbar button { flex: 0 0 auto; min-height: 36px; min-width: 36px; padding: 4px 10px; font-size: 13px; border-radius: 18px; box-shadow: 0 2px 0 #f4a0c4; }
   .iconbtn { white-space: nowrap; font-size: 11px; padding: 4px 8px; }
+  .mapbar #pickicon { display: flex; align-items: center; gap: 4px; min-width: 44px; padding: 4px 8px; }
+  .mapbar #pickicon .face { width: 22px; height: 22px; font-size: 13px; }
+  .mapbar #pickicon .lab { font-size: 11px; font-weight: 800; }
+  .racehd { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .racehd h2 { flex: 1; }
+  .racehd [data-race-icon] { flex: 0 0 auto; min-height: 36px; min-width: 44px; padding: 4px 8px; font-size: 11px; }
   .mapbar button.off { opacity: .55; }
   .mapfoot { position: absolute; left: 0; right: 0; bottom: 0; z-index: 7; display: flex; align-items: center; gap: 8px; padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px)); padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px)); background: linear-gradient(0deg, rgba(255,214,232,.94) 0%, rgba(255,214,232,.7) 60%, rgba(255,214,232,0) 100%); pointer-events: none; }
   .mapfoot > * { pointer-events: auto; }
@@ -170,10 +182,10 @@
   .minishelf i { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: #fff6f9; border: 1.5px dashed #efc2d4; font-style: normal; font-size: 14px; filter: grayscale(1) opacity(.35); }
   .minishelf i.got { filter: none; border-style: solid; border-color: #ffb400; background: radial-gradient(circle at 35% 30%, #fff, #ffe9a8 55%, #ffd36a); }
 
-  .racechip { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 50px); right: max(8px, env(safe-area-inset-right, 0px)); z-index: 7; display: flex; align-items: center; gap: 4px; flex: none; min-height: 34px; padding: 3px 10px 3px 4px; border-radius: 999px; background: rgba(255,255,255,.94); border: 2px solid #ffb3d3; box-shadow: 0 2px 0 rgba(242,123,176,.45); font-size: 12px; font-weight: 800; color: #7a1f4c; }
+  .racechip { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 58px); right: max(8px, env(safe-area-inset-right, 0px)); z-index: 28; display: flex; align-items: center; gap: 4px; flex: none; min-height: 34px; padding: 3px 10px 3px 4px; border-radius: 999px; background: rgba(255,255,255,.94); border: 2px solid #ffb3d3; box-shadow: 0 2px 0 rgba(242,123,176,.45); font-size: 12px; font-weight: 800; color: #7a1f4c; }
   .racechip .face { width: 22px; height: 22px; font-size: 13px; }
   .racechip[hidden], .raceboard[hidden] { display: none !important; }
-  .raceboard { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 50px); right: max(8px, env(safe-area-inset-right, 0px)); z-index: 8; width: min(230px, calc(100% - 24px)); max-height: min(52dvh, 380px); overflow: auto; margin: 0; background: rgba(255,255,255,.96); border: 2px solid #ffb3d3; border-radius: 16px; padding: 8px; box-shadow: 0 4px 0 rgba(242,123,176,.45), 0 10px 22px rgba(90,18,56,.16); }
+  .raceboard { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 58px); right: max(8px, env(safe-area-inset-right, 0px)); z-index: 29; width: min(230px, calc(100% - 24px)); max-height: min(52dvh, 380px); overflow: auto; margin: 0; background: rgba(255,255,255,.96); border: 2px solid #ffb3d3; border-radius: 16px; padding: 8px; box-shadow: 0 4px 0 rgba(242,123,176,.45), 0 10px 22px rgba(90,18,56,.16); }
   .racehd { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
   .raceboard h2 { margin: 0; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #b3487c; }
   .raceboard ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
@@ -746,7 +758,7 @@
   .hearts.out { border-color: #c9a0b3; color: #8a5a70; }
   .hearts .hn { font-style: normal; font-size: 11px; font-weight: 800; color: #b0457a; margin-left: 3px; font-variant-numeric: tabular-nums; }
   .hearts.inlevel .hn { font-size: 10px; }
-  .hearts.onmap { position: absolute; left: 10px; top: 58px; z-index: 7; }
+  .hearts.onmap { position: absolute; left: 10px; top: 58px; z-index: 28; }
   .hearts.inlevel { position: absolute; right: 20px; top: 22px; z-index: 3; }
   body.ingame #game h1 .frost { display: block; }
   body.ingame #game h1 small { display: block; margin: 2px 0 0 2px; color: #7a2048; }
@@ -806,9 +818,61 @@
   .postcard-hud > strong { color: #c2185b; font-size: 13px; white-space: nowrap; }
   @media (max-width: 370px) { .pc-card { padding: 8px 6px; } .postcards-head { gap: 6px; } .postcards-head h1 { font-size: 19px; } .mapfoot { gap: 5px; } }
   @media (prefers-reduced-motion: reduce) { .pc-preview { transform: none; } }
+
+  /* JOB 8: phone-sized Exit and Minimise on the map and in a level */
+  .mapbar #mapexit, .mapbar #mapmin, .gamebar button {
+    min-height: 44px !important;
+    min-width: 64px;
+    padding: 8px 14px;
+    font-size: 15px;
+    font-weight: 800;
+  }
+  .mapbar #mapmin, .gamebar #gamemin {
+    background: linear-gradient(180deg, #fff, #ffe9f3);
+    color: #9d2458;
+    border-color: #f4a0c4;
+  }
+  .gamebar {
+    position: sticky;
+    top: 0;
+    z-index: 9;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 8px;
+    padding: 6px 0;
+    padding-top: max(6px, env(safe-area-inset-top, 0px));
+    background: linear-gradient(180deg, rgba(255,246,252,.98) 0%, rgba(255,246,252,.86) 70%, rgba(255,246,252,0) 100%);
+  }
+  /* JOB 7: open intro. playSugarIntro also injects this; keep it here for standalone. */
+  #sr-open-intro{position:fixed;inset:0;z-index:20000;background:#16010c;display:flex;align-items:center;justify-content:center;color:#fff}
+  #sr-open-intro[hidden]{display:none!important}
+  #sr-open-intro.fade{opacity:0;transition:opacity .4s ease;pointer-events:none}
+  #sr-open-intro video,#sr-open-intro .sr-intro-poster{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#16010c}
+  #sr-intro-skip{position:absolute;top:max(12px,env(safe-area-inset-top,0px));right:max(12px,env(safe-area-inset-right,0px));z-index:2;min-height:44px;min-width:72px;padding:8px 16px;border:0;border-radius:22px;background:rgba(255,255,255,.92);color:#111;font-weight:800;font-size:16px;cursor:pointer}
+  #sr-open-intro audio{display:none}
 </style>
+<script>
+(function (d, loc) {
+  try {
+    var q = new URLSearchParams((loc && loc.search) || '');
+    d.documentElement.classList.add('sr-wait');
+    if (q.has('resume')) d.documentElement.classList.add('sr-resume');
+    if (q.has('afterIntro')) d.documentElement.classList.add('sr-after-intro');
+  } catch (e) { try { d.documentElement.classList.add('sr-wait'); } catch (err) { } }
+})(document, location);
+</script>
 </head>
 <body>
+  <div id="sr-open-intro" hidden role="dialog" aria-label="Sugar Rush intro">
+    <video id="sr-intro-video" playsinline webkit-playsinline preload="auto" poster="img/sugar-rush/sugar-rush-intro-poster-75cbb408.jpg">
+      <source src="img/sugar-rush/sugar-rush-intro-95641ff8.webm" type="video/webm">
+      <source src="img/sugar-rush/sugar-rush-intro-95641ff8.mp4" type="video/mp4">
+    </video>
+    <img class="sr-intro-poster" src="img/sugar-rush/sugar-rush-intro-poster-75cbb408.jpg" alt="" aria-hidden="true">
+    <button type="button" id="sr-intro-skip">Skip</button>
+    <audio id="sr-intro-song" preload="auto"></audio>
+  </div>
   <div class="scene" id="scene" aria-hidden="true"></div>
   <div class="candy-sky" aria-hidden="true">
     <span class="wrapc r" style="left:2%;top:22px;--r:-22deg;animation-delay:-.4s"><i></i></span>
@@ -840,6 +904,7 @@
         </div>
         <header class="mapbar" id="mapbar">
           <button type="button" class="pri" id="mapexit" aria-label="Exit">Exit</button>
+          <button type="button" id="mapmin" aria-label="Minimise">Minimise</button>
           <h1>Sugar Rush <small>Pacific &amp; Asia</small></h1>
           <button type="button" id="mapsound" aria-label="Sound">🔉</button>
           <button type="button" id="mapmusic" aria-label="Music">🎵</button>
@@ -851,6 +916,7 @@
         <aside class="raceboard" id="raceboard" hidden aria-label="Family and friends progress">
           <div class="racehd">
             <h2 id="raceheading">🏁 Family progress</h2>
+            <button type="button" id="raceicon" data-race-icon>Change icon</button>
             <button type="button" data-race="close">Close</button>
           </div>
           <ol id="racelist"></ol>
@@ -862,6 +928,7 @@
           </section>
         </aside>
         <footer class="mapfoot">
+          <button type="button" id="racefoot" aria-label="Family race leaderboard">🏁 Race</button>
           <button type="button" id="badgebtn">Badges</button>
           <div class="minishelf" id="minishelf" aria-hidden="true"></div>
           <button type="button" id="postcardbtn">📮 Postcards</button>
@@ -887,6 +954,10 @@
     </section>
 
     <div id="game" hidden>
+      <div class="gamebar" id="gamebar">
+        <button type="button" class="pri" id="gameexit" aria-label="Exit">Exit</button>
+        <button type="button" id="gamemin" aria-label="Minimise">Minimise</button>
+      </div>
       <button type="button" class="hearts inlevel" id="hearts2" aria-label="Lives"><i aria-hidden="true">❤️</i><b>3</b></button>
       <h1><span class="frost">Sugar Rush</span> <small id="lvname">Level 1</small></h1>
       <div id="postcardHud" class="postcard-hud" hidden></div>
@@ -1055,6 +1126,7 @@
   </div>
   <canvas id="fxov" class="fxov" hidden aria-hidden="true"></canvas>
   <script src="scores.js?v=1.9.293"></script>
+  <script src="sugar-rush-intro-assets.js?v=1.9.293"></script>
   <script src="sugar-rush.js?v=1.9.293"></script>
   <script src="sugar-rush-map.js?v=1.9.293"></script>
 </body>

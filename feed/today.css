@@ -117,6 +117,33 @@ html.today-look .load.note,html.today-look #feed > .load{font-size:.8rem;padding
 .today-game.sr{background:linear-gradient(135deg,#ff7eb6,#ffa24c)}
 .today-game.sc{background:linear-gradient(135deg,#6cc7ff,#b18cff)}
 .today-game.te{background:linear-gradient(135deg,#5fe0b6,#3ccf9a);color:#083326}
+.today-games-hero{gap:16px;margin:12px 0 24px}
+.today-gtile{display:flex;align-items:stretch;gap:14px;padding:0;overflow:hidden;min-height:132px;border-radius:24px;box-shadow:0 8px 0 rgba(0,0,0,.12),0 16px 28px rgba(0,0,0,.12);text-align:left}
+.today-games-hero .today-gtile{min-height:168px}
+.today-gtile .gtile-art{flex:0 0 112px;display:flex;align-items:center;justify-content:center;gap:6px;background:rgba(255,255,255,.18)}
+.today-games-hero .today-gtile .gtile-art{flex-basis:128px}
+.today-gtile .gtile-art img{width:84px;height:84px;object-fit:contain;filter:drop-shadow(0 4px 0 rgba(0,0,0,.12))}
+.today-gtile .gtile-body{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;padding:16px 16px 16px 0;min-width:0}
+.today-gtile .gtile-name{display:block;font:800 1.7rem/1.05 var(--today-sans);letter-spacing:-.03em;text-shadow:0 1px 0 rgba(0,0,0,.12)}
+.today-games-hero .today-gtile .gtile-name{font-size:2rem}
+.today-gtile .gtile-hook{display:block;margin-top:6px;font:650 .98rem/1.3 var(--today-sans);opacity:.95}
+.today-gtile .gtile-best{display:block;margin-top:4px;font:800 .85rem/1.2 var(--today-sans);opacity:.9}
+.today-gtile .gtile-play{display:inline-flex;align-items:center;justify-content:center;margin-top:12px;min-height:44px;padding:8px 22px;border-radius:999px;background:#fff;color:#111;font:800 1.05rem var(--today-sans);box-shadow:0 3px 0 rgba(0,0,0,.16)}
+.today-gtile.te .gtile-play{color:#083326}
+.gtile-candy{width:28px;height:28px;border-radius:50%;border:3px solid rgba(255,255,255,.85);box-shadow:0 3px 0 rgba(0,0,0,.12),inset 0 -4px 0 rgba(0,0,0,.12)}
+.today-games-hero .gtile-candy{width:34px;height:34px}
+.gtile-candy.c1{background:radial-gradient(circle at 30% 30%,#fff 0 18%,#ff4f93 19% 100%)}
+.gtile-candy.c2{background:radial-gradient(circle at 30% 30%,#fff 0 18%,#ffd24a 19% 100%);transform:translateY(8px)}
+.gtile-candy.c3{background:radial-gradient(circle at 30% 30%,#fff 0 18%,#7ae0a6 19% 100%)}
+.gtile-letter{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;background:#f4e2b3;color:#3a2a12;font:800 1rem/1 ui-rounded,system-ui,sans-serif;box-shadow:0 3px 0 #c9a66b,inset 0 1px 0 #fff}
+.today-games-hero .gtile-letter{width:36px;height:36px;font-size:1.2rem}
+html.today-look #feed > .card.soon{background:linear-gradient(160deg,#4c1d95,#db2777 55%,#f59e0b)!important;color:#fff!important;border-color:transparent!important}
+html.today-look #feed > .card.soon h3,
+html.today-look #feed > .card.soon li,
+html.today-look #feed > .card.soon .who b,
+html.today-look #feed > .card.soon .who small,
+html.today-look #feed > .card.soon .tp,
+html.today-look #feed > .card.soon .bd{color:#fff!important}
 .today-appear{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0 16px}
 .today-appear button{min-height:48px;border-radius:14px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:600 .88rem var(--today-sans);text-align:left;padding:10px 12px}
 .today-appear button.on{border-color:var(--sage);box-shadow:inset 0 0 0 2px var(--sage)}
@@ -131,6 +158,13 @@ html.today-look .mfopt.on{border-color:var(--sage);background:color-mix(in srgb,
 html.today-look .mfnote{padding:8px 16px 24px}
 html.today-look .mf-games{display:flex;flex-direction:column;gap:8px;padding:4px 12px 8px}
 html.today-look .mf-games .today-game{min-height:64px;font-size:1rem;box-shadow:0 4px 0 rgba(0,0,0,.08)}
+html.today-look .mf-games .today-gtile{min-height:72px;border-radius:18px;box-shadow:0 4px 0 rgba(0,0,0,.08)}
+html.today-look .mf-games .today-gtile .gtile-art{flex-basis:64px}
+html.today-look .mf-games .today-gtile .gtile-art img{width:44px;height:44px}
+html.today-look .mf-games .today-gtile .gtile-name{font-size:1.05rem}
+html.today-look .mf-games .today-gtile .gtile-hook,html.today-look .mf-games .today-gtile .gtile-best{display:none}
+html.today-look .mf-games .today-gtile .gtile-play{margin-top:6px;min-height:32px;padding:4px 12px;font-size:.85rem}
+html.today-look .mf-games .gtile-candy,html.today-look .mf-games .gtile-letter{width:18px;height:18px;font-size:.7rem}
 
 html.today-look .mf-cal{padding:4px 12px 12px}
 html.today-look .today-cal{display:block;width:100%;border:0;border-radius:18px;padding:14px 14px 10px;text-align:left;cursor:pointer;

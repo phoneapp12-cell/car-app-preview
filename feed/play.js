@@ -214,6 +214,7 @@
   const ART_KEY = 'ib-art-open';
   const TETRIS_LIVE_KEY = 'ib-tetris-live';
   const ART_TTL = 36 * 3600 * 1000;
+  let sugarMinimised = false, sugarSkipPop = false, sugarDock = null;
   function artParts() {
     if (artWin) return;
     artWin = root.document.createElement('div');
@@ -225,12 +226,15 @@
     artWin.innerHTML = '<div class="artbar"><button type="button" class="artx" data-artclose>Close</button><div class="artmeta"><strong id="arttitle"></strong><a class="artsite" target="_blank" rel="noopener"></a><span class="artlive"></span></div><button type="button" class="artfs" data-artfs hidden>Full screen</button></div><button type="button" class="artfsx" data-artfsx>Exit full screen</button><iframe class="artframe" title="" sandbox="allow-scripts allow-same-origin" allow="autoplay; fullscreen" referrerpolicy="strict-origin-when-cross-origin"></iframe>';
     root.document.body.appendChild(artWin);
     artFrame = artWin.querySelector('iframe');
+    artFrame.setAttribute('allow', 'autoplay; fullscreen');
     artFrame.addEventListener('load', () => { if (artWin && artWin.classList.contains('artfull')) tellFrame(true); });
     artWin.addEventListener('click', e => {
       if (e.target.closest('[data-artclose]')) closeArt(false);
       else if (e.target.closest('[data-artfs]')) setFull(true);
       else if (e.target.closest('[data-artfsx]')) setFull(false);
+      else if (e.target.closest('[data-artmin]')) minimiseArt();
     });
+    ensureSugarDock();
     root.document.addEventListener('fullscreenchange', () => { if (!root.document.fullscreenElement && artWin) { artWin.classList.remove('artfull'); tellFrame(false); } });
     root.document.addEventListener('webkitfullscreenchange', () => { if (!root.document.webkitFullscreenElement && artWin) { artWin.classList.remove('artfull'); tellFrame(false); } });
   }
@@ -257,7 +261,7 @@
       }
     } catch (e) { }
     tellFrame(on);
-    if (artKind === 'tetris') persistArt();
+    if (artKind === 'tetris' || artKind === 'sugar') persistArt();
   }
   function storePut(st, k, v) { try { if (st) st.setItem(k, v); } catch (e) { } }
   function storeDel(st, k) { try { if (st) st.removeItem(k); } catch (e) { } }
@@ -269,13 +273,41 @@
       else { try { delete el.dataset.ibArt; } catch (e) { el.dataset.ibArt = ''; } }
     } catch (e) { }
   }
+  function isSugarOpen() { return !!(artWin && !artWin.hidden && artKind === 'sugar'); }
+  function isSugarSession() { return artKind === 'sugar' && !!(isSugarOpen() || sugarMinimised); }
+  function sugarFrameLoaded() {
+    if (!artFrame) return false;
+    const src = artFrame.getAttribute('src') || artFrame.src || '';
+    return /sugar-rush/i.test(src) && src !== 'about:blank';
+  }
+  function ensureSugarDock() {
+    if (sugarDock || !root.document || !root.document.body) return;
+    sugarDock = root.document.createElement('button');
+    sugarDock.type = 'button';
+    sugarDock.className = 'sugar-dock';
+    sugarDock.id = 'sugardock';
+    sugarDock.hidden = true;
+    sugarDock.setAttribute('data-sugar-dock', '1');
+    sugarDock.textContent = '🍬 Sugar Rush · Continue';
+    sugarDock.addEventListener('click', () => { restoreSugar(); });
+    root.document.body.appendChild(sugarDock);
+  }
+  function showSugarDock(on) {
+    ensureSugarDock();
+    if (sugarDock) sugarDock.hidden = !on;
+  }
   function persistArt() {
-    if (!artWin || artWin.hidden || artKind !== 'tetris') return;
-    const payload = JSON.stringify({ v: 1, kind: 'tetris', full: !!artWin.classList.contains('artfull'), at: Date.now() });
+    if (!artWin) return;
+    if (artKind === 'tetris') {
+      if (artWin.hidden) return;
+    } else if (artKind === 'sugar') {
+      if (artWin.hidden && !sugarMinimised) return;
+    } else return;
+    const payload = JSON.stringify({ v: 1, kind: artKind, full: !!artWin.classList.contains('artfull'), minimised: artKind === 'sugar' && !!sugarMinimised, at: Date.now() });
     storePut(root.sessionStorage, ART_KEY, payload);
     storePut(root.localStorage, ART_KEY, payload);
-    markArt('tetris');
-    if (root.ibArt) root.ibArt._open = 'tetris';
+    markArt(artKind);
+    if (root.ibArt) root.ibArt._open = artKind;
   }
   function clearArtPersist() {
     storeDel(root.sessionStorage, ART_KEY);
@@ -289,16 +321,70 @@
     for (const st of [root.sessionStorage, root.localStorage]) {
       try {
         const o = JSON.parse((st && st.getItem(ART_KEY)) || 'null');
-        if (o && o.v === 1 && o.kind === 'tetris' && Date.now() - (o.at || 0) < ART_TTL) return o;
+        if (o && o.v === 1 && (o.kind === 'tetris' || o.kind === 'sugar') && Date.now() - (o.at || 0) < ART_TTL) return o;
       } catch (e) { }
     }
     return null;
   }
   function isTetrisOpen() { return !!(artWin && !artWin.hidden && artKind === 'tetris'); }
+  function tellSugar(type) {
+    if (!artFrame || !artFrame.contentWindow) return;
+    try { artFrame.contentWindow.postMessage({ type: type }, '*'); } catch (e) { }
+  }
+  function startParentSugarIntro(onDone) {
+    root.ibSugarIntro = { status: 'playing' };
+    const done = () => {
+      root.ibSugarIntro = { status: 'done' };
+      tellSugar('ib-sugar-intro-done');
+      if (onDone) onDone();
+    };
+    if (typeof root.playSugarIntro === 'function') {
+      root.playSugarIntro({ doc: root.document, root: root, host: artWin || root.document.body, onDone: done });
+    } else {
+      done();
+    }
+  }
+  function minimiseArt() {
+    if (artKind !== 'sugar' || !artWin) return;
+    tellSugar('ib-sugar-pause');
+    setFull(false);
+    sugarMinimised = true;
+    artWin.hidden = true;
+    lockFeed(false);
+    persistArt();
+    showSugarDock(true);
+    if (artHist) {
+      sugarSkipPop = true;
+      artHist = false;
+      try { root.history.back(); } catch (e) { sugarSkipPop = false; }
+    }
+  }
+  function restoreSugar() {
+    if (artKind !== 'sugar' || !sugarFrameLoaded()) {
+      openArt('sugar', null, { resume: true });
+      return;
+    }
+    sugarMinimised = false;
+    artWin.hidden = false;
+    lockFeed(true);
+    artWin.classList.add('artsugar');
+    setFull(true);
+    persistArt();
+    showSugarDock(false);
+    tellSugar('ib-sugar-resume');
+    if (!artHist) { try { root.history.pushState({ ibArt: 'sugar' }, ''); artHist = true; } catch (e) { artHist = false; } }
+  }
   function maybeRestoreArt() {
-    if (isTetrisOpen()) return true;
+    if (isTetrisOpen() || isSugarOpen()) return true;
+    if (artKind === 'sugar' && sugarMinimised && sugarFrameLoaded()) return true;
     const saved = readArtPersist();
     if (!saved) return false;
+    if (saved.kind === 'sugar') {
+      openArt('sugar', null, { resume: true });
+      if (saved.minimised) minimiseArt();
+      else if (saved.full) setFull(true);
+      return isSugarOpen() || sugarMinimised;
+    }
     openArt('tetris');
     if (saved.full) setFull(true);
     return isTetrisOpen();
@@ -343,6 +429,7 @@
   }
   function openArt(kind, btn, opts) {
     const spec = ART[kind]; if (!spec) return;
+    opts = opts || {};
     artParts();
     pauseFeed();
     artBtn = btn || null;
@@ -362,16 +449,31 @@
       try { root.sessionStorage.setItem('scrabble-open', openId); } catch (e) { }
       url = spec.url + (spec.url.indexOf('?') >= 0 ? '&' : '?') + 'open=' + encodeURIComponent(openId) + '#' + openId;
     }
+    if (kind === 'sugar' && sugarFrameLoaded() && (sugarMinimised || isSugarOpen() || (opts && opts.resume))) {
+      restoreSugar();
+      return;
+    }
+    if (kind === 'sugar') {
+      const q = spec.url.indexOf('?') >= 0 ? '&' : '?';
+      url = (opts && opts.resume)
+        ? spec.url + q + 'resume=1'
+        : spec.url + q + 'afterIntro=1&fresh=' + Date.now();
+    }
+    if (kind === 'sugar') root.ibSugarClosing = false;
+    if (kind === 'sugar' && !(opts && opts.resume)) {
+      // Start the intro unmuted in this same tap, before the iframe finishes loading.
+      artWin.classList.add('artsugar');
+      artWin.hidden = false;
+      lockFeed(true);
+      startParentSugarIntro();
+    } else if (kind === 'sugar') {
+      root.ibSugarIntro = { status: 'done' };
+    }
     artFrame.src = url;
     artWin.querySelector('[data-artfs]').hidden = !spec.local;
     artWin.hidden = false;
     lockFeed(true);
     artWin.classList.toggle('artsugar', kind === 'sugar');
-    if (kind === 'sugar') {
-      // A new address every open, so the phone cannot keep showing a saved Sugar Rush.
-      const fresh = spec.url + (spec.url.indexOf('?') >= 0 ? '&' : '?') + 'fresh=' + Date.now();
-      artFrame.src = fresh;
-    }
     if (kind === 'tetris') {
       if (typeof root.setTetrisChrome === 'function') root.setTetrisChrome(true);
       else if (typeof setTetrisChrome === 'function') setTetrisChrome(true);
@@ -379,9 +481,10 @@
       setFull(true);
       persistArt();
     }
-    // 1.9.211 Sugar Rush map fills the phone, same artfull path as Tetris (no persist).
+    // 1.9.211 Sugar Rush map fills the phone, same artfull path as Tetris.
     // Scrabble uses the same fill so the board and Cancel game are reachable on a phone.
     if (kind === 'sugar' || kind === 'scrabble') setFull(true);
+    if (kind === 'sugar') persistArt();
     if (kind === 'scrabble' && openId) {
       const send = () => { try { if (artFrame && artFrame.contentWindow) artFrame.contentWindow.postMessage({ type: 'ib-scrabble-open', id: openId }, '*'); } catch (e) { } };
       artFrame.addEventListener('load', send, { once: true });
@@ -403,7 +506,8 @@
       .then(data => {
         const n = data && data.yourTurn || 0;
         root.ibScrabbleTurn = n;
-        root.document.querySelectorAll('[data-art="scrabble"] span:last-child').forEach(el => { el.textContent = n ? 'Play Scrabble · your turn' : 'Play Scrabble'; });
+        root.document.querySelectorAll('[data-gplay="scrabble"]').forEach(el => { el.textContent = n ? 'Your turn' : 'Play'; });
+        root.document.querySelectorAll('[data-art="scrabble"] span:last-child').forEach(el => { if (el.closest && el.closest('[data-gplay]')) return; el.textContent = n ? 'Play Scrabble · your turn' : 'Play Scrabble'; });
         let host = root.document.getElementById('scrayourhost');
         if (!host) {
           host = root.document.createElement('div');
@@ -423,16 +527,25 @@
       }).catch(() => { if (tm) clearTimeout(tm); });
   }
   function closeArt(fromPop) {
-    if (!artWin || artWin.hidden) return;
+    if (!artWin || (artWin.hidden && !sugarMinimised)) return;
     const wasTetris = artKind === 'tetris';
     const wasScrabble = artKind === 'scrabble';
+    const wasSugar = artKind === 'sugar';
+    if (wasSugar) {
+      root.ibSugarClosing = true;
+      storePut(root.sessionStorage, 'ib-sugar-closing', '1');
+      tellSugar('ib-sugar-exit');
+    }
     setFull(false);
     unloadArt();
     artWin.hidden = true;
     artWin.classList.remove('artsugar');
+    sugarMinimised = false;
+    showSugarDock(false);
+    root.ibSugarIntro = { status: 'idle' };
     artKind = null;
     lockFeed(false);
-    if (wasTetris) clearArtPersist();
+    if (wasTetris || wasSugar) clearArtPersist();
     if (wasScrabble) scrabbleNotice();
     if (typeof root.setTetrisChrome === 'function') root.setTetrisChrome(false);
     else if (typeof setTetrisChrome === 'function') setTetrisChrome(false);
@@ -443,29 +556,41 @@
   }
   root.addEventListener('message', e => {
     const d = e && e.data;
-    if (!d || (d.type !== 'ib-tetris-close' && d.type !== 'ib-sugar-close')) return;
+    if (!d || !d.type) return;
+    if (artFrame && e.source && e.source !== artFrame.contentWindow) {
+      if (d.type === 'ib-tetris-close' || d.type === 'ib-sugar-close' || d.type === 'ib-sugar-minimise') return;
+    }
+    if (d.type === 'ib-sugar-minimise') {
+      if (artKind === 'sugar') minimiseArt();
+      return;
+    }
+    if (d.type !== 'ib-tetris-close' && d.type !== 'ib-sugar-close') return;
     if (d.type === 'ib-tetris-close' && !isTetrisOpen()) return;
     if (d.type === 'ib-sugar-close' && artKind !== 'sugar') return;
-    if (artFrame && e.source && e.source !== artFrame.contentWindow) return;
     closeArt(false);
   });
   root.addEventListener('keydown', e => { if (e.key === 'Escape' && artWin && !artWin.hidden) { e.preventDefault(); closeArt(false); } });
-  root.addEventListener('popstate', () => { if (artWin && !artWin.hidden) closeArt(true); });
-  // 1.9.188: leaving Tetris open when Info Book is minimised. Other live windows still close so their sound stops.
+  root.addEventListener('popstate', () => {
+    if (sugarSkipPop) { sugarSkipPop = false; return; }
+    if (artWin && !artWin.hidden) closeArt(true);
+  });
+  // 1.9.188: leaving Tetris open when Info Book is minimised. Sugar Rush now stays too, paused, so a resume picks up the same board.
   root.document.addEventListener('visibilitychange', () => {
     if (root.document.hidden) {
       if (isTetrisOpen()) { persistArt(); return; }
+      if (isSugarSession()) { persistArt(); tellSugar('ib-sugar-pause'); return; }
       if (artWin && !artWin.hidden) closeArt(false);
       return;
     }
     maybeRestoreArt();
+    if (isSugarOpen()) tellSugar('ib-sugar-resume');
   });
   root.addEventListener('pagehide', () => {
-    if (isTetrisOpen()) { persistArt(); return; }
+    if (isTetrisOpen() || isSugarSession()) { persistArt(); return; }
     unloadArt();
   });
-  root.addEventListener('pageshow', () => { maybeRestoreArt(); });
-  root.ibArt = { isTetris: isTetrisOpen, kind: () => (artWin && !artWin.hidden ? artKind : null), open: openArt, close: closeArt, persist: persistArt, restore: maybeRestoreArt, read: readArtPersist };
+  root.addEventListener('pageshow', () => { maybeRestoreArt(); if (isSugarOpen()) tellSugar('ib-sugar-resume'); });
+  root.ibArt = { isTetris: isTetrisOpen, kind: () => (artWin && !artWin.hidden ? artKind : (sugarMinimised ? 'sugar' : null)), open: openArt, close: closeArt, persist: persistArt, restore: maybeRestoreArt, read: readArtPersist, minimise: minimiseArt };
   scrabbleNotice();
   if (typeof root.setInterval === 'function') root.setInterval(() => { if (!root.document.hidden) scrabbleNotice(); }, 60000);
   if (root.document && root.document.addEventListener) root.document.addEventListener('visibilitychange', () => { if (!root.document.hidden) scrabbleNotice(); });

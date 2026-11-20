@@ -5706,7 +5706,7 @@
   }
   function frame() {
     if (screen === 'game' && st) {
-      if (tickTimer(st, Date.now())) hud();
+      if (!livePaused && tickTimer(st, Date.now())) hud();
       if (st.timerExpired && !st.timerEndHandled && !busy) {
         st.timerEndHandled = true;
         if (st.won) beginGoalFinish(); else showEnd();
@@ -5994,9 +5994,17 @@
   function requestCloseSugar() {
     try { settleLife(); } catch (e) { }
     resetSessionBenefits();
+    try { saveProg(); } catch (e) { }
+    try { clearLive(); } catch (e) { }
     try { stopAllMusic(); } catch (e) { }
     try {
       if (root.parent && root.parent !== root) root.parent.postMessage({ type: 'ib-sugar-close' }, '*');
+    } catch (e) { }
+  }
+  function requestMinimiseSugar() {
+    try { pauseLive(true); } catch (e) { }
+    try {
+      if (root.parent && root.parent !== root) root.parent.postMessage({ type: 'ib-sugar-minimise' }, '*');
     } catch (e) { }
   }
 
@@ -6158,6 +6166,144 @@
   function memberTag() {
     const me = root.IBScores && root.IBScores.who && root.IBScores.who();
     return (me && me.id) ? ':' + me.id : '';
+  }
+  const LIVE_TTL = 36 * 3600 * 1000;
+  const LIVE_ST_KEYS = ['score', 'moves', 'target', 'timerLeft', 'timerMsLeft', 'timerUpdatedAt', 'turns', 'over', 'won', 'stars', 'collected', 'specialsMade', 'combosMade', 'hiddenLeft', 'ingsLeft', 'liqIdle', 'defused', 'fuseBlown', 'moveNo', 'played', 'lifeDone', 'challenge', 'tutorial', 'postcardFound', 'timerExpired', 'timerEndHandled', 'cannonDue', 'cannonShots', 'boss', 'jelly', 'flow', 'kinds'];
+  let liveMem = null, livePaused = false, holdPaused = false, liveSaveTimer = 0;
+  function liveKey() { return 'ib-sugar-live' + memberTag(); }
+  function snapBoard(b) {
+    return (b || []).map(function (row) {
+      return (row || []).map(function (tile) {
+        if (!tile) return null;
+        if (tile.hole || isHole(tile)) return { hole: 1 };
+        return Object.assign({}, tile);
+      });
+    });
+  }
+  function loadBoard(rows) {
+    return (rows || []).map(function (row) {
+      return (row || []).map(function (o) {
+        if (!o) return null;
+        if (o.hole) return HOLE;
+        const tile = mk(o.c, o.s);
+        Object.keys(o).forEach(function (k) { if (k !== 'c' && k !== 's') tile[k] = o[k]; });
+        return tile;
+      });
+    });
+  }
+  function buildLive() {
+    const view = $('mapview');
+    const payload = {
+      v: 1,
+      at: Date.now(),
+      screen: screen,
+      level: lvNum,
+      map: {
+        x: view ? view.scrollLeft : 0,
+        y: view ? view.scrollTop : 0,
+        open: (prog && prog.open) || 1
+      },
+      st: null
+    };
+    if (screen === 'game' && st && st.board && !st.tutorial) {
+      const snap = { level: (st.lv && st.lv.n) || lvNum, board: snapBoard(st.board) };
+      LIVE_ST_KEYS.forEach(function (k) {
+        const val = st[k];
+        if (val == null || typeof val === 'function') return;
+        try { snap[k] = JSON.parse(JSON.stringify(val)); } catch (e) { }
+      });
+      payload.st = snap;
+    }
+    return payload;
+  }
+  function writeLive(payload) {
+    liveMem = payload || buildLive();
+    try { ls.set(liveKey(), liveMem); } catch (e) { }
+  }
+  function readLive() {
+    if (liveMem && liveMem.v === 1 && Date.now() - (liveMem.at || 0) < LIVE_TTL) return liveMem;
+    const v = ls.get(liveKey(), null);
+    if (v && v.v === 1 && Date.now() - (v.at || 0) < LIVE_TTL) { liveMem = v; return v; }
+    return null;
+  }
+  function clearLive() {
+    liveMem = null;
+    try { if (root.localStorage) root.localStorage.removeItem(liveKey()); } catch (e) { }
+  }
+  function scheduleSaveLive() {
+    try { liveMem = buildLive(); } catch (e) { }
+    if (liveSaveTimer) return;
+    try {
+      liveSaveTimer = root.setTimeout(function () { liveSaveTimer = 0; try { writeLive(liveMem || buildLive()); } catch (e) { } }, 400);
+    } catch (e) { try { writeLive(); } catch (err) { } }
+  }
+  function loadLiveState(snap, lv) {
+    const stt = newGame({ level: lv });
+    if (snap && snap.board) stt.board = loadBoard(snap.board);
+    LIVE_ST_KEYS.forEach(function (k) {
+      if (k === 'board') return;
+      if (snap && snap[k] != null) {
+        try { stt[k] = JSON.parse(JSON.stringify(snap[k])); } catch (e) { stt[k] = snap[k]; }
+      }
+    });
+    stt.lv = lv;
+    stt.rand = rng(Date.now());
+    return stt;
+  }
+  function applyLive(snap) {
+    snap = snap || readLive();
+    if (!snap) return false;
+    if (snap.screen === 'game' && snap.st && snap.st.board) {
+      const n = snap.st.level || snap.level || 1;
+      bootLevel(n, { restore: snap.st });
+      return true;
+    }
+    showMap({ behavior: 'auto', scroll: (snap.map && snap.map.open) || (prog && prog.open) || 1, keepSong: true });
+    const view = $('mapview');
+    if (view && snap.map) {
+      const go = function () { view.scrollLeft = snap.map.x || 0; view.scrollTop = snap.map.y || 0; };
+      if (root.requestAnimationFrame) root.requestAnimationFrame(function () { root.requestAnimationFrame(go); });
+      else go();
+    }
+    return true;
+  }
+  function queryFlag(name) {
+    try { return new URLSearchParams((root.location && root.location.search) || '').has(name); } catch (e) { return false; }
+  }
+  function isResumeOpen() {
+    if (queryFlag('resume')) return !!readLive();
+    if (queryFlag('fresh') || queryFlag('afterIntro')) return false;
+    return !!readLive();
+  }
+  function parentIntroStatus() {
+    try {
+      if (root.parent && root.parent !== root && root.parent.ibSugarIntro)
+        return root.parent.ibSugarIntro.status || '';
+    } catch (e) { }
+    return '';
+  }
+  function parentIsClosing() {
+    try {
+      if (root.parent && root.parent !== root && root.parent.ibSugarClosing) return true;
+    } catch (e) { }
+    try { return (root.sessionStorage && root.sessionStorage.getItem('ib-sugar-closing')) === '1'; } catch (e) { return false; }
+  }
+  function pauseLive(fromParent) {
+    if (fromParent) holdPaused = true;
+    livePaused = true;
+    try { scheduleSaveLive(); writeLive(); } catch (e) { }
+    try { stopAllMusic(); } catch (e) { }
+    try { stopSpeech(); } catch (e) { }
+    try { if (ac) ac.suspend().catch(function () { }); } catch (e) { }
+  }
+  function resumeLiveSession(fromParent) {
+    if (fromParent) holdPaused = false;
+    if (holdPaused) return;
+    if (doc.hidden) return;
+    livePaused = false;
+    if (st && st.lv && st.lv.timer && !st.over) st.timerUpdatedAt = Date.now();
+    try { if (ac && (soundOn || musicOn)) ac.resume().catch(function () { }); } catch (e) { }
+    if (musicOn) playKind(wantKind());
   }
   function tutorialStorageKey(n) {
     return TUTORIAL_KEY + ':' + (n || 1) + memberTag();
@@ -6535,6 +6681,17 @@
     $('endmap').textContent = challengeRun ? 'Postcard shelf' : 'Levels';
     $('restartbtn').textContent = challengeRun ? 'Restart hunt' : 'Restart';
     paintGoalStrip(lv);
+    if (opt.restore) {
+      st = loadLiveState(opt.restore, lv);
+      sel = null; busy = false; lastAct = now();
+      crush = null; warned3 = false; hintOn = false; hintHold = false; hintMove = null; hideHintHand(); hideMovesWarn(); lastSaying = ''; sayUntil = 0; clearSayQueue(); hideSaying();
+      resetStreak(); hideCrushBan();
+      fitCanvas(); syncAll(); hud();
+      paintGoalStrip(lv, st);
+      hintMove = opt.tutorial ? null : findMove(st.board, st.mask);
+      revealSugarUi();
+      return;
+    }
     st = newGame(opt.board ? { level: lv, board: fromRows(opt.board) } : { level: lv });
     try { applyBoardTheme(lv.n); } catch (e) { }
     if (challengeRun) {
@@ -6566,6 +6723,7 @@
     hintMove = opt.tutorial ? null : findMove(st.board, st.mask);
     for (const s of sprites.values()) { s.y = s.r - N - 1 + (N - s.r) * .2; moveTo(s, s.r, s.c, 300 + (N - s.r) * 40, easeOut); }
     if (musicOn) playKind(wantKind());
+    revealSugarUi();
   }
   function beginLevel(n) {
     hideIntro();
@@ -6573,6 +6731,32 @@
     else startLevel(n);
   }
 
+  function revealSugarUi() {
+    try { doc.documentElement.classList.remove('sr-wait'); } catch (e) { }
+  }
+  function paintPickIcon() {
+    const btn = $('pickicon');
+    if (!btn) return;
+    const id = (race && race.mine && race.mine.icon) || ls.get('ib-sugar-icon', null);
+    const ic = isRaceIcon(id) ? raceIcon(id) : null;
+    if (ic) {
+      btn.innerHTML = '<span class="face" style="--ic:' + ic.color + '">' + ic.emoji + '</span><span class="lab">Icon</span>';
+      btn.setAttribute('aria-label', 'Change your icon, currently ' + ic.name);
+      btn.hidden = false;
+      btn.disabled = false;
+    } else {
+      btn.textContent = 'Pick your icon';
+      btn.setAttribute('aria-label', 'Pick your icon');
+      btn.hidden = false;
+      btn.disabled = false;
+    }
+    const alt = $('raceicon');
+    if (alt) {
+      alt.hidden = false;
+      alt.disabled = false;
+      alt.textContent = ic ? ('Change icon') : 'Pick your icon';
+    }
+  }
   function paintButtons() {
     const s = soundOn ? '🔉 Sound on' : '🔇 Sound off', m = musicOn ? '🎵 Music on' : '🎵 Music off';
     if ($('soundbtn')) $('soundbtn').textContent = s;
@@ -6582,6 +6766,7 @@
     const v = voiceOn ? '🗣️ Voice on' : '🤐 Voice off';
     if ($('voicebtn')) $('voicebtn').textContent = v;
     if ($('mapvoice')) { $('mapvoice').textContent = voiceOn ? '🗣️' : '🤐'; $('mapvoice').setAttribute('aria-label', v); $('mapvoice').classList.toggle('off', !voiceOn); }
+    paintPickIcon();
   }
   function objText(g) {
     if (!g || !g.lv) return '';
@@ -6616,6 +6801,7 @@
   }
   function hud() {
     if (!st) return;
+    try { if (screen === 'game') scheduleSaveLive(); } catch (e) { }
     $('score').textContent = st.score.toLocaleString('en-NZ');
     const timed = !!(st.lv && st.lv.timer && !st.challenge);
     const moveLabel = $('movecount') && $('movecount').querySelector('span');
@@ -6864,6 +7050,7 @@
     renderRacers();
     renderRaceBoard();
     renderRaceEvent(true);
+    paintPickIcon();
   }
   /* ---- 1.9.222 Family race events: "Race on!" card, a 0-5 progress bar on the map and level screens, prizes. ---- */
   const RACE_GOAL = 5;
@@ -7053,7 +7240,7 @@
         if (raceDemo && race.mine) {
           race.mine.icon = ic.id;
           race.racers = race.racers.map(function (r) { return r.mine ? Object.assign({}, r, { icon: ic.id }) : r; });
-          renderRacers(); renderRaceBoard();
+          renderRacers(); renderRaceBoard(); paintPickIcon();
         } else {
           syncRace(true);
         }
@@ -7263,7 +7450,9 @@
     const go = function () { scrollMapTo(scrollTo, { behavior: behavior }); };
     if (root.requestAnimationFrame) root.requestAnimationFrame(function () { root.requestAnimationFrame(go); });
     else go();
-    if (musicOn) playKind(wantKind());
+    if (musicOn && !livePaused) playKind(wantKind());
+    try { scheduleSaveLive(); } catch (e) { }
+    revealSugarUi();
   }
   function openLevel(n) {
     const lv = LEVELS[n - 1]; if (!lv || !sessionLevelAccess.allows(n, prog.open)) return;
@@ -8421,6 +8610,8 @@
   if ($('goalnextbtn')) $('goalnextbtn').addEventListener('click', () => { unlockAudio(); goNext(); });
   if ($('goalmapbtn')) $('goalmapbtn').addEventListener('click', () => { unlockAudio(); if ($('goalnext')) $('goalnext').hidden = true; });
   if ($('pickicon')) $('pickicon').addEventListener('click', () => { unlockAudio(); openIconPicker(); });
+  if ($('raceicon')) $('raceicon').addEventListener('click', () => { unlockAudio(); openIconPicker(); });
+  if ($('racefoot')) $('racefoot').addEventListener('click', () => { unlockAudio(); setRaceOpen(true); });
   if ($('boosters')) $('boosters').addEventListener('click', e => {
     const b = e.target.closest && e.target.closest('[data-boost]');
     if (b) { unlockAudio(); useBoost(b.dataset.boost); }
@@ -8446,6 +8637,17 @@
     if (e.target === $('raceon') || e.target === $('raceonbtn')) $('raceon').hidden = true;
   });
   if ($('mapexit')) $('mapexit').addEventListener('click', requestCloseSugar);
+  if ($('gameexit')) $('gameexit').addEventListener('click', requestCloseSugar);
+  if ($('mapmin')) $('mapmin').addEventListener('click', requestMinimiseSugar);
+  if ($('gamemin')) $('gamemin').addEventListener('click', requestMinimiseSugar);
+  root.addEventListener('message', function (e) {
+    const d = e && e.data;
+    if (!d || !d.type) return;
+    if (d.type === 'ib-sugar-pause') pauseLive(true);
+    else if (d.type === 'ib-sugar-resume') resumeLiveSession(true);
+    else if (d.type === 'ib-sugar-intro-done') { /* boot waiter also listens */ }
+    else if (d.type === 'ib-sugar-exit') requestCloseSugar();
+  });
   if (root.addEventListener) {
     root.addEventListener('pagehide', resetSessionBenefits);
     root.addEventListener('pageshow', e => {
@@ -8470,23 +8672,57 @@
   doc.addEventListener('pointerup', unlockAudio, { passive: true });
   doc.addEventListener('touchend', unlockAudio, { passive: true });
   doc.addEventListener('visibilitychange', () => {
-    if (doc.hidden) { if (ac) ac.suspend().catch(() => { }); stopSpeech(); }
-    else {
-      if (ac && (soundOn || musicOn)) ac.resume().catch(() => { });
-      if (musicOn && !doc.hidden) playKind(wantKind());
-    }
+    if (doc.hidden) pauseLive(false);
+    else resumeLiveSession(false);
   });
-  root.addEventListener('pagehide', () => { stopAllMusic(); if (ac) ac.close().catch(() => { }); });
+  root.addEventListener('pagehide', () => {
+    try {
+      if (parentIsClosing()) { try { settleLife(); } catch (e) { } try { saveProg(); } catch (e) { } clearLive(); }
+      else writeLive();
+    } catch (e) { }
+    try { stopAllMusic(); } catch (e) { }
+    try { if (ac) ac.suspend().catch(() => { }); } catch (e) { }
+  });
   root.addEventListener('resize', () => { ovFit(); fitCanvas(); if (tut && tut.active && tut.step && tut.step.move) placeTutHand(tut.step.move[0], tut.step.move[1]); if (hintOn && hintMove) placeHintHand(hintMove[0], hintMove[1], hintHold); });
 
   paintButtons();
-  showMap();
   root.requestAnimationFrame(frame);
+  (function bootOpen() {
+    if (isResumeOpen() && applyLive()) return;
+    const after = queryFlag('afterIntro') || parentIntroStatus() === 'playing' || parentIntroStatus() === 'done';
+    if (after) {
+      let opened = false;
+      function goMap() { if (opened) return; opened = true; showMap(); }
+      if (parentIntroStatus() === 'done') { goMap(); return; }
+      const to = root.setTimeout(goMap, 15000);
+      function onMsg(e) {
+        if (e && e.data && e.data.type === 'ib-sugar-intro-done') {
+          try { root.clearTimeout(to); } catch (err) { }
+          root.removeEventListener('message', onMsg);
+          goMap();
+        }
+      }
+      root.addEventListener('message', onMsg);
+      const iv = root.setInterval(function () {
+        if (parentIntroStatus() === 'done') {
+          try { root.clearInterval(iv); root.clearTimeout(to); } catch (err) { }
+          root.removeEventListener('message', onMsg);
+          goMap();
+        }
+      }, 200);
+      return;
+    }
+    if (typeof root.playSugarIntro === 'function') {
+      root.playSugarIntro({ doc: doc, root: root, onDone: function () { showMap(); } });
+      return;
+    }
+    showMap();
+  })();
 
   root.SugarRush.ui = {
     state: () => st, attempt, comboTip: maybeComboTip, hud, paintGoalStrip, showEnd, showMap, scrollMapTo, openLevel, startLevel, showIntro, startTutorial, skipTutorial, finishTutorial, showTutStep, beginLevel, beginGoalFinish, showGoalBanner, celebrateOnMap, progress: () => prog, tutorial: () => tut, crush: () => crush,
     seedLives, showLives, openLivesPanel, lives: () => lives(), settleLife, nextLife: () => nextLife(),
-    seedRace, seedRaceEvent, showRaceOn, showRaceResult, racePrize, syncRace, openIconPicker, setRaceOpen, requestCloseSugar, race: () => race,
+    seedRace, seedRaceEvent, showRaceOn, showRaceResult, racePrize, syncRace, openIconPicker, setRaceOpen, requestCloseSugar, requestMinimiseSugar, saveLive: writeLive, readLive, applyLive, clearLive, pauseLive, resumeLiveSession, isResumeOpen, race: () => race,
     say, chime, callout, unlockAudio, audio, showSaying, hideSaying, showMovesWarn, hideMovesWarn, maybeWarn3, showHint, hideHintHand, noteActivity,
     clipsReady: () => Object.keys(VOICE_FILES).every(k => !!bufs[k]),
     setSound(on) { soundOn = !!on; ls.set('ib-sugar-sound', soundOn); paintButtons(); },
