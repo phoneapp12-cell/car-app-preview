@@ -87,7 +87,12 @@
       '@keyframes srRide{from{transform:translate(0,0)}to{transform:translate(62vw,-34vh)}}',
       '.sr-zoom .sr-fly{position:absolute;left:10%;top:46%;animation:srFly 2.6s ease-in-out forwards}',
       '@keyframes srFly{from{transform:translate(0,10px) rotate(-8deg)}to{transform:translate(70vw,-26vh) rotate(6deg)}}',
-      '.sr-zoom-label{position:absolute;left:50%;top:64px;transform:translateX(-50%);padding:8px 14px;border-radius:16px;background:rgba(255,255,255,.96);color:#d6246e;font:900 16px/1.2 ui-rounded,system-ui,sans-serif;box-shadow:0 4px 12px rgba(90,140,170,.18);white-space:nowrap}'
+      '.sr-zoom-label{position:absolute;left:50%;top:64px;transform:translateX(-50%);padding:8px 14px;border-radius:16px;background:rgba(255,255,255,.96);color:#d6246e;font:900 16px/1.2 ui-rounded,system-ui,sans-serif;box-shadow:0 4px 12px rgba(90,140,170,.18);white-space:nowrap}',
+      '.sr-nav{position:absolute;left:50%;bottom:78px;transform:translateX(-50%);z-index:11;display:flex;align-items:center;gap:8px;padding:6px;border-radius:22px;background:rgba(255,255,255,.96);box-shadow:0 4px 12px rgba(90,140,170,.18)}',
+      'body:not(.onmap) .sr-nav{display:none}',
+      '.sr-nav button{width:40px;height:40px;border:0;border-radius:50%;background:#ff8ab8;color:#fff;font:900 22px/1 ui-rounded,system-ui,sans-serif;box-shadow:0 2px 0 #f4a0c4}',
+      '.sr-nav button:disabled{opacity:.35}',
+      '.sr-nav span{min-width:120px;text-align:center;font:900 14px/1.1 ui-rounded,system-ui,sans-serif;color:#d6246e}'
     ].join('');
     document.head.appendChild(css);
   }
@@ -115,6 +120,122 @@
     });
   }
 
+  var picked = '';
+  var lastHere = '';
+
+  function countryList() {
+    var seen = {};
+    var list = [];
+    var pins = Array.prototype.slice.call(document.querySelectorAll('.stops .lv[data-country]'));
+    pins.sort(function (a, b) { return (+a.dataset.n) - (+b.dataset.n); });
+    pins.forEach(function (pin) {
+      var c = pin.dataset.country;
+      if (!c || seen[c]) return;
+      seen[c] = true;
+      list.push(c);
+    });
+    return list;
+  }
+
+  function currentCountry() {
+    var here = document.querySelector('.stops .lv.here');
+    return (here && here.dataset.country) || '';
+  }
+
+  function ensurePicked() {
+    var list = countryList();
+    if (!list.length) return '';
+    var here = currentCountry();
+    if (here && here !== lastHere) {
+      lastHere = here;
+      picked = here;
+      var stage = document.getElementById('mapstage');
+      if (stage) stage.dataset.framed = '';
+    }
+    if (!picked || list.indexOf(picked) < 0) picked = here || list[0];
+    return picked;
+  }
+
+  function frameCountry(country) {
+    var stage = document.getElementById('mapstage');
+    var view = document.getElementById('mapview');
+    if (!stage || !view || !country) return;
+    if (stage.classList.contains('travel-shot')) return;
+    var all = document.querySelectorAll('.stops .lv, .stops .future-stop');
+    var pins = [];
+    all.forEach(function (pin) {
+      var on = pin.dataset.country === country;
+      pin.style.visibility = on ? '' : 'hidden';
+      if (on && pin.classList.contains('lv')) pins.push(pin);
+    });
+    if (!pins.length) return;
+    var key = country + ':' + pins.length;
+    if (stage.dataset.framed === key) return;
+    stage.dataset.framed = key;
+    var sw = stage.clientWidth, sh = stage.clientHeight, vw = view.clientWidth, vh = view.clientHeight;
+    if (!sw || !sh || !vw || !vh) return;
+    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    pins.forEach(function (p) {
+      var x = parseFloat(p.style.left) / 100 * sw;
+      var y = parseFloat(p.style.top) / 100 * sh;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    });
+    var pad = 90;
+    var bw = Math.max(140, maxX - minX + pad * 2);
+    var bh = Math.max(180, maxY - minY + pad * 2);
+    var cx = (minX + maxX) / 2;
+    var cy = (minY + maxY) / 2;
+    var scale = Math.min(vw / bw, (vh - 120) / bh, 2.2);
+    if (scale < 0.9) scale = 0.9;
+    var tx = vw / 2 - cx * scale;
+    var ty = (vh / 2 + 10) - cy * scale;
+    view.style.overflow = 'hidden';
+    stage.style.transformOrigin = '0 0';
+    stage.style.transition = 'transform .35s ease';
+    stage.style.transform = 'translate3d(' + tx.toFixed(1) + 'px,' + ty.toFixed(1) + 'px,0) scale(' + scale.toFixed(3) + ')';
+  }
+
+  function stepCountry(dir) {
+    var list = countryList();
+    if (!list.length) return;
+    var i = list.indexOf(ensurePicked());
+    if (i < 0) i = 0;
+    var next = i + dir;
+    if (next < 0 || next >= list.length) return;
+    picked = list[next];
+    var stage = document.getElementById('mapstage');
+    if (stage) stage.dataset.framed = '';
+    frameCountry(picked);
+    showCard();
+    syncNav();
+  }
+
+  function syncNav() {
+    var map = document.getElementById('map');
+    if (!map) return;
+    var nav = document.getElementById('sr-nav');
+    if (!nav) {
+      nav = document.createElement('div');
+      nav.id = 'sr-nav';
+      nav.className = 'sr-nav';
+      nav.innerHTML = '<button type="button" id="sr-prev" aria-label="Previous country">‹</button><span></span><button type="button" id="sr-next" aria-label="Next country">›</button>';
+      nav.querySelector('#sr-prev').addEventListener('click', function () { stepCountry(-1); });
+      nav.querySelector('#sr-next').addEventListener('click', function () { stepCountry(1); });
+      map.appendChild(nav);
+    }
+    var list = countryList();
+    var country = ensurePicked();
+    var i = list.indexOf(country);
+    nav.querySelector('span').textContent = country || 'Country';
+    nav.querySelector('#sr-prev').disabled = i <= 0;
+    nav.querySelector('#sr-next').disabled = i < 0 || i >= list.length - 1;
+    if (!document.body.classList.contains('onmap')) nav.style.display = 'none';
+    else nav.style.display = '';
+  }
+
   function showCard() {
     var map = document.getElementById('map');
     if (!map) return;
@@ -127,8 +248,7 @@
       card.innerHTML = '<b class="sr-cname"></b><div class="sr-bits"></div>';
       map.appendChild(card);
     }
-    var here = document.querySelector('.stops .lv.here');
-    var country = here && here.dataset.country;
+    var country = ensurePicked();
     if (!country || !document.body.classList.contains('onmap')) {
       card.hidden = true;
       return;
@@ -257,7 +377,18 @@
   function tick() {
     injectStyle();
     decorate();
+    var stage = document.getElementById('mapstage');
+    if (stage && stage.classList.contains('travel-shot')) {
+      stage.dataset.wasTravel = '1';
+    } else {
+      if (stage && stage.dataset.wasTravel === '1') {
+        stage.dataset.wasTravel = '';
+        stage.dataset.framed = '';
+      }
+      frameCountry(ensurePicked());
+    }
     showCard();
+    syncNav();
     syncTravel();
     syncZoom();
   }
