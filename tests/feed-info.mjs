@@ -1070,7 +1070,7 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   assert.ok(Math.min(...scale) >= 400 && Math.max(...scale) <= 800);
   assert.ok(srJs.includes('createDynamicsCompressor') && srJs.includes('BGM_DUCK = 0.078') && srJs.includes('VOICE_VOL = 0.36') && srJs.includes('CHIME_VOL = 0.10'));
   assert.ok(SR.CHIME_DUR >= 0.15 && SR.CHIME_DUR <= 0.25 && SR.CHIME_VOL < SR.VOICE_VOL);
-  assert.ok(SR.VOICE_GAP === 1.2 && SR.playChime && SR.voiceForStep && SR.playClip);
+  assert.ok(SR.VOICE_GAP === 1.5 && SR.playChime && SR.voiceForStep && SR.playClip);
   assert.ok(srJs.includes("ls.get('ib-sugar-sound', true)"), 'sound effects are on by default');
   assert.ok(srJs.includes("ls.get('ib-sugar-music', true)"), 'music is on by default');
   assert.ok(srJs.includes("doc.addEventListener('pointerup', unlockAudio") && srJs.includes("doc.addEventListener('touchend', unlockAudio"), 'game page resumes audio on pointerup/touchend');
@@ -1079,8 +1079,19 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   assert.ok(!srJs.includes('sugar-rush-sfx-pop') && !srJs.includes('SFX_CUTS') && !srJs.includes('CLIP_VOL'), 'old pack and synth effects are gone');
   const sugarFiles = ['sugar-rush-music.mp3', 'sugar-rush-l1.mp3', 'sugar-rush-l2.mp3', 'sugar-rush-menu.mp3', 'sugar-rush-win.mp3', 'sugar-rush-yum.mp3',
     'sugar-rush-voice-yay.mp3', 'sugar-rush-voice-great.mp3', 'sugar-rush-voice-awesome.mp3',
-    'sugar-rush-voice-sweetas.mp3', 'sugar-rush-voice-succulent.mp3'];
+    'sugar-rush-voice-sweetas.mp3', 'sugar-rush-voice-succulent.mp3',
+    'sugar-rush-swap.mp3', 'sugar-rush-swap-lo.mp3', 'sugar-rush-swap-hi.mp3', 'sugar-rush-swap-bad.mp3'];
   for (const f of sugarFiles) assert.ok(fs.existsSync('feed/' + SR.mediaUrl(f)), 'audio ' + f);
+  assert.strictEqual(SR.MEDIA_HASH['sugar-rush-swap.mp3'], 'a48d245c');
+  assert.strictEqual(SR.MEDIA_HASH['sugar-rush-swap-lo.mp3'], '9e2b08ee');
+  assert.strictEqual(SR.MEDIA_HASH['sugar-rush-swap-hi.mp3'], '49127f7a');
+  assert.strictEqual(SR.MEDIA_HASH['sugar-rush-swap-bad.mp3'], '610e5e44');
+  assert.ok(SR.SWAP_VOL >= 0.18 && SR.SWAP_VOL <= 0.22);
+  assert.ok(SR.SWAP_VALID.length === 3 && ['swap', 'swap_lo', 'swap_hi'].every(k => Array.from(SR.SWAP_VALID).includes(k)));
+  assert.ok(srJs.includes('if (res && res.valid) playValidSwap()') && srJs.includes('playBadSwap()'));
+  assert.ok(srJs.includes('playClip(ctx, out, b') && srJs.includes('SWAP_VOL'));
+  const swShell = fs.readFileSync('feed/sw.js', 'utf8');
+  assert.ok(!swShell.includes('sugar-rush-swap') && !swShell.includes('053277f7') && !swShell.includes('74356646'), 'swap and new praise clips stay lazy, not SW-precached');
   for (const old of ['pop', 'crush', 'bomb', 'hammer', 'spread', 'fail']) {
     const leftovers = fs.readdirSync('feed').filter(n => n.startsWith('sugar-rush-sfx-' + old));
     assert.deepStrictEqual(leftovers, [], 'removed old pack clip ' + old);
@@ -1448,7 +1459,8 @@ if (live) {
 
   const sugarFiles = ['sugar-rush-music.mp3', 'sugar-rush-l1.mp3', 'sugar-rush-l2.mp3', 'sugar-rush-menu.mp3', 'sugar-rush-win.mp3', 'sugar-rush-yum.mp3',
     'sugar-rush-voice-yay.mp3', 'sugar-rush-voice-great.mp3', 'sugar-rush-voice-awesome.mp3',
-    'sugar-rush-voice-sweetas.mp3', 'sugar-rush-voice-succulent.mp3'];
+    'sugar-rush-voice-sweetas.mp3', 'sugar-rush-voice-succulent.mp3',
+    'sugar-rush-swap.mp3', 'sugar-rush-swap-lo.mp3', 'sugar-rush-swap-hi.mp3', 'sugar-rush-swap-bad.mp3'];
   const SR = load('feed/sugar-rush.js').SugarRush;
   for (const f of sugarFiles) {
     const url = SR.mediaUrl(f);
@@ -2112,7 +2124,8 @@ if (live) {
   // 1.9.190: Shane's Fantastic! recording replaces vo-fantastic-271ecea2.
   // 1.9.192: Amazing/Brilliant/Awesome/Keep going re-toned to the game-over voice;
   // Fantastic (Shane) and You got this (7761c550) are unchanged.
-  const VO187 = { amazing: 'f68cdbb0', brilliant: '791b3eb0', fantastic: '95c74d33', awesome: 'c083a2f5', yougotthis: '7761c550' };
+  const VO187 = { amazing: '74356646', brilliant: '1a01ca1d', fantastic: '95c74d33', awesome: 'e3ba59fe', yougotthis: '7761c550' };
+  assert.strictEqual(tetGame.CALLOUT_DUR, 1600);
   Object.keys(VO187).forEach(id => {
     assert.strictEqual(tetGame.CALLOUT_VOICES[id], VO187[id]);
     assert.ok(fs.existsSync('feed/tetris-bg/vo-' + id + '-' + VO187[id] + '.mp3'));
