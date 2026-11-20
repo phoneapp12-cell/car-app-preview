@@ -6729,6 +6729,7 @@
       paintGoalStrip(lv, st);
       hintMove = opt.tutorial ? null : findMove(st.board, st.mask);
       revealSugarUi();
+      scrollPastGameChrome();
       return;
     }
     st = newGame(opt.board ? { level: lv, board: fromRows(opt.board) } : { level: lv });
@@ -6763,6 +6764,7 @@
     for (const s of sprites.values()) { s.y = s.r - N - 1 + (N - s.r) * .2; moveTo(s, s.r, s.c, 300 + (N - s.r) * 40, easeOut); }
     if (musicOn) playKind(wantKind());
     revealSugarUi();
+    scrollPastGameChrome();
   }
   function beginLevel(n) {
     hideIntro();
@@ -6772,6 +6774,23 @@
 
   function revealSugarUi() {
     try { doc.documentElement.classList.remove('sr-wait'); } catch (e) { }
+  }
+  /* 1.9.300: hide Exit/Minimise just above the fold so the title and board fill the phone. */
+  function scrollPastGameChrome() {
+    try {
+      if (!doc.body || !doc.body.classList.contains('ingame')) return;
+      const title = doc.querySelector('#game h1');
+      if (!title || ($('game') && $('game').hidden)) return;
+      const go = function () {
+        const top = title.getBoundingClientRect().top + (root.scrollY || doc.documentElement.scrollTop || 0);
+        const y = Math.max(0, Math.round(top - 8));
+        const se = doc.scrollingElement || doc.documentElement;
+        if (se && se.scrollTo) se.scrollTo(0, y);
+        else if (root.scrollTo) root.scrollTo(0, y);
+      };
+      go();
+      if (root.requestAnimationFrame) root.requestAnimationFrame(go);
+    } catch (e) { }
   }
   function paintPickIcon() {
     const btn = $('pickicon');
@@ -8763,7 +8782,7 @@
   root.SugarRush.ui = {
     state: () => st, attempt, comboTip: maybeComboTip, hud, paintGoalStrip, showEnd, showMap, scrollMapTo, openLevel, startLevel, showIntro, startTutorial, skipTutorial, finishTutorial, showTutStep, beginLevel, beginGoalFinish, showGoalBanner, celebrateOnMap, progress: () => prog, tutorial: () => tut, crush: () => crush,
     seedLives, showLives, openLivesPanel, lives: () => lives(), settleLife, nextLife: () => nextLife(),
-    seedRace, seedRaceEvent, showRaceOn, showRaceResult, racePrize, syncRace, openIconPicker, setRaceOpen, requestCloseSugar, requestMinimiseSugar, saveLive: writeLive, readLive, applyLive, clearLive, pauseLive, resumeLiveSession, isResumeOpen, race: () => race,
+    seedRace, seedRaceEvent, showRaceOn, showRaceResult, racePrize, syncRace, openIconPicker, setRaceOpen, requestCloseSugar, requestMinimiseSugar, scrollPastGameChrome, saveLive: writeLive, readLive, applyLive, clearLive, pauseLive, resumeLiveSession, isResumeOpen, race: () => race,
     say, chime, callout, unlockAudio, audio, showSaying, hideSaying, showMovesWarn, hideMovesWarn, maybeWarn3, showHint, hideHintHand, noteActivity,
     clipsReady: () => Object.keys(VOICE_FILES).every(k => !!bufs[k]),
     setSound(on) { soundOn = !!on; ls.set('ib-sugar-sound', soundOn); paintButtons(); },
