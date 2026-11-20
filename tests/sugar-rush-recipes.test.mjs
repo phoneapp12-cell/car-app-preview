@@ -25,7 +25,7 @@ test('the eight new campaign levels are mapped and carry the intended order reci
   assert.ok(game.LEVELS[59].recipe.combos.some(item => item.kind === 'crisscross'), 'double-stripe order requires a real special swap');
   assert.ok(game.LEVELS[60].hard && game.LEVELS[60].timer === 90, 'the scarce countdown is marked Hard and lasts 90 seconds');
   assert.match(game.levelIntro(63).tip, /Popper.*3×3 blast/i);
-  assert.match(html, /sugar-rush\.js\?v=1\.9\.289/);
+  assert.match(html, /sugar-rush\.js\?v=1\.9\.290/);
 });
 
 test('a recipe only wins after the requested colours and a wrapped sweet have both been collected/made', () => {
