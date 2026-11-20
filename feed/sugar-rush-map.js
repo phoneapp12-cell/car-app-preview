@@ -88,9 +88,9 @@
       '.sr-zoom .sr-fly{position:absolute;left:10%;top:46%;animation:srFly 2.6s ease-in-out forwards}',
       '@keyframes srFly{from{transform:translate(0,10px) rotate(-8deg)}to{transform:translate(70vw,-26vh) rotate(6deg)}}',
       '.sr-zoom-label{position:absolute;left:50%;top:64px;transform:translateX(-50%);padding:8px 14px;border-radius:16px;background:rgba(255,255,255,.96);color:#d6246e;font:900 16px/1.2 ui-rounded,system-ui,sans-serif;box-shadow:0 4px 12px rgba(90,140,170,.18);white-space:nowrap}',
-      '.sr-nav{position:absolute;left:50%;bottom:78px;transform:translateX(-50%);z-index:11;display:flex;align-items:center;gap:8px;padding:6px;border-radius:22px;background:rgba(255,255,255,.96);box-shadow:0 4px 12px rgba(90,140,170,.18)}',
+      '.sr-nav{position:absolute;left:50%;bottom:72px;transform:translateX(-50%);z-index:20;display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:24px;background:#fff;border:2px solid #ff8ab8;box-shadow:0 4px 0 #f4a0c4}',
       'body:not(.onmap) .sr-nav{display:none}',
-      '.sr-nav button{width:40px;height:40px;border:0;border-radius:50%;background:#ff8ab8;color:#fff;font:900 22px/1 ui-rounded,system-ui,sans-serif;box-shadow:0 2px 0 #f4a0c4}',
+      '.sr-nav button{width:48px;height:48px;border:0;border-radius:50%;background:#ff4f88;color:#fff;font:900 26px/1 ui-rounded,system-ui,sans-serif;box-shadow:0 3px 0 #d6246e}',
       '.sr-nav button:disabled{opacity:.35}',
       '.sr-nav span{min-width:120px;text-align:center;font:900 14px/1.1 ui-rounded,system-ui,sans-serif;color:#d6246e}'
     ].join('');
@@ -229,7 +229,7 @@
     var list = countryList();
     var country = ensurePicked();
     var i = list.indexOf(country);
-    nav.querySelector('span').textContent = country || 'Country';
+    nav.querySelector('span').innerHTML = (country || 'Country') + '<small style="display:block;font-size:10px;color:#7a4a62">1.9.274</small>';
     nav.querySelector('#sr-prev').disabled = i <= 0;
     nav.querySelector('#sr-next').disabled = i < 0 || i >= list.length - 1;
     if (!document.body.classList.contains('onmap')) nav.style.display = 'none';
