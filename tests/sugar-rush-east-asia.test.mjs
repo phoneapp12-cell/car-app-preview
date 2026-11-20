@@ -17,15 +17,15 @@ test('East Asia extends the campaign after Haikou with accurate city stops and c
   assert.equal(game.MAP_STOPS.length, 75);
   assert.deepEqual(
     Array.from(game.MAP_STOPS.slice(65, 70).map(stop => stop.place)),
-    ['Taipei', 'Naha', 'Fukuoka', 'Busan', 'Seoul']
+    ['Taipei', 'Naha', 'Fukuoka', 'Seoul', 'Tokyo']
   );
   assert.deepEqual(
     Array.from(game.MAP_COUNTRIES.slice(65, 70)),
-    ['Taiwan', 'Japan', 'Japan', 'South Korea', 'South Korea']
+    ['Taiwan', 'Japan', 'Japan', 'South Korea', 'Japan']
   );
   assert.deepEqual(
     Array.from([66, 67, 68, 69, 70].map(n => game.countryForLevel(n))),
-    ['Taiwan', 'Japan', 'Japan', 'South Korea', 'South Korea']
+    ['Taiwan', 'Japan', 'Japan', 'South Korea', 'Japan']
   );
 
   for (const stop of game.MAP_STOPS.slice(65, 70)) {
@@ -48,8 +48,8 @@ test('new East Asian levels have matching intro copy and playable objectives', (
     ['Taipei Lantern Market', 'Taipei'],
     ['Naha Coral Garden', 'Naha'],
     ['Fukuoka Mochi Delivery', 'Fukuoka'],
-    ['Busan Harbor Star Parade', 'Busan'],
-    ['Seoul Palace Garden', 'Seoul']
+    ['Seoul Palace Garden', 'Seoul'],
+    ['Tokyo Star Parade', 'Tokyo']
   ];
   expected.forEach(([name, place], index) => {
     const n = index + 66;
@@ -60,12 +60,12 @@ test('new East Asian levels have matching intro copy and playable objectives', (
     const state = game.newGame({ level: game.LEVELS[n - 1], seed: 8675309 + n });
     assert.equal(game.goalsMet(state), false, `level ${n} should start with its objectives unfinished`);
   });
-  assert.equal(game.sceneFor(69).id, 'busan');
-  assert.equal(game.sceneFor(70).id, 'seoul');
+  assert.equal(game.sceneFor(69).id, 'beach');
+  assert.equal(game.sceneFor(70).id, 'beach');
   assert.equal(new Set(game.SCENES.map(scene => scene.id)).size, game.SCENES.length, 'defined campaign scene ids stay unique');
 });
 
-test('saved Seoul progress follows the moved level 70 while Busan starts as a new stop', () => {
+test('saved Seoul and Tokyo progress stays on the current stops before Koror', () => {
   const oldIds = game.levelIds();
   oldIds[68] = 'seoulgarden';
   oldIds[69] = 'tokyostars';
@@ -75,13 +75,13 @@ test('saved Seoul progress follows the moved level 70 while Busan starts as a ne
   badges[68] = 1;
   stars[69] = 3;
   const moved = game.migrateProg({ open: 71, ids: oldIds, stars, best, badges });
-  assert.equal(game.stopId(69), 'busanstars');
-  assert.equal(game.stopId(70), 'seoulgarden');
-  assert.equal(moved.stars[68], 0, 'Busan has no inherited Seoul stars');
-  assert.equal(moved.stars[69], 2, 'Seoul keeps its saved stars at level 70');
-  assert.equal(moved.best[69], 15800);
-  assert.equal(moved.badges[69], 1);
-  assert.equal(moved.stars[70], 0, 'the removed Tokyo stage does not overwrite Koror');
+  assert.equal(game.stopId(69), 'seoulgarden');
+  assert.equal(game.stopId(70), 'tokyostars');
+  assert.equal(moved.stars[68], 2, 'Seoul keeps its saved stars at level 69');
+  assert.equal(moved.stars[69], 3, 'Tokyo keeps its saved stars at level 70');
+  assert.equal(moved.best[68], 15800);
+  assert.equal(moved.badges[68], 1);
+  assert.equal(moved.stars[70], 0, 'Koror does not inherit Tokyo progress');
   assert.equal(moved.open, 71, 'existing access to Koror is retained');
 });
 

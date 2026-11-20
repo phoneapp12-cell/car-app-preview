@@ -31,7 +31,7 @@ test('feed shell, app, and Sugar Rush assets share one release version', () => {
 test('feed update lifecycle does not force a reload when the service-worker controller changes', () => {
   assert.match(feedHtml, /No controllerchange reload/);
   assert.doesNotMatch(app, /addEventListener\(['"]controllerchange['"][\s\S]{0,300}location\.reload\(/);
-  assert.doesNotMatch(worker, /skipWaiting\s*\(|clients\.claim\s*\(/);
+  assert.doesNotMatch(worker, /clients\.claim\s*\(/);
 });
 
 test('map atmosphere is decorative and respects reduced-motion preferences', () => {

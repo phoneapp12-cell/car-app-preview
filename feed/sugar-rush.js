@@ -1,4 +1,4 @@
-/* Info Book 1.9.260 – Sugar Rush, levels 1–75. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.280 – Sugar Rush, levels 1–75. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -398,15 +398,15 @@
       ice: ['00000000', '00000000', '00000000', '00011000', '00011000', '00000000', '00000000', '00000000'],
       help: 'Bring both mochi treats down and crack the four icy blocks in 34 moves.',
       badge: { id: 'fukuokamochi', name: 'Mochi Delivery', icon: '🍡' } },
-    { n: 69, name: 'Busan Harbor Star Parade', target: 0, scoreGoal: 14500, moves: 34, stars: [0, 16000, 24000], kinds: 6,
-      help: 'Score 14,500 points in 34 moves as the lights shimmer across Busan Harbor.',
-      badge: { id: 'busanstars', name: 'Harbor Star Parade', icon: '🌟' } },
-    { n: 70, name: 'Seoul Palace Garden', target: 0, moves: 34, stars: [0, 7900, 15800], kinds: 6,
+    { n: 69, name: 'Seoul Palace Garden', target: 0, moves: 34, stars: [0, 7900, 15800], kinds: 6,
       collect: { color: 2, n: 12 },
       locks: ['00000000', '00000000', '00000000', '00011000', '00011000', '00000000', '00000000', '00000000'],
       help: 'Collect 12 lemon drops and free the four locked jars in the palace garden in 34 moves.',
       badge: { id: 'seoulgarden', name: 'Palace Garden', icon: '🌿' } },
-    // 1.9.260: five new stops continue east from Seoul through Micronesia and Kiribati.
+    { n: 70, name: 'Tokyo Star Parade', target: 0, scoreGoal: 14500, moves: 34, stars: [0, 16000, 24000], kinds: 6,
+      help: 'Score 14,500 points before your 34 moves run out.',
+      badge: { id: 'tokyostars', name: 'Star Parade', icon: '🌟' } },
+    // 1.9.260: five new stops hop east from Japan through Micronesia and Kiribati.
     { n: 71, name: 'Koror Jelly Lagoon', target: 0, moves: 36, stars: [0, 8200, 16400], kinds: 6,
       jelly: ['00000000', '00111100', '01100110', '01000010', '01000010', '01100110', '00111100', '00000000'],
       bub: ['00000000', '01000010', '00100100', '00000000', '00000000', '00100100', '01000010', '00000000'],
@@ -506,8 +506,8 @@
     { icon: '🏮', goal: 'Collect blueberry gems and pop the bubbles', detail: 'Collect 12 blueberry gems and pop the four sugar bubbles in 32 moves.', tip: 'The bubbles are tucked into the corners. Make matches nearby while you gather the blueberry gems.', mechanic: 'collect-bubbles' },
     { icon: '🐠', goal: 'Clear the coral-ring jelly', detail: 'Clear the reef-shaped jelly in 34 moves.', tip: 'Work around the outer ring, then clear the last pieces in the corners.', mechanic: 'jelly' },
     { icon: '🍡', goal: 'Bring both mochi treats down and crack the icing', detail: 'Bring both treats down and clear the four blocks of icing in 34 moves.', tip: 'Match underneath each treat to bring it down; nearby matches will chip away at the icing.', mechanic: 'ingredients' },
-    { icon: '🌟', goal: 'Reach the star score', detail: 'Score 14,500 points before your 34 moves run out.', tip: 'Long matches and special sweets score more. Chain matches together to light up Busan Harbor.', mechanic: 'score' },
-    { icon: '🌿', goal: 'Collect lemon drops and free the jars', detail: 'Collect 12 lemon drops and free the four locked jars in 34 moves.', tip: 'A match that includes a locked jar frees it. Keep collecting lemon drops as you work through Seoul’s palace garden.', mechanic: 'collect-locks' },
+    { icon: '🌿', goal: 'Collect lemon drops and free the jars', detail: 'Collect 12 lemon drops and free the four locked jars in 34 moves.', tip: 'A match that includes a locked jar frees it. Keep collecting lemon drops as you work through the middle.', mechanic: 'collect-locks' },
+    { icon: '🌟', goal: 'Reach the star score', detail: 'Score 14,500 points before your 34 moves run out.', tip: 'Long matches and special sweets score more. Chain matches together to light up the Tokyo night.', mechanic: 'score' },
     { icon: '🐠', goal: 'Clear the reef jelly and pop the lagoon bubbles', detail: 'Clear the reef-ring jelly and pop all 8 sugar bubbles in 36 moves.', tip: 'Work around the jelly ring, then match beside the bubbled sweets. Bubbles touching each other pop together.', mechanic: 'reef-bubbles' },
     { icon: '🥥', goal: 'Bring both coconuts down and clear the icing', detail: 'Bring both coconut treats down and clear all 4 blocks of icing in 36 moves.', tip: 'Match underneath each coconut to bring it down; nearby matches or specials will crack the icing.', mechanic: 'ingredients-ice' },
     { icon: '📜', goal: 'Fill the atoll recipe and make a wrapped sweet', detail: 'Collect 10 orange jellies and 8 blueberry gems, then make one wrapped sweet in 36 moves.', tip: 'A T- or L-shaped match creates a wrapped sweet. The recipe counts both colours and the special as soon as you make them.', mechanic: 'recipe' },
@@ -1107,8 +1107,8 @@
     { n: 66, x: 99.5, y: 1415.9, place: 'Taipei', kind: 'city', label: 'left', lat: 25.0330, lon: 121.5654 },
     { n: 67, x: 151.7, y: 1403.0, place: 'Naha', kind: 'city', label: 'right', lat: 26.2124, lon: 127.6809 },
     { n: 68, x: 174.9, y: 1322.1, place: 'Fukuoka', kind: 'city', label: 'right', lat: 33.5902, lon: 130.4017 },
-    { n: 69, x: 163.6, y: 1304.6, place: 'Busan', kind: 'city', label: 'left', lat: 35.1796, lon: 129.0756 },
-    { n: 70, x: 145.7, y: 1278.4, place: 'Seoul', kind: 'city', label: 'left', lat: 37.5665, lon: 126.9780 },
+    { n: 69, x: 145.7, y: 1278.4, place: 'Seoul', kind: 'city', label: 'left', lat: 37.5665, lon: 126.9780 },
+    { n: 70, x: 253.8, y: 1299.2, place: 'Tokyo', kind: 'city', label: 'right', lat: 35.6762, lon: 139.6503 },
     { n: 71, x: 209.7, y: 1610.0, place: 'Koror', kind: 'city', label: 'left', lat: 7.3426, lon: 134.4789 },
     { n: 72, x: 411.8, y: 1614.6, place: 'Palikir', kind: 'city', label: 'below', lat: 6.9248, lon: 158.1610 },
     { n: 73, x: 524.6, y: 1612.8, place: 'Majuro', kind: 'city', label: 'right', lat: 7.0897, lon: 171.3803 },
@@ -1123,7 +1123,7 @@
       'Vietnam', 'Malaysia', 'Thailand', 'Myanmar', 'India', 'Nepal', 'Bangladesh', 'Sri Lanka', 'Singapore', 'Cambodia', 'Philippines', 'Laos', 'Bhutan', 'Pakistan',
       'Afghanistan', 'Iran', 'Uzbekistan', 'Kazakhstan', 'China'],
     Array(13).fill('China'),
-    ['Taiwan', 'Japan', 'Japan', 'South Korea', 'South Korea'],
+    ['Taiwan', 'Japan', 'Japan', 'South Korea', 'Japan'],
     ['Palau', 'Federated States of Micronesia', 'Marshall Islands', 'Nauru', 'Kiribati']
   );
   function countryForLevel(n) { return MAP_COUNTRIES[(n | 0) - 1] || ''; }
@@ -1138,11 +1138,6 @@
     Singapore: '🌆', Cambodia: '🛕', Philippines: '⛵', Laos: '🌿', Bhutan: '🏔️',
     Pakistan: '🏔️', Afghanistan: '🧿', Iran: '🌷', Uzbekistan: '🕌', Kazakhstan: '🐎', China: '🐉'
   };
-  const MAP_COUNTRY_ICONS = Object.assign({}, POSTCARD_ICONS, {
-    Taiwan: '🧋', Japan: '🌸', 'South Korea': '🥁', Palau: '🐠',
-    'Federated States of Micronesia': '🪸', 'Marshall Islands': '🌊', Nauru: '🏝️', Kiribati: '🌅'
-  });
-  function mapCountryIconForLevel(n) { return MAP_COUNTRY_ICONS[countryForLevel(n)] || '✦'; }
   function normalizePostcardProgress(raw) {
     const source = raw && raw.countries && typeof raw.countries === 'object' ? raw.countries : {};
     const countries = {};
@@ -1338,18 +1333,12 @@
     const groves = [[326, 210, .55], [318, 251, .48], [93, 980, .55], [194, 1927, .68], [148, 1980, .62], [252, 1867, .5], [-148, 1548, .52], [281, 1460, .48]];
     const hillSvg = hills.map(function (p, i) {
       const fill = ['#9ed9a7', '#b7e5a7', '#a9dfb2'][i % 3];
-      return '<g transform="translate(' + p[0] + ' ' + p[1] + ') scale(' + p[2] + ')" opacity=".72">' +
-        '<path d="M-34 12 C-28 -1 -19 -9 -9 -6 C-1 -22 12 -20 19 -6 C29 -12 38 -3 40 12 Z" fill="' + fill + '" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/>' +
-        '<path d="M-20 5 Q-8 -2 3 5 T27 5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity=".8"/></g>';
+      return '<g transform="translate(' + p[0] + ' ' + p[1] + ') scale(' + p[2] + ')" opacity=".72"><path d="M-34 12 C-28 -1 -19 -9 -9 -6 C-1 -22 12 -20 19 -6 C29 -12 38 -3 40 12 Z" fill="' + fill + '" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/><path d="M-20 5 Q-8 -2 3 5 T27 5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity=".8"/></g>';
     }).join('');
     const groveSvg = groves.map(function (p, i) {
-      return '<g transform="translate(' + p[0] + ' ' + p[1] + ') scale(' + p[2] + ')" opacity=".84">' +
-        '<ellipse cx="0" cy="8" rx="19" ry="4" fill="#5e9977" opacity=".2"/>' +
-        '<circle cx="-9" cy="1" r="8" fill="#72c89a" stroke="#fff" stroke-width="1.8"/><circle cx="1" cy="-4" r="10" fill="' + (i % 2 ? '#80d3a2' : '#63bd8d') + '" stroke="#fff" stroke-width="1.8"/><circle cx="12" cy="2" r="7" fill="#9bdfaa" stroke="#fff" stroke-width="1.8"/>' +
-        '<circle cx="-2" cy="-7" r="2.2" fill="#d9f7ce" opacity=".9"/></g>';
+      return '<g transform="translate(' + p[0] + ' ' + p[1] + ') scale(' + p[2] + ')" opacity=".84"><ellipse cx="0" cy="8" rx="19" ry="4" fill="#5e9977" opacity=".2"/><circle cx="-9" cy="1" r="8" fill="#72c89a" stroke="#fff" stroke-width="1.8"/><circle cx="1" cy="-4" r="10" fill="' + (i % 2 ? '#80d3a2' : '#63bd8d') + '" stroke="#fff" stroke-width="1.8"/><circle cx="12" cy="2" r="7" fill="#9bdfaa" stroke="#fff" stroke-width="1.8"/><circle cx="-2" cy="-7" r="2.2" fill="#d9f7ce" opacity=".9"/></g>';
     }).join('');
-    return '<g class="sr-terrain" aria-hidden="true" pointer-events="none">' + hillSvg + groveSvg +
-      '</g>';
+    return '<g class="sr-terrain" aria-hidden="true" pointer-events="none">' + hillSvg + groveSvg + '</g>';
   }
   function mapLandmarks() {
     const image = function (id, file, x, y, w, h, kind, opacity) {
@@ -1359,7 +1348,7 @@
       const w = Math.max(42, text.length * 5.2 + 12);
       return '<g id="' + id + '" class="sr-landmark-label" transform="translate(' + x + ' ' + y + ')" pointer-events="none"><rect x="' + (-w / 2) + '" y="-8" width="' + w + '" height="16" rx="8" fill="#fff8e9" fill-opacity=".94" stroke="#fff" stroke-width="1.8" filter="url(#sr-soft)"/><text x="0" y="3" text-anchor="middle" font-size="8" font-weight="900" letter-spacing=".65" fill="#326f7e" font-family="ui-rounded,system-ui,sans-serif">' + text + '</text></g>';
     };
-    return '<g class="sr-landmarks" aria-hidden="true">' +
+    return '<g class="sr-landmarks" aria-hidden="true" pointer-events="none">' +
       image('landmark-lake-taupo', 'lake', 257, 310, 80, 40, 'lake') +
       image('landmark-lake-pukaki', 'lake', 204, 805, 59, 30, 'lake') +
       image('landmark-lake-wakatipu', 'lake', 97, 889, 62, 31, 'lake') +
@@ -1385,22 +1374,22 @@
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + MAP_X0 + ' 0 ' + MAP_VW + ' ' + MAP_H + '" width="' + MAP_VW + '" height="' + MAP_H + '" aria-hidden="true" class="nzsvg">' +
       '<defs>' +
       '<linearGradient id="sr-sea" x1="0" y1="0" x2="0" y2="1">' +
-      '<stop offset="0" stop-color="#8fe7e1"/><stop offset=".45" stop-color="#7bdad6"/><stop offset="1" stop-color="#b8f3de"/>' +
+      '<stop offset="0" stop-color="#7ee8f5"/><stop offset=".45" stop-color="#8fe8f0"/><stop offset="1" stop-color="#b6f3e6"/>' +
       '</linearGradient>' +
       '<linearGradient id="sr-land" x1="0" y1="0" x2="1" y2="1">' +
       '<stop offset="0" stop-color="#d8efc4"/><stop offset=".34" stop-color="#c2e8b9"/><stop offset=".7" stop-color="#a5dcae"/><stop offset="1" stop-color="#8ecdb1"/>' +
       '</linearGradient>' +
-      '<linearGradient id="sr-candy-strawberry" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff2f7"/><stop offset=".55" stop-color="#ffc5db"/><stop offset="1" stop-color="#ff9fbe"/></linearGradient>' +
-      '<linearGradient id="sr-candy-peach" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff5e8"/><stop offset=".55" stop-color="#ffd2ad"/><stop offset="1" stop-color="#ffb98e"/></linearGradient>' +
-      '<linearGradient id="sr-candy-lemon" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fffbe0"/><stop offset=".55" stop-color="#ffe89c"/><stop offset="1" stop-color="#ffd763"/></linearGradient>' +
-      '<linearGradient id="sr-candy-mint" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#effff3"/><stop offset=".55" stop-color="#b9edc9"/><stop offset="1" stop-color="#8bd9a5"/></linearGradient>' +
-      '<linearGradient id="sr-candy-blueberry" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f0f8ff"/><stop offset=".55" stop-color="#c5e3ff"/><stop offset="1" stop-color="#9ccdf5"/></linearGradient>' +
-      '<linearGradient id="sr-candy-grape" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#faf1ff"/><stop offset=".55" stop-color="#ddc6ff"/><stop offset="1" stop-color="#bc9aea"/></linearGradient>' +
+      '<linearGradient id="sr-candy-strawberry" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff6f2"/><stop offset=".55" stop-color="#f8d4c4"/><stop offset="1" stop-color="#f0c0ae"/></linearGradient>' +
+      '<linearGradient id="sr-candy-peach" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff8f4"/><stop offset=".55" stop-color="#f7d8c8"/><stop offset="1" stop-color="#efc4b4"/></linearGradient>' +
+      '<linearGradient id="sr-candy-lemon" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f7fff9"/><stop offset=".55" stop-color="#cfead8"/><stop offset="1" stop-color="#b7dfc6"/></linearGradient>' +
+      '<linearGradient id="sr-candy-mint" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f4fff8"/><stop offset=".55" stop-color="#c8ead4"/><stop offset="1" stop-color="#b4e0c4"/></linearGradient>' +
+      '<linearGradient id="sr-candy-blueberry" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#faf6ff"/><stop offset=".55" stop-color="#e4d4f0"/><stop offset="1" stop-color="#d4c0e6"/></linearGradient>' +
+      '<linearGradient id="sr-candy-grape" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fbf7ff"/><stop offset=".55" stop-color="#e6d6f2"/><stop offset="1" stop-color="#d8c4e8"/></linearGradient>' +
       '<linearGradient id="sr-icing" x1="0" y1="0" x2="0" y2="1">' +
       '<stop offset="0" stop-color="#ff8ab8"/><stop offset=".55" stop-color="#ffb347"/><stop offset="1" stop-color="#ff6fa8"/>' +
       '</linearGradient>' +
       '<filter id="sr-soft" x="-6%" y="-6%" width="112%" height="112%">' +
-      '<feDropShadow dx="0" dy="2" stdDeviation="2.2" flood-color="#4a90b8" flood-opacity=".28"/>' +
+      '<feDropShadow dx="0" dy="3" stdDeviation="3.2" flood-color="#5aa0c0" flood-opacity=".32"/>' +
       '</filter>' +
       '</defs>' +
       '<rect x="' + MAP_X0 + '" width="' + MAP_VW + '" height="' + MAP_H + '" fill="url(#sr-sea)"/>' +
@@ -1433,22 +1422,6 @@
       '<path d="M 24 336 L 240 336 L 258 406 C 128 418 88 442 130 472 C 64 488 24 462 6 472 Z" fill="url(#sr-land)" opacity=".9"/>' +
       '<text x="18" y="512" text-anchor="start" font-size="11" font-weight="900" fill="#2a6a88" font-family="ui-rounded,system-ui,sans-serif">Whangārei close-up</text>' +
       '</g>' +
-      // 1.9.220 Pacific Islands inset: a lagoon-blue panel with Rarotonga, Tonga and Samoa.
-      '<g class="sr-pacific">' +
-      '<rect x="16" y="1236" width="368" height="448" rx="30" fill="#7fe6dc" opacity=".55" stroke="#fff" stroke-width="4" stroke-dasharray="10 8"/>' +
-      // 1.9.227 Islands at their real relative positions (see pacXY): Samoa north, Tonga and Rarotonga side by side.
-      // Samoa: Savai\'i and Upolu
-      '<ellipse cx="122" cy="1348" rx="30" ry="20" fill="#bff5ec" opacity=".8"/><ellipse cx="110" cy="1345" rx="13" ry="8" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
-      '<ellipse cx="138" cy="1356" rx="12" ry="6" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
-      // Tonga: Tongatapu, with Ha\'apai and Vava\'u to the north
-      '<ellipse cx="70" cy="1508" rx="34" ry="20" fill="#bff5ec" opacity=".8"/><path d="M48 1510 c6 -10 30 -12 44 -4 c4 8 -10 14 -24 13 c-10 1 -18 -3 -20 -9 Z" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
-      '<circle cx="90" cy="1454" r="5" fill="url(#sr-land)" stroke="#fff" stroke-width="2"/><circle cx="84" cy="1479" r="4" fill="url(#sr-land)" stroke="#fff" stroke-width="2"/>' +
-      // Rarotonga: a round island with its reef ring
-      '<circle cx="330" cy="1509" r="30" fill="#bff5ec" opacity=".85"/><circle cx="330" cy="1509" r="26" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="4 4"/><circle cx="330" cy="1509" r="16" fill="url(#sr-land)" stroke="#fff" stroke-width="4"/>' +
-      '<path d="M323 1507 l9 -9 5 11 Z" fill="#7ac77a"/>' +
-      [[102, 1339], [150, 1354], [94, 1522], [350, 1503]].map(function (q) { return '<path d="M' + q[0] + ' ' + q[1] + ' v-12 M' + q[0] + ' ' + (q[1] - 12) + ' q-6 -2 -9 3 M' + q[0] + ' ' + (q[1] - 12) + ' q6 -2 9 3 M' + q[0] + ' ' + (q[1] - 12) + ' q-2 -6 -7 -6 M' + q[0] + ' ' + (q[1] - 12) + ' q2 -6 7 -6" stroke="#2f9a5a" stroke-width="2.4" fill="none" stroke-linecap="round"/>'; }).join('') +
-      '<path d="M250 1440 q12 -5 24 0" stroke="#fff" stroke-width="2.5" fill="none" opacity=".7"/>' +
-      '</g>' +
       // A little plane on the flight out of Dunedin
       // 1.9.222 Australia: same full-screen style as New Zealand, with Tasmania and a heading pill.
       '<g class="sr-aus">' +
@@ -1462,6 +1435,24 @@
       // Asia polygon order: Southeast/South Asia and Silk Road countries, followed by East Asia.
       ASIA_LAND.map(function (pts, i) { return '<path filter="url(#sr-soft)" fill="url(#' + asiaCandy[i % asiaCandy.length] + ')" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="' + ausPath(pts) + '"/>'; }).join('') +
       ASIA_EAST_LAND.map(function (pts, i) { return '<path filter="url(#sr-soft)" fill="url(#' + asiaCandy[(i + 3) % asiaCandy.length] + ')" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="' + ausPath(pts) + '"/>'; }).join('') +
+      // 1.9.269 Pacific inset is painted after Asia so Samoa, Tonga and Rarotonga stay on top.
+      // 1.9.220 Pacific Islands inset: a lagoon-blue panel with Rarotonga, Tonga and Samoa.
+      '<g class="sr-pacific">' +
+      '<rect x="16" y="1236" width="368" height="448" rx="30" fill="#7fe6dc" opacity=".96" stroke="#fff" stroke-width="4" stroke-dasharray="10 8"/>' +
+      // 1.9.227 Islands at their real relative positions (see pacXY): Samoa north, Tonga and Rarotonga side by side.
+      // Samoa: Savai\'i and Upolu
+      '<ellipse cx="122" cy="1348" rx="30" ry="20" fill="#bff5ec" opacity=".8"/><ellipse cx="110" cy="1345" rx="13" ry="8" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
+      '<ellipse cx="138" cy="1356" rx="12" ry="6" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
+      // Tonga: Tongatapu, with Ha\'apai and Vava\'u to the north
+      '<ellipse cx="70" cy="1508" rx="34" ry="20" fill="#bff5ec" opacity=".8"/><path d="M48 1510 c6 -10 30 -12 44 -4 c4 8 -10 14 -24 13 c-10 1 -18 -3 -20 -9 Z" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
+      '<circle cx="90" cy="1454" r="5" fill="url(#sr-land)" stroke="#fff" stroke-width="2"/><circle cx="84" cy="1479" r="4" fill="url(#sr-land)" stroke="#fff" stroke-width="2"/>' +
+      // Rarotonga: a round island with its reef ring
+      '<circle cx="330" cy="1509" r="30" fill="#bff5ec" opacity=".85"/><circle cx="330" cy="1509" r="26" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="4 4"/><circle cx="330" cy="1509" r="16" fill="url(#sr-land)" stroke="#fff" stroke-width="4"/>' +
+      '<path d="M323 1507 l9 -9 5 11 Z" fill="#7ac77a"/>' +
+      [[102, 1339], [150, 1354], [94, 1522], [350, 1503]].map(function (q) { return '<path d="M' + q[0] + ' ' + q[1] + ' v-12 M' + q[0] + ' ' + (q[1] - 12) + ' q-6 -2 -9 3 M' + q[0] + ' ' + (q[1] - 12) + ' q6 -2 9 3 M' + q[0] + ' ' + (q[1] - 12) + ' q-2 -6 -7 -6 M' + q[0] + ' ' + (q[1] - 12) + ' q2 -6 7 -6" stroke="#2f9a5a" stroke-width="2.4" fill="none" stroke-linecap="round"/>'; }).join('') +
+      '<path d="M250 1440 q12 -5 24 0" stroke="#fff" stroke-width="2.5" fill="none" opacity=".7"/>' +
+      '<text x="122" y="1310" text-anchor="middle" font-size="14" font-weight="900" fill="#145e56" font-family="ui-rounded,system-ui,sans-serif">Samoa</text>' +
+      '</g>' +
       mapTerrain() +
       mapLandmarks() +
       '<path d="M120 1960 C150 1940 190 1950 210 1980 C190 1990 150 1990 120 1960 Z" fill="#ffd9a8" opacity=".6"/>' +
@@ -1478,7 +1469,7 @@
       '<path id="sr-path-wide" d="' + live + '" fill="none" stroke="url(#sr-icing)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>' +
       '<path id="sr-path-dash" d="' + live + '" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 10" opacity=".9"/>' +
       '<path id="sr-path-win" d="" fill="none" stroke="#fff6a8" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>' +
-      '<g id="sr-travel-plane" display="none" pointer-events="none" filter="url(#sr-soft)"><circle r="24" fill="#fff6c8" fill-opacity=".92" stroke="#fff" stroke-width="4"/><circle r="18" fill="none" stroke="#ff6fa8" stroke-width="2.5"/><path d="M0 -14 L3 -4 L14 2 L14 5 L3 2 L2 10 L6 13 L6 15 L0 13 L-6 15 L-6 13 L-2 10 L-3 2 L-14 5 L-14 2 L-3 -4 Z" fill="#fff" stroke="#2878c8" stroke-width="2"/></g>' +
+      '<g id="sr-travel-plane" display="none" pointer-events="none" filter="url(#sr-soft)"><g transform="scale(1.7)"><circle r="24" fill="#fff6c8" fill-opacity=".92" stroke="#fff" stroke-width="4"/><circle r="18" fill="none" stroke="#ff6fa8" stroke-width="2.5"/><path d="M0 -14 L3 -4 L14 2 L14 5 L3 2 L2 10 L6 13 L6 15 L0 13 L-6 15 L-6 13 L-2 10 L-3 2 L-14 5 L-14 2 L-3 -4 Z" fill="#fff" stroke="#2878c8" stroke-width="2"/></g></g>' +
       '<g id="sr-travel-car" display="none" pointer-events="none" filter="url(#sr-soft)"><ellipse cx="0" cy="11" rx="27" ry="6" fill="#3e6674" opacity=".28"/><path d="M-25 5 L-23 -4 Q-22 -7 -17 -8 L-10 -10 L-4 -20 Q-2 -22 2 -22 L12 -22 Q16 -21 18 -17 L24 -8 L29 -5 Q31 -3 31 2 L29 7 Q28 10 24 10 L-20 10 Q-25 9 -25 5 Z" fill="#ee4055" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/><path d="M-8 -10 L-3 -18 Q-2 -19 1 -19 L5 -19 L5 -10 Z M8 -19 L12 -19 Q14 -18 16 -15 L19 -10 L8 -10 Z" fill="#bceeff" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/><path d="M-22 -2 L-17 -5 M24 -2 L28 0" fill="none" stroke="#fff6c8" stroke-width="2.3" stroke-linecap="round"/><circle cx="-15" cy="9" r="6" fill="#3e3844" stroke="#fff" stroke-width="1.7"/><circle cx="18" cy="9" r="6" fill="#3e3844" stroke="#fff" stroke-width="1.7"/><circle cx="-15" cy="9" r="2.5" fill="#dcebf0"/><circle cx="18" cy="9" r="2.5" fill="#dcebf0"/><path d="M-9 -21 Q2 -24 12 -21" fill="none" stroke="#ffb0b4" stroke-width="2" stroke-linecap="round"/></g>' +
       '</svg>'
     );
@@ -4122,37 +4113,6 @@
           [[44, 472], [74, 444], [320, 456], [352, 480]].map(function (p) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="9" fill="#ff92ad"/><circle cx="' + p[0] + '" cy="' + p[1] + '" r="3" fill="#fff7d1"/>'; }).join('');
       },
       sprites: [{ x: 12, y: 70, w: 9, cls: 'sc-bob', d: 4.2, emoji: '🌸' }, { x: 78, y: 17, w: 8, cls: 'sc-drift', d: 12, svg: 'gull' }] },
-    { n: 69, id: 'busan', place: 'Busan', title: 'Gwangalli lights, Busan', night: false,
-      art: function () {
-        return '<defs>' + scGrad('sk', [[0, '#88d0ed'], [0.5, '#f4c7c9'], [1, '#ffdc9e']]) + scGrad('sea', [[0, '#54c9d8'], [1, '#247eae']]) + '</defs>' +
-          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(284, 76, 0.82, 0.8) +
-          '<circle cx="76" cy="152" r="38" fill="#fff0ac" opacity=".9"/>' +
-          '<path d="M0 498 L46 426 L90 470 L144 398 L198 468 L258 414 L314 476 L362 430 L410 490 V594 H0 Z" fill="#7caa8b"/>' +
-          '<rect y="520" width="390" height="324" fill="url(#sea)"/>' +
-          '<path d="M0 596 Q74 572 148 596 T296 592 T430 594 M0 704 Q82 682 164 704 T328 700 T430 702 M0 778 Q88 758 176 778 T350 774 T430 776" stroke="#b8f5ec" stroke-width="7" fill="none" opacity=".82"/>' +
-          '<path d="M0 548 Q96 536 195 548 T390 546" stroke="#f7d7b0" stroke-width="12" fill="none"/>' +
-          '<path d="M72 546 V414 M318 546 V414 M72 418 Q195 302 318 418" stroke="#fff0d1" stroke-width="7" fill="none"/>' +
-          '<path d="M78 424 Q195 320 312 424 M92 440 Q195 350 298 440 M106 458 Q195 382 284 458" stroke="#ff9db4" stroke-width="3" fill="none" opacity=".9"/>' +
-          '<path d="M34 548 V478 H66 V548 M326 546 V464 H362 V546 M138 546 V492 H164 V546 M224 546 V482 H252 V546" fill="#f5bd9c" stroke="#fff0d6" stroke-width="4"/>' +
-          '<circle cx="112" cy="560" r="5" fill="#fff6c3"/><circle cx="196" cy="560" r="5" fill="#fff6c3"/><circle cx="278" cy="560" r="5" fill="#fff6c3"/>';
-      },
-      sprites: [{ x: 61, y: 76, w: 12, cls: 'sc-drift', d: 15, svg: 'boat' }, { x: 82, y: 62, w: 8, cls: 'sc-bob', d: 4.8, emoji: '🌟' }, { x: 12, y: 19, w: 8, cls: 'sc-drift', d: 12, svg: 'gull' }] },
-    { n: 70, id: 'seoul', place: 'Seoul', title: 'Palace garden, Seoul', night: false,
-      art: function () {
-        return '<defs>' + scGrad('sk', [[0, '#8ed2ec'], [0.56, '#e5f1d8'], [1, '#ffddb3']]) + scGrad('pond', [[0, '#70d5d8'], [1, '#2b8eb2']]) + '</defs>' +
-          '<rect width="390" height="844" fill="url(#sk)"/>' + scCloud(82, 78, 0.82, 0.8) +
-          '<path d="M0 500 L52 408 L108 470 L172 350 L232 464 L302 396 L366 472 L410 422 V610 H0 Z" fill="#799e82"/>' +
-          '<path d="M0 596 Q88 566 178 594 T360 588 T430 594 V844 H0 Z" fill="#78b078"/>' +
-          '<path d="M0 662 Q98 642 196 662 T390 658 V844 H0 Z" fill="url(#pond)"/>' +
-          '<path d="M0 666 Q90 648 180 666 T360 662 T430 664 M0 746 Q96 726 192 746 T384 742" stroke="#c4fff0" stroke-width="6" fill="none" opacity=".82"/>' +
-          '<path d="M72 592 V464 H114 V592 M276 592 V464 H318 V592" fill="#c75549" stroke="#8e3d43" stroke-width="5"/>' +
-          '<path d="M56 468 Q95 412 132 468 Q116 458 94 458 Q74 458 56 468 Z M260 468 Q297 412 334 468 Q318 458 297 458 Q278 458 260 468 Z" fill="#42516d" stroke="#f5d9aa" stroke-width="5"/>' +
-          '<path d="M88 528 H302 V578 H88 Z" fill="#e5b96f" stroke="#f8e2b5" stroke-width="5"/>' +
-          '<path d="M74 526 Q195 452 316 526 Q270 508 195 508 Q120 508 74 526 Z" fill="#bd4c47" stroke="#ffe7ba" stroke-width="6"/>' +
-          '<path d="M104 538 V576 M145 538 V576 M195 538 V576 M245 538 V576 M286 538 V576" stroke="#fff1d1" stroke-width="5"/>' +
-          '<path d="M120 594 V626 M270 594 V626" stroke="#e8c98e" stroke-width="8"/><circle cx="121" cy="632" r="8" fill="#ffe38f"/><circle cx="270" cy="632" r="8" fill="#ff93b4"/>';
-      },
-      sprites: [{ x: 76, y: 70, w: 9, cls: 'sc-bob', d: 4.4, emoji: '🌸' }, { x: 14, y: 18, w: 8, cls: 'sc-drift', d: 12, svg: 'gull' }] },
     { n: 71, id: 'koror', place: 'Koror', title: 'Rock Islands lagoon, Koror', night: false,
       art: function () {
         return '<defs>' + scGrad('sk', [[0, '#8bd9f3'], [0.5, '#d8f2e8'], [1, '#ffe4b8']]) + scGrad('sea', [[0, '#51c8d4'], [1, '#1686b6']]) + '</defs>' +
@@ -4480,8 +4440,6 @@
   root.SugarRush.normalizePostcardProgress = normalizePostcardProgress;
   root.SugarRush.addPostcardPiece = addPostcardPiece;
   root.SugarRush.countryForLevel = countryForLevel;
-  root.SugarRush.mapCountryIconForLevel = mapCountryIconForLevel;
-  root.SugarRush.flightPath = flightPath;
   root.SugarRush.journeyPath = journeyPath;
   root.SugarRush.createSessionLevelAccess = createSessionLevelAccess;
 
@@ -6624,12 +6582,9 @@
     LEVELS.forEach((lv, i) => {
       const n = i + 1, open = sessionLevelAccess.allows(n, prog.open), stars = prog.stars[i] || 0, stop = MAP_STOPS[i], country = countryForLevel(n);
       const countryStop = country && country.toLowerCase() === stop.place.toLowerCase();
-      const countryStart = country && country !== countryForLevel(n - 1);
-      const countryIcon = countryStart ? mapCountryIconForLevel(n) : '';
-      const countryPill = countryStart ? '<i class="country"><span class="country-icon" aria-hidden="true">' + countryIcon + '</span>' + (countryStop ? '' : '<span class="country-name">' + country + '</span>') + '</i>' : (country && !countryStop ? '<i class="country"><span class="country-name">' + country + '</span></i>' : '');
       const b = doc.createElement('button');
       b.type = 'button';
-      b.className = 'lv lab-' + (stop.label || 'right') + (stop.lift ? ' lift' : '') + (lv.theme === 'sarah' ? ' sarah' : '') + (lv.hard ? ' hard hard' + lv.hard : '') + (countryStop ? ' country-stop' : '') + (countryStart ? ' country-start' : '') + (open ? ' open' : '') + (stars ? ' done' : '') + (n === here ? ' here' : '') + ' kind-' + (stop.kind || 'town');
+      b.className = 'lv lab-' + (stop.label || 'right') + (stop.lift ? ' lift' : '') + (lv.theme === 'sarah' ? ' sarah' : '') + (lv.hard ? ' hard hard' + lv.hard : '') + (countryStop ? ' country-stop' : '') + (open ? ' open' : '') + (stars ? ' done' : '') + (n === here ? ' here' : '') + ' kind-' + (stop.kind || 'town');
       b.disabled = !open;
       b.dataset.n = String(n);
       b.dataset.country = country;
@@ -6639,7 +6594,7 @@
       const starHtml = [0, 1, 2].map(k => '<span class="' + (k < stars ? 'on' : '') + '">★</span>').join('');
       const badge = prog.badges[i] && lv.badge ? '<span class="gotbadge" aria-hidden="true">' + lv.badge.icon + '</span>' : '';
       b.innerHTML = '<span class="pin"><span class="no">' + n + '</span>' + (mark ? '<span class="mark" aria-hidden="true">' + mark + '</span>' : '') + (lv.hard ? '<span class="hardmark" aria-hidden="true">🔥</span>' : '') + '</span><span class="st">' + starHtml + '</span>' +
-        '<span class="meta"><b>' + stop.place + '</b><em>' + lv.name + '</em>' + countryPill + '</span>' + badge;
+        '<span class="meta"><b>' + stop.place + '</b><em>' + lv.name + '</em>' + (country && !countryStop ? '<i class="country">' + country + '</i>' : '') + '</span>' + badge;
       b.setAttribute('aria-label', (open ? 'Play ' : 'Locked: ') + 'level ' + n + ', ' + lv.name + ', ' + stop.place + (country && !countryStop ? ', ' + country : '') + (lv.hard ? ', ' + hardLabel(lv.hard) : '') + (stars ? ', ' + stars + ' stars' : '') + (prog.badges[i] && lv.badge ? ', badge ' + lv.badge.name : ''));
       if (open) b.addEventListener('click', () => { unlockAudio(); openLevel(n); });
       path.appendChild(b);
@@ -7928,3 +7883,17 @@
     }
   };
 })(typeof window !== 'undefined' ? window : globalThis);
+
+// 1.9.275 Load the map extras even if the page was saved before the script tag existed.
+(function () {
+  if (typeof document === 'undefined') return;
+  function ensureMapExtras() {
+    if (document.querySelector('script[src*="sugar-rush-map"]')) return;
+    var s = document.createElement('script');
+    s.src = 'sugar-rush-map.js?v=1.9.280';
+    s.async = false;
+    document.body.appendChild(s);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ensureMapExtras, { once: true });
+  else ensureMapExtras();
+})();
