@@ -175,6 +175,30 @@
     const wrap = document.createElement('div'); wrap.id = 'today-hero-wrap'; wrap.innerHTML = heroHtml();
     feed.insertBefore(wrap, feed.firstChild);
     try { if (typeof wxFetchNow === 'function') wxFetchNow(); } catch (e) { }
+    injectCeleb();
+  }
+
+  function celebCardHtml() {
+    return `<section class="today-celeb" id="today-celeb">
+      <p class="kicker">A question for you</p>
+      <h2>Would you like celebrity &amp; reality TV news in your feed?</h2>
+      <p>Things like the Kardashians, Love Island and Real Housewives — from NZ Herald Entertainment, Now to Love, E! News and Us Weekly. Sport is never included. You can change this later in Settings.</p>
+      <div class="today-celeb-actions">
+        <button type="button" class="btn pri" data-celeb="yes">Yes please</button>
+        <button type="button" class="btn" data-celeb="no">No thanks</button>
+      </div>
+    </section>`;
+  }
+
+  function injectCeleb() {
+    $('#today-celeb')?.remove();
+    const ask = typeof CELEB !== 'undefined' && CELEB.ask && typeof tab !== 'undefined' && tab === 'all';
+    if (!ask) return;
+    const hero = $('#today-hero-wrap');
+    const el = document.createElement('div'); el.innerHTML = celebCardHtml();
+    const card = el.firstElementChild;
+    if (hero && hero.parentNode) hero.after(card);
+    else { const feed = $('#feed'); if (feed) feed.insertBefore(card, feed.firstChild); }
   }
 
   /* ---- Tab bar ---- */
@@ -338,7 +362,7 @@
 
   /* ---- Double-tap heart (TikTok-style) ---- */
   const TAP_WAIT = 280;
-  const IGNORE = 'button, input, textarea, select, a.open-l, .fb, .vote, .rxl, .rxpick, .cmts, .cm, .cml, .mini, .ich, .upbs, .today-hero, .today-composer, .today-bit, .ib-tabs, [data-like], [data-cmt], [data-share], [data-vote], [data-likers], [data-unshare], [data-upload], [data-sharelink], [data-sharetext], [contenteditable]';
+  const IGNORE = 'button, input, textarea, select, a.open-l, .fb, .vote, .rxl, .rxpick, .cmts, .cm, .cml, .mini, .ich, .upbs, .today-hero, .today-composer, .today-bit, .today-celeb, .ib-tabs, [data-like], [data-cmt], [data-share], [data-vote], [data-likers], [data-unshare], [data-upload], [data-sharelink], [data-sharetext], [contenteditable]';
   let tap = null, scrolled = false, ptr = null;
 
   function isIgnore(el) { return !!(el && el.closest && el.closest(IGNORE)); }
@@ -443,6 +467,14 @@
       if (typeof settings === 'function') settings();
       return;
     }
+    const celebBtn = t.closest && t.closest('[data-celeb]');
+    if (celebBtn) {
+      e.preventDefault();
+      const on = celebBtn.dataset.celeb === 'yes';
+      celebBtn.disabled = true;
+      try { if (typeof setCelebNews === 'function') setCelebNews(on); } catch (err) { }
+      return;
+    }
     const bit = t.closest && t.closest('[data-today-bit]');
     if (bit) {
       const k = bit.dataset.todayBit;
@@ -459,5 +491,5 @@
   paintTabs();
   if (typeof tab !== 'undefined' && tab === 'all' && $('#feed') && !$('#feed .sk')) injectHero();
 
-  window.ibToday = { nzParts, wxLabel, nextBirthday, sugarLevel, loveKeep, TAP_WAIT, IGNORE, heroHtml, calPreview, calWhen, fmtTime, daysUntil, isoDate, openReaderOrLink };
+  window.ibToday = { nzParts, wxLabel, nextBirthday, sugarLevel, loveKeep, TAP_WAIT, IGNORE, heroHtml, celebCardHtml, calPreview, calWhen, fmtTime, daysUntil, isoDate, openReaderOrLink };
 })();

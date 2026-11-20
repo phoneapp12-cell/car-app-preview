@@ -36,6 +36,32 @@ const LS_PREFIX = MEMBER && MEMBER.id && MEMBER.role !== 'admin' ? 'mf.m.' + MEM
 // deliveries, his garden, weather/power at home, photos, shopping, Kindle) are never shareable.
 const SHARE_BOARDS = new Set(['gardening', 'space', 'astro', 'travel', 'science', 'aitech', 'diy', 'coding', 'walk', 'video', 'top40', 'recipe', 'quote', 'fact', 'joke', 'webcam', 'cinema', 'prime', 'tv', 'concert', 'news', 'radio', 'lang', 'blog', 'podcast']);
 const DEFAULT_ON = ['kids']; // 1.7.1: on for everyone, and added once to anyone who picked before it existed
+let CELEB = { can: false, news: null, ask: false }; // 1.9.291 celebrity news opt-in, only for members the server marks
+function applyCelebFlags(r) {
+  if (!r) return;
+  CELEB.can = !!r.canCeleb;
+  CELEB.ask = !!r.askCeleb;
+  CELEB.news = r.celebNews === true ? true : r.celebNews === false ? false : null;
+  syncCelebPick();
+}
+function syncCelebPick() {
+  if (!PICK) return;
+  const i = PICK.indexOf('celeb');
+  if (CELEB.news === true && i < 0) { PICK.push('celeb'); ls.set('pick', PICK); }
+  if (CELEB.news !== true && i >= 0) { PICK.splice(i, 1); ls.set('pick', PICK); }
+}
+async function setCelebNews(on) {
+  if (!CELEB.can) return;
+  CELEB.news = !!on;
+  CELEB.ask = false;
+  syncCelebPick();
+  try {
+    const r = await fam('/prefs', { method: 'PUT', body: JSON.stringify({ pick: PICK, given: ls.get('defaultsGiven', []), adds: ls.get('addsGot', []), intOff: typeof INT_OFF !== 'undefined' ? INT_OFF : {}, moodOff: typeof MOOD_OFF !== 'undefined' ? MOOD_OFF : false, celebNews: !!on }) });
+    if (r && 'celebNews' in r) applyCelebFlags(r);
+  } catch (e) { }
+  try { if (typeof draw === 'function') draw(); } catch (e) { }
+  try { toast(on ? 'Celebrity news is on in your feed' : 'No celebrity news in your feed'); } catch (e) { }
+}
 let PICK = null;          // topics this person picked at the start (members); null = everything (Shane)
 let SHARES = [], COUNTS = {}, CSEEN = {}, FAM_PEOPLE = [];
 
@@ -74,14 +100,15 @@ async function famInit() {
   if (MEMBER.role === 'admin' && !ls.get('seed103', 0)) { ls.set('optIn', [...new Set([...ls.get('optIn', []), 'aiassist', 'smart', 'innov'])]); ls.set('seed103', 1); } // 1.9.103 Shane's new tech topics on
   CSEEN = ls.get('cseen', {});
   if (MEMBER.role !== 'admin' && !PICK) { // a new phone: their settings from the server, or the welcome screen
-    try { const r = await fam('/prefs'); if (r.prefs && Array.isArray(r.prefs.adds)) ls.set('addsPre', r.prefs.adds.filter(t => TOPIC[t])); if (r.nudge && Array.isArray(r.nudge.topics)) { ls.set('nudge', r.nudge); ls.set('addsPre', [...new Set([...ls.get('addsPre', []), ...r.nudge.topics.filter(t => TOPIC[t])])]); } if (r.prefs && Array.isArray(r.prefs.pick)) { applyPrefs(r.prefs); } } catch (e) { } // 1.8.5 addsPre: interests Shane switched on for them, ticked on the welcome screen
+    try { const r = await fam('/prefs'); applyCelebFlags(r); if (r.prefs && Array.isArray(r.prefs.adds)) ls.set('addsPre', r.prefs.adds.filter(t => TOPIC[t])); if (r.nudge && Array.isArray(r.nudge.topics)) { ls.set('nudge', r.nudge); ls.set('addsPre', [...new Set([...ls.get('addsPre', []), ...r.nudge.topics.filter(t => TOPIC[t])])]); } if (r.prefs && Array.isArray(r.prefs.pick)) { applyPrefs(r.prefs); } } catch (e) { } // 1.8.5 addsPre: interests Shane switched on for them, ticked on the welcome screen
     if (!PICK) { onboarding(); }
   }
-  if (PICK || MEMBER.role === 'admin') fam('/prefs').then(r => { ls.set('nudge', r.nudge || null); if (r.prefs && Array.isArray(r.prefs.vlTags)) ls.set('vlTags', r.prefs.vlTags); }).catch(() => { }); // 1.9.0 suggestions from Shane (life stage)
+  if (PICK || MEMBER.role === 'admin') fam('/prefs').then(r => { applyCelebFlags(r); ls.set('nudge', r.nudge || null); if (r.prefs && Array.isArray(r.prefs.vlTags)) ls.set('vlTags', r.prefs.vlTags); try { if (typeof draw === 'function' && CELEB.ask) draw(); } catch (e) { } }).catch(() => { }); // 1.9.0 suggestions from Shane (life stage)
   if (MEMBER.role !== 'admin' && PICK) fam('/prefs').then(r => { // 1.8.5 interests Shane switched on for them (e.g. 🔮 Tarot for Monique), once each
+    applyCelebFlags(r);
     const adds = (r.prefs && r.prefs.adds) || [], got = ls.get('addsGot', []); let ch = false;
     for (const t of adds) if (!got.includes(t)) { got.push(t); if (TOPIC[t] && !PICK.includes(t)) { PICK.push(t); ch = true; } }
-    ls.set('addsGot', got); if (ch) { ls.set('pick', PICK); famPrefsChanged(); draw(); }
+    ls.set('addsGot', got); if (ch) { ls.set('pick', PICK); famPrefsChanged(); } draw();
   }).catch(() => { });
   loadShares(); loadPop();
   fam('/people').then(p => { FAM_PEOPLE = p; }).catch(() => { });
@@ -92,18 +119,18 @@ function giveDefaults() { // a new default chip is switched on once for people w
   if (ch) { ls.set('defaultsGiven', got); ls.set('pick', PICK); }
 }
 function applyPrefs(p) {
-  PICK = p.pick; if (Array.isArray(p.given)) ls.set('defaultsGiven', p.given); giveDefaults(); ls.set('pick', PICK);
+  PICK = p.pick; if (Array.isArray(p.given)) ls.set('defaultsGiven', p.given); giveDefaults(); syncCelebPick(); ls.set('pick', PICK);
   if (p.intOff) { INT_OFF = p.intOff; ls.set('intOff', INT_OFF); }
   if (Array.isArray(p.vlTags)) ls.set('vlTags', p.vlTags); // 1.9.40 vlog likes Shane set for them
   if (typeof p.moodOff === 'boolean') { MOOD_OFF = p.moodOff; ls.set('moodOff', MOOD_OFF); }
   draw();
 }
 let prefsT = 0;
-function famPrefsChanged() { if (!FAM_ON) return; clearTimeout(prefsT); prefsT = setTimeout(() => fam('/prefs', { method: 'PUT', body: JSON.stringify({ pick: PICK, given: ls.get('defaultsGiven', []), adds: ls.get('addsGot', []), intOff: INT_OFF, moodOff: MOOD_OFF }) }).catch(() => { }), 1500); }
+function famPrefsChanged() { if (!FAM_ON) return; clearTimeout(prefsT); prefsT = setTimeout(() => fam('/prefs', { method: 'PUT', body: JSON.stringify({ pick: PICK, given: ls.get('defaultsGiven', []), adds: ls.get('addsGot', []), intOff: INT_OFF, moodOff: MOOD_OFF, celebNews: (CELEB.can && CELEB.news !== null) ? CELEB.news : undefined }) }).catch(() => { }), 1500); }
 
 /* ---- welcome: pick interests ---- */
 function onboarding() {
-  const list = TOPICS.filter(t => !['all', 'life', 'photos', 'liked', 'family'].includes(t[0]) && (t[0] !== 'election' || Date.now() < ELECTION_END));
+  const list = TOPICS.filter(t => !['all', 'life', 'photos', 'liked', 'family'].includes(t[0]) && t[0] !== 'celeb' && (t[0] !== 'election' || Date.now() < ELECTION_END)); // celeb is asked on a Today card, not here
   const sel = new Set(PICK || [...DEFAULT_ON, ...ls.get('addsPre', [])]);
   $('#sheetin').innerHTML = `<h2>Kia ora ${esc(MEMBER.name)} 👋</h2>
     <p>This is your own Info Book: photos, videos and stories from public sources, picked for you. Tap what you’re into (you can change it any time in ⚙️). Your 👍 and 👎 only change your own feed.</p>
@@ -116,7 +143,7 @@ function onboarding() {
 function obGo() {
   const p = [...document.querySelectorAll('.obt.on')].map(b => b.dataset.pick);
   if (!p.length) { toast('Pick at least one'); return; }
-  PICK = p; ls.set('defaultsGiven', DEFAULT_ON.slice()); ls.set('addsGot', [...new Set([...ls.get('addsGot', []), ...ls.get('addsPre', [])])]); ls.set('pick', PICK); famPrefsChanged();
+  PICK = p; ls.set('defaultsGiven', DEFAULT_ON.slice()); ls.set('addsGot', [...new Set([...ls.get('addsGot', []), ...ls.get('addsPre', [])])]); syncCelebPick(); ls.set('pick', PICK); famPrefsChanged();
   $('#sheet').classList.remove('on', 'ob'); tab = 'all'; ls.set('tab', tab); draw(); toast((myName() ? myName() + ', your' : 'Your') + ' feed is ready ✨');
 }
 

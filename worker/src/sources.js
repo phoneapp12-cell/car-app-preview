@@ -1,6 +1,6 @@
 import { GEARTH, GSV } from './mapsfun.js';
 /* My Feed sources. Free public feeds only, no API keys (NASA's public DEMO_KEY is used for APOD, with a page fallback).
-   topic: gf | sitcoms | garden | music | scifi | nz | events | dogs | nature | tech | diy | science | travel | food | fitness | selling | creative | culture | learn | games | collect | outdoors | cars
+   topic: gf | sitcoms | celeb | garden | music | scifi | nz | events | dogs | nature | tech | diy | science | travel | food | fitness | selling | creative | culture | learn | games | collect | outdoors | cars
    kinds: rss (RSS/Atom), reddit, yt (YouTube channel), tvmaze, apod, inat (iNaturalist JSON), page (a listing page + og:image of each article) */
 const pg = (id, topic, name, url, link, extra = {}) => ({ id, topic, kind: 'page', name, url, link, ...extra });
 const yt = (id, topic, name, ch, extra = {}) => ({ id, topic, kind: 'yt', name, ch, ...extra });
@@ -46,6 +46,12 @@ export const SOURCES_BASE = [
   rss('decider', 'sitcoms', 'Decider', 'https://decider.com/feed/', { notWant: /election|midterm|debate|politic|trump|vote|how to watch/i, want: /comedy|sitcom|series|season|stream|netflix|hulu|prime|max|peacock|apple tv|watch|premiere|renew|trailer|episode/i }),
   rss('tvline', 'sitcoms', 'TVLine', 'https://tvline.com/feed/', { notWant: /election|midterm|debate|politic|trump|vote|how to watch/i, want: /comedy|sitcom|renew|season|premiere|trailer|first look|series|cast|revival|reboot/i }),
   rss('denofgeek-tv', 'sitcoms', 'Den of Geek', 'https://www.denofgeek.com/feed/', { notWant: /election|midterm|debate|politic|trump|vote|how to watch/i, want: /comedy|sitcom|tv|series|season|episode|streaming/i }),
+  // 1.9.291 Celebrity & reality TV news — only shown to family members who opt in (Sarah, Millesha, Monique, Nicole, Miracle).
+  // Sport is also dropped later by SPORT_RE. People.com and Daily Mail were skipped (blocked or less reliable).
+  rss('nzh-ent', 'celeb', 'NZ Herald Entertainment', 'https://www.nzherald.co.nz/arc/outboundfeeds/rss/section/entertainment/?outputType=xml', { nz: 1, max: 8, og: true }),
+  rss('ntl-nz', 'celeb', 'Now to Love NZ', 'https://www.nowtolove.co.nz/feed/', { nz: 1, max: 8, og: true, notWant: /\b(sports?|rugby|cricket|netball|nrl|afl|league|racing|melbourne cup|all blacks)\b/i }),
+  rss('eonline', 'celeb', 'E! News', 'https://eol-feeds.eonline.com/rssfeed/us/top_stories', { max: 8, og: true }),
+  rss('usweekly', 'celeb', 'Us Weekly', 'https://www.usmagazine.com/feed/', { max: 8, og: true }),
   // Gardening
   yt('yt-gardenau', 'garden', 'Gardening Australia', 'UCzzsltdnAgTMSlPOvjko_Dw'),
   yt('yt-epic', 'garden', 'Epic Gardening', 'UCSbyncU597LMwb3HhnAI_4w'),
