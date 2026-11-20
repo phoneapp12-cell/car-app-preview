@@ -543,7 +543,7 @@
     var css = document.createElement('style');
     css.id = 'sr-map-extra-style';
     css.textContent = [
-      '.mapview{background:#7ee8f5}',
+      '.mapview{background:#7ee8f5;overflow:hidden;overscroll-behavior:none}',
       '.nzsvg .sr-atlas,.nzsvg .sr-bob{display:none}',
       '.nzsvg path{stroke-linejoin:round}',
       '.stops .lv .pin{width:18px;height:18px;border:2px solid #fff;background:#fff;box-shadow:0 1px 0 rgba(180,40,90,.12);color:#d6246e}',

@@ -93,14 +93,19 @@
   @keyframes badgeIn { 0% { transform: scale(.2) rotate(-12deg); opacity: 0; } 60% { transform: scale(1.12) rotate(4deg); opacity: 1; } 100% { transform: none; } }
   .badgecap { font-size: 14px; font-weight: 800; color: #d6246e; margin: -4px 0 10px; }
   .introheart { font-size: 56px; margin: 4px 0 8px; }
-  /* 1.9.210 NZ candy map; 1.9.211 almost-full-screen map chrome */
-  body.onmap { display: block; min-height: 100dvh; height: 100dvh; height: 100svh; padding: 0; margin: 0; overflow: hidden; background: #9be7ff; }
+  /* 1.9.210 NZ candy map; 1.9.211 almost-full-screen map chrome.
+     1.9.293: size the map to 100svh only. min-height:100dvh was taller than the
+     visible screen whenever the browser chrome was showing, so the bottom bar
+     sat below the fold; that overflow hid and showed the chrome, which changed
+     the height again, and the bar looped about once a second. */
+  html:has(body.onmap) { height: 100svh; min-height: 100svh; max-height: 100svh; overflow: hidden; }
+  body.onmap { display: block; height: 100svh; min-height: 100svh; max-height: 100svh; padding: 0; margin: 0; overflow: hidden; overscroll-behavior: none; background: #9be7ff; }
   body.onmap .awning { display: none; }
   body.onmap .wrap { max-width: none; width: 100%; height: 100%; margin: 0; min-height: 0; }
   /* Keep the scrollable map in a lower stacking context than fixed sibling dialogs on mobile. */
   body.onmap #map { position: absolute; inset: 0; z-index: 0; display: block; min-height: 0; }
   .mapwrap { position: absolute; inset: 0; }
-  .mapview { position: absolute; inset: 0; flex: none; min-height: 0; overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-x pan-y; border-radius: 0; border: 0; box-shadow: none; background: #9be7ff; }
+  .mapview { position: absolute; inset: 0; flex: none; min-height: 0; overflow: hidden; overscroll-behavior: none; touch-action: none; border-radius: 0; border: 0; box-shadow: none; background: #9be7ff; }
   .mapstage { position: relative; width: 150%; min-width: 320px; }
   .mapstage svg.nzsvg { display: block; width: 100%; height: auto; }
   .mapstage.travel-shot .stops, .mapstage.travel-shot .racers, .mapstage.travel-shot .nzsvg .sr-atlas-box, .mapstage.travel-shot .nzsvg .sr-atlas-kicker, .mapstage.travel-shot .nzsvg .sr-atlas-title, .mapstage.travel-shot .nzsvg .sr-atlas-note { visibility: hidden; }
