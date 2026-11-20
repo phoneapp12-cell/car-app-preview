@@ -934,7 +934,7 @@
     nav.querySelector('#sr-next').disabled = !inWorld && (i < 0 || i >= list.length - 1);
     if (nav.dataset.country !== country) {
       nav.dataset.country = country;
-      nav.querySelector('span').innerHTML = (inWorld ? 'World map' : (country || 'Country')) + '<small style="display:block;font-size:10px;color:#7a4a62">1.9.287</small>';
+      nav.querySelector('span').innerHTML = (inWorld ? 'World map' : (country || 'Country')) + '<small style="display:block;font-size:10px;color:#7a4a62">1.9.288</small>';
     }
     nav.style.display = document.body.classList.contains('onmap') ? '' : 'none';
   }
