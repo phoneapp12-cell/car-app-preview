@@ -358,10 +358,21 @@
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 800);
   }
-  function openLink(link) {
+  function openReaderOrLink(card, link) {
+    try {
+      if (card && window.ibReader && typeof ibReader.canOpen === 'function' && ibReader.canOpen(card)) {
+        ibReader.open(card);
+        return;
+      }
+    } catch (err) {}
+    if (!link) return;
     const ev = new MouseEvent('click', { bubbles: true, cancelable: true, view: window, button: 0 });
     ev._ibToday = true;
     link.dispatchEvent(ev);
+  }
+  function openLink(link) {
+    const card = link && link.closest && link.closest('#feed .card');
+    openReaderOrLink(card, link);
   }
 
   addEventListener('pointerdown', e => {
@@ -395,11 +406,11 @@
     const isArticle = link && (link.classList.contains('media') || link.classList.contains('open-l') || link.target === '_blank' || link.classList.contains('lm'));
     if (isArticle) {
       e.preventDefault(); e.stopPropagation();
-      const timer = setTimeout(() => { tap = null; openLink(link); }, TAP_WAIT);
+      const timer = setTimeout(() => { tap = null; openReaderOrLink(card, link); }, TAP_WAIT);
       tap = { t: now, x, y, card, timer };
       return;
     }
-    const timer = setTimeout(() => { tap = null; }, TAP_WAIT);
+    const timer = setTimeout(() => { tap = null; openReaderOrLink(card, null); }, TAP_WAIT);
     tap = { t: now, x, y, card, timer };
   }, true);
 
@@ -448,5 +459,5 @@
   paintTabs();
   if (typeof tab !== 'undefined' && tab === 'all' && $('#feed') && !$('#feed .sk')) injectHero();
 
-  window.ibToday = { nzParts, wxLabel, nextBirthday, sugarLevel, loveKeep, TAP_WAIT, IGNORE, heroHtml, calPreview, calWhen, fmtTime, daysUntil, isoDate };
+  window.ibToday = { nzParts, wxLabel, nextBirthday, sugarLevel, loveKeep, TAP_WAIT, IGNORE, heroHtml, calPreview, calWhen, fmtTime, daysUntil, isoDate, openReaderOrLink };
 })();

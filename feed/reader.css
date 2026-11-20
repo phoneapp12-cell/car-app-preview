@@ -1,0 +1,54 @@
+/* Info Book 1.9.288 — magazine article reader (Today look) */
+html.ib-reader-on #ib-tabs{display:none}
+html.ib-reader-on #stories-host{display:none}
+html.ib-reader-on{overflow:hidden}
+.ib-reader{position:fixed;inset:0;z-index:80;background:var(--paper,#F4F1EB);color:var(--ink);overflow:hidden}
+.ib-reader[hidden]{display:none !important}
+.ibr-book{position:relative;height:100%;perspective:1600px;transform-style:preserve-3d}
+.ibr-under{position:absolute;inset:0;z-index:0;pointer-events:none;background:color-mix(in srgb,var(--paper,#F4F1EB) 85%,var(--card,#fffdf8))}
+.ibr-page{position:relative;z-index:1;height:100%;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
+  background:var(--card,#fffdf8);color:var(--ink);transform-origin:left center;padding:10px 20px calc(28px + env(safe-area-inset-bottom,0px));
+  box-shadow:8px 0 0 color-mix(in srgb,var(--paper) 70%,#0000);max-width:720px;margin:0 auto}
+.ibr-page::before{content:"";position:absolute;inset:0 auto 0 0;width:10px;background:linear-gradient(90deg,rgba(0,0,0,.06),transparent);pointer-events:none}
+html.today-look .ibr-back{display:inline-flex;align-items:center;min-height:40px;margin:6px 0 14px;padding:0 14px;border:0;border-radius:999px;
+  background:linear-gradient(180deg,#ff8aa0,#e8783a);color:#fff;font:700 .85rem var(--today-sans,system-ui,sans-serif);cursor:pointer}
+html.today-look .ibr-kicker{margin:0 0 8px;font-size:.68rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--sage,#3F6E55)}
+html.today-look .ibr-page h1{font-family:var(--today-serif,Fraunces,Georgia,serif);font-weight:600;font-size:2.05rem;letter-spacing:-.03em;
+  line-height:1.15;margin:0 0 10px;color:var(--ink)}
+html.today-look .ibr-by{margin:0 0 16px;color:var(--mute);font-size:.9rem}
+html.today-look .ibr-hero{margin:0 -8px 18px;border-radius:14px;overflow:hidden;background:color-mix(in srgb,var(--chip) 60%,var(--card))}
+html.today-look .ibr-hero img{display:block;width:100%;height:auto;max-height:52vh;object-fit:cover}
+html.today-look .ibr-hero figcaption{padding:8px 12px 10px;font-size:.75rem;color:var(--mute)}
+html.today-look .ibr-body{font-size:1.08rem;line-height:1.65;max-width:38em}
+html.today-look .ibr-body p{margin:0 0 1em}
+html.today-look .ibr-body.ibr-drop > p:first-of-type::first-letter{
+  font-family:var(--today-serif,Fraunces,Georgia,serif);font-weight:600;font-size:3.4em;float:left;line-height:.8;
+  padding:.08em .1em 0 0;color:var(--press,#8B2E2E)}
+html.today-look .ibr-body blockquote,
+html.today-look .ibr-pull{margin:1.2em 0 1.2em;padding:4px 0 4px 16px;border-left:3px solid var(--press,#8B2E2E);
+  font-family:var(--today-serif,Fraunces,Georgia,serif);font-style:italic;font-size:1.25rem;line-height:1.4;color:var(--ink)}
+html.today-look .ibr-src{margin:22px 0 8px;padding-top:14px;border-top:1px solid var(--line,#DAD3C8);font-size:.88rem;color:var(--mute);line-height:1.5}
+html.today-look .ibr-src a{color:var(--press,#8B2E2E);font-weight:600}
+html.today-look .ibr-orig{display:inline-flex;align-items:center;min-height:44px;margin-top:10px;padding:0 16px;border-radius:999px;
+  background:var(--press,#8B2E2E);color:#fff !important;text-decoration:none;font-weight:700}
+html.today-look .ibr-cmts{margin:18px 0 8px}
+html.today-look .ibr-cmts .cmts{border-top:1px solid var(--line,#DAD3C8);padding-top:12px}
+html.today-look .ibr-empty{color:var(--mute);font-size:.95rem}
+
+/* page-turn */
+.ib-reader.ibr-in .ibr-page{animation:ibrTurnIn .55s ease both}
+.ib-reader.ibr-out .ibr-page{animation:ibrTurnOut .45s ease both}
+.ib-reader.ibr-turn-hold .ibr-page{animation:none;transform:rotateY(-58deg);box-shadow:-20px 12px 30px rgba(0,0,0,.22)}
+@keyframes ibrTurnIn{from{transform:rotateY(-90deg);opacity:.35}to{transform:none;opacity:1}}
+@keyframes ibrTurnOut{from{transform:none;opacity:1}to{transform:rotateY(-90deg);opacity:.2}}
+@media (prefers-reduced-motion:reduce){
+  .ib-reader.ibr-in .ibr-page,.ib-reader.ibr-out .ibr-page{animation:ibrFade .25s ease both}
+  .ib-reader.ibr-turn-hold .ibr-page{transform:none;opacity:.55}
+}
+@keyframes ibrFade{from{opacity:0}to{opacity:1}}
+.ib-reader.ibr-out.ibr-reduce .ibr-page{animation:ibrFadeOut .25s ease both}
+@keyframes ibrFadeOut{to{opacity:0}}
+@media (min-width:720px){
+  html.today-look .ibr-body{column-count:2;column-gap:2em}
+  html.today-look .ibr-body.ibr-drop > p:first-of-type::first-letter{font-size:2.8em}
+}
