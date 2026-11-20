@@ -5,7 +5,10 @@
    which is the reminder that still works when the app is shut.
    1.9.287 adds a book-style Day / Week / Month / Year reader, with a page-turn
    swipe, a Monday week start, and NZ public holidays from the same Holidays Act
-   2003 / Matariki schedule already used in My App (core.js / DD.nzHolidays). */
+   2003 / Matariki schedule already used in My App (core.js / DD.nzHolidays).
+   1.9.289 adds an honest NZTA Check Expiry card: a link to the official page and
+   date fields the person fills in. Shared /cars dates also show, labelled by owner.
+   Nothing about cars is added to the feed. */
 (function (root) {
   const KEY = 'cal';
   const NZ_TV = new Set(['nz-tvg2', 'tvm-nz', 'nz-yt-three']);
@@ -52,14 +55,15 @@
     const time = /^\d{2}:\d{2}$/.test(e.time || '') ? e.time : '';
     const note = String(e.note || '').trim().slice(0, 400);
     const remind = REMIND[e.remind] == null && e.remind !== 'none' ? 'none' : (e.remind || 'none');
-    const kind = ['tv', 'movie', 'event', 'own'].includes(e.kind) ? e.kind : 'own';
+    const kind = ['tv', 'movie', 'event', 'own', 'wof', 'rego'].includes(e.kind) ? e.kind : 'own';
+    const plate = String(e.plate || '').toUpperCase().replace(/\s+/g, '').slice(0, 8);
     if (!title || !date) return null;
     let at = typeof e.at === 'number' && isFinite(e.at) ? e.at : NaN;
     if (time) {
       const wall = isFinite(at) ? nzParts(at) : { date: '', time: '' };
       if (!isFinite(at) || wall.date !== date || wall.time !== time) at = aucklandMs(date, time);
     }
-    return { id: e.id || ('c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)), title, date, time, note, remind, kind, url: String(e.url || '').slice(0, 400), fired: e.fired || '', at: isFinite(at) ? at : undefined };
+    return { id: e.id || ('c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)), title, date, time, note, remind, kind, plate: plate || undefined, url: String(e.url || '').slice(0, 400), fired: e.fired || '', at: isFinite(at) ? at : undefined };
   }
   function upsert(raw) {
     const e = clean(raw); if (!e) return null;
@@ -297,15 +301,90 @@
     }
     return out;
   }
+  const NZTA_EXPIRY = 'https://transact.nzta.govt.nz/v2/check-expiry';
+  const NZTA_NOTE = 'Source: NZTA Check Expiry — dates entered after checking the official page (or the windscreen stickers).';
+  function carShareList() {
+    if (isFriend()) return [];
+    try { if (typeof X !== 'undefined' && X && Array.isArray(X.cars)) return X.cars; } catch (err) {}
+    if (root.X && Array.isArray(root.X.cars)) return root.X.cars;
+    return [];
+  }
+  function carLabel(row) {
+    const c = (row && row.car) || {};
+    const name = String(c.name || '').trim();
+    if (name) return name;
+    const who = String((row && row.name) || '').trim();
+    const plate = String(c.plate || (row && row.plate) || '').toUpperCase().replace(/\s+/g, '');
+    if (who && plate) return who + ' (' + plate + ')';
+    return who || plate || 'Car';
+  }
+  /* Shared /cars dates (GET only). The Worker already limits this list: Shane sees every
+     shared car, other members see only the car shared with them, friends get none. */
+  function carEvents(from, to) {
+    const out = [];
+    for (const row of carShareList()) {
+      const c = row && row.car; if (!c) continue;
+      const plate = String(c.plate || row.plate || '').toUpperCase().replace(/\s+/g, '');
+      const label = carLabel(row);
+      const bits = [[c.wof, 'wof', 'WOF', '🛡️'], [c.rego, 'rego', 'rego', '🚗'], [c.svc || c.svcDate, 'svc', 'service', '🔧']];
+      for (const [date, part, word, icon] of bits) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) continue;
+        if (from && date < from) continue;
+        if (to && date > to) continue;
+        out.push({ date, time: '', title: label + ' ' + word, kind: part === 'svc' ? 'event' : part, src: 'cars', plate, part, readOnly: true, icon, note: 'From the family car list in My App.' });
+      }
+    }
+    return out;
+  }
+  function savePlateDates(raw) {
+    const name = String((raw && raw.name) || '').trim().slice(0, 40);
+    const plate = String((raw && raw.plate) || '').toUpperCase().replace(/\s+/g, '').slice(0, 8);
+    const remind = (raw && raw.remind) || 'd1';
+    const who = name || plate || 'Car';
+    const saved = [];
+    if (raw && raw.wof) {
+      const e = upsert({ title: who + ' WOF', date: raw.wof, kind: 'wof', plate, remind, note: NZTA_NOTE, url: NZTA_EXPIRY });
+      if (e) saved.push(e);
+    }
+    if (raw && raw.rego) {
+      const e = upsert({ title: who + ' rego', date: raw.rego, kind: 'rego', plate, remind, note: NZTA_NOTE, url: NZTA_EXPIRY });
+      if (e) saved.push(e);
+    }
+    return saved;
+  }
+  function plateCardHtml() {
+    return `<section class="cal-plate" data-calplate>
+      <h3>Add your car’s WOF &amp; rego</h3>
+      <p>Check the official NZTA page, then enter the dates you were shown (or the dates on the windscreen stickers). We don’t look the dates up for you.</p>
+      <p><a class="ibr-orig cal-nzta" href="${NZTA_EXPIRY}" target="_blank" rel="noopener noreferrer">Check expiry on NZTA (opens in a new tab)</a></p>
+      <form class="calform" data-calplateform>
+        <div class="cal-plate-row">
+          <label>Car name (optional)<input name="name" maxlength="40" placeholder="e.g. Shane’s car" autocomplete="off"></label>
+          <label>Plate (optional)<input name="plate" maxlength="8" placeholder="ABC123" autocapitalize="characters" spellcheck="false" style="text-transform:uppercase"></label>
+        </div>
+        <div class="cal-plate-row">
+          <label>WOF due<input name="wof" type="date"></label>
+          <label>Rego due<input name="rego" type="date"></label>
+        </div>
+        <label>Reminder<select name="remind">
+          ${[['d1', '1 day before'], ['h1', '1 hour before'], ['at', 'On the day (9:00 am NZ)'], ['none', 'No reminder']].map(([k, lab]) => `<option value="${k}"${k === 'd1' ? ' selected' : ''}>${lab}</option>`).join('')}
+        </select></label>
+        <p class="calnote">Events stay on this phone, on your own calendar. Source: NZTA Check Expiry, or the windscreen stickers.</p>
+        <div class="xbtns"><button class="btn pri" type="submit">Save to my calendar</button></div>
+      </form>
+    </section>`;
+  }
   function ownEvents(from, to) {
-    return load().filter(e => e && e.date && (!from || e.date >= from) && (!to || e.date <= to)).map(e => Object.assign({ src: 'cal', icon: e.kind === 'tv' ? '📺' : e.kind === 'movie' ? '🎬' : e.kind === 'event' ? '🎉' : '📅', readOnly: false }, e));
+    return load().filter(e => e && e.date && (!from || e.date >= from) && (!to || e.date <= to)).map(e => Object.assign({ src: 'cal', icon: e.kind === 'wof' ? '🛡️' : e.kind === 'rego' ? '🚗' : e.kind === 'tv' ? '📺' : e.kind === 'movie' ? '🎬' : e.kind === 'event' ? '🎉' : '📅', readOnly: false }, e));
   }
   function allEvents(from, to) {
-    const evs = ownEvents(from, to).concat(familyEvents(from, to), holidayEvents(from, to));
+    const own = ownEvents(from, to);
+    const cars = carEvents(from, to).filter(ce => !own.some(o => o.date === ce.date && ((o.plate && ce.plate && o.plate === ce.plate && o.kind === ce.kind) || o.title === ce.title)));
+    const evs = own.concat(cars, familyEvents(from, to), holidayEvents(from, to));
     evs.sort((a, b) => (a.date + (a.time || '') + a.title).localeCompare(b.date + (b.time || '') + b.title));
     return evs;
   }
-  function evIcon(e) { return e.icon || (e.kind === 'bday' ? '🎂' : e.kind === 'holiday' ? '🇳🇿' : e.kind === 'tv' ? '📺' : e.kind === 'movie' ? '🎬' : '📅'); }
+  function evIcon(e) { return e.icon || (e.kind === 'wof' ? '🛡️' : e.kind === 'rego' ? '🚗' : e.kind === 'bday' ? '🎂' : e.kind === 'holiday' ? '🇳🇿' : e.kind === 'tv' ? '📺' : e.kind === 'movie' ? '🎬' : '📅'); }
   function dotsFor(date, evs) {
     const kinds = evs.filter(e => e.date === date).map(e => e.kind || 'own');
     const uniq = [];
@@ -419,7 +498,7 @@
     const friend = isFriend();
     const key = friend
       ? `<p class="calkey"><i class="cdot own"></i> Yours <i class="cdot holiday"></i> NZ holidays <i class="cdot tv"></i> TV <i class="cdot movie"></i> Movies</p>`
-      : `<p class="calkey"><i class="cdot own"></i> Yours <i class="cdot bday"></i> Family <i class="cdot holiday"></i> NZ holidays <i class="cdot tv"></i> TV <i class="cdot movie"></i> Movies</p>`;
+      : `<p class="calkey"><i class="cdot own"></i> Yours <i class="cdot bday"></i> Family <i class="cdot holiday"></i> NZ holidays <i class="cdot wof"></i> Cars <i class="cdot tv"></i> TV <i class="cdot movie"></i> Movies</p>`;
     const segs = [['day', 'Day'], ['week', 'Week'], ['month', 'Month'], ['year', 'Year']].map(([k, lab]) => `<button type="button" role="tab" aria-selected="${view === k ? 'true' : 'false'}" data-calview="${k}" class="${view === k ? 'on' : ''}">${lab}</button>`).join('');
     const extra = (view === 'month' || view === 'year') ? '' : '';
     return `<div class="calwrap calbook-wrap"><button type="button" class="backpill" data-calclose>← Back to feed</button>
@@ -434,6 +513,7 @@
       </div>
       ${form}
       <div class="xbtns"><button type="button" class="btn pri" data-calnew>Add something</button></div>
+      ${plateCardHtml()}
       ${extra}
       </div>`;
   }
@@ -485,10 +565,24 @@
     edit = pre || null;
     draw();
     if (root.scrollTo) root.scrollTo(0, 0);
+    refreshCars();
+  }
+  async function refreshCars() {
+    if (isFriend()) return;
+    try {
+      if (typeof fam !== 'function') return;
+      if (typeof FAM_ON === 'undefined' || !FAM_ON) return;
+      const r = await fam('/cars');
+      const list = r && r.cars;
+      if (!Array.isArray(list)) return;
+      try { if (typeof X !== 'undefined') X.cars = list; } catch (err) {}
+      if (root.X) root.X.cars = list;
+      if (on) draw();
+    } catch (err) {}
   }
   root.ibCalOpen = open;
   root.ibCalDraw = function () { if (on) draw(); };
-  Object.assign(root.ibCal, { weekStart, addDays, addMonths, monthGrid, holidaysOfYear, localNzHolidays, allEvents, familyEvents, holidayEvents, isFriend, viewHtml,
+  Object.assign(root.ibCal, { weekStart, addDays, addMonths, monthGrid, holidaysOfYear, localNzHolidays, allEvents, familyEvents, holidayEvents, carEvents, carShareList, savePlateDates, plateCardHtml, NZTA_EXPIRY, isFriend, viewHtml,
     getView() { return view; }, setView(v) { view = v; }, getCursor() { return cursor; }, setCursor(d) { cursor = d; }, today, dayLabel, weekLabel, monthLabel, turn, reduceMotion });
   root.ibSoon = function () { on = false; root.ibCalOn = false; setCalClass(false); edit = null; const el = root.document && root.document.querySelector && root.document.querySelector('[data-id="gamesoon"]'); if (el) el.scrollIntoView({ block: 'start' }); else root.alert('Scroll the feed to find the Games card and play Tetris or Scrabble.'); };
 
@@ -560,6 +654,19 @@
     const sheet = root.document.getElementById('sheet'); if (sheet) sheet.classList.remove('on');
     if (saved && saved.remind !== 'none') askNotify();
     if (root.toast) root.toast(saved ? 'Reminder saved' : 'Add a title and a date first');
+  });
+  if (root.document && root.document.addEventListener) root.document.addEventListener('submit', e => {
+    const pf = e.target; if (pf && pf.matches && pf.matches('[data-calplateform]')) {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(pf).entries());
+      const saved = savePlateDates(data);
+      if (!saved.length) { if (root.toast) root.toast('Add a WOF or rego date first'); return; }
+      if (saved.some(x => x.remind !== 'none') && typeof askNotify === 'function') askNotify();
+      pf.reset();
+      if (root.toast) root.toast(saved.length === 2 ? 'WOF and rego saved to your calendar' : (saved[0].kind === 'wof' ? 'WOF saved to your calendar' : 'Rego saved to your calendar'));
+      draw();
+      return;
+    }
   });
   if (root.document && root.document.addEventListener) root.document.addEventListener('submit', e => {
     const f = e.target; if (!f || !f.matches || !f.matches('[data-calform]')) return;
