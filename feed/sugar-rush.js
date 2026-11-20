@@ -1,4 +1,4 @@
-/* Info Book 1.9.267 – Sugar Rush, levels 1–75. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.269 – Sugar Rush, levels 1–75. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -1370,22 +1370,6 @@
       '<path d="M 24 336 L 240 336 L 258 406 C 128 418 88 442 130 472 C 64 488 24 462 6 472 Z" fill="url(#sr-land)" opacity=".9"/>' +
       '<text x="18" y="512" text-anchor="start" font-size="11" font-weight="900" fill="#2a6a88" font-family="ui-rounded,system-ui,sans-serif">Whangārei close-up</text>' +
       '</g>' +
-      // 1.9.220 Pacific Islands inset: a lagoon-blue panel with Rarotonga, Tonga and Samoa.
-      '<g class="sr-pacific">' +
-      '<rect x="16" y="1236" width="368" height="448" rx="30" fill="#7fe6dc" opacity=".55" stroke="#fff" stroke-width="4" stroke-dasharray="10 8"/>' +
-      // 1.9.227 Islands at their real relative positions (see pacXY): Samoa north, Tonga and Rarotonga side by side.
-      // Samoa: Savai\'i and Upolu
-      '<ellipse cx="122" cy="1348" rx="30" ry="20" fill="#bff5ec" opacity=".8"/><ellipse cx="110" cy="1345" rx="13" ry="8" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
-      '<ellipse cx="138" cy="1356" rx="12" ry="6" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
-      // Tonga: Tongatapu, with Ha\'apai and Vava\'u to the north
-      '<ellipse cx="70" cy="1508" rx="34" ry="20" fill="#bff5ec" opacity=".8"/><path d="M48 1510 c6 -10 30 -12 44 -4 c4 8 -10 14 -24 13 c-10 1 -18 -3 -20 -9 Z" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
-      '<circle cx="90" cy="1454" r="5" fill="url(#sr-land)" stroke="#fff" stroke-width="2"/><circle cx="84" cy="1479" r="4" fill="url(#sr-land)" stroke="#fff" stroke-width="2"/>' +
-      // Rarotonga: a round island with its reef ring
-      '<circle cx="330" cy="1509" r="30" fill="#bff5ec" opacity=".85"/><circle cx="330" cy="1509" r="26" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="4 4"/><circle cx="330" cy="1509" r="16" fill="url(#sr-land)" stroke="#fff" stroke-width="4"/>' +
-      '<path d="M323 1507 l9 -9 5 11 Z" fill="#7ac77a"/>' +
-      [[102, 1339], [150, 1354], [94, 1522], [350, 1503]].map(function (q) { return '<path d="M' + q[0] + ' ' + q[1] + ' v-12 M' + q[0] + ' ' + (q[1] - 12) + ' q-6 -2 -9 3 M' + q[0] + ' ' + (q[1] - 12) + ' q6 -2 9 3 M' + q[0] + ' ' + (q[1] - 12) + ' q-2 -6 -7 -6 M' + q[0] + ' ' + (q[1] - 12) + ' q2 -6 7 -6" stroke="#2f9a5a" stroke-width="2.4" fill="none" stroke-linecap="round"/>'; }).join('') +
-      '<path d="M250 1440 q12 -5 24 0" stroke="#fff" stroke-width="2.5" fill="none" opacity=".7"/>' +
-      '</g>' +
       // A little plane on the flight out of Dunedin
       // 1.9.222 Australia: same full-screen style as New Zealand, with Tasmania and a heading pill.
       '<g class="sr-aus">' +
@@ -1399,6 +1383,24 @@
       // Asia polygon order: Southeast/South Asia and Silk Road countries, followed by East Asia.
       ASIA_LAND.map(function (pts, i) { return '<path filter="url(#sr-soft)" fill="url(#' + asiaCandy[i % asiaCandy.length] + ')" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="' + ausPath(pts) + '"/>'; }).join('') +
       ASIA_EAST_LAND.map(function (pts, i) { return '<path filter="url(#sr-soft)" fill="url(#' + asiaCandy[(i + 3) % asiaCandy.length] + ')" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="' + ausPath(pts) + '"/>'; }).join('') +
+      // 1.9.269 Pacific inset is painted after Asia so Samoa, Tonga and Rarotonga stay on top.
+      // 1.9.220 Pacific Islands inset: a lagoon-blue panel with Rarotonga, Tonga and Samoa.
+      '<g class="sr-pacific">' +
+      '<rect x="16" y="1236" width="368" height="448" rx="30" fill="#7fe6dc" opacity=".96" stroke="#fff" stroke-width="4" stroke-dasharray="10 8"/>' +
+      // 1.9.227 Islands at their real relative positions (see pacXY): Samoa north, Tonga and Rarotonga side by side.
+      // Samoa: Savai\'i and Upolu
+      '<ellipse cx="122" cy="1348" rx="30" ry="20" fill="#bff5ec" opacity=".8"/><ellipse cx="110" cy="1345" rx="13" ry="8" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
+      '<ellipse cx="138" cy="1356" rx="12" ry="6" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
+      // Tonga: Tongatapu, with Ha\'apai and Vava\'u to the north
+      '<ellipse cx="70" cy="1508" rx="34" ry="20" fill="#bff5ec" opacity=".8"/><path d="M48 1510 c6 -10 30 -12 44 -4 c4 8 -10 14 -24 13 c-10 1 -18 -3 -20 -9 Z" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
+      '<circle cx="90" cy="1454" r="5" fill="url(#sr-land)" stroke="#fff" stroke-width="2"/><circle cx="84" cy="1479" r="4" fill="url(#sr-land)" stroke="#fff" stroke-width="2"/>' +
+      // Rarotonga: a round island with its reef ring
+      '<circle cx="330" cy="1509" r="30" fill="#bff5ec" opacity=".85"/><circle cx="330" cy="1509" r="26" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="4 4"/><circle cx="330" cy="1509" r="16" fill="url(#sr-land)" stroke="#fff" stroke-width="4"/>' +
+      '<path d="M323 1507 l9 -9 5 11 Z" fill="#7ac77a"/>' +
+      [[102, 1339], [150, 1354], [94, 1522], [350, 1503]].map(function (q) { return '<path d="M' + q[0] + ' ' + q[1] + ' v-12 M' + q[0] + ' ' + (q[1] - 12) + ' q-6 -2 -9 3 M' + q[0] + ' ' + (q[1] - 12) + ' q6 -2 9 3 M' + q[0] + ' ' + (q[1] - 12) + ' q-2 -6 -7 -6 M' + q[0] + ' ' + (q[1] - 12) + ' q2 -6 7 -6" stroke="#2f9a5a" stroke-width="2.4" fill="none" stroke-linecap="round"/>'; }).join('') +
+      '<path d="M250 1440 q12 -5 24 0" stroke="#fff" stroke-width="2.5" fill="none" opacity=".7"/>' +
+      '<text x="122" y="1310" text-anchor="middle" font-size="14" font-weight="900" fill="#145e56" font-family="ui-rounded,system-ui,sans-serif">Samoa</text>' +
+      '</g>' +
       '<path d="M120 1960 C150 1940 190 1950 210 1980 C190 1990 150 1990 120 1960 Z" fill="#ffd9a8" opacity=".6"/>' +
       '<path d="M236 1930 C250 1918 270 1922 276 1936 C264 1944 246 1942 236 1930 Z" fill="#ffd9a8" opacity=".55"/>' +
       '<circle class="sr-bob" cx="380" cy="1860" r="6" fill="#ffb347" opacity=".5"/><circle class="sr-bob" cx="30" cy="2160" r="7" fill="#ff8ab8" opacity=".45"/>' +
