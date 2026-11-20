@@ -3,6 +3,8 @@
    a pink ribbon path, and a car inside a country / plane between. */
 (function () {
   'use strict';
+  if (window.__sugarRushMapLoaded) return;
+  window.__sugarRushMapLoaded = true;
 
   var COUNTRIES = {
     'new zealand': ['🥝', [['🌿', 'silver fern'], ['🌊', 'harbours'], ['🥝', 'kiwi']]],
@@ -58,7 +60,7 @@
     css.textContent = [
       '.mapview{background:#7ee8f5}',
       '.nzsvg .sr-atlas,.nzsvg .sr-bob{display:none}',
-      '.nzsvg path{stroke:#fff;stroke-linejoin:round}',
+      '.nzsvg path{stroke-linejoin:round}',
       '.stops .lv .pin{width:18px;height:18px;border:2px solid #fff;background:#fff;box-shadow:0 1px 0 rgba(180,40,90,.12);color:#d6246e}',
       '.stops .lv .pin .no{font-size:0}',
       '.stops .lv .pin .mark,.stops .lv .pin .hardmark{display:none}',
@@ -79,7 +81,7 @@
       '.sr-country-card .sr-bit span{font:700 10px/1.15 ui-rounded,system-ui,sans-serif;color:#5c6b82;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}',
       '#sr-path-wide{stroke:#f48fb1;stroke-width:10}',
       '#sr-path-dash{stroke:#fff;stroke-width:2.4;opacity:.9}',
-      '#sr-future{stroke:#fff;stroke-width:5;stroke-dasharray:8 12;opacity:.75}',
+      '#sr-future{stroke:#ff6fa8;stroke-width:7;stroke-dasharray:3 8;opacity:.96}',
       '.sr-zoom{position:absolute;inset:0;z-index:12;display:none;background:linear-gradient(180deg,#8eecf6,#7ee0ee 40%,#b7f3e4);overflow:hidden}',
       '.sr-zoom.on{display:block}',
       '.sr-zoom svg{position:absolute;inset:0;width:100%;height:100%}',
@@ -229,12 +231,11 @@
     var list = countryList();
     var country = ensurePicked();
     var i = list.indexOf(country);
-    nav.querySelector('span').innerHTML = (country || 'Country') + '<small style="display:block;font-size:10px;color:#7a4a62">1.9.276</small>';
     nav.querySelector('#sr-prev').disabled = i <= 0;
     nav.querySelector('#sr-next').disabled = i < 0 || i >= list.length - 1;
     if (nav.dataset.country !== country) {
       nav.dataset.country = country;
-      nav.querySelector('span').innerHTML = (country || 'Country') + '<small style="display:block;font-size:10px;color:#7a4a62">1.9.277</small>';
+      nav.querySelector('span').innerHTML = (country || 'Country') + '<small style="display:block;font-size:10px;color:#7a4a62">1.9.280</small>';
     }
     nav.style.display = document.body.classList.contains('onmap') ? '' : 'none';
   }
@@ -397,8 +398,6 @@
       }
       showCard();
       syncNav();
-      syncTravel();
-      syncZoom();
     } finally {
       busy = false;
       var root = document.getElementById('map');
