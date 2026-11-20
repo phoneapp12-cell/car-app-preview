@@ -30,3 +30,18 @@ test('My App and Info Book manifests already open as standalone PWAs', () => {
   assert.equal(app.display, 'standalone');
   assert.equal(feed.display, 'standalone');
 });
+
+test('Info Book icons are the light-blue set with cache-busting filenames', () => {
+  const idx = read('feed/index.html');
+  const man = JSON.parse(read('feed/manifest.webmanifest'));
+  const sw = read('feed/sw.js');
+  const app = read('app.js');
+  assert.match(idx, /icons\/logo-lb\.svg/);
+  assert.match(idx, /icons\/favicon-32-lb\.png/);
+  assert.match(idx, /icons\/apple-touch-icon-lb\.png/);
+  assert.ok(man.icons.every(i => /-lb\.png$/.test(i.src)));
+  assert.match(sw, /icons\/icon-192-lb\.png/);
+  assert.match(sw, /icons\/logo-lb\.svg/);
+  assert.match(app, /feed\/icons\/logo-lb\.svg/);
+  assert.match(app, /\['#7EC8F0', '#A8DCF7'\]/);
+});
