@@ -208,6 +208,34 @@
   /* Keep the player and country badges a fixed size on screen when a small
      country is zoomed in, and slide the player beside the stop so the land
      and the star pin stay visible. */
+  /* In the world view the country badges sit on their countries; where several share a few pixels
+     (South and Southeast Asia) they are eased apart so each stays tappable. */
+  function spreadWorldBadges(stage) {
+    if (!stage.classList.contains('sr-world-view')) { stage.dataset.spread = ''; return; }
+    var key = stage.dataset.framed + ':' + stage.style.transform;
+    if (stage.dataset.spread === key) return;
+    stage.dataset.spread = key;
+    var medals = Array.prototype.slice.call(document.querySelectorAll('.stops .lv .sr-medal'));
+    var pts = medals.map(function (m) {
+      var pin = m.parentNode.querySelector('.pin') || m.parentNode;
+      var r = pin.getBoundingClientRect();
+      return { m: m, x0: r.left + r.width / 2, y0: r.top + r.height / 2, dx: 0, dy: 0 };
+    });
+    var min = 31;
+    for (var it = 0; it < 90; it++) {
+      for (var i = 0; i < pts.length; i++) for (var j = i + 1; j < pts.length; j++) {
+        var a = pts[i], b = pts[j];
+        var dx = (b.x0 + b.dx) - (a.x0 + a.dx), dy = (b.y0 + b.dy) - (a.y0 + a.dy), d = Math.sqrt(dx * dx + dy * dy);
+        if (d >= min) continue;
+        if (d < 0.01) { dx = 1; dy = 0.3 * (i % 3 - 1); d = Math.sqrt(dx * dx + dy * dy); }
+        var push = (min - d) / 2 * 0.6;
+        a.dx -= dx / d * push; a.dy -= dy / d * push; b.dx += dx / d * push; b.dy += dy / d * push;
+      }
+      pts.forEach(function (p) { p.dx *= 0.995; p.dy *= 0.995; });
+    }
+    pts.forEach(function (p) { p.m.style.setProperty('--dx', p.dx.toFixed(1) + 'px'); p.m.style.setProperty('--dy', p.dy.toFixed(1) + 'px'); });
+  }
+
   function fitMarkers() {
     var stage = document.getElementById('mapstage');
     if (!stage) return;
@@ -227,6 +255,7 @@
       var want = 'translate(-50%, -50%) translate(' + (x / k).toFixed(1) + 'px, ' + (y / k).toFixed(1) + 'px) scale(' + (1 / k).toFixed(3) + ')';
       if (el.style.transform !== want) el.style.transform = want;
     });
+    spreadWorldBadges(stage);
     var here = document.querySelector('.stops .lv.here');
     document.querySelectorAll('.stops .lv .sr-star').forEach(function (s) { if (s.parentNode !== here) s.remove(); });
     if (here && !here.querySelector('.sr-star')) {
@@ -279,7 +308,7 @@
     var vb = svg.viewBox.baseVal;
     return Array.prototype.map.call(document.querySelectorAll('.stops .lv'), function (b) {
       return { n: +b.dataset.n, country: b.dataset.country, done: b.classList.contains('done'), here: b.classList.contains('here'),
-        x: vb.x + parseFloat(b.style.left) / 100 * vb.width, y: parseFloat(b.style.top) / 100 * vb.height };
+        x: vb.x + parseFloat(b.style.left) / 100 * vb.width, y: vb.y + parseFloat(b.style.top) / 100 * vb.height };
     });
   }
 
@@ -301,7 +330,7 @@
     }
     var seaRect = svg.querySelector('rect[fill="url(#sr-sea)"]');
     var vb = svg.viewBox.baseVal;
-    var swirl = el('rect', { x: vb.x, y: 0, width: vb.width, height: vb.height, fill: 'url(#v2-swirl)', 'class': 'sr-v2-swirl', 'pointer-events': 'none' });
+    var swirl = el('rect', { x: vb.x, y: vb.y, width: vb.width, height: vb.height, fill: 'url(#v2-swirl)', 'class': 'sr-v2-swirl', 'pointer-events': 'none' });
     if (seaRect) seaRect.parentNode.insertBefore(swirl, seaRect.nextSibling);
     svg.querySelectorAll('.sr-pacific > rect').forEach(function (r) {
       r.setAttribute('fill', '#8ae8ee'); r.setAttribute('opacity', '.5'); r.setAttribute('stroke', '#fff'); r.setAttribute('stroke-width', '3'); r.removeAttribute('stroke-dasharray');
@@ -332,7 +361,8 @@
       list.forEach(function (n) {
         var bb; try { bb = n.getBBox(); } catch (e) { return; }
         var size = Math.max(bb.width, bb.height);
-        var d = Math.max(2, Math.min(14, size * 0.035));
+        var d = Math.max(0.5, Math.min(12, size * 0.03));
+        var foam = Math.max(0.6, Math.min(10, size * 0.03));
         var sw = parseFloat(n.getAttribute('stroke-width') || '3');
         function copy(dy, attrs, into) {
           var g = el('g', { transform: 'translate(0 ' + dy.toFixed(1) + ')' });
@@ -341,16 +371,17 @@
           for (var k in attrs) c.setAttribute(k, attrs[k]);
           g.appendChild(c); into.appendChild(g);
         }
-        copy(d + Math.max(3, d * 0.7), { fill: '#1d7d9c', stroke: '#1d7d9c', 'stroke-width': sw + 2 }, shadow);
-        copy(d, { fill: 'none', stroke: '#fff', 'stroke-width': sw + 26 }, foamOut);
-        copy(d, { fill: 'none', stroke: '#fff', 'stroke-width': sw + 9 }, foamIn);
+        copy(d + Math.max(0.6, d * 0.7), { fill: '#1d7d9c', stroke: '#1d7d9c', 'stroke-width': sw + d * 0.3 }, shadow);
+        copy(d, { fill: 'none', stroke: '#fff', 'stroke-width': sw + foam * 2.6 }, foamOut);
+        copy(d, { fill: 'none', stroke: '#fff', 'stroke-width': sw + foam }, foamIn);
         copy(d, { fill: '#d98f7c', stroke: '#d98f7c', 'stroke-width': sw }, cliff);
-        if (d >= 4) copy(d * 0.6, { fill: '#e8a68f', stroke: '#e8a68f', 'stroke-width': sw }, cliff);
+        if (d >= 1.2) copy(d * 0.6, { fill: '#e8a68f', stroke: '#e8a68f', 'stroke-width': sw }, cliff);
         copy(d * 0.28, { fill: '#f2bda6', stroke: '#f2bda6', 'stroke-width': sw }, cliff);
-        if (n.tagName.toLowerCase() !== 'path' || n.getAttribute('transform') || bb.width * bb.height < 1400) return;
+        var s0 = Math.max(0.12, Math.min(0.8, size * 0.0022)); // bush scale follows the land, so it reads the same zoomed in
+        if (n.tagName.toLowerCase() !== 'path' || n.getAttribute('transform') || size < 18) return;
         bigLands.push(n);
         var area = bb.width * bb.height;
-        var wantB = Math.min(38, Math.round(area / 1500)), wantP = Math.min(22, Math.round(area / 2600));
+        var wantB = Math.min(38, Math.round(area / (1500 * s0 * s0))), wantP = Math.min(22, Math.round(area / (2600 * s0 * s0)));
         var pt = svg.createSVGPoint();
         function inside(x, y, m) {
           pt.x = x; pt.y = y; if (!n.isPointInFill(pt)) return false;
@@ -363,11 +394,11 @@
           return false;
         }
         var tries = 0, gotB = 0, gotP = 0;
-        while ((gotB < wantB || gotP < wantP) && tries < (wantB + wantP) * 4 && bushes < 230 && pebbles < 150) {
+        while ((gotB < wantB || gotP < wantP) && tries < (wantB + wantP) * 4 && bushes < 320 && pebbles < 200) {
           tries++;
           var x = bb.x + rand() * bb.width, y = bb.y + rand() * bb.height;
-          if (nearStop(x, y, 16) || !inside(x, y, 9)) continue;
-          var s = (0.75 + rand() * 0.6).toFixed(2);
+          if (nearStop(x, y, Math.max(1.5, 20 * s0)) || !inside(x, y, 12 * s0)) continue;
+          var s = (s0 * (0.75 + rand() * 0.6)).toFixed(3);
           if (gotB < wantB && (gotP >= wantP || rand() < 0.62)) {
             var cl = el('g', { transform: 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ') scale(' + s + ')' });
             cl.appendChild(el('use', { href: '#v2-bush' }));
@@ -385,7 +416,7 @@
     });
 
     // Rocky islets out at sea, away from coasts, stops and the inset panels.
-    var panels = Array.prototype.map.call(svg.querySelectorAll('.sr-pacific > rect, .sr-inset > rect'), function (r) { return r.getBBox(); });
+    var panels = Array.prototype.map.call(svg.querySelectorAll('.sr-inset > rect'), function (r) { return r.getBBox(); });
     var isle = el('g', { 'class': 'sr-v2-islets', 'pointer-events': 'none' });
     var placed = [], pt2 = svg.createSVGPoint(), tries2 = 0;
     function onLand(x, y) {
@@ -395,17 +426,17 @@
       }
       return false;
     }
-    while (placed.length < 30 && tries2 < 600) {
+    while (placed.length < 34 && tries2 < 800) {
       tries2++;
-      var x = vb.x + 20 + rand() * (vb.width - 40), y = 30 + rand() * (vb.height - 60);
-      var bad = panels.some(function (b) { return x > b.x - 30 && x < b.x + b.width + 30 && y > b.y - 30 && y < b.y + b.height + 30; });
+      var x = vb.x + 20 + rand() * (vb.width - 40), y = vb.y + 20 + rand() * (vb.height - 40);
+      var bad = panels.some(function (b) { return x > b.x - 8 && x < b.x + b.width + 8 && y > b.y - 8 && y < b.y + b.height + 8; });
       if (bad) continue;
-      if (stops.some(function (s) { return Math.abs(s.x - x) < 70 && Math.abs(s.y - y) < 70; })) continue;
-      if (placed.some(function (p) { return Math.abs(p[0] - x) < 90 && Math.abs(p[1] - y) < 90; })) continue;
-      if (onLand(x, y) || onLand(x - 40, y) || onLand(x + 40, y) || onLand(x, y - 40) || onLand(x, y + 40)) continue;
+      if (stops.some(function (s) { return Math.abs(s.x - x) < 22 && Math.abs(s.y - y) < 22; })) continue;
+      if (placed.some(function (p) { return Math.abs(p[0] - x) < 60 && Math.abs(p[1] - y) < 60; })) continue;
+      if (onLand(x, y) || onLand(x - 14, y) || onLand(x + 14, y) || onLand(x, y - 14) || onLand(x, y + 14)) continue;
       placed.push([x, y]);
       var big = rand() < 0.4;
-      isle.appendChild(el('use', { href: big ? '#v2-islet-green' : '#v2-islet', transform: 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ') scale(' + (0.9 + rand() * 0.7).toFixed(2) + ')' }));
+      isle.appendChild(el('use', { href: big ? '#v2-islet-green' : '#v2-islet', transform: 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ') scale(' + (0.3 + rand() * 0.25).toFixed(2) + ')' }));
     }
     swirl.parentNode.insertBefore(isle, swirl.nextSibling);
     svg.dataset.v2 = bushes + '/' + pebbles + '/' + placed.length + '/' + Math.round(performance.now() - t0) + 'ms';
@@ -428,7 +459,11 @@
     if (!svg || !stage || !svg.__v2) return;
     var k = stageScale(stage);
     var unit = (stage.clientWidth || 1) / svg.viewBox.baseVal.width * k; // screen px per map unit
-    var pts = stopPoints(svg).filter(function (s) { return s.country === country; }).sort(function (a, b) { return a.n - b.n; });
+    var winPath = svg.querySelector('#sr-path-win');
+    if (winPath && !stage.classList.contains('travel-shot')) winPath.style.strokeWidth = (8 / unit).toFixed(3);
+    var swirlPat = svg.querySelector('#v2-swirl');
+    if (swirlPat) { var ps = 'scale(' + (1.2 / unit).toFixed(4) + ')'; if (swirlPat.getAttribute('patternTransform') !== ps) swirlPat.setAttribute('patternTransform', ps); }
+    var pts = stopPoints(svg).filter(function (s) { return country === WORLD || s.country === country; }).sort(function (a, b) { return a.n - b.n; });
     var hereI = -1;
     pts.forEach(function (p, i) { if (p.here) hereI = i; else if (p.done && hereI < 0) hereI = Math.max(hereI, -1); });
     var lastDone = -1;
@@ -442,7 +477,7 @@
       if (before && before.parentNode) before.parentNode.insertBefore(g, before); else svg.appendChild(g);
     }
     g.dataset.key = key;
-    var w = 9 / unit;
+    var w = (country === WORLD ? 5 : 9) / unit;
     var all = catmull(pts), done = lastDone > 0 ? catmull(pts.slice(0, lastDone + 1)) : '';
     g.innerHTML = all ? (
       '<path d="' + all + '" fill="none" stroke="#c9547f" stroke-opacity=".18" stroke-width="' + (w * 2.1).toFixed(2) + '" stroke-linecap="round" stroke-linejoin="round" transform="translate(0 ' + (2.5 / unit).toFixed(2) + ')"/>' +
@@ -564,7 +599,20 @@
       '.sr-v2-cloud.c-ml{left:-90px;bottom:190px;width:220px;animation-duration:34s}',
       '.sr-v2-cloud.c-br{right:-60px;bottom:150px;width:180px;animation-duration:29s}',
       '@keyframes srV2Cloud{from{transform:translateX(0)}to{transform:translateX(18px)}}',
-      '@media (prefers-reduced-motion:reduce){.sr-v2-cloud{animation:none}}'
+      '@media (prefers-reduced-motion:reduce){.sr-v2-cloud{animation:none}}',
+      /* 1.9.283 world map: every country at true size on one projection, mini badges you can tap */
+      '.sr-world-btn{position:absolute;right:12px;bottom:152px;z-index:21;padding:9px 13px;border:2px solid #ff8ab8;border-radius:18px;background:#fff;color:#d6246e;font:900 13px/1 ui-rounded,system-ui,sans-serif;box-shadow:0 3px 0 #f4a0c4;cursor:pointer}',
+      'body:not(.onmap) .sr-world-btn{display:none}',
+      '.mapstage.sr-world-view .stops .lv .pin{opacity:0}',
+      '.mapstage.sr-world-view .sr-medal{transform:translate(calc(-50% + var(--dx, 0px)),calc(-50% + var(--dy, 0px)));pointer-events:auto;cursor:pointer}',
+      '.mapstage.sr-world-view .stops .lv.here .sr-medal{display:flex}',
+      '.mapstage.sr-world-view .sr-medal i{width:28px;height:28px;box-shadow:0 0 0 2px #fff,0 3px 6px rgba(40,110,140,.28)}',
+      '.mapstage.sr-world-view .sr-medal i u{font-size:15px}',
+      '.mapstage.sr-world-view .sr-medal i b{display:none}',
+      '.mapstage.sr-world-view .stops .lv.here .sr-medal i{box-shadow:0 0 0 2.5px #ff4f88,0 3px 6px rgba(40,110,140,.28)}',
+      '.mapstage.sr-world-view .sr-star{display:none}',
+      '.stops .lv .gotbadge{scale:calc(1 / var(--sr-k, 1))}',
+      '.mapstage.sr-world-view .stops .lv .gotbadge{display:none}'
     ].join('');
     document.head.appendChild(css);
   }
@@ -624,19 +672,23 @@
       var stage = document.getElementById('mapstage');
       if (stage) stage.dataset.framed = '';
     }
+    if (picked === WORLD) return WORLD;
     if (!picked || list.indexOf(picked) < 0) picked = here || list[0];
     return picked;
   }
 
+  var WORLD = '__world';
   function frameCountry(country) {
     var stage = document.getElementById('mapstage');
     var view = document.getElementById('mapview');
     if (!stage || !view || !country) return;
     if (stage.classList.contains('travel-shot')) return;
+    var world = country === WORLD;
+    stage.classList.toggle('sr-world-view', world);
     var all = document.querySelectorAll('.stops .lv, .stops .future-stop');
     var pins = [];
     all.forEach(function (pin) {
-      var on = pin.dataset.country === country;
+      var on = world ? pin.classList.contains('lv') : pin.dataset.country === country;
       pin.style.visibility = on ? '' : 'hidden';
       if (on && pin.classList.contains('lv')) pins.push(pin);
     });
@@ -646,24 +698,35 @@
     stage.dataset.framed = key;
     var sw = stage.clientWidth, sh = stage.clientHeight, vw = view.clientWidth, vh = view.clientHeight;
     if (!sw || !sh || !vw || !vh) return;
-    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    pins.forEach(function (p) {
-      var x = parseFloat(p.style.left) / 100 * sw;
-      var y = parseFloat(p.style.top) / 100 * sh;
-      if (x < minX) minX = x;
-      if (x > maxX) maxX = x;
-      if (y < minY) minY = y;
-      if (y > maxY) maxY = y;
-    });
-    var pad = 90;
-    var bw = Math.max(140, maxX - minX + pad * 2);
-    var bh = Math.max(180, maxY - minY + pad * 2);
-    var cx = (minX + maxX) / 2;
-    var cy = (minY + maxY) / 2;
-    var scale = Math.min(vw / bw, (vh - 120) / bh, 2.2);
-    if (scale < 0.9) scale = 0.9;
+    var svg = stage.querySelector('svg.nzsvg');
+    var perUnit = svg && svg.viewBox && svg.viewBox.baseVal && svg.viewBox.baseVal.width ? sw / svg.viewBox.baseVal.width : 1;
+    var top = 175, bottom = 150; // title card above, country buttons below
+    var scale, cx, cy;
+    if (world) {
+      scale = Math.min(vw / sw, (vh - top - bottom) / sh) * 0.98;
+      cx = sw / 2; cy = sh / 2;
+    } else {
+      var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      pins.forEach(function (p) {
+        var x = parseFloat(p.style.left) / 100 * sw;
+        var y = parseFloat(p.style.top) / 100 * sh;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      });
+      // One world projection: frame the country's stops with a margin, but never closer than ~300 km across,
+      // so a one-stop island still shows its neighbourhood at the same scale as everything else.
+      var pad = 16 * perUnit, minBox = 130 * perUnit;
+      var bw = Math.max(minBox, maxX - minX + pad * 2);
+      var bh = Math.max(minBox, maxY - minY + pad * 2);
+      cx = (minX + maxX) / 2;
+      cy = (minY + maxY) / 2;
+      scale = Math.min(vw / bw, (vh - top - bottom) / bh);
+      scale = Math.max(0.3, Math.min(scale, 14));
+    }
     var tx = vw / 2 - cx * scale;
-    var ty = (vh / 2 + 10) - cy * scale;
+    var ty = (top + (vh - bottom - top) / 2) - cy * scale;
     view.style.overflow = 'hidden';
     stage.style.transformOrigin = '0 0';
     stage.style.transition = 'transform .35s ease';
@@ -673,11 +736,21 @@
   function stepCountry(dir) {
     var list = countryList();
     if (!list.length) return;
+    if (ensurePicked() === WORLD) { picked = currentCountry() || list[0]; var st0 = document.getElementById('mapstage'); if (st0) st0.dataset.framed = ''; frameCountry(picked); showCard(); syncNav(); return; }
     var i = list.indexOf(ensurePicked());
     if (i < 0) i = 0;
     var next = i + dir;
     if (next < 0 || next >= list.length) return;
     picked = list[next];
+    var stage = document.getElementById('mapstage');
+    if (stage) stage.dataset.framed = '';
+    frameCountry(picked);
+    showCard();
+    syncNav();
+  }
+
+  function gotoCountry(c) {
+    picked = c;
     var stage = document.getElementById('mapstage');
     if (stage) stage.dataset.framed = '';
     frameCountry(picked);
@@ -698,14 +771,28 @@
       nav.querySelector('#sr-next').addEventListener('click', function () { stepCountry(1); });
       map.appendChild(nav);
     }
+    var wb = document.getElementById('sr-world-btn');
+    if (!wb) {
+      wb = document.createElement('button');
+      wb.type = 'button';
+      wb.id = 'sr-world-btn';
+      wb.className = 'sr-world-btn';
+      wb.addEventListener('click', function () { gotoCountry(ensurePicked() === WORLD ? (currentCountry() || countryList()[0]) : WORLD); });
+      map.appendChild(wb);
+    }
+    var inWorld = ensurePicked() === WORLD;
+    var wbText = inWorld ? '← Back to ' + (currentCountry() || 'my stop') : '🌏 World map';
+    if (wb.textContent !== wbText) wb.textContent = wbText;
+    wb.setAttribute('aria-pressed', inWorld ? 'true' : 'false');
+    wb.style.display = document.body.classList.contains('onmap') ? '' : 'none';
     var list = countryList();
     var country = ensurePicked();
     var i = list.indexOf(country);
-    nav.querySelector('#sr-prev').disabled = i <= 0;
-    nav.querySelector('#sr-next').disabled = i < 0 || i >= list.length - 1;
+    nav.querySelector('#sr-prev').disabled = !inWorld && i <= 0;
+    nav.querySelector('#sr-next').disabled = !inWorld && (i < 0 || i >= list.length - 1);
     if (nav.dataset.country !== country) {
       nav.dataset.country = country;
-      nav.querySelector('span').innerHTML = (country || 'Country') + '<small style="display:block;font-size:10px;color:#7a4a62">1.9.282</small>';
+      nav.querySelector('span').innerHTML = (inWorld ? 'World map' : (country || 'Country')) + '<small style="display:block;font-size:10px;color:#7a4a62">1.9.283</small>';
     }
     nav.style.display = document.body.classList.contains('onmap') ? '' : 'none';
   }
@@ -731,9 +818,11 @@
       card.hidden = false;
       return;
     }
-    var pair = info(country);
+    var pair = country === WORLD
+      ? ['🌏', [['🗺️', countryList().length + ' countries'], ['📍', document.querySelectorAll('.stops .lv').length + ' stops'], ['⭐', document.querySelectorAll('.stops .lv.done').length + ' cleared']]]
+      : info(country);
     card.dataset.country = country;
-    card.querySelector('.sr-cname').textContent = country;
+    card.querySelector('.sr-cname').textContent = country === WORLD ? 'World tour' : country;
     card.querySelector('.sr-bits').innerHTML = pair[1].map(function (bit) {
       return '<div class="sr-bit"><i aria-hidden="true">' + bit[0] + '</i><span>' + bit[1] + '</span></div>';
     }).join('');
@@ -880,7 +969,16 @@
     }
   }
 
-  window.SugarRushMap = { showPlace: showPlace, hidePlace: hidePlace, placeFacts: placeFacts, PLACES: PLACES };
+  document.addEventListener('click', function (e) {
+    var stage = document.getElementById('mapstage');
+    if (!stage || !stage.classList.contains('sr-world-view')) return;
+    var lv = e.target && e.target.closest ? e.target.closest('.stops .lv') : null;
+    if (!lv || !lv.dataset.country) return;
+    e.preventDefault();
+    e.stopPropagation();
+    gotoCountry(lv.dataset.country);
+  }, true);
+  window.SugarRushMap = { gotoCountry: function (c) { gotoCountry(c || WORLD); }, WORLD: WORLD, showPlace: showPlace, hidePlace: hidePlace, placeFacts: placeFacts, PLACES: PLACES };
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && placeOpen) hidePlace(); });
 
   var obs = new MutationObserver(function () { tick(); });

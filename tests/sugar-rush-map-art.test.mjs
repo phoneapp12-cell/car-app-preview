@@ -13,7 +13,7 @@ test('map art v2 paints raised pastel land with cliffs, foam and shadow without 
   assert.match(art, /n\.removeAttribute\('filter'\)/, 'per-country drop-shadow filters are dropped for phone performance');
   assert.doesNotMatch(art, /<filter|filter="url|setAttribute\('filter'/, 'the art pass adds no SVG filters');
   assert.match(art, /'#d98f7c'/, 'cliff sides');
-  assert.match(art, /stroke-width': sw \+ 26/, 'outer foam line');
+  assert.match(art, /stroke-width': sw \+ foam \* 2\.6/, 'outer foam line, sized to the land');
   assert.match(art, /'#1d7d9c'/, 'soft drop shadow');
   assert.match(art, /svg\.__v2/, 'painted once per map');
   assert.match(art, /isPointInFill/, 'bushes, pebbles and islets are placed on real land or open sea');
