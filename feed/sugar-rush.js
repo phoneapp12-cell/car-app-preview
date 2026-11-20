@@ -3,6 +3,9 @@
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
    Open to every family member since 1.9.228 (Shane-only before; the coming-soon screen is no longer used).
+   1.9.285 Gameplay overhaul: countdown bombs, candy cannons, portals, boss blockers with health bars and thick frosting,
+   plus timed and order levels, spread over levels 25–75 with a "New!" card the first time each appears; per-country
+   board frames, animated obstacles, bigger effects, heavier shakes and a smoother cascade.
    Scores are not sent to the family scoreboard yet. 1.9.229: only major moments are spoken; minor sayings play candy sounds. Good moves were spoken in a bright, punchy callout voice (matched to Shane's "Great!" clip)
    (Yay, Great, Awesome, Sweet as, Succulent). A plain 3-match plays a short, soft chime (about 200 ms, sine
    with a gentle bell harmonic, 400–800 Hz, 2.5 kHz lowpass). There are no pack pops, smashes or synth select
@@ -514,6 +517,154 @@
     { icon: '🧚', goal: 'Uncover the sugar sprites', detail: 'Uncover all 6 sugar sprites hidden under the frosting in 34 moves.', tip: 'The tiny silhouettes mark sprites beneath the icing. Match next to the frosting or hit it with a special to uncover them.', mechanic: 'hidden' },
     { icon: '🌈', goal: 'Clear the syrup clogs and pop the bubbles', detail: 'Clear all 8 syrup clogs and pop the 4 lagoon bubbles in 40 moves.', tip: 'Match on the rainbow-marked channel. A match beside a Popper triggers its 3×3 blast, which can clear clogs and help pop bubbles.', mechanic: 'flow-bubbles' }
   ];
+  // 1.9.285 Gameplay overhaul. Shane: "the challenges are all the same". New mechanics (countdown bombs, candy cannons,
+  // portals, multi-layer frosting, bosses with a health bar, more timed and order levels) are spread through the
+  // campaign so neighbouring levels feel different and every country brings something new. Goals stay objectives.
+  const MIRROR_PORTALS = [0, 1, 2, 3, 4, 5, 6, 7].map(function (c) { return { from: [2, c], to: [4, 7 - c] }; });
+  const SPLIT_MASK = ['XXXXXXXX', 'XXXXXXXX', 'XXXXXXXX', '........', 'XXXXXXXX', 'XXXXXXXX', 'XXXXXXXX', 'XXXXXXXX'];
+  const SIDE_PORTALS = [0, 1, 2, 3].map(function (c) { return { from: [7, c], to: [0, c + 4] }; });
+  const LEVEL_REWORK_285 = {
+    25: { moves: 37, set: { ice: ['31000000', '10000000', '00000000', '00000001', '00000013', '00000000', '10000000', '31000000'] },
+      intro: { icon: '🧁', goal: 'Clear the river jelly and the triple frosting', line: 'Clear the jelly along the river and crack the jacaranda frosting (the corner blocks have three layers)', tip: 'The corner frosting has three layers. Matches beside it, or a special, take one layer at a time.', mechanic: 'ice' } },
+    26: { moves: 24, drop: ['bub', 'locks'], set: { jelly: ['00000000', '00000000', '00000000', '00011000', '00111100', '01111110', '11111111', '11111111'], fuses: [[0, 1, 12], [0, 6, 14], [2, 3, 16]] },
+      intro: { icon: '💣', goal: 'Clear the jelly before a bomb goes off', line: 'Clear the paradise jelly before any countdown bomb reaches zero', tip: 'Countdown bombs tick down by one every move. Match one to defuse it. If one reaches zero, the level is lost.', mechanic: 'fuse' } },
+    27: { moves: 28, drop: ['jelly', 'bub'], set: { recipe: { candies: [{ color: 4, n: 36 }, { color: 3, n: 30 }], specials: [{ kind: 'w', n: 2 }] } },
+      intro: { icon: '🧾', goal: 'Fill the reef order', line: 'Fill the order: 36 blueberry gems, 30 apple chews and 2 wrapped sweets', tip: 'Order levels ask for exact sweets. Make a wrapped sweet with an L or T shape of five.', mechanic: 'order' } },
+    28: { moves: 32, drop: ['ings'], set: { cannons: [{ c: 3, drop: 'ing', every: 6, max: 3 }] },
+      intro: { icon: '🌋', goal: 'Bring down the volcano treats', line: 'The volcano cannon drops 3 treats. Bring all 3 down and crack the icing', tip: 'A candy cannon sits above a column and drops a new treat every few moves. Clear under it to bring it down.', mechanic: 'cannon' } },
+    29: { moves: 36, drop: ['ings', 'ingStyle', 'ingIcon'], set: { timer: 110, jelly: ['11000011', '12222221', '02111120', '02100120', '02100120', '02111120', '12222221', '11000011'] },
+      intro: { icon: '⏱️', goal: 'Clear the jelly against the clock', line: 'Clear the beach jelly', tip: 'Beat the clock! You have moves and seconds — the timer starts with your first look at the board.', mechanic: 'timer' } },
+    30: { moves: 30, drop: ['locks', 'bub'], set: { mask: SPLIT_MASK, portals: MIRROR_PORTALS, jelly: ['00000000', '00000000', '00000000', '00000000', '00000000', '11111111', '11111111', '00000000'] },
+      intro: { icon: '🌀', goal: 'Clear the lagoon jelly through the portals', line: 'Clear the jelly in the lower lagoon. Sweets reach it only through the portals', tip: 'Portals link the two pools: a sweet that drops into a purple portal comes out of the matching orange one below.', mechanic: 'portal' } },
+    31: { moves: 32, drop: ['jelly', 'ice'], set: { liq: ['00000000', '00000000', '00011000', '00100100', '00100100', '00011000', '00000000', '00000000'], cannons: [{ c: 1, drop: 'liq', every: 5, max: 3 }, { c: 6, drop: 'liq', every: 5, max: 3 }] },
+      intro: { icon: '➿', goal: 'Free all the liquorice — even the cannon’s', line: 'Free every liquorice sweet, including the 6 that the market cannons fire', tip: 'Twist: these cannons fire liquorice-wrapped sweets. Free them as they land so the liquorice cannot creep.', mechanic: 'cannon', twist: { icon: '➿', name: 'Liquorice cannons', text: 'Cannons that fire wrapped liquorice.' } } },
+    32: { moves: 32, drop: ['jelly', 'bub'], set: { recipe: { candies: [{ color: 3, n: 48 }, { color: 0, n: 48 }] } },
+      intro: { icon: '🧾', goal: 'Fill the lakeside order', line: 'Fill the order: 48 apple chews and 48 cherry gumdrops', tip: 'Only these two colours count. Twist: a mega order — two big piles of one colour each. Big matches and specials of the right colour go a long way.', mechanic: 'order', twist: { icon: '🧺', name: 'Mega order', text: 'Twice as many sweets on one order.' } } },
+    33: { moves: 29, drop: ['jelly', 'ice'], set: { boss: { r: 2, c: 3, hp: 34, name: 'Gummy Devil', icon: '😈' } },
+      intro: { icon: '😈', goal: 'Beat the Gummy Devil', line: 'Knock the Gummy Devil’s health bar down to zero', tip: 'Boss level! Every match next to the boss, and every special that hits it, takes a heart. Leave it alone for a move and it heals one.', mechanic: 'boss' } },
+    34: { moves: 28, drop: ['bub'], set: { belts: [{ row: 2, dir: 1 }, { row: 5, dir: -1 }], jelly: ['11111111', '11111111', '22222222', '11111111', '11111111', '22222222', '11111111', '11111111'] },
+      intro: { icon: '🛶', goal: 'Clear the jelly on the floating market', line: 'Clear all the jelly across the floating market, double on the two belts', tip: 'Conveyor belts slide their row one step after every move. Plan your match for where the sweets will be.', mechanic: 'belts' } },
+    35: { moves: 36, set: { fuses: [[3, 1, 6], [3, 6, 7], [6, 3, 8]] },
+      intro: { icon: '💣', goal: 'Clear the icing on a short fuse', line: 'Clear the jelly and crack the icing while you defuse 3 quick countdown bombs', tip: 'Twist: these bombs start low. Defuse the smallest number first.', mechanic: 'fuse', twist: { icon: '🧨', name: 'Short fuses', text: 'Countdown bombs that start on single digits.' } } },
+    36: { moves: 20, drop: ['jelly', 'bub', 'locks'], set: { timer: 80, recipe: { candies: [{ color: 1, n: 26 }], specials: [{ kind: 'w', n: 1 }] } },
+      intro: { icon: '🛺', goal: 'Rush order: oranges and a wrapped sweet', line: 'Rush order: 26 orange jellies and 1 wrapped sweet', tip: 'Twist: an order with a clock. Look for oranges first, then make the wrapped sweet.', mechanic: 'order', twist: { icon: '⏱️', name: 'Rush orders', text: 'Orders against the clock.' } } },
+    37: { moves: 32, drop: ['ice'], set: { mask: SPLIT_MASK, portals: MIRROR_PORTALS, ings: [[0, 2], [0, 5]], ingIcon: '🪷' },
+      intro: { icon: '🪷', goal: 'Send the lotus treats through the portals', line: 'Guide both lotus treats through the portals and down to the bottom', tip: 'Twist: ingredients travel through portals too. A treat that drops into a portal pops out of its twin below.', mechanic: 'portal', twist: { icon: '🌀', name: 'Portal deliveries', text: 'Bring treats down through the portals.' } } },
+    38: { moves: 34, set: { ice: ['44000044', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000'] },
+      intro: { icon: '🪔', goal: 'Clear the jelly and the four-layer frosting', line: 'Clear the bottom jelly and crack the four-layer frosting in the corners', tip: 'Twist: four layers of frosting. Specials fired into the corners crack them fastest.', mechanic: 'ice', twist: { icon: '🧁', name: 'Four-layer frosting', text: 'Frosting that takes four hits.' } } },
+    39: { moves: 32, drop: ['belts'], set: { jelly: ['11000011', '12222221', '02222220', '02111120', '02111120', '12222221', '11000011', '00000000'], cannons: [{ c: 2, drop: 'fuse', every: 6, fuse: 10, max: 4 }, { c: 5, drop: 'fuse', every: 6, fuse: 10, max: 4 }] },
+      intro: { icon: '🏔️', goal: 'Clear the jelly under the bomb cannons', line: 'Clear the prayer-flag jelly while two cannons fire countdown bombs', tip: 'Twist: cannons that fire countdown bombs. Defuse each one by matching it before it reaches zero.', mechanic: 'cannon', twist: { icon: '💣', name: 'Bomb cannons', text: 'Cannons that fire countdown bombs.' } } },
+    40: { moves: 23, drop: ['belts'], set: { boss: { r: 3, c: 3, hp: 22, name: 'Gummy Tiger', icon: '🐯' } },
+      intro: { icon: '🐯', goal: 'Beat the Gummy Tiger and pop the bubbles', line: 'Knock out the Gummy Tiger and pop every sugar bubble', tip: 'Twist: a boss behind bubbles. Pop the bubbles beside it to reach it.', mechanic: 'boss', twist: { icon: '🫧', name: 'Bubble-guarded boss', text: 'A boss hiding behind sugar bubbles.' } } },
+    41: { moves: 28, set: {},
+      intro: { icon: '🌧️', goal: 'Bring the pineapples down on the monsoon belts', line: 'Bring both pineapples down and crack the icing while the belts change direction', tip: 'Twist: the monsoon belts reverse direction after every move.', mechanic: 'belts', twist: { icon: '🔁', name: 'Reversing belts', text: 'Belts that switch direction every move.' } } },
+    42: { moves: 26, set: { timer: 80, jelly: ['11000011', '12222221', '01000010', '01122110', '01122110', '01000010', '12222221', '11000011'] },
+      intro: { icon: '🦁', goal: 'Clear the jelly and free the jars on the clock', line: 'Clear the jelly and free the locked jars on the reversing belts', tip: 'Twist: reversing belts against the clock. Match fast and watch which way the belts turn.', mechanic: 'belts', twist: { icon: '⏱️', name: 'Belts on the clock', text: 'Reversing belts with a timer.' } } },
+    43: { moves: 36, drop: ['jelly', 'locks'], set: { recipe: { candies: [{ color: 2, n: 22 }], combos: [{ kind: 'crisscross', n: 1 }] } },
+      intro: { icon: '🛕', goal: 'Temple order: lemons and a double-stripe blast', line: 'Fill the temple order: 22 lemon drops and 1 double-stripe blast', tip: 'Twist: an order for a combo. Make two striped sweets side by side, then swap them together.', mechanic: 'order', twist: { icon: '⚡', name: 'Combo orders', text: 'Orders that ask for a special combo.' } } },
+    44: { moves: 32, set: { portals: SIDE_PORTALS, fuses: [[3, 0, 9], [3, 7, 11]], bub: ['11100111', '11100111', '01111110', '00111100', '00111100', '01111110', '11100111', '11100111'] },
+      intro: { icon: '🏝️', goal: 'Island-hop the portals and pop the bubbles', line: 'Pop every sugar bubble before the 2 countdown bombs go off. The left islands feed the right ones through portals', tip: 'Twist: sweets leave the bottom of the left side and drop in at the top of the right side.', mechanic: 'portal', twist: { icon: '🏝️', name: 'Island-hop portals', text: 'Left-to-right portals.' } } },
+    45: { moves: 34, drop: ['ice'], set: { fuses: [[2, 2, 12], [2, 5, 12]] },
+      intro: { icon: '🥭', goal: 'Deliver the treats before the bombs go off', line: 'Bring both treats down before either countdown bomb reaches zero', tip: 'Twist: a delivery with bombs ticking. Defuse them on the way down.', mechanic: 'fuse', twist: { icon: '💣', name: 'Bomb deliveries', text: 'Deliveries with countdown bombs.' } } },
+    46: { moves: 31, drop: ['jelly', 'locks'], set: { ice: ['00000000', '00222200', '02000020', '02055020', '02055020', '02000020', '00222200', '00000000'] },
+      intro: { icon: '🏯', goal: 'Crack the five-layer dzong frosting', line: 'Crack every layer of frosting, right to the five-layer centre', tip: 'Twist: five layers in the middle. Break the ring first, then aim specials at the centre.', mechanic: 'ice', twist: { icon: '🧁', name: 'Five-layer frosting', text: 'The thickest frosting yet.' } } },
+    47: { moves: 36, drop: ['ice', 'locks'], set: { timer: 125, jelly: ['11111111', '12222221', '12100121', '11000011', '11000011', '12100121', '12222221', '11111111'], choco: ['00000000', '00000000', '00000000', '00011000', '00011000', '00000000', '00000000', '00000000'] },
+      intro: { icon: '🍫', goal: 'Clear the jelly before the chocolate spreads', line: 'Clear the jelly while the chocolate spreads, on the clock', tip: 'Twist: chocolate on the clock. Break chocolate every move or it grows.', mechanic: 'choco', twist: { icon: '⏱️', name: 'Chocolate rush', text: 'Spreading chocolate with a timer.' } } },
+    48: { moves: 30, drop: ['jelly', 'bub'], set: { locks: ['00000000', '01000010', '00000000', '00011000', '00011000', '00000000', '01000010', '00000000'], cannons: [{ c: 3, drop: 'lock', every: 5, max: 4 }] },
+      intro: { icon: '🔒', goal: 'Free every jar, even the cannon’s', line: 'Free all the locked jars, including the 4 the cannon fires', tip: 'Twist: a lock cannon. Each shot drops a locked jar. Match it to free it.', mechanic: 'cannon', twist: { icon: '🔒', name: 'Lock cannon', text: 'A cannon that fires locked jars.' } } },
+    49: { moves: 34, drop: ['ings', 'ingIcon', 'ice'], set: { mask: SPLIT_MASK, portals: MIRROR_PORTALS, choco: ['00000000', '00011000', '00000000', '00000000', '00000000', '00000000', '00000000', '00000000'], jelly: ['00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '11111111', '11111111'] },
+      intro: { icon: '🌹', goal: 'Clear the garden jelly through the portals', line: 'Clear the lower garden jelly while chocolate grows in the pool above', tip: 'Twist: chocolate above the portals. Keep it small or it blocks the portal mouths.', mechanic: 'portal', twist: { icon: '🍫', name: 'Chocolate portals', text: 'Portals with chocolate in the way.' } } },
+    50: { moves: 36, drop: ['jelly', 'locks'], set: { boss: { r: 3, c: 3, hp: 26, name: 'Gummy Camel', icon: '🐫' }, fuses: [[0, 1, 14], [0, 6, 16]] },
+      intro: { icon: '🐫', goal: 'Beat the Gummy Camel before the bombs blow', line: 'Knock out the Gummy Camel before either countdown bomb reaches zero', tip: 'Milestone boss! Hit the camel and defuse the two bombs at the top.', mechanic: 'boss', twist: { icon: '💣', name: 'Boss with bombs', text: 'A boss with countdown bombs.' } } },
+    51: { moves: 17, drop: ['jelly', 'bub', 'choco'], set: { belts: [{ row: 3, dir: 1 }, { row: 4, dir: -1 }], fuses: [[0, 1, 10], [0, 6, 12]], recipe: { candies: [{ color: 4, n: 48 }, { color: 5, n: 48 }] } },
+      intro: { icon: '🦅', goal: 'Steppe order on the belts', line: 'Fill the order: 48 blueberry gems and 48 grape twists, with two belts running and 2 countdown bombs ticking', tip: 'Twist: an order on the belts. Watch both rows slide in opposite directions.', mechanic: 'order', twist: { icon: '🛞', name: 'Belt orders', text: 'An order with belts running.' } } },
+    52: { moves: 21, set: { timer: 75 },
+      intro: { icon: '🏯', goal: 'Clear the jelly, icing and jars on the clock', line: 'Clear the jelly, crack the icing and free the jars', tip: 'Twist: a Hard level with a clock as well as moves. Specials save time.', mechanic: 'mix', twist: { icon: '⏱️', name: 'Hard and timed', text: 'A hard level against the clock.' } } },
+    53: { moves: 36, drop: ['ice'], set: { belts: [{ row: 3, dir: 1 }], fuses: [[3, 0, 8], [3, 7, 10]], jelly: ['00022000', '00222200', '02211220', '22100122', '22100122', '02211220', '00222200', '00022000'] },
+      intro: { icon: '🚄', goal: 'Clear the jelly with bombs on the belt', line: 'Clear the jelly while two countdown bombs ride the belt', tip: 'Twist: bombs on a conveyor belt. They slide every move, so catch them as they pass.', mechanic: 'fuse', twist: { icon: '🚄', name: 'Bomb belt', text: 'Countdown bombs on a conveyor belt.' } } },
+    54: { moves: 36, drop: ['jelly'], set: { bub: ['11000011', '10000001', '00011000', '00000000', '00000000', '00011000', '10000001', '11000011'], recipe: { candies: [{ color: 3, n: 40 }], specials: [{ kind: 'w', n: 3 }] } },
+      intro: { icon: '🐼', goal: 'Panda order and the bamboo bubbles', line: 'Fill the panda order (40 apple chews and 3 wrapped sweets) and pop every bubble', tip: 'An order plus bubbles. Wrapped sweets pop bubbles nicely.', mechanic: 'order' } },
+    56: { moves: 38, set: { portals: SIDE_PORTALS },
+      intro: { icon: '🌶️', goal: 'Clear the jelly while chocolate spreads across the portals', line: 'Clear the jelly while the chocolate spreads. The left side feeds the right through portals', tip: 'Chocolate and side portals together. Break chocolate on the left so the portals keep flowing.', mechanic: 'portal' } },
+    59: { moves: 42, set: { liq: ['00000000', '00000000', '00000000', '00011000', '00011000', '00000000', '00000000', '00000000'], cannons: [{ c: 0, drop: 'liq', every: 4, max: 2 }, { c: 7, drop: 'liq', every: 4, max: 2 }] },
+      intro: { icon: '🧶', goal: 'Clear the triple jelly and the liquorice', line: 'Clear the triple jelly and free all the liquorice, including 4 cannon shots', tip: 'Liquorice cannons on both edges. Free the wrapped sweets as they land.', mechanic: 'cannon' } },
+    65: { moves: 30, drop: ['scoreGoal'], set: { boss: { r: 2, c: 3, hp: 30, name: 'Gummy Dragon', icon: '🐉' }, jelly: ['00000000', '00000000', '00000000', '00000000', '00000000', '00000000', '11111111', '00000000'] },
+      intro: { icon: '🐉', goal: 'Beat the Gummy Dragon and clear the jelly', line: 'Knock out the Gummy Dragon and clear the jelly at the bottom', tip: 'China’s finale boss. The dragon heals when you leave it alone, so keep hitting.', mechanic: 'boss' } },
+    66: { moves: 24, set: { timer: 90, collect: { color: 4, n: 30 }, bub: ['11000011', '10011001', '00000000', '01000010', '01000010', '00000000', '10011001', '11000011'] },
+      intro: { icon: '🧋', goal: 'Night-market rush', line: 'Collect 30 blueberry gems and pop all 20 bubbles before the market closes', tip: 'Twist: a collect level with a clock. Big matches first.', mechanic: 'collect', twist: { icon: '🏮', name: 'Night-market rush', text: 'Collecting against the clock.' } } },
+    67: { moves: 26, set: { cannons: [{ c: 3, drop: 'fuse', every: 5, fuse: 9, max: 4 }, { c: 4, drop: 'fuse', every: 7, fuse: 11, max: 3 }] },
+      intro: { icon: '🌸', goal: 'Clear the jelly under the blossom bomb cannons', line: 'Clear the jelly while two cannons drop countdown bombs', tip: 'Twist: two bomb cannons in the middle. Keep the centre moving.', mechanic: 'cannon', twist: { icon: '🌸', name: 'Blossom bomb cannons', text: 'Two bomb cannons side by side.' } } },
+    69: { moves: 24, set: { cannons: [{ c: 2, drop: 'lock', every: 6, max: 3 }, { c: 5, drop: 'lock', every: 6, max: 3 }] },
+      intro: { icon: '🥢', goal: 'Collect the sweets and free every jar', line: 'Collect the sweets and free every locked jar, including 6 cannon shots', tip: 'Twist: lock cannons on a collect level.', mechanic: 'cannon', twist: { icon: '🔒', name: 'Twin lock cannons', text: 'Two cannons firing locked jars.' } } },
+    70: { moves: 26, drop: ['scoreGoal'], set: { recipe: { candies: [{ color: 0, n: 30 }], specials: [{ kind: 'w', n: 2 }] } },
+      intro: { icon: '🌟', goal: 'Star order: 30 cherries and 2 wrapped sweets', line: 'Fill the star order: 30 cherry gumdrops and 2 wrapped sweets', tip: 'Twist: this order needs wrapped sweets too. Make L and T shapes.', mechanic: 'order', twist: { icon: '🎀', name: 'Special order', text: 'An order that asks for wrapped sweets.' } } },
+    71: { moves: 24, set: { fuses: [[0, 2, 14], [0, 5, 14]] },
+      intro: { icon: '🐠', goal: 'Clear the reef jelly and pop the bubbles', line: 'Clear the reef jelly and pop the bubbles before the countdown bombs go off', tip: 'Twist: bombs in the reef. Defuse them while you clear.', mechanic: 'fuse', twist: { icon: '🐠', name: 'Reef bombs', text: 'Countdown bombs on a jelly-and-bubble level.' } } },
+    72: { moves: 36, set: { cannons: [{ c: 4, drop: 'ing', every: 7, max: 1 }] },
+      intro: { icon: '🪨', goal: 'Bring down the stone money and crack the icing', line: 'Bring every stone-money treat down (one comes from the cannon) and crack the icing', tip: 'Twist: an extra treat arrives by cannon.', mechanic: 'cannon', twist: { icon: '🪨', name: 'Treat cannon', text: 'One more treat drops from a cannon.' } } },
+    73: { moves: 32, set: { timer: 90, recipe: { candies: [{ color: 1, n: 30 }, { color: 4, n: 26 }], specials: [{ kind: 'w', n: 2 }, { kind: 'row', n: 1 }] } },
+      intro: { icon: '🛶', goal: 'Atoll rush order', line: 'Fill the atoll order: 30 orange jellies, 26 blueberry gems, 2 wrapped sweets and 1 striped sweet', tip: 'Twist: an order against the clock.', mechanic: 'order', twist: { icon: '⏱️', name: 'Atoll rush', text: 'A full order with a timer.' } } },
+    74: { moves: 16, set: { belts: [{ row: 4, dir: 1 }], ice: ['00000000', '03000030', '00333300', '00000000', '00300300', '03000030', '00000000', '00000000'], hidden: ['00000000', '01000010', '00111100', '00000000', '00100100', '01000010', '00000000', '00000000'] },
+      intro: { icon: '🧚', goal: 'Find the hidden sprites on the belt', line: 'Crack the frosting and find every hidden sugar sprite', tip: 'Twist: a belt runs under the frosting row.', mechanic: 'ice', twist: { icon: '🧚', name: 'Sprites on the belt', text: 'Hidden sprites with a belt.' } } },
+    75: { moves: 26, set: { boss: { r: 0, c: 3, hp: 22, name: 'King Gummy Crab', icon: '🦀' } },
+      intro: { icon: '🦀', goal: 'Clear the syrup, pop the bubbles and beat the King Crab', line: 'Clear the syrup clogs, pop the bubbles and knock out the King Gummy Crab', tip: 'The grand finale boss! Poppers blast 3×3 — aim them at the crab.', mechanic: 'boss', twist: { icon: '🦀', name: 'Finale boss', text: 'A boss on the syrup crossing.' } } }
+  };
+  function reworkDetail(lv, line) {
+    return line + ' in ' + lv.moves + ' moves' + (lv.timer ? ' and ' + lv.timer + ' seconds' : '') + '.';
+  }
+  Object.keys(LEVEL_REWORK_285).forEach(function (k) {
+    const n = +k, lv = LEVELS[n - 1], w = LEVEL_REWORK_285[k];
+    (w.drop || []).forEach(function (key) { delete lv[key]; });
+    Object.assign(lv, w.set || {});
+    if (w.moves) lv.moves = w.moves;
+    const old = LEVEL_INTROS[n - 1] || {};
+    LEVEL_INTROS[n - 1] = Object.assign({}, old, w.intro, { detail: reworkDetail(lv, w.intro.line) });
+    lv.help = LEVEL_INTROS[n - 1].detail;
+  });
+  // 1.9.285 Balance: a few older levels the play-test bot cleared every time get bigger goals.
+  const TUNE_285 = {
+    58: { moves: 24, set: { recipe: { candies: [{ color: 0, n: 22 }, { color: 4, n: 20 }], specials: [{ kind: 'w', n: 2 }] } }, detail: 'Collect 22 cherry gumdrops and 20 blueberry gems, then create 2 wrapped sweets in 32 moves.' },
+    61: { moves: 25, set: { collect: { color: 2, n: 24 }, jelly: ['00000000', '01100110', '11111111', '11111111', '11111111', '11111111', '01100110', '00000000'] }, detail: 'Collect 24 lemon drops and clear the lantern-path jelly before time runs out.' },
+    62: { moves: 25, set: { ice: ['00000000', '03000030', '00333300', '00000000', '00300300', '03000030', '00000000', '00000000'], hidden: ['00000000', '01000010', '00111100', '00000000', '00100100', '01000010', '00000000', '00000000'] }, detail: 'Uncover all 10 sugar sprites hidden under the thick frosting in 34 moves.' }
+  };
+  Object.keys(TUNE_285).forEach(function (k) {
+    const n = +k, lv = LEVELS[n - 1], w = TUNE_285[k], it = LEVEL_INTROS[n - 1] = Object.assign({}, LEVEL_INTROS[n - 1]);
+    Object.assign(lv, w.set || {});
+    if (w.moves) lv.moves = w.moves;
+    it.detail = String(w.detail || it.detail || lv.help || '').replace(/in \d+ moves/, 'in ' + lv.moves + ' moves');
+    lv.help = it.detail;
+  });
+  // The "New!" card: the first level that uses a mechanic introduces it. Other levels can carry a "New twist".
+  const MECHANICS = [
+    { id: 'collect', icon: '🍒', name: 'Collect', text: 'Collect the sweets shown on the goal.', on: lv => !!lv.collect },
+    { id: 'jelly', icon: '🟩', name: 'Jelly', text: 'Match on jelly tiles to clear them.', on: lv => !!lv.jelly },
+    { id: 'locks', icon: '🔒', name: 'Locked jars', text: 'Include a locked jar in a match to free it.', on: lv => !!lv.locks },
+    { id: 'ice', icon: '🧁', name: 'Frosting', text: 'Match next to frosting to chip it away.', on: lv => !!lv.ice },
+    { id: 'ings', icon: '🎁', name: 'Ingredients', text: 'Bring treats down to the bottom row.', on: lv => !!(lv.ings && lv.ings.length) },
+    { id: 'choco', icon: '🍫', name: 'Chocolate', text: 'Chocolate spreads if you do not break some each move.', on: lv => !!lv.choco },
+    { id: 'bub', icon: '🫧', name: 'Sugar bubbles', text: 'Pop bubbles with a match next to them.', on: lv => !!lv.bub },
+    { id: 'liq', icon: '➿', name: 'Liquorice', text: 'Liquorice creeps unless you free some.', on: lv => !!lv.liq },
+    { id: 'frost3', icon: '🧁', name: 'Thick frosting', text: 'Frosting with three or more layers — each hit takes one.', on: lv => !!(lv.ice && lv.ice.some(r => /[3-9]/.test(r))) },
+    { id: 'fuse', icon: '💣', name: 'Countdown bombs', text: 'They tick down every move. Match one to defuse it before it reaches zero.', on: lv => !!((lv.fuses && lv.fuses.length) || (lv.cannons || []).some(c => c.drop === 'fuse')) },
+    { id: 'order', icon: '🧾', name: 'Orders', text: 'Collect exactly the sweets and specials on the order.', on: lv => !!lv.recipe },
+    { id: 'cannon', icon: '🌋', name: 'Candy cannons', text: 'A cannon above a column drops a new treat or obstacle every few moves.', on: lv => !!(lv.cannons && lv.cannons.length) },
+    { id: 'timer', icon: '⏱️', name: 'Beat the clock', text: 'Moves and seconds: finish before either runs out.', on: lv => !!lv.timer },
+    { id: 'portal', icon: '🌀', name: 'Portals', text: 'Sweets that drop into a portal come out of its twin.', on: lv => !!(lv.portals && lv.portals.length) },
+    { id: 'boss', icon: '👾', name: 'Boss', text: 'Knock its health bar to zero with matches and specials beside it. It heals if left alone.', on: lv => !!lv.boss },
+    { id: 'belts', icon: '🛞', name: 'Conveyor belts', text: 'Belts slide their row one step after every move.', on: lv => !!(lv.belts && lv.belts.length) },
+    { id: 'hidden', icon: '🧚', name: 'Hidden sprites', text: 'Crack the frosting to find what is hiding under it.', on: lv => !!lv.hidden },
+    { id: 'flow', icon: '🌈', name: 'Syrup clogs and Poppers', text: 'Poppers blast 3×3. Clear the syrup channel.', on: lv => !!lv.flow }
+  ];
+  const MECHANIC_FIRST = {};
+  LEVELS.forEach(function (lv) { MECHANICS.forEach(function (m) { if (MECHANIC_FIRST[m.id] == null && m.on(lv)) MECHANIC_FIRST[m.id] = lv.n; }); });
+  function newsFor(n) {
+    const lv = LEVELS[(n | 0) - 1]; if (!lv) return null;
+    const fresh = MECHANICS.filter(function (m) { return MECHANIC_FIRST[m.id] === lv.n && lv.n > 2; });
+    if (fresh.length) { const m = fresh[fresh.length - 1]; return { kind: 'new', icon: m.icon, name: m.name, text: m.text, id: m.id }; }
+    const w = LEVEL_REWORK_285[lv.n];
+    if (w && w.intro && w.intro.twist) return Object.assign({ kind: 'twist' }, w.intro.twist);
+    return null;
+  }
   function levelIntro(n, p) {
     const lv = LEVELS[(n | 0) - 1]; if (!lv) return null;
     const info = LEVEL_INTROS[(n | 0) - 1] || LEVEL_INTROS[0];
@@ -524,7 +675,8 @@
       stopLine: 'Level ' + lv.n + ' · ' + stop.place,
       icon: info.icon, goal: info.goal, detail: info.detail, tip: info.tip, mechanic: info.mechanic,
       moves: lv.moves, timer: lv.timer || 0, badge: lv.badge, stars: stars, theme: lv.theme || '',
-      strip: info.goal + ' · ' + (lv.timer ? lv.timer + ' seconds' : lv.moves + ' moves')
+      strip: info.goal + ' · ' + (lv.timer ? lv.timer + ' seconds' : lv.moves + ' moves'),
+      news: newsFor(n)
     };
   }
   const TUTORIAL_KEY = 'ib-sugar-tutorial-done';
@@ -997,6 +1149,32 @@
     52: [{ id: 'recap52', kind: 'recap', title: 'China', bubble: 'Beijing: the Great Wall winds across the mountain ridges.',
       items: [{ icon: '💜', text: 'Clear the wall-shaped jelly' }, { icon: '🧁', text: 'Crack the four icy corners' }, { icon: '🔒', text: 'Free all four locked jars' }] }]
   };
+  // 1.9.285 Reworked levels: the arrival card lists the level's real goals and hazards.
+  function goalItems285(lv) {
+    const out = [], has = function (g) { return !!(g && g.some(function (r) { return /[1-9]/.test(r); })); };
+    if (lv.boss) out.push({ icon: lv.boss.icon || '👾', text: 'Beat the ' + (lv.boss.name || 'boss') });
+    if (lv.recipe) out.push({ icon: '🧾', text: 'Fill the order' });
+    if (lv.collect) out.push({ icon: '🍬', text: 'Collect the sweets' });
+    if (has(lv.jelly)) out.push({ icon: '💜', text: lv.jelly.some(function (r) { return /[2-9]/.test(r); }) ? 'Clear the jelly (some is double)' : 'Clear the jelly' });
+    if ((lv.ings && lv.ings.length) || (lv.cannons || []).some(function (c) { return c.drop === 'ing'; })) out.push({ icon: lv.ingIcon || '🎁', text: 'Bring the treats down' });
+    if (has(lv.hidden)) out.push({ icon: lv.hiddenIcon || '🧚', text: 'Find the hidden sprites' });
+    else if (has(lv.ice) && lv.iceGoal !== false) out.push({ icon: '🧁', text: lv.ice.some(function (r) { return /[3-9]/.test(r); }) ? 'Crack the thick frosting' : 'Crack the icing' });
+    if (has(lv.bub)) out.push({ icon: '🫧', text: 'Pop the sugar bubbles' });
+    if (has(lv.locks)) out.push({ icon: '🔒', text: 'Free the locked jars' });
+    if (has(lv.liq)) out.push({ icon: '➿', text: 'Free the liquorice' });
+    if (has(lv.choco) && lv.chocoGoal) out.push({ icon: '🍫', text: 'Clear the chocolate' });
+    if (has(lv.flow)) out.push({ icon: '🌈', text: 'Clear the syrup channel' });
+    if ((lv.fuses && lv.fuses.length) || (lv.cannons || []).some(function (c) { return c.drop === 'fuse'; })) out.push({ icon: '💣', text: 'Don’t let a countdown bomb reach zero' });
+    if (lv.cannons && lv.cannons.length) out.push({ icon: '🌋', text: 'Watch the candy cannons' });
+    if (lv.portals && lv.portals.length) out.push({ icon: '🌀', text: 'Sweets travel through portals' });
+    if (lv.belts && lv.belts.length) out.push({ icon: '🛞', text: 'Conveyor belts move each turn' });
+    if (has(lv.choco) && !lv.chocoGoal) out.push({ icon: '🍫', text: 'Stop the chocolate spreading' });
+    if (lv.timer) out.push({ icon: '⏱️', text: 'Beat the clock: ' + lv.timer + ' seconds' });
+    return out.slice(0, 5);
+  }
+  Object.keys(LEVEL_REWORK_285).concat(Object.keys(TUNE_285)).forEach(function (k) {
+    (TUTORIALS[k] || []).forEach(function (step) { if (step.kind === 'recap') step.items = goalItems285(LEVELS[k - 1]); });
+  });
   function tutorialFor(n) { return TUTORIALS[n] || null; }
 
 
@@ -1554,7 +1732,7 @@
   const isHole = t => t === HOLE || !!(t && t.hole);
   // 1.9.219 Sugar bubbles (t.bub) hold a sweet in place like a block until a match next to them, or a special, pops them.
   // Liquorice (t.liq) wraps a sweet like a lock, and creeps to a neighbour when a move frees none.
-  const isBlock = t => !!(t && (t.ice > 0 || t.choco > 0 || t.bub > 0 || t.popper > 0));
+  const isBlock = t => !!(t && (t.ice > 0 || t.choco > 0 || t.bub > 0 || t.popper > 0 || t.boss > 0));
   const isIng = t => !!(t && t.ing);
   const isBomb = t => !!(t && t.s === 'b' && t.c < 0 && !t.ing && !t.ice && !t.choco);
   const isCandy = t => !!(t && t.c >= 0 && !t.ice && !t.choco && !t.ing && !t.bub);
@@ -1794,7 +1972,65 @@
     }
     return null;
   }
-  function collapse(b, rand, kinds, mask) {
+  // 1.9.285 Candy cannons sit above a column and load an obstacle into the next sweet that drops there.
+  function cannonTile(st, c, rand, kinds) {
+    const due = st && st.cannonDue;
+    if (!due || !(due[c] > 0)) return null;
+    const cn = (st.lv.cannons || []).find(function (x) { return x.c === c; });
+    if (!cn) return null;
+    due[c]--;
+    st.cannonFired = (st.cannonFired || 0) + 1;
+    if (cn.drop === 'ing') return Object.assign(mk(-3), { ing: 1, cannon: 1 });
+    const t = mk(randKind(rand, kinds));
+    if (cn.drop === 'fuse') t.fuse = cn.fuse || 9;
+    else if (cn.drop === 'lock') t.lock = 1;
+    else t.liq = 1;
+    t.cannon = 1;
+    return t;
+  }
+  function freshTile(st, c, rand, kinds) { return cannonTile(st, c, rand, kinds) || mk(randKind(rand, kinds)); }
+  // 1.9.285 Portals: a sweet that drops out of a portal's mouth comes out of its exit, in another part of the tray.
+  function collapsePortals(b, rand, kinds, mask, st) {
+    const portals = st.lv.portals, exits = new Set(portals.map(function (p) { return key(p.to[0], p.to[1]); }));
+    const open = function (r, c) { return isOpen(mask, r, c) && !isHole(b[r][c]); };
+    const start = new Map(), via = new Map(), fresh = new Map();
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) { const t = b[r][c]; if (t && !isHole(t)) start.set(t.id, [r, c]); }
+    for (let guard = 0; guard < 600; guard++) {
+      let moved = false;
+      for (let c = 0; c < N; c++) for (let r = N - 1; r >= 0; r--) {
+        if (!open(r, c) || b[r][c]) continue;
+        for (let i = r - 1; i >= 0 && open(i, c) && !isBlock(b[i][c]); i--) {
+          if (b[i][c]) { b[r][c] = b[i][c]; b[i][c] = null; moved = true; break; }
+        }
+      }
+      for (const p of portals) {
+        const [fr, fc] = p.from, [tr, tc] = p.to, t = b[fr] && b[fr][fc];
+        if (!open(tr, tc) || b[tr][tc] || !t || isHole(t) || isBlock(t)) continue;
+        b[tr][tc] = t; b[fr][fc] = null; via.set(t.id, [tr, tc]); moved = true;
+      }
+      if (moved) continue;
+      let spawned = false;
+      for (let c = 0; c < N; c++) for (let r = 0; r < N; r++) {
+        if (!open(r, c) || b[r][c] || exits.has(key(r, c))) continue;
+        if (r > 0 && open(r - 1, c) && !isBlock(b[r - 1][c])) continue; // not the top of its run
+        const t = freshTile(st, c, rand, kinds); b[r][c] = t; fresh.set(t.id, (fresh.get('c' + c) || 0) + 1); fresh.set('c' + c, (fresh.get('c' + c) || 0) + 1); spawned = true;
+      }
+      if (!spawned) break;
+    }
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (isOpen(mask, r, c) && !b[r][c]) { const t = freshTile(st, c, rand, kinds); b[r][c] = t; fresh.set(t.id, 1); }
+    const falls = [];
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+      const t = b[r][c]; if (!t || isHole(t)) continue;
+      const s0 = start.get(t.id), pv = via.get(t.id);
+      if (s0 && s0[0] === r && s0[1] === c) continue;
+      if (pv) falls.push({ t, r, c, from: pv[0] - 1, portal: true });
+      else if (!s0) falls.push({ t, r, c, from: r - (fresh.get(t.id) || 1) - 1, fresh: true });
+      else falls.push({ t, r, c, from: s0[0] });
+    }
+    return falls;
+  }
+  function collapse(b, rand, kinds, mask, st) {
+    if (st && st.lv && st.lv.portals && st.lv.portals.length) return collapsePortals(b, rand, kinds, mask, st);
     const falls = [];
     kinds = kinds || KINDS;
     for (let c = 0; c < N; c++) {
@@ -1812,7 +2048,7 @@
         let spawn = 0;
         for (let i = w; i >= top; i--) {
           spawn++;
-          const t = mk(randKind(rand, kinds));
+          const t = (st && st.cannonDue) ? freshTile(st, c, rand, kinds) : mk(randKind(rand, kinds));
           b[i][c] = t;
           falls.push({ t, r: i, c, from: top - spawn, fresh: true });
         }
@@ -1827,6 +2063,7 @@
       let bottom = -1;
       for (let r = N - 1; r >= 0; r--) if (isOpen(mask, r, c)) { bottom = r; break; }
       if (bottom < 0) continue;
+      if (st && st.lv && st.lv.portals && st.lv.portals.some(function (p) { return p.from[0] === bottom && p.from[1] === c; })) continue;
       const t = b[bottom][c];
       if (isIng(t)) {
         (step.delivered || (step.delivered = [])).push({ t, r: bottom, c });
@@ -1867,10 +2104,11 @@
     step.clear.forEach(k => {
       const [r, c] = rc(k), t = b[r][c];
       if (t && !isHole(t) && !isBlock(t)) {
-        step.popped.push({ id: t.id, r, c, color: t.c, s: t.s, lock: t.lock, liq: t.liq,
+        step.popped.push({ id: t.id, r, c, color: t.c, s: t.s, lock: t.lock, liq: t.liq, fuse: t.fuse || 0,
           postcardPiece: Number.isInteger(t.postcardPiece) ? t.postcardPiece : null });
         if (t.lock) step.brokeLock = true;
         if (t.liq) step.liqFreed++;
+        if (t.fuse) { step.defused = (step.defused || 0) + 1; if (st) st.defused = (st.defused || 0) + 1; }
         if (st && t.c >= 0) st.collected[t.c] = (st.collected[t.c] || 0) + 1;
         b[r][c] = null;
         if (st && st.jelly) {
@@ -1885,6 +2123,19 @@
     hit.forEach(k => {
       const [r, c] = rc(k), t = b[r][c];
       if (!t) return;
+      if (t.boss > 0) {
+        // 1.9.285 Boss: every hit on one of its four squares takes one heart off its health bar.
+        if (st && st.boss && st.boss.hp > 0) {
+          st.boss.hp = Math.max(0, st.boss.hp - 1); st.boss.hitThisMove = true;
+          step.bossHit = (step.bossHit || 0) + 1;
+          step.blocked.push({ r, c, kind: 'boss', left: st.boss.hp });
+          if (st.boss.hp <= 0) {
+            step.bossDown = { r: st.boss.r, c: st.boss.c };
+            for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) { const o = b[st.boss.r + i] && b[st.boss.r + i][st.boss.c + j]; if (o && o.boss) b[st.boss.r + i][st.boss.c + j] = null; }
+          }
+        }
+        return;
+      }
       if (t.ice > 0) {
         t.ice--;
         step.blocked.push({ r, c, kind: 'ice', left: t.ice });
@@ -1918,7 +2169,7 @@
     step.points = step.popped.length * PTS * cascade + (step.made || []).reduce((n, m) => n + (BONUS[m.s] || 0), 0) + (step.comboBonus || 0);
     step.falls = [];
     for (let guard = 0; guard < 8; guard++) {
-      const f = collapse(b, rand, kinds, mask);
+      const f = collapse(b, rand, kinds, mask, st);
       step.falls.push.apply(step.falls, f);
       if (!collectIngs(b, mask, st, step)) break;
     }
@@ -1947,7 +2198,7 @@
     const cells = [], tiles = [];
     for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
       const t = b[r][c];
-      if (isCandy(t) && !t.lock && !t.liq) { cells.push([r, c]); tiles.push(t); }
+      if (isCandy(t) && !t.lock && !t.liq && !t.fuse) { cells.push([r, c]); tiles.push(t); }
     }
     for (let tries = 0; tries < 300; tries++) {
       for (let i = tiles.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); const x = tiles[i]; tiles[i] = tiles[j]; tiles[j] = x; }
@@ -1956,7 +2207,7 @@
     }
     const fresh = newBoard(rand, kinds, mask);
     for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
-      if (isHole(b[r][c]) || isBlock(b[r][c]) || isIng(b[r][c]) || (b[r][c] && (b[r][c].lock || b[r][c].liq))) continue;
+      if (isHole(b[r][c]) || isBlock(b[r][c]) || isIng(b[r][c]) || (b[r][c] && (b[r][c].lock || b[r][c].liq || b[r][c].fuse))) continue;
       if (isOpen(mask, r, c)) b[r][c] = fresh[r][c];
     }
     return true;
@@ -1999,10 +2250,20 @@
     grid(lv.choco, (r, c) => { board[r][c] = Object.assign(mk(-5), { choco: 1 }); });
     grid(lv.poppers, (r, c, n) => { board[r][c] = Object.assign(mk(-6), { popper: n }); });
     (lv.ings || []).forEach(([r, c]) => { if (isOpen(mask, r, c)) board[r][c] = Object.assign(mk(-3), { ing: 1 }); });
+    (lv.fuses || []).forEach(([r, c, n]) => { const t = board[r] && board[r][c]; if (isCandy(t) && isOpen(mask, r, c)) { t.fuse = n || 9; t.lock = 0; t.liq = 0; t.bub = 0; } });
+    if (lv.boss) {
+      const { r, c } = lv.boss;
+      for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) board[r + i][c + j] = Object.assign(mk(-7), { boss: 1, part: i * 2 + j });
+    }
     if (!hasMove(board, mask)) shuffle(board, rand, kinds, mask);
     return board;
   }
   function countIngs(b) { let n = 0; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (isIng(b[r][c])) n++; return n; }
+  function ingTotal(lv) {
+    lv = lv || {};
+    return (lv.ings || []).length + (lv.cannons || []).reduce(function (n, cn) { return n + (cn.drop === 'ing' ? (cn.max || 0) : 0); }, 0);
+  }
+  function fusesOn(b) { const out = []; if (!b) return out; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) { const t = b[r][c]; if (t && t.fuse > 0) out.push({ r, c, n: t.fuse }); } return out; }
   function jellyLeft(st) {
     if (!st.jelly) return 0;
     let n = 0; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) n += st.jelly[r][c] || 0;
@@ -2022,6 +2283,16 @@
     let n = 0; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (b[r][c] && b[r][c].lock) n++;
     return n;
   }
+  // 1.9.285 Lock and liquorice cannons with a set number of shots: the jars and liquorice still to come count as goals.
+  function cannonGoal(lv, kind) { return (lv.cannons || []).some(function (c) { return c.drop === kind && c.max > 0; }); }
+  function cannonLeft(st, kind) {
+    let n = 0;
+    ((st && st.lv && st.lv.cannons) || []).forEach(function (c) {
+      if (c.drop !== kind || !(c.max > 0)) return;
+      n += Math.max(0, c.max - ((st.cannonShots && st.cannonShots[c.c]) || 0)) + ((st.cannonDue && st.cannonDue[c.c]) || 0);
+    });
+    return n;
+  }
   function goalsMet(st) {
     const lv = st.lv || LEVEL;
     if (st.challenge) return Array.isArray(st.postcardFound) && st.postcardFound.length >= POSTCARD_COUNT;
@@ -2036,10 +2307,11 @@
       if ((lv.recipe.specials || []).some(function (item) { return ((st.specialsMade || {})[item.kind] || 0) < item.n; })) return false;
       if ((lv.recipe.combos || []).some(function (item) { return ((st.combosMade || {})[item.kind] || 0) < item.n; })) return false;
     }
-    if ((lv.ings && lv.ings.length) && (st.ingsLeft || 0) > 0) return false;
-    if (lv.locks && locksLeft(st.board) > 0) return false;
+    if (ingTotal(lv) && (st.ingsLeft || 0) > 0) return false;
+    if (lv.boss && st.boss && st.boss.hp > 0) return false;
+    if ((lv.locks || cannonGoal(lv, 'lock')) && locksLeft(st.board) + cannonLeft(st, 'lock') > 0) return false;
     if (lv.bub && bubLeft(st.board) > 0) return false;
-    if (lv.liq && liqLeft(st.board) > 0) return false;
+    if ((lv.liq || cannonGoal(lv, 'liq')) && liqLeft(st.board) + cannonLeft(st, 'liq') > 0) return false;
     if (lv.chocoGoal && chocoLeft(st.board) > 0) return false;
     if (lv.scoreGoal && st.score < lv.scoreGoal) return false;
     return true;
@@ -2138,7 +2410,11 @@
       specialsMade: {},
       combosMade: {},
       hiddenLeft: lv.hidden ? parseDigits(lv.hidden).reduce((sum, row) => sum + row.reduce((a, n) => a + n, 0), 0) : 0,
-      ingsLeft: countIngs(board),
+      ingsLeft: countIngs(board) + (lv.cannons || []).reduce(function (n, cn) { return n + (cn.drop === 'ing' ? (cn.max || 0) : 0); }, 0),
+      boss: lv.boss ? { r: lv.boss.r, c: lv.boss.c, hp: lv.boss.hp, max: lv.boss.hp, heal: lv.boss.heal == null ? 1 : lv.boss.heal, hitThisMove: false } : null,
+      cannonDue: lv.cannons ? Object.fromEntries(lv.cannons.map(function (cn) { return [cn.c, cn.drop === 'ing' ? 1 : 0]; })) : null,
+      cannonShots: lv.cannons ? Object.fromEntries(lv.cannons.map(function (cn) { return [cn.c, cn.drop === 'ing' ? 1 : 0]; })) : null,
+      defused: 0,
       score: 0, moves: lv.moves, target: lv.target || 0, timerLeft: lv.timer || 0, timerMsLeft: (lv.timer || 0) * 1000, timerUpdatedAt: Date.now(),
       turns: 0, over: false, won: false, stars: 0
     };
@@ -2146,7 +2422,7 @@
   function isScoreOnly(lv) {
     lv = lv || {};
     // Kept for older tests; no live level is score-only any more.
-    return !lv.jelly && !lv.flow && !lv.ice && !lv.hidden && !lv.collect && !lv.recipe && !(lv.ings && lv.ings.length) && !lv.locks && !lv.bub && !lv.liq && !lv.chocoGoal && !lv.scoreGoal;
+    return !lv.jelly && !lv.flow && !lv.ice && !lv.hidden && !lv.collect && !lv.recipe && !ingTotal(lv) && !lv.locks && !lv.bub && !lv.liq && !lv.chocoGoal && !lv.scoreGoal && !lv.boss;
   }
   function tickTimer(st, at) {
     if (!st || !st.lv || !st.lv.timer || st.over) return false;
@@ -2196,8 +2472,8 @@
         out.push({ kind: 'recipe-combo', icon: def.icon, left: left, have: have, n: item.n, lab: 'make', text: def.icon + ' ' + def.name + ' ' + have + '/' + item.n });
       });
     }
-    if (lv.ings && lv.ings.length) {
-      const n = lv.ings.length;
+    if (ingTotal(lv)) {
+      const n = ingTotal(lv);
       const have = stt ? (n - (stt.ingsLeft || 0)) : 0;
       const left = stt ? (stt.ingsLeft || 0) : n;
       const ii = lv.ingIcon || '🎁';
@@ -2229,21 +2505,27 @@
       const left = Math.max(0, lv.scoreGoal - have);
       out.push({ kind: 'score', icon: '⭐', left: left, have: have, n: lv.scoreGoal, lab: 'points left', text: '⭐ Score ' + have + '/' + lv.scoreGoal });
     }
-    if (lv.locks) {
-      const left = stt && stt.board ? locksLeft(stt.board) : 0;
+    if (lv.locks || cannonGoal(lv, 'lock')) {
+      const left = stt && stt.board ? locksLeft(stt.board) + cannonLeft(stt, 'lock') : 0;
       out.push({ kind: 'locks', icon: '🔒', left: left, have: 0, n: left, lab: left + ' left', text: '🔒 ' + left + ' left' });
     }
     if (lv.bub) {
       const left = stt && stt.board ? bubLeft(stt.board) : 0;
       out.push({ kind: 'bub', icon: '🫧', left: left, have: 0, n: left, lab: 'Bubbles ' + left + ' left', text: '🫧 Bubbles ' + left + ' left' });
     }
-    if (lv.liq) {
-      const left = stt && stt.board ? liqLeft(stt.board) : 0;
+    if (lv.liq || cannonGoal(lv, 'liq')) {
+      const left = stt && stt.board ? liqLeft(stt.board) + cannonLeft(stt, 'liq') : 0;
       out.push({ kind: 'liq', icon: '➿', left: left, have: 0, n: left, lab: 'Liquorice ' + left + ' left', text: '➿ Liquorice ' + left + ' left' });
+    }
+    if (lv.boss) {
+      const max = lv.boss.hp, left = stt && stt.boss ? stt.boss.hp : max;
+      const icon = lv.boss.icon || '🐻';
+      out.push({ kind: 'boss', icon: icon, left: left, have: max - left, n: max, lab: 'Boss ' + left + '/' + max, text: icon + ' ' + (lv.boss.name || 'Boss') + ' ' + left + '/' + max });
     }
     return out;
   }
   function finishIfDone(st) {
+    if (st.fuseBlown) { st.over = true; st.won = false; st.stars = 0; return; }
     const reached = goalsMet(st);
     // Score-only levels (including level 1) play out every move, then award the win.
     if (isScoreOnly(st.lv)) {
@@ -2292,11 +2574,44 @@
     }
     // 1.9.219 A spread can take the last swap away; shuffle so the board never gets stuck.
     if (!st.tutorial && !shuffled && (spread || liqSpread) && !hasMove(b, mask)) { shuffle(b, st.rand, st.kinds, mask); shuffled = true; }
+    const extra = endOfMove(st);
     if (!st.tutorial) finishIfDone(st);
-    return { valid: true, steps, shuffled, swapped: [A, Z], spread, liqSpread, beltMoves, beltStepIndex };
+    return Object.assign({ valid: true, steps, shuffled, swapped: [A, Z], spread, liqSpread, beltMoves, beltStepIndex }, extra);
   }
 
 
+  // 1.9.285 After every move: cannons load their next shot, a boss that took no hit heals,
+  // and every countdown bomb ticks down. One that reaches zero ends the level (unless the goals are already met).
+  function endOfMove(st) {
+    const out = { cannonLoaded: [], bossHealed: 0, fuseTicks: [], fuseBlown: null };
+    st.moveNo = (st.moveNo || 0) + 1;
+    const lv = st.lv || {};
+    (lv.cannons || []).forEach(function (cn) {
+      const shots = st.cannonShots[cn.c] || 0;
+      if (cn.max && shots >= cn.max) return;
+      if (st.moveNo % (cn.every || 4) !== 0) return;
+      st.cannonDue[cn.c] = (st.cannonDue[cn.c] || 0) + 1; st.cannonShots[cn.c] = shots + 1;
+      out.cannonLoaded.push(cn.c);
+    });
+    if (st.boss && st.boss.hp > 0) {
+      if (!st.boss.hitThisMove && st.boss.heal > 0 && st.boss.hp < st.boss.max) { st.boss.hp = Math.min(st.boss.max, st.boss.hp + st.boss.heal); out.bossHealed = st.boss.heal; }
+      st.boss.hitThisMove = false;
+    }
+    if (!st.tutorial) {
+      const b = st.board;
+      for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+        const t = b[r][c];
+        if (!t || !(t.fuse > 0)) continue;
+        t.fuse--; out.fuseTicks.push({ r, c, n: t.fuse });
+        if (t.fuse <= 0 && !out.fuseBlown) out.fuseBlown = { r, c };
+      }
+      if (out.fuseBlown) {
+        if (goalsMet(st)) { fusesOn(b).forEach(function (f) { b[f.r][f.c].fuse = Math.max(1, b[f.r][f.c].fuse); }); out.fuseBlown = null; }
+        else { st.fuseBlown = out.fuseBlown; st.over = true; st.won = false; st.stars = 0; }
+      }
+    }
+    return out;
+  }
   function listPlayOutCandies(st) {
     const cells = [];
     for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
@@ -2387,6 +2702,9 @@
       collected: st.collected.slice(),
       specialsMade: Object.assign({}, st.specialsMade || {}), combosMade: Object.assign({}, st.combosMade || {}), hiddenLeft: st.hiddenLeft || 0,
       ingsLeft: st.ingsLeft, liqIdle: st.liqIdle || 0, turns: st.turns || 0,
+      boss: st.boss ? Object.assign({}, st.boss) : null,
+      cannonDue: st.cannonDue ? Object.assign({}, st.cannonDue) : null, cannonShots: st.cannonShots ? Object.assign({}, st.cannonShots) : null,
+      defused: st.defused || 0, fuseBlown: st.fuseBlown || null, moveNo: st.moveNo || 0,
       score: st.score, moves: st.moves, target: st.target, timerLeft: st.timerLeft, timerMsLeft: st.timerMsLeft, timerUpdatedAt: st.timerUpdatedAt,
       over: st.over, won: st.won, stars: st.stars
     };
@@ -2417,6 +2735,10 @@
     if (before.lv && before.lv.bub) h += (bubLeft(before.board) - bubLeft(after.board)) * 320;
     if (before.lv && before.lv.liq) h += (liqLeft(before.board) - liqLeft(after.board)) * 420;
     h += ((before.ingsLeft || 0) - (after.ingsLeft || 0)) * 800;
+    if (before.boss && after.boss) h += (before.boss.hp - after.boss.hp) * 600;
+    if (after.fuseBlown) h -= 5e6;
+    const fb = fusesOn(before.board), fa = fusesOn(after.board);
+    if (fb.length) { const urgent = function (fs) { return fs.reduce(function (n, f) { return n + 1 / Math.max(1, f.n); }, 0); }; h += (urgent(fb) - urgent(fa)) * 2600; }
     if (res && res.steps) h += res.steps.reduce((n, s) => n + (s.madeTiles ? s.madeTiles.length * 80 : 0), 0);
     if (res && res.steps && res.steps[0] && res.steps[0].combo) h += 2500; // 1.9.230 hints prefer a super power combo
     return h;
@@ -4488,7 +4810,7 @@
     return true;
   }
 
-  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_X0, MAP_VW, MAP_Y0, MAP_VH, worldXY, nzToWorld, PACIFIC_ISLES, MAP_STOPS, FUTURE_STOPS, NZ_PROJ, nzXY, WHANGAREI_INSET, insetXY, pacXY, ausXY, westPacXY, LV_COUNT, lvId, levelIds, stopId, LEGACY_220_IDS, migrateProg, stopForLevel, icingPath, beenPath, aheadPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, bubLeft, liqLeft, flowLeft, chocoLeft, tickTimer, spreadLiq, beltDirection, shiftBelts, LIQ_IDLE, goalCounts, cloneState, bestMove, hintMoveFor, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
+  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_X0, MAP_VW, MAP_Y0, MAP_VH, worldXY, nzToWorld, PACIFIC_ISLES, MAP_STOPS, FUTURE_STOPS, MECHANICS, MECHANIC_FIRST, newsFor, LEVEL_REWORK_285, ingTotal, fusesOn, endOfMove, NZ_PROJ, nzXY, WHANGAREI_INSET, insetXY, pacXY, ausXY, westPacXY, LV_COUNT, lvId, levelIds, stopId, LEGACY_220_IDS, migrateProg, stopForLevel, icingPath, beenPath, aheadPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, bubLeft, liqLeft, flowLeft, chocoLeft, tickTimer, spreadLiq, beltDirection, shiftBelts, LIQ_IDLE, goalCounts, cloneState, bestMove, hintMoveFor, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
     allowed: () => true, // 1.9.228 open to every family member
     SAY_REST_MS, SAY_BIG, sayBig, COMBO_KINDS, COMBO_BONUS, comboKind, comboSwap, adjacentSpecials, isSpecialTile, HARD_LINES, hardLine, CANDY_STYLES, candySfxPlan, playCandySfx, SAY_SHOW_MS, SAY_AFTER_MS, sayShowGap, SPEAK_GAP, SPEAK_PITCH, SPEAK_RATE, SPEAK_VOL, pickSpeechVoice, speechGender, speakWorthy, SAY_SPRITES, SAY_CLIPS, sayClip, nextSayVoice, SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL, XF,
     VOICE_FILES, VOICE_RANK, MEDIA_HASH, mediaUrl, gameTrack, SONG_PLAN, SONG_FILES, SONG_FROM, songMood, attachSfxBus, playTone, playChime, playMovesWarnChime, playClip, voiceForStep,
@@ -4935,6 +5257,7 @@
   // 1.9.218 Glossier, rounder sweets: a soft contact shadow, a darker rim, bounce light
   // from below and a crisp specular. No shadowBlur, so it stays cheap on a phone.
   function drawSweet(t, x, y, R, sc, al, wob) {
+    if (t.boss) { if (t.part === 0) drawBoss(x, y, al); return; }
     if (t.popper) {
       ctx.save(); ctx.translate(x, y); if (wob) ctx.rotate(wob); ctx.scale(sc, sc); ctx.globalAlpha = al;
       ctx.fillStyle = 'rgba(70,10,40,.2)'; ctx.beginPath(); ctx.ellipse(0, R * .78, R * .72, R * .2, 0, 0, Math.PI * 2); ctx.fill();
@@ -4997,6 +5320,18 @@
         ctx.font = '900 ' + Math.round(R * .72) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillStyle = 'rgba(100,42,150,.9)'; ctx.fillText(t.hiddenIcon || '🧚', 0, R * .08);
       }
+      if (t.ice >= 3) {
+        // 1.9.285 Thick frosting: extra drips and a layer count.
+        ctx.fillStyle = 'rgba(30,90,150,.32)'; rr(-R * .88, R * .34, R * 1.76, R * .5, R * .2); ctx.fill();
+        ctx.fillStyle = '#1d5f99'; ctx.beginPath(); ctx.arc(R * .5, R * .5, R * .34, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = R * .08; ctx.stroke();
+        ctx.fillStyle = '#fff'; ctx.font = '900 ' + Math.round(R * .46) + 'px ui-rounded, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(String(t.ice), R * .5, R * .53);
+      }
+      if (!reduce) {
+        const gl = (performance.now() / 2600 + (t.id || 0) * .37) % 1;
+        if (gl < .18) drawStarGlint(ctx, -R * .45 + gl * R * 4, -R * .5, R * .22, Math.sin(gl / .18 * Math.PI), 0);
+      }
       drawCandyShine(ctx, R * 0.82, thick ? 1 : .65);
       ctx.restore(); return;
     }
@@ -5007,6 +5342,13 @@
       ctx.strokeStyle = 'rgba(255,214,170,.4)'; ctx.lineWidth = R * .06; ctx.beginPath();
       ctx.moveTo(-R * .62, 0); ctx.lineTo(R * .62, 0); ctx.moveTo(0, -R * .62); ctx.lineTo(0, R * .62); ctx.stroke();
       ctx.fillStyle = 'rgba(90,40,18,.45)'; ctx.beginPath(); ctx.ellipse(R * .1, R * .55, R * .28, R * .1, 0, 0, Math.PI * 2); ctx.fill();
+      if (!reduce) {
+        // 1.9.285 A slow glossy sheen slides across the chocolate.
+        const sh = ((performance.now() / 1800 + (t.id || 0) * .21) % 1.6) - .3;
+        ctx.save(); rr(-R * .86, -R * .86, R * 1.72, R * 1.72, R * .24); ctx.clip();
+        ctx.fillStyle = 'rgba(255,225,190,.22)'; ctx.beginPath(); ctx.moveTo(-R + sh * R * 2, -R); ctx.lineTo(-R * .6 + sh * R * 2, -R); ctx.lineTo(-R * 1.2 + sh * R * 2, R); ctx.lineTo(-R * 1.6 + sh * R * 2, R); ctx.closePath(); ctx.fill();
+        ctx.restore();
+      }
       drawCandyShine(ctx, R * 0.8, 0.9);
       ctx.restore(); return;
     }
@@ -5066,12 +5408,112 @@
     }
     drawCandyShine(ctx, body, 1);
     ctx.fillStyle = 'rgba(255,255,255,.95)'; ctx.beginPath(); ctx.arc(-body * .44, -body * .3, body * .055, 0, Math.PI * 2); ctx.fill();
+    if (t.fuse > 0) drawFuseBadge(t, body);
     if (t.lock) {
       ctx.fillStyle = 'rgba(70,40,20,.8)'; rr(-R * .28, -R * .05, R * .56, R * .45, R * .08); ctx.fill();
       ctx.strokeStyle = 'rgba(70,40,20,.8)'; ctx.lineWidth = R * .1; ctx.beginPath(); ctx.arc(0, -R * .08, R * .2, Math.PI, 0); ctx.stroke();
     }
     if (t.liq) drawLiqWrap(R);
     ctx.restore();
+  }
+  // 1.9.285 Countdown bomb: a dark casing ring, a sparking fuse and the moves left. Pulses red at 3 or less.
+  function drawFuseBadge(t, R) {
+    const T = performance.now(), low = t.fuse <= 3, pulse = reduce ? 0 : (low ? .5 + .5 * Math.sin(T / 110) : .5 + .5 * Math.sin(T / 400));
+    ctx.save();
+    ctx.strokeStyle = low ? 'rgba(200,20,40,' + (.6 + .4 * pulse) + ')' : 'rgba(40,24,40,.85)'; ctx.lineWidth = R * .16;
+    ctx.beginPath(); ctx.arc(0, 0, R * 1.02, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = '#6b4a2a'; ctx.lineWidth = R * .09; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(R * .55, -R * .8); ctx.quadraticCurveTo(R * .9, -R * 1.25, R * 1.1, -R * 1.05); ctx.stroke();
+    const sp = R * (.14 + .1 * pulse);
+    ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(R * 1.1, -R * 1.05, sp, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(R * 1.1, -R * 1.05, sp * .45, 0, Math.PI * 2); ctx.fill();
+    const bz = R * (.44 + (low ? .08 * pulse : 0));
+    ctx.fillStyle = low ? '#e0182f' : '#2b1830'; ctx.beginPath(); ctx.arc(R * .62, R * .62, bz, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = R * .09; ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.font = '900 ' + Math.round(bz * 1.25) + 'px ui-rounded, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(String(t.fuse), R * .62, R * .66);
+    ctx.restore();
+  }
+  // 1.9.285 Boss: a big gummy creature over its 2×2 cells, with a health bar. Wobbles, flashes when hit.
+  function drawBoss(x, y, al) {
+    const b = st && st.boss, info = (st && st.lv && st.lv.boss) || {};
+    const T = performance.now(), cx = x + CS / 2, cy = y + CS / 2, S = CS * .92;
+    const hitAge = b && b.hitAt ? T - b.hitAt : 1e9, healAge = b && b.healAt ? T - b.healAt : 1e9;
+    const wob = reduce ? 0 : Math.sin(T / 520) * .035, jolt = hitAge < 300 ? (1 - hitAge / 300) : 0;
+    const col = info.col || ['#c86bff', '#8a2be2', '#4b0f7a'];
+    ctx.save(); ctx.translate(cx + (jolt ? Math.sin(T / 18) * CS * .05 * jolt : 0), cy); ctx.globalAlpha = al;
+    ctx.fillStyle = 'rgba(60,10,60,.22)'; ctx.beginPath(); ctx.ellipse(0, S * .92, S * .9, S * .16, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.scale(1 + wob + jolt * .08, 1 - wob - jolt * .05);
+    const g = ctx.createRadialGradient(-S * .35, -S * .4, S * .1, 0, 0, S * 1.1);
+    g.addColorStop(0, col[0]); g.addColorStop(.55, col[1]); g.addColorStop(1, col[2]);
+    ctx.fillStyle = g; ctx.beginPath();
+    ctx.moveTo(-S * .9, S * .8);
+    ctx.bezierCurveTo(-S * 1.02, -S * .2, -S * .7, -S * .95, 0, -S * .95);
+    ctx.bezierCurveTo(S * .7, -S * .95, S * 1.02, -S * .2, S * .9, S * .8);
+    for (let i = 0; i < 4; i++) { const x0 = S * .9 - i * S * .45; ctx.quadraticCurveTo(x0 - S * .22, S * (.98 + (reduce ? 0 : .04 * Math.sin(T / 300 + i))), x0 - S * .45, S * .8); }
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = S * .06; ctx.beginPath(); ctx.arc(-S * .2, -S * .3, S * .55, Math.PI * 1.05, Math.PI * 1.55); ctx.stroke();
+    ctx.font = '900 ' + Math.round(S * 1.0) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(info.icon || '👾', 0, S * .02);
+    if (jolt) { ctx.globalAlpha = al * .7 * jolt; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0, 0, S * .95, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
+  }
+  function drawBossBar() {
+    const b = st && st.boss; if (!b || !(b.hp > 0)) return;
+    const T = performance.now(), healAge = b.healAt ? T - b.healAt : 1e9, al = 1;
+    const cx = (b.c + 1) * CS, y = b.r * CS;
+    const bw = CS * 1.6, bh = CS * .24, bx = cx - bw / 2, by = y + CS * .02, f = Math.max(0, b.hp / (b.max || 1));
+    ctx.save(); ctx.globalAlpha = al;
+    ctx.fillStyle = 'rgba(40,8,40,.78)'; rr(bx - 2, by - 2, bw + 4, bh + 4, bh * .6); ctx.fill();
+    const hg = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+    hg.addColorStop(0, '#ff3b5c'); hg.addColorStop(.5, '#ffb400'); hg.addColorStop(1, '#5dd47a');
+    ctx.fillStyle = hg; if (f > 0) { rr(bx, by, Math.max(bh, bw * f), bh, bh * .5); ctx.fill(); }
+    if (healAge < 600) { ctx.fillStyle = 'rgba(120,255,160,' + (1 - healAge / 600) * .7 + ')'; rr(bx, by, bw * f, bh, bh * .5); ctx.fill(); }
+    ctx.fillStyle = '#fff'; ctx.font = '900 ' + Math.round(bh * .95) + 'px ui-rounded, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('♥ ' + b.hp + ' / ' + b.max, cx, by + bh * .55);
+    ctx.restore();
+  }
+  // 1.9.285 Portals: a purple swirl where sweets fall in, an orange one where they come out.
+  function drawPortals(lv, T) {
+    (lv.portals || []).forEach(function (p) {
+      [[p.from, 1, '#a35cff', '#e3c8ff'], [p.to, -1, '#ff9a2e', '#ffe0b8']].forEach(function (q) {
+        const r = q[0][0], c = q[0][1], x = c * CS + CS / 2, y = r * CS + (q[1] > 0 ? CS * .95 : CS * .05);
+        ctx.save(); ctx.translate(x, y); ctx.scale(1, .34);
+        const g = ctx.createRadialGradient(0, 0, 1, 0, 0, CS * .44);
+        g.addColorStop(0, '#fff'); g.addColorStop(.35, q[3]); g.addColorStop(1, rgbaOf(q[2], 0));
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, CS * .44, 0, Math.PI * 2); ctx.fill();
+        ctx.rotate((reduce ? 0 : T / 500) * q[1]);
+        ctx.strokeStyle = q[2]; ctx.lineWidth = CS * .07; ctx.lineCap = 'round';
+        for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(0, 0, CS * (.18 + i * .09), i * 2.1, i * 2.1 + 2.2); ctx.stroke(); }
+        ctx.restore();
+      });
+    });
+  }
+  // 1.9.285 Candy cannons: a striped barrel above the column with its shots left.
+  function drawCannons(lv, T) {
+    (lv.cannons || []).forEach(function (cn) {
+      const x = cn.c * CS + CS / 2, shots = (st.cannonShots && st.cannonShots[cn.c]) || 0, left = cn.max ? Math.max(0, cn.max - shots) : null;
+      const fired = st.cannonPuff && st.cannonPuff[cn.c] ? T - st.cannonPuff[cn.c] : 1e9, kick = fired < 300 ? Math.sin(fired / 300 * Math.PI) * CS * .06 : 0;
+      ctx.save(); ctx.translate(x, -kick); ctx.scale(1.4, 1.4);
+      const col = cn.drop === 'fuse' ? ['#4a4a5a', '#1c1c26'] : cn.drop === 'liq' ? ['#5a3a5a', '#1c0f18'] : cn.drop === 'lock' ? ['#a87a4a', '#5a3a1a'] : ['#ff7eb3', '#c2185b'];
+      const g = ctx.createLinearGradient(-CS * .2, 0, CS * .2, 0); g.addColorStop(0, col[1]); g.addColorStop(.5, col[0]); g.addColorStop(1, col[1]);
+      ctx.fillStyle = 'rgba(255,255,255,.55)'; rr(-CS * .34, -CS * .04, CS * .68, CS * .44, CS * .14); ctx.fill();
+      ctx.fillStyle = g; rr(-CS * .26, 0, CS * .52, CS * .3, CS * .08); ctx.fill();
+      ctx.strokeStyle = 'rgba(60,10,40,.55)'; ctx.lineWidth = Math.max(1, CS * .025); ctx.stroke();
+      ctx.fillStyle = col[1]; rr(-CS * .31, CS * .24, CS * .62, CS * .12, CS * .06); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.fillRect(-CS * .16, CS * .04, CS * .06, CS * .2);
+      ctx.font = Math.round(CS * .2) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(cn.drop === 'ing' ? ((st.lv && st.lv.ingIcon) || '🎁') : cn.drop === 'fuse' ? '💣' : cn.drop === 'lock' ? '🔒' : '➿', CS * .05, CS * .15);
+      if (left != null) {
+        ctx.fillStyle = left ? '#fff' : 'rgba(255,255,255,.5)'; ctx.beginPath(); ctx.arc(CS * .32, CS * .06, CS * .12, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#c2185b'; ctx.lineWidth = Math.max(1, CS * .02); ctx.stroke();
+        ctx.fillStyle = '#c2185b'; ctx.font = '900 ' + Math.round(CS * .15) + 'px ui-rounded, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(String(left), CS * .32, CS * .07);
+      }
+      const due = st.cannonDue && st.cannonDue[cn.c] > 0;
+      if (due && !reduce) { ctx.fillStyle = 'rgba(255,224,102,' + (.5 + .5 * Math.sin(T / 120)) + ')'; ctx.beginPath(); ctx.arc(0, CS * .3, CS * .07, 0, Math.PI * 2); ctx.fill(); }
+      ctx.restore();
+    });
   }
   // 1.9.219 Liquorice: two twisted black ropes crossed over the sweet, with a glossy edge.
   function drawLiqWrap(R) {
@@ -5130,7 +5572,7 @@
   const now = () => performance.now();
   const easeOut = x => 1 - Math.pow(1 - x, 3), easeIn = x => x * x;
   function sprite(t, r, c) { const s = { t, r, c, y: r, x: c, sc: 1, al: 1, tw: null }; sprites.set(t.id, s); return s; }
-  function moveTo(s, r, c, dur, ease) { s.tw = { fx: s.x, fy: s.y, tx: c, ty: r, t0: now(), dur: Math.max(1, dur * SP), ease: ease || easeOut }; s.r = r; s.c = c; }
+  function moveTo(s, r, c, dur, ease, delay) { s.tw = { fx: s.x, fy: s.y, tx: c, ty: r, t0: now() + (delay || 0) * SP, dur: Math.max(1, dur * SP), ease: ease || easeOut }; s.r = r; s.c = c; }
   function syncAll() { sprites = new Map(); if (!st) return; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) { const t = st.board[r][c]; if (t && !isHole(t)) sprite(t, r, c); } }
   const wait = ms => new Promise(res => setTimeout(res, ms * SP));
   function fitCanvas() {
@@ -5173,9 +5615,32 @@
     ctx.fillRect(0, 0, W, W);
   }
   // 1.9.243 Each open tile is a little glass well. Jelly is a glossy dome; two layers read darker.
+  // 1.9.285 Each country gets its own board frame and tile colours.
+  const BOARD_THEMES = [
+    { id: 'pink', frame: '#ff7eb3', deep: '#e25a96', tileA: 'rgba(255,255,255,.8)', tileB: 'rgba(255,214,232,.72)', well: 'rgba(176,64,112,.16)', bg: 'rgba(255,228,240,.46)' },
+    { id: 'reef', frame: '#2ec4d6', deep: '#138a9e', tileA: 'rgba(240,255,255,.82)', tileB: 'rgba(196,240,246,.74)', well: 'rgba(20,110,140,.16)', bg: 'rgba(200,245,250,.5)' },
+    { id: 'sand', frame: '#f5a524', deep: '#c27a0e', tileA: 'rgba(255,252,240,.84)', tileB: 'rgba(255,232,190,.74)', well: 'rgba(160,100,30,.16)', bg: 'rgba(255,240,210,.5)' },
+    { id: 'jungle', frame: '#4cbf6a', deep: '#2b8a47', tileA: 'rgba(245,255,245,.82)', tileB: 'rgba(206,242,210,.74)', well: 'rgba(40,120,60,.16)', bg: 'rgba(214,248,220,.5)' },
+    { id: 'grape', frame: '#a066e8', deep: '#6d3cbc', tileA: 'rgba(250,245,255,.82)', tileB: 'rgba(226,210,252,.74)', well: 'rgba(100,50,170,.16)', bg: 'rgba(232,220,255,.5)' },
+    { id: 'sky', frame: '#4aa8ff', deep: '#2a74c8', tileA: 'rgba(245,250,255,.84)', tileB: 'rgba(208,230,255,.74)', well: 'rgba(40,90,160,.16)', bg: 'rgba(214,234,255,.5)' },
+    { id: 'coral', frame: '#ff7a5c', deep: '#d24e30', tileA: 'rgba(255,248,244,.84)', tileB: 'rgba(255,218,204,.74)', well: 'rgba(170,70,40,.16)', bg: 'rgba(255,226,214,.5)' },
+    { id: 'gold', frame: '#e8b923', deep: '#a8820a', tileA: 'rgba(255,253,240,.84)', tileB: 'rgba(250,236,180,.74)', well: 'rgba(140,110,20,.16)', bg: 'rgba(252,242,200,.5)' }
+  ];
+  function boardThemeFor(n) {
+    const country = countryForLevel(n), list = [];
+    MAP_COUNTRIES.forEach(function (c) { if (list.indexOf(c) < 0) list.push(c); });
+    const i = Math.max(0, list.indexOf(country));
+    return BOARD_THEMES[i % BOARD_THEMES.length];
+  }
+  let boardTheme = BOARD_THEMES[0];
+  function applyBoardTheme(n) {
+    boardTheme = boardThemeFor(n);
+    const tray = doc.querySelector('#game .tray');
+    if (tray) { tray.dataset.board = boardTheme.id; tray.style.setProperty('--bf', boardTheme.frame); tray.style.setProperty('--bfd', boardTheme.deep); tray.style.setProperty('--bbg', boardTheme.bg); }
+  }
   function drawTile(x, y, s, jelly, blush, flow) {
     const rad = s * .2;
-    ctx.fillStyle = 'rgba(176, 64, 112, .16)';
+    ctx.fillStyle = boardTheme.well;
     rr(x + 2, y + 4, s - 4, s - 5, rad); ctx.fill();
     if (jelly) {
       const deep = jelly >= 2;
@@ -5200,7 +5665,7 @@
         rr(x + 2.5, y + 2.5, s - 5, s - 5, rad); ctx.stroke();
       }
     } else {
-      ctx.fillStyle = blush ? 'rgba(255,255,255,.8)' : 'rgba(255,214,232,.72)';
+      ctx.fillStyle = blush ? boardTheme.tileA : boardTheme.tileB;
       rr(x + 1.6, y + 1.6, s - 3.2, s - 3.2, rad); ctx.fill();
     }
     if (flow > 0) {
@@ -5258,6 +5723,7 @@
         drawTile(c * CS, r * CS, CS, st.jelly ? (st.jelly[r][c] || 0) : 0, (r + c) % 2, st.flow ? (st.flow[r][c] || 0) : 0);
       }
       if (st.lv && st.lv.belts) st.lv.belts.forEach(function (lane) { drawBeltLane(lane, beltDirection(st.lv, lane, st.turns)); });
+      if (st.lv && st.lv.portals) drawPortals(st.lv, t);
       if (sel && !busy) { ctx.strokeStyle = '#ff4f9a'; ctx.lineWidth = 3 * DPR; rr(sel[1] * CS + 3, sel[0] * CS + 3, CS - 6, CS - 6, CS * .2); ctx.stroke(); }
       for (const f of fx) if (f.type === 'beam') {
         const p = Math.min(1, (t - f.t0) / f.dur); ctx.fillStyle = 'rgba(255,255,255,' + (0.7 * (1 - p)) + ')';
@@ -5266,7 +5732,7 @@
         const p = Math.min(1, Math.max(0, (t - f.t0) / f.dur)); ctx.strokeStyle = f.col ? rgbaOf(f.col, 0.85 * (1 - p)) : 'rgba(255,255,255,' + (0.8 * (1 - p)) + ')'; ctx.lineWidth = CS * .2 * (1 - p);
         ctx.beginPath(); ctx.arc(f.x, f.y, CS * (.4 + (f.big || 1.3) * p), 0, Math.PI * 2); ctx.stroke();
       } else if (f.type === 'blast') {
-        const p = Math.min(1, Math.max(0, (t - f.t0) / f.dur)), radius = CS * (.35 + 1.8 * easeOut(p));
+        const p = Math.min(1, Math.max(0, (t - f.t0) / f.dur)), radius = CS * (.45 + 2.4 * easeOut(p));
         const g = ctx.createRadialGradient(f.x, f.y, radius * .1, f.x, f.y, radius);
         g.addColorStop(0, rgbaOf('#fff4a8', .72 * (1 - p))); g.addColorStop(.55, rgbaOf('#ff6b39', .38 * (1 - p))); g.addColorStop(1, rgbaOf('#e92f69', 0));
         ctx.fillStyle = g; ctx.beginPath(); ctx.arc(f.x, f.y, radius, 0, Math.PI * 2); ctx.fill();
@@ -5276,7 +5742,7 @@
       if (hint) drawHintGlow(hint, t, true);
       const crushing = !!(crush && crush.active);
       for (const s of sprites.values()) {
-        if (s.tw) { const p = Math.min(1, (t - s.tw.t0) / s.tw.dur), e = s.tw.ease(p); s.x = s.tw.fx + (s.tw.tx - s.tw.fx) * e; s.y = s.tw.fy + (s.tw.ty - s.tw.fy) * e; if (p >= 1) { if (s.tw.ease === easeIn && !reduce) s.land = t; s.tw = null; } }
+        if (s.tw) { const p = Math.max(0, Math.min(1, (t - s.tw.t0) / s.tw.dur)), e = s.tw.ease(p); s.x = s.tw.fx + (s.tw.tx - s.tw.fx) * e; s.y = s.tw.fy + (s.tw.ty - s.tw.fy) * e; if (p >= 1) { if (s.tw.ease === easeIn && !reduce) s.land = t; s.tw = null; } }
         if (s.pop) { const p = Math.min(1, (t - s.pop) / (220 * SP)); s.sc = 1 + .3 * p; s.al = 1 - p; }
         if (s.grow) { const p = Math.min(1, (t - s.grow) / (260 * SP)); s.sc = .3 + .7 * easeOut(p) + (p < 1 ? .25 * Math.sin(p * Math.PI) : 0); if (p >= 1) { s.grow = 0; s.sc = 1; } }
         if (s.y < -0.5) continue;
@@ -5286,7 +5752,7 @@
         // Gentle idle bob (off with reduced motion) and a little squash when a sweet lands.
         let bob = 0, land = 1;
         if (!reduce && !s.tw && !s.pop) bob = Math.sin(t / 640 + s.t.id * 1.37) * CS * 0.022;
-        if (s.land) { const p = (t - s.land) / 170; if (p >= 1) s.land = 0; else land = 1 + 0.08 * Math.sin(p * Math.PI); }
+        if (s.land) { const p = (t - s.land) / 240; if (p >= 1) s.land = 0; else land = 1 + 0.12 * Math.sin(p * Math.PI) * (1 - p) - 0.04 * Math.sin(p * Math.PI * 2) * p; }
         const px = s.x * CS + CS / 2, py = s.y * CS + CS / 2 + bob;
         if (s.t.s && !s.pop && !crushing && (isCandy(s.t) || isBomb(s.t))) drawSpecialGlow(s.t, px, py, R, t, s.al);
         drawSweet(s.t, px, py, R, s.sc * land, s.al, wob);
@@ -5298,6 +5764,7 @@
           ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('✉', s.x * CS + CS * .845, s.y * CS + CS * .14); ctx.restore();
         }
       }
+      drawBossBar();
       if (hint) drawHintGlow(hint, t, false);
       for (const f of fx) {
         if (f.type === 'beam2') {
@@ -5395,6 +5862,18 @@
         const pop = p < .18 ? 0.6 + 0.4 * easeOut(p / .18) + 0.15 * Math.sin(p / .18 * Math.PI) : 1;
         ctx.font = '900 ' + Math.round(f.size * DPR * pop) + 'px ui-rounded, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.lineWidth = 5 * DPR; ctx.strokeStyle = 'rgba(120,20,70,.85)'; ctx.strokeText(f.str, f.x, f.y - p * CS * .8); ctx.fillStyle = f.col || '#fff'; ctx.fillText(f.str, f.x, f.y - p * CS * .8); ctx.globalAlpha = 1;
+      }
+      if (st.lv && st.lv.cannons) drawCannons(st.lv, t);
+      for (const f of fx) if (f.type === 'screenflash') {
+        // 1.9.285 Big combos light up the whole tray for a moment.
+        const p = Math.min(1, Math.max(0, (t - f.t0) / f.dur));
+        ctx.fillStyle = rgbaOf(f.col || '#ffffff', .45 * (1 - p)); ctx.fillRect(0, 0, W, W);
+      } else if (f.type === 'boom') {
+        // 1.9.285 Boss defeat and countdown bomb blasts: a fireball with flying debris rings.
+        const p = Math.min(1, Math.max(0, (t - f.t0) / f.dur)), radius = CS * (.5 + (f.big || 3) * easeOut(p));
+        const g = ctx.createRadialGradient(f.x, f.y, radius * .05, f.x, f.y, radius);
+        g.addColorStop(0, rgbaOf('#ffffff', .95 * (1 - p))); g.addColorStop(.3, rgbaOf('#ffe066', .8 * (1 - p))); g.addColorStop(.65, rgbaOf(f.col || '#ff5a36', .55 * (1 - p))); g.addColorStop(1, rgbaOf('#7a1040', 0));
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(f.x, f.y, radius, 0, Math.PI * 2); ctx.fill();
       }
       fx = fx.filter(f => t - f.t0 < f.dur);
       for (const [id, s] of sprites) if (s.pop && t - s.pop > 230 * SP) sprites.delete(id);
@@ -5717,6 +6196,14 @@
     if (kind === 'ings') return '<span class="ing">🍒</span><span class="ing">🍋</span>';
     if (kind === 'choco') return '<span class="choco"></span>';
     if (kind === 'mix') return '<span class="jelly"></span><span class="lock">🔒</span><span class="ing">🎁</span>';
+    // 1.9.285 New mechanics.
+    if (kind === 'fuse') return '<span class="fusep"><b>9</b></span><span class="fusep low"><b>3</b></span>';
+    if (kind === 'boss') return '<span class="bossp">' + ((LEVELS[(pendingLv || 1) - 1] || {}).boss || {}).icon + '<i><u></u></i></span>'.replace('undefined', '👾');
+    if (kind === 'cannon') return '<span class="cannonp"></span><span class="ing">🎁</span>';
+    if (kind === 'portal') return '<span class="portalp in"></span><span class="pip c1"></span><span class="portalp out"></span>';
+    if (kind === 'order') return '<span class="orderp">🧾</span><span class="pip c0"></span><span class="pip c2"></span>';
+    if (kind === 'timer') return '<span class="timerp">⏱️</span>';
+    if (kind === 'belts') return '<span class="beltp"></span>';
     return '<span class="pip c0"></span><span class="pip c1"></span><span class="pip c0"></span>';
   }
   function paintGoalStrip(lv, stt) {
@@ -5726,7 +6213,7 @@
     if (hold) {
       const prev = (hold.dataset.sig || '').split(',');
       hold.innerHTML = counts.map(function (c, i) {
-        const customLab = c.kind.indexOf('recipe-') === 0 || c.kind === 'hidden' || c.kind === 'flow' || c.kind === 'choco' || c.kind === 'score';
+        const customLab = c.kind.indexOf('recipe-') === 0 || c.kind === 'hidden' || c.kind === 'flow' || c.kind === 'choco' || c.kind === 'score' || c.kind === 'boss';
         const lab = c.kind === 'ings' || customLab ? c.lab : (c.kind === 'jelly' ? 'Jelly left' : c.kind === 'ice' ? 'Icing left' : c.kind === 'bub' ? 'Bubbles left' : c.kind === 'locks' ? 'Jars left' : c.kind === 'liq' ? 'Liquorice left' : 'left');
         const num = c.kind === 'ings' ? c.lab : String(c.left);
         const iconId = i === 0 ? ' id="gicon"' : '';
@@ -5784,7 +6271,14 @@
     $('introstars').setAttribute('aria-label', info.stars ? info.stars + ' stars earned' : 'No stars yet');
     const b = info.badge;
     $('introbadge').textContent = b ? ('Badge: ' + b.icon + ' ' + b.name) : '';
+    pendingLv = n;
     $('introprev').innerHTML = mechanicPreview(info.mechanic);
+    const nw = $('intronew'), news = info.news;
+    if (nw) {
+      nw.hidden = !news;
+      nw.className = 'intronew' + (news ? ' ' + news.kind : '');
+      nw.innerHTML = news ? '<span class="nw-tag">' + (news.kind === 'new' ? 'New!' : 'New twist') + '</span><span class="nw-ic">' + news.icon + '</span><span class="nw-tx"><b>' + news.name + '</b>' + news.text + '</span>' : '';
+    }
     $('introprev').dataset.mechanic = info.mechanic;
     $('introbtn').textContent = "Let's go!";
     const how = $('introhow');
@@ -6042,6 +6536,7 @@
     $('restartbtn').textContent = challengeRun ? 'Restart hunt' : 'Restart';
     paintGoalStrip(lv);
     st = newGame(opt.board ? { level: lv, board: fromRows(opt.board) } : { level: lv });
+    try { applyBoardTheme(lv.n); } catch (e) { }
     if (challengeRun) {
       st.challenge = true;
       st.postcardFound = challengeRun.pieces.slice();
@@ -6837,6 +7332,27 @@
     } else if (!st.tutorial && st.lv && st.lv.liq && st.liqIdle === LIQ_IDLE - 1 && liqLeft(st.board)) {
       addText('Free the liquorice!', W / 2, W * .12, 18, '#f3d1ff');
     }
+    // 1.9.285 End-of-move mechanics: the boss heals, cannons load, countdown bombs tick or go off.
+    if (res.bossHealed && st.boss && st.boss.hp > 0) {
+      st.boss.healAt = performance.now();
+      addText('+' + res.bossHealed + ' ♥', (st.boss.c + 1) * CS, st.boss.r * CS + CS * .2, 22, '#7dffa8');
+    }
+    if (res.cannonLoaded && res.cannonLoaded.length) {
+      res.cannonLoaded.forEach(function (c) { fx.push({ type: 'ring', x: c * CS + CS / 2, y: CS * .15, t0: now(), dur: 380, col: '#ffffff', big: .8 }); });
+    }
+    if (res.fuseBlown) {
+      const [x, y] = cellXY(res.fuseBlown.r, res.fuseBlown.c);
+      fx.push({ type: 'boom', x, y, t0: now(), dur: 900, big: 5, col: '#ff3b2f' });
+      fx.push({ type: 'screenflash', t0: now(), dur: 520, col: '#ffb27a' });
+      addText('BOOM!', x, y, 40, '#ffe066');
+      shake(3); playZap(true);
+      await wait(800);
+    } else if (res.fuseTicks && res.fuseTicks.some(function (f) { return f.n <= 3; })) {
+      const f = res.fuseTicks.reduce(function (a, b) { return b.n < a.n ? b : a; });
+      const [x, y] = cellXY(f.r, f.c);
+      fx.push({ type: 'ring', x, y, t0: now(), dur: 420, col: '#ff3b2f', big: 1.2 });
+      if (f.n <= 2) addText(f.n === 1 ? 'Last move!' : '2 moves!', x, y - CS * .4, 18, '#ffd0d0');
+    }
     maybeComboTip();
     if (res.shuffled) {
       addText('Shuffle!', W / 2, W / 2, 30, '#fff'); await wait(450);
@@ -6990,6 +7506,28 @@
       if (!reduce) for (let k = 0; k < 3; k++) pushFx({ type: 'glint', x: x + (Math.random() - .5) * .4, y: y + (Math.random() - .5) * .4, dx: 0, dy: -.2, sz: .12 + Math.random() * .08, rot: 0, t0: t1 + k * 50, dur: 380 });
       const sp = st.board[b.r] && st.board[b.r][b.c] && sprites.get(st.board[b.r][b.c].id); if (sp) sp.grow = t1;
     }
+    // 1.9.285 Boss hits: a flash and a damage number; defeat is a huge explosion.
+    if (s.bossHit && st.boss) {
+      st.boss.hitAt = performance.now();
+      const bx = (st.boss.c + 1) * CS, by = (st.boss.r + 1) * CS;
+      addText('-' + s.bossHit, bx + (Math.random() - .5) * CS * .6, by - CS * .4, 26, '#ff5a7a');
+      fx.push({ type: 'ring', x: bx, y: by, t0: t, dur: 420, col: '#ff5a7a', big: 1.8 });
+      if (!reduce) for (let k = 0; k < 6; k++) { const a = Math.random() * Math.PI * 2, v = .6 + Math.random() * .6; pushFx({ type: 'shard', x: bx, y: by, vx: Math.cos(a) * v, vy: Math.sin(a) * v - .5, rot: a, vr: (Math.random() - .5) * 10, sz: .1, col: k % 2 ? '#c86bff' : '#ff8ad8', t0: t, dur: 600 }); }
+    }
+    if (s.bossDown) {
+      const bx = (s.bossDown.c + 1) * CS, by = (s.bossDown.r + 1) * CS;
+      for (const sp of sprites.values()) if (sp.t.boss) sp.pop = t;
+      fx.push({ type: 'boom', x: bx, y: by, t0: t, dur: 900, big: 4.5, col: '#c86bff' });
+      fx.push({ type: 'screenflash', t0: t, dur: 500, col: '#ffffff' });
+      for (let k = 0; k < 3; k++) fx.push({ type: 'ring', x: bx, y: by, t0: t + k * 110, dur: 700, col: ['#ffe066', '#ff8ad8', '#ffffff'][k], big: 3 + k });
+      if (!reduce) for (let k = 0; k < 24; k++) { const a = Math.random() * Math.PI * 2, v = .9 + Math.random() * 1.4; pushFx({ type: 'shard', x: bx, y: by, vx: Math.cos(a) * v, vy: Math.sin(a) * v - .8, rot: a, vr: (Math.random() - .5) * 14, sz: .12 + Math.random() * .08, col: COL[k % 6][1], t0: t, dur: 900 }); }
+      addText('Boss beaten!', W / 2, W * .3, 34, '#ffe066');
+      try { confetti(70, root.innerWidth / 2, root.innerHeight * .4); } catch (e) { }
+      shake(3);
+    }
+    if (s.defused) {
+      for (const p of s.popped) if (p.fuse) { const [x, y] = cellXY(p.r, p.c); fx.push({ type: 'ring', x, y, t0: t, dur: 480, col: '#5dd47a', big: 1.6 }); addText('Defused!', x, y - CS * .3, 18, '#b8ffcc'); }
+    }
     for (const b of s.blasts || []) {
       const [x, y] = cellXY(b.r, b.c);
       fx.push({ type: 'blast', x, y, t0: t, dur: 460 });
@@ -7026,17 +7564,33 @@
     callout(s, i);
     if (n) addText('+' + s.points, cx / n, cy / n, 22, '#fff');
     if (!s.combo) showSaying(s, i);
-    if (opt.shake !== false) shake(shakeLevel([s]) >= 2 ? 2 : (i >= 2 ? 1 : shakeLevel([s])));
+    if (opt.shake !== false) {
+      // 1.9.285 Bigger feedback: colour-bomb combos and huge clears get a heavy shake and a flash; long cascades build up.
+      const lvl = shakeLevel([s]), huge = !!s.combo || s.popped.length >= 24;
+      shake(huge ? 3 : lvl >= 2 ? 2 : (i >= 4 ? 2 : i >= 2 ? 1 : lvl));
+      if (huge && !reduce) fx.push({ type: 'screenflash', t0: t, dur: 380, col: '#fff6c8' });
+    }
     for (const m of s.madeTiles || []) { const sp = sprite(m.t, m.r, m.c); sp.grow = t; if (!reduce) { const [x, y] = cellXY(m.r, m.c); pushFx({ type: 'glint', x, y, dx: 0, dy: 0, sz: .45, rot: 0, t0: t, dur: 520 }); } }
     if (s.delivered) for (const d of s.delivered) { const sp = sprites.get(d.t.id); if (sp) sp.pop = t; }
     await wait(230);
     let longest = 0;
+    const fallCols = {};
     for (const f of s.falls || []) {
       let sp = sprites.get(f.t.id);
       if (!sp || sp.pop) { sp = sprite(f.t, f.from, f.c); }
-      const d = f.r - (f.fresh ? f.from : sp.y), dur = 120 + 70 * Math.sqrt(Math.max(1, Math.abs(d)));
-      longest = Math.max(longest, dur);
-      moveTo(sp, f.r, f.c, dur, easeIn);
+      if (f.portal) { sp.x = f.c; sp.y = f.from; } // 1.9.285 out of the portal's twin
+      const d = f.r - (f.fresh || f.portal ? f.from : sp.y), dur = 120 + 70 * Math.sqrt(Math.max(1, Math.abs(d)));
+      // 1.9.285 Smoother cascade: columns land one after another, lower sweets first, with a soft bounce.
+      const delay = reduce ? 0 : (f.c * 16 + (fallCols[f.c] = (fallCols[f.c] || 0) + 1) * 10);
+      longest = Math.max(longest, dur + delay);
+      moveTo(sp, f.r, f.c, dur, easeIn, delay);
+      if (f.fresh && f.t.cannon) {
+        if (!st.cannonPuff) st.cannonPuff = {};
+        st.cannonPuff[f.c] = performance.now();
+        const x = f.c * CS + CS / 2;
+        fx.push({ type: 'ring', x, y: CS * .2, t0: t + 230, dur: 420, col: '#ffe066', big: 1 });
+        addText(f.t.ing ? 'Treat!' : f.t.fuse ? 'Bomb!' : f.t.liq ? 'Liquorice!' : 'Cannon!', x, CS * .55, 16, '#fff');
+      }
     }
     hud();
     await wait(longest + 40);
@@ -7047,10 +7601,10 @@
     if (reduce || !level) return;
     const el = doc.querySelector('#game .tray');
     if (!el) return;
-    if (el.classList.contains('shk2') && level < 2) return;
-    el.classList.remove('shk1', 'shk2'); void el.offsetWidth; el.classList.add(level >= 2 ? 'shk2' : 'shk1');
+    if ((el.classList.contains('shk2') || el.classList.contains('shk3')) && level < 2) return;
+    el.classList.remove('shk1', 'shk2', 'shk3'); void el.offsetWidth; el.classList.add(level >= 3 ? 'shk3' : level >= 2 ? 'shk2' : 'shk1');
     if (shakeT) clearTimeout(shakeT);
-    shakeT = setTimeout(function () { el.classList.remove('shk1', 'shk2'); }, 520);
+    shakeT = setTimeout(function () { el.classList.remove('shk1', 'shk2', 'shk3'); }, 640);
   }
   // ---------- Sweet streak meter ----------
   function addStreak(gain) {
@@ -7187,6 +7741,16 @@
     stopEnd();
     st.over = false; st.won = false; st.stars = 0;
     st.moves += EXTRA_MOVES;
+    // 1.9.285 A blown countdown bomb is re-armed with 5 more moves; a timed level gets 20 more seconds.
+    if (st.fuseBlown) {
+      st.fuseBlown = null;
+      for (const row of st.board) for (const t of row) if (t && t.fuse != null && t.fuse <= 5) t.fuse = Math.max(0, t.fuse) + 5;
+    }
+    if (st.timerExpired && st.lv && st.lv.timer) {
+      st.timerExpired = false; st.timerEndHandled = false;
+      st.timerMsLeft = (st.timerMsLeft || 0) + 20000; st.timerLeft = Math.ceil(st.timerMsLeft / 1000); st.timerUpdatedAt = Date.now();
+      addText('+20 seconds', W / 2, W / 2 + CS, 22, '#bfe9ff');
+    }
     warned3 = st.moves <= MOVES_WARN_AT;
     busy = false; lastAct = now();
     addText('+' + EXTRA_MOVES + ' moves', W / 2, W / 2, 28, '#ffe066');
@@ -7697,7 +8261,7 @@
       return;
     }
     const fly = !!(won && opts.animateStars && n > 0);
-    $('endtitle').textContent = won ? (lv.theme === 'sarah' ? "Sarah's level complete!" : ('Level ' + lv.n + ' complete!')) : (st.timerExpired ? "Time's up!" : 'So close!');
+    $('endtitle').textContent = won ? (lv.theme === 'sarah' ? "Sarah's level complete!" : ('Level ' + lv.n + ' complete!')) : (st.fuseBlown ? 'Boom! A bomb went off' : st.timerExpired ? "Time's up!" : 'So close!');
     if (fly) {
       $('endstars').innerHTML = [0, 1, 2].map(() => '<span>★</span>').join('');
     } else {
@@ -7742,6 +8306,7 @@
       if (lv.ings && lv.ings.length) bits.push('an ingredient did not make it down');
       if (lv.locks) bits.push('some jars are still locked');
       $('endmsg').textContent = bits.length ? ('Not quite — ' + bits.join(', ') + '. Have another go!') : 'Have another go!';
+      if (st.fuseBlown) $('endmsg').textContent = 'A countdown bomb reached zero. Match the lowest numbers first next time!';
     }
     $('againbtn').textContent = won ? 'Play again' : 'Try again';
     $('nextbtn').hidden = !(won && lv.n < LV_COUNT);

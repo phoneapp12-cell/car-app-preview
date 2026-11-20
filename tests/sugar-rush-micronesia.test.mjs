@@ -58,9 +58,9 @@ test('new stages use varied, winnable objectives and original animated island sc
   const goals = [
     ['jelly', 'bub'],
     ['ings', 'ice'],
-    ['recipe-candy', 'recipe-candy', 'recipe-special'],
+    ['recipe-candy', 'recipe-candy', 'recipe-special', 'recipe-special'],
     ['hidden'],
-    ['flow', 'bub']
+    ['flow', 'bub', 'boss']
   ];
   for (let i = 0; i < NEW_STOPS.length; i++) {
     const expected = NEW_STOPS[i];
