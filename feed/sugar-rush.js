@@ -1349,45 +1349,29 @@
         '<circle cx="-2" cy="-7" r="2.2" fill="#d9f7ce" opacity=".9"/></g>';
     }).join('');
     return '<g class="sr-terrain" aria-hidden="true" pointer-events="none">' + hillSvg + groveSvg +
-      '<g transform="translate(-226 1300)" opacity=".82"><path d="M-42 20 L-19 -19 L0 13 L19 -31 L48 20 Z" fill="#efc99b" stroke="#fff" stroke-width="3" stroke-linejoin="round"/><path d="M-26 -7 L-19 -19 L-12 -7 L-18 -10 Z M11 -17 L19 -31 L28 -13 L19 -19 Z" fill="#fff"/><path d="M-35 21 Q0 10 40 21" fill="none" stroke="#c7e8ba" stroke-width="6" stroke-linecap="round"/></g>' +
       '</g>';
   }
   function mapLandmarks() {
-    const lake = function (id, x, y, rx, ry, label) {
-      return '<g id="' + id + '" class="sr-landmark sr-lake" transform="translate(' + x + ' ' + y + ')" pointer-events="none">' +
-        '<ellipse cx="0" cy="0" rx="' + rx + '" ry="' + ry + '" fill="#55cfe4" stroke="#fff" stroke-width="4"/>' +
-        '<ellipse cx="0" cy="0" rx="' + (rx * .72).toFixed(1) + '" ry="' + (ry * .55).toFixed(1) + '" fill="#a7f2f1" opacity=".55"/>' +
-        '<path d="M-' + (rx * .65).toFixed(1) + ' 0 Q-' + (rx * .28).toFixed(1) + ' -' + (ry * .35).toFixed(1) + ' 0 0 T' + (rx * .65).toFixed(1) + ' 0" fill="none" stroke="#efffff" stroke-width="2.2" stroke-linecap="round"/>' +
-        (label ? '<text x="0" y="4" text-anchor="middle" font-size="7" font-weight="900" fill="#216d84" stroke="#fff" stroke-width="2.5" paint-order="stroke" font-family="ui-rounded,system-ui,sans-serif">' + label + '</text>' : '') + '</g>';
+    const image = function (id, file, x, y, w, h, kind, opacity) {
+      return '<g id="' + id + '" class="sr-landmark sr-' + kind + '" pointer-events="none" opacity="' + (opacity == null ? 1 : opacity) + '"><image href="img/sugar-rush/landmarks/' + file + '.webp" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" preserveAspectRatio="xMidYMid meet"/></g>';
     };
-    const mountainRange = function (id, x, y, scale, label) {
-      return '<g id="' + id + '" class="sr-landmark sr-mountains" transform="translate(' + x + ' ' + y + ') scale(' + scale + ')" pointer-events="none">' +
-        '<path d="M-90 35 L-69 6 L-54 23 L-28 -20 L-12 3 L4 -48 L25 -5 L39 -26 L56 12 L73 -2 L96 35 Z" fill="#a9c1cc" stroke="#fff" stroke-width="4" stroke-linejoin="round"/>' +
-        '<path d="M4 -48 L15 -22 L5 -29 L-2 -13 L-5 -29 Z M39 -26 L49 -4 L39 -10 L32 3 L28 -8 Z M-28 -20 L-19 -1 L-29 -7 L-35 5 Z M73 -2 L82 16 L71 10 L67 19 Z" fill="#fff" stroke="#ecfbff" stroke-width="2" stroke-linejoin="round"/>' +
-        '<path d="M-90 36 C-64 27 -46 39 -22 32 C1 25 18 38 42 32 C62 27 75 38 94 34" fill="none" stroke="#78bf8e" stroke-width="5" stroke-linecap="round" opacity=".82"/>' +
-        (label ? '<text x="0" y="57" text-anchor="middle" font-size="9" font-weight="900" letter-spacing=".8" fill="#326f7e" stroke="#fff" stroke-width="3" paint-order="stroke" font-family="ui-rounded,system-ui,sans-serif">' + label + '</text>' : '') + '</g>';
-    };
-    const volcano = function (id, x, y, scale, label) {
-      return '<g id="' + id + '" class="sr-landmark sr-volcano" transform="translate(' + x + ' ' + y + ') scale(' + scale + ')" pointer-events="none">' +
-        '<ellipse cx="0" cy="25" rx="38" ry="7" fill="#568b79" opacity=".24"/>' +
-        '<path d="M-34 24 L-10 -22 Q-3 -38 3 -34 Q10 -28 13 -21 L36 24 Z" fill="#c98578" stroke="#fff" stroke-width="3.5" stroke-linejoin="round"/>' +
-        '<path d="M-10 -22 Q0 -28 11 -21 L5 -15 L0 -19 L-5 -15 Z" fill="#ffe9d5" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/>' +
-        '<ellipse cx="1" cy="-21" rx="8" ry="3.4" fill="#ff8855" stroke="#a95756" stroke-width="1.3"/>' +
-        '<path d="M1 -17 Q1 -7 8 2" fill="none" stroke="#fa674e" stroke-width="4" stroke-linecap="round"/>' +
-        '<path d="M-7 -38 C-18 -45 -15 -54 -6 -53 C-3 -64 10 -60 10 -51 C22 -53 23 -42 12 -37" fill="#fff8f1" stroke="#fff" stroke-width="2" opacity=".9"/>' +
-        (label ? '<text x="0" y="40" text-anchor="middle" font-size="8" font-weight="900" letter-spacing=".6" fill="#714d63" stroke="#fff" stroke-width="3" paint-order="stroke" font-family="ui-rounded,system-ui,sans-serif">' + label + '</text>' : '') + '</g>';
+    const plaque = function (id, x, y, text) {
+      const w = Math.max(42, text.length * 5.2 + 12);
+      return '<g id="' + id + '" class="sr-landmark-label" transform="translate(' + x + ' ' + y + ')" pointer-events="none"><rect x="' + (-w / 2) + '" y="-8" width="' + w + '" height="16" rx="8" fill="#fff8e9" fill-opacity=".94" stroke="#fff" stroke-width="1.8" filter="url(#sr-soft)"/><text x="0" y="3" text-anchor="middle" font-size="8" font-weight="900" letter-spacing=".65" fill="#326f7e" font-family="ui-rounded,system-ui,sans-serif">' + text + '</text></g>';
     };
     return '<g class="sr-landmarks" aria-hidden="true">' +
-      lake('landmark-lake-taupo', 303, 332, 29, 17, 'TAUPŌ') +
-      lake('landmark-lake-pukaki', 208, 815, 24, 9, '') +
-      lake('landmark-lake-wakatipu', 125, 920, 25, 10, '') +
-      mountainRange('landmark-southern-alps', 163, 850, .78, '') +
-      mountainRange('landmark-himalaya', -220, 1270, .92, 'HIMALAYA') +
-      mountainRange('landmark-great-dividing-range', 289, 1936, .68, 'GREAT DIVIDING RANGE') +
-      mountainRange('landmark-mt-fuji', 220, 1278, .55, 'MT. FUJI') +
-      volcano('landmark-tongariro-volcano', 247, 382, 1.02, 'TONGARIRO') +
-      volcano('landmark-java-volcano', 10, 1772, .72, '') +
-      volcano('landmark-yasur-volcano', 538, 1846, .62, '') +
+      image('landmark-lake-taupo', 'lake', 257, 310, 80, 40, 'lake') +
+      image('landmark-lake-pukaki', 'lake', 204, 805, 59, 30, 'lake') +
+      image('landmark-lake-wakatipu', 'lake', 97, 889, 62, 31, 'lake') +
+      image('landmark-himalaya', 'mountains', -297, 1215, 166, 91, 'mountains', .78) +
+      image('landmark-great-dividing-range', 'mountains', 219, 1894, 142, 78, 'mountains', .82) +
+      image('landmark-southern-alps', 'mountains', 122, 820, 104, 57, 'mountains') +
+      image('landmark-mt-fuji', 'volcano', 205, 1244, 57, 46, 'volcano', .86) +
+      image('landmark-tongariro-volcano', 'volcano', 222, 348, 68, 55, 'volcano') +
+      image('landmark-java-volcano', 'volcano', -18, 1738, 58, 47, 'volcano', .86) +
+      image('landmark-yasur-volcano', 'volcano', 512, 1817, 58, 47, 'volcano', .86) +
+      plaque('landmark-label-taupo', 298, 350, 'LAKE TAUPŌ') +
+      plaque('landmark-label-tongariro', 256, 414, 'TONGARIRO') +
       '</g>';
   }
   function nzMapSvg() {
@@ -1404,7 +1388,7 @@
       '<stop offset="0" stop-color="#8fe7e1"/><stop offset=".45" stop-color="#7bdad6"/><stop offset="1" stop-color="#b8f3de"/>' +
       '</linearGradient>' +
       '<linearGradient id="sr-land" x1="0" y1="0" x2="1" y2="1">' +
-      '<stop offset="0" stop-color="#ffd5e7"/><stop offset=".25" stop-color="#ffd2bd"/><stop offset=".5" stop-color="#ffe8a1"/><stop offset=".75" stop-color="#c4efcd"/><stop offset="1" stop-color="#c7e2ff"/>' +
+      '<stop offset="0" stop-color="#d8efc4"/><stop offset=".34" stop-color="#c2e8b9"/><stop offset=".7" stop-color="#a5dcae"/><stop offset="1" stop-color="#8ecdb1"/>' +
       '</linearGradient>' +
       '<linearGradient id="sr-candy-strawberry" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff2f7"/><stop offset=".55" stop-color="#ffc5db"/><stop offset="1" stop-color="#ff9fbe"/></linearGradient>' +
       '<linearGradient id="sr-candy-peach" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff5e8"/><stop offset=".55" stop-color="#ffd2ad"/><stop offset="1" stop-color="#ffb98e"/></linearGradient>' +
@@ -1437,11 +1421,6 @@
       '<path filter="url(#sr-soft)" fill="url(#sr-land)" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="M 195 159 L 197 162 L 193 163 L 185 159 L 183 154 L 184 147 L 191 152 Z"/>' +
       '<path filter="url(#sr-soft)" fill="url(#sr-land)" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="M 70 1040 L 71 1046 L 63 1049 L 62 1044 L 66 1039 Z"/>' +
       '<path filter="url(#sr-soft)" fill="url(#sr-land)" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="M 245 523 L 241 531 L 239 521 L 241 516 L 244 511 Z"/>' +
-      '<ellipse cx="275" cy="328" rx="9" ry="11" fill="#7ec8ef" stroke="#fff" stroke-width="2"/>' +
-      // Soft icing alps along the Southern Alps
-      '<path d="M 184 746 C 194 704 206 704 216 746 C 206 738 194 738 184 746 Z" fill="#fff" opacity=".9"/>' +
-      '<path d="M 142 828 C 152 786 164 786 174 828 C 164 820 152 820 142 828 Z" fill="#fff" opacity=".9"/>' +
-      '<path d="M 112 932 C 122 890 134 890 144 932 C 134 924 122 924 112 932 Z" fill="#fff" opacity=".9"/>' +
       // Ferry across Cook Strait (Wellington to Picton)
       '<path d="M 286 536 C 278 552 274 547 264 551" fill="none" stroke="#fff" stroke-width="2.4" stroke-dasharray="5 7" stroke-linecap="round" opacity=".85"/>' +
       // 1.9.227 Whangārei close-up (30x): Whangārei and Onerahi at their real relative places, Sarah\'s House beside Onerahi,
@@ -6647,6 +6626,7 @@
       const countryStop = country && country.toLowerCase() === stop.place.toLowerCase();
       const countryStart = country && country !== countryForLevel(n - 1);
       const countryIcon = countryStart ? mapCountryIconForLevel(n) : '';
+      const countryPill = countryStart ? '<i class="country"><span class="country-icon" aria-hidden="true">' + countryIcon + '</span>' + (countryStop ? '' : '<span class="country-name">' + country + '</span>') + '</i>' : (country && !countryStop ? '<i class="country"><span class="country-name">' + country + '</span></i>' : '');
       const b = doc.createElement('button');
       b.type = 'button';
       b.className = 'lv lab-' + (stop.label || 'right') + (stop.lift ? ' lift' : '') + (lv.theme === 'sarah' ? ' sarah' : '') + (lv.hard ? ' hard hard' + lv.hard : '') + (countryStop ? ' country-stop' : '') + (countryStart ? ' country-start' : '') + (open ? ' open' : '') + (stars ? ' done' : '') + (n === here ? ' here' : '') + ' kind-' + (stop.kind || 'town');
@@ -6658,8 +6638,8 @@
       const mark = stop.kind === 'house' ? '🏠' : (stop.kind === 'post' ? '✉️' : (stop.kind === 'station' ? '🚂' : (stop.kind === 'island' ? '🌴' : '')));
       const starHtml = [0, 1, 2].map(k => '<span class="' + (k < stars ? 'on' : '') + '">★</span>').join('');
       const badge = prog.badges[i] && lv.badge ? '<span class="gotbadge" aria-hidden="true">' + lv.badge.icon + '</span>' : '';
-      b.innerHTML = '<span class="pin"><span class="no">' + n + '</span>' + (countryIcon ? '<span class="country-mark" aria-hidden="true">' + countryIcon + '</span>' : '') + (mark ? '<span class="mark" aria-hidden="true">' + mark + '</span>' : '') + (lv.hard ? '<span class="hardmark" aria-hidden="true">🔥</span>' : '') + '</span><span class="st">' + starHtml + '</span>' +
-        '<span class="meta"><b>' + stop.place + '</b><em>' + lv.name + '</em>' + (country && !countryStop ? '<i class="country">' + country + '</i>' : '') + '</span>' + badge;
+      b.innerHTML = '<span class="pin"><span class="no">' + n + '</span>' + (mark ? '<span class="mark" aria-hidden="true">' + mark + '</span>' : '') + (lv.hard ? '<span class="hardmark" aria-hidden="true">🔥</span>' : '') + '</span><span class="st">' + starHtml + '</span>' +
+        '<span class="meta"><b>' + stop.place + '</b><em>' + lv.name + '</em>' + countryPill + '</span>' + badge;
       b.setAttribute('aria-label', (open ? 'Play ' : 'Locked: ') + 'level ' + n + ', ' + lv.name + ', ' + stop.place + (country && !countryStop ? ', ' + country : '') + (lv.hard ? ', ' + hardLabel(lv.hard) : '') + (stars ? ', ' + stars + ' stars' : '') + (prog.badges[i] && lv.badge ? ', badge ' + lv.badge.name : ''));
       if (open) b.addEventListener('click', () => { unlockAudio(); openLevel(n); });
       path.appendChild(b);

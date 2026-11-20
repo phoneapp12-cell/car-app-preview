@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
 const html = readFileSync(new URL('../feed/sugar-rush.html', import.meta.url), 'utf8');
+const source = readFileSync(new URL('../feed/sugar-rush.js', import.meta.url), 'utf8');
 const css = html.match(/<style>([\s\S]*?)<\/style>/i)?.[1] || '';
 const require = createRequire(import.meta.url);
 require('../feed/sugar-rush.js');
@@ -28,7 +29,7 @@ test('mobile map scrolling layer stays below the fixed level intro dialog', () =
   assert.match(mapView, /-webkit-overflow-scrolling\s*:\s*touch/i, 'native mobile momentum scrolling remains enabled');
 });
 
-test('every country-entry level has its own representative map icon badge', () => {
+test('every country-entry level has a representative emblem integrated into its country label', () => {
   const starts = [];
   for (let i = 0; i < game.MAP_COUNTRIES.length; i++) {
     if (i === 0 || game.MAP_COUNTRIES[i] !== game.MAP_COUNTRIES[i - 1]) {
@@ -38,7 +39,9 @@ test('every country-entry level has its own representative map icon badge', () =
     }
   }
   assert.ok(starts.length > 30, 'country icons cover the full world tour');
-  assert.match(rule('.stops .lv .pin .country-mark'), /position\s*:\s*absolute/i, 'country icon badges sit on map pins');
+  assert.match(rule('.stops .meta .country-icon'), /border-radius\s*:\s*50%/i, 'country emblems sit in styled circular label badges');
+  assert.match(source, /countryPill\s*=\s*countryStart/, 'emblems are attached to country labels');
+  assert.doesNotMatch(source, /class="country-mark"/, 'emblems no longer float on numbered pins');
 });
 
 test('map SVG contains labeled lakes, snowcapped ranges, and volcano landmarks', () => {
@@ -48,4 +51,7 @@ test('map SVG contains labeled lakes, snowcapped ranges, and volcano landmarks',
     'landmark-southern-alps', 'landmark-himalaya', 'landmark-tongariro-volcano',
     'landmark-java-volcano', 'landmark-yasur-volcano', 'landmark-mt-fuji'
   ]) assert.ok(svg.includes(`id="${id}"`), `illustrated landmark ${id} remains present`);
+  for (const file of ['mountains.webp', 'volcano.webp', 'lake.webp']) {
+    assert.ok(svg.includes(`img/sugar-rush/landmarks/${file}`), `map references the painted asset ${file}`);
+  }
 });

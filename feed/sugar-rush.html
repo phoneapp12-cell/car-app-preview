@@ -115,7 +115,6 @@
   .stops .lv .pin, .stops .future-stop .pin { position: relative; display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 50%; border: 3px solid #ffb3d3; background: rgba(255,255,255,.96); box-shadow: 0 3px 0 #f4a0c4, 0 6px 12px rgba(180,40,90,.18); color: #7a1f4c; font: 900 16px/1 ui-rounded, system-ui, sans-serif; }
   .stops .lv .pin .no { font-size: 16px; }
   .stops .lv .pin .mark { position: absolute; right: -8px; bottom: -6px; width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 1.5px solid #ffb3d3; font-size: 11px; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 0 #f4a0c4; }
-  .stops .lv .pin .country-mark { position: absolute; left: -9px; top: -8px; z-index: 2; width: 24px; height: 24px; border-radius: 50%; border: 2px solid #fff; background: linear-gradient(180deg,#fff,#e5fbf7); box-shadow: 0 1px 4px rgba(20,96,105,.32); font-size: 13px; line-height: 1; display: flex; align-items: center; justify-content: center; }
   .stops .lv.sarah .pin { border-color: #ff7eb0; background: linear-gradient(180deg, #fff, #ffe0ee); }
   .stops .lv.sarah .pin .mark { border-color: #ff7eb0; }
   .stops .lv.sarah .pin .no { font-size: 16px; color: #d6246e; }
@@ -133,9 +132,11 @@
   .stops .meta b { display: block; font-size: 12px; font-weight: 900; color: #4a2240; line-height: 1.1; letter-spacing: .01em; text-shadow: 0 1px 0 #fff, 0 0 3px #fff; }
   .stops .lv.country-stop .meta b { font-size: 10px; text-transform: uppercase; letter-spacing: .055em; }
   .stops .meta em { display: block; font-size: 10px; font-style: normal; font-weight: 700; color: #8a3a62; line-height: 1.15; text-shadow: 0 1px 0 #fff; }
-  .stops .meta .country { display: none; width: max-content; max-width: 120px; margin-top: 2px; padding: 2px 5px; border-radius: 999px; background: rgba(255,255,255,.82); box-shadow: 0 1px 3px rgba(42,105,112,.14); font-size: 8px; font-style: normal; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: #347b82; line-height: 1.1; text-shadow: 0 1px 0 #fff; }
-  .stops .lv.here .meta .country, .stops .lv:hover .meta .country, .stops .lv:focus-visible .meta .country { display: block; }
-  .stops .lv.country-start .meta .country { display: block; }
+  .stops .meta .country { display: none; align-items: center; gap: 5px; width: max-content; max-width: 140px; margin-top: 5px; padding: 3px 8px 3px 3px; border: 1px solid rgba(255,255,255,.95); border-radius: 999px; background: linear-gradient(180deg,#fffdf7,#f6edce); box-shadow: 0 2px 6px rgba(50,95,100,.18), inset 0 1px 0 rgba(255,255,255,.9); font-size: 9px; font-style: normal; font-weight: 900; letter-spacing: .07em; text-transform: uppercase; color: #347b82; line-height: 1.1; text-shadow: 0 1px 0 #fff; }
+  .stops .meta .country-icon { flex: 0 0 25px; width: 25px; height: 25px; display: grid; place-items: center; border: 1px solid #e8d8ae; border-radius: 50%; background: radial-gradient(circle at 34% 27%,#fff,#fff5d8 72%,#eddda9); box-shadow: inset 0 1px 2px rgba(119,94,48,.14), 0 1px 2px rgba(60,91,85,.12); font-size: 15px; line-height: 1; letter-spacing: 0; }
+  .stops .meta .country-name { display: block; white-space: normal; text-align: left; }
+  .stops .lv.here .meta .country, .stops .lv:hover .meta .country, .stops .lv:focus-visible .meta .country { display: flex; }
+  .stops .lv.country-start .meta .country { display: flex; }
   .stops .lv:not(.done) .st { display: none; }
   .stops .lv .meta em { display: none; }
   .stops .lv.here .meta em, .stops .lv:hover .meta em, .stops .lv:focus-visible .meta em { display: block; }
