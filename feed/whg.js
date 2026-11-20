@@ -295,7 +295,7 @@
   }
 
   function slotBusy(x) {
-    return x && (x.x === 'play' || x.x === 'zoomq' || x.x === 'fallq' || x.x === 'tetq' || x.x === 'cine' || x.x === 'whgev' || x.x === 'whgdev' || x.x === 'sportask' || (x.x === 'row' && (x.k === 'cine' || x.k === 'whg-ev' || x.k === 'whg-dev')));
+    return x && (x.x === 'play' || x.x === 'zoomq' || x.x === 'fallq' || x.x === 'tetq' || x.x === 'cine' || x.x === 'whgev' || x.x === 'whgdev' || x.x === 'sportask' || x.x === 'relask' || (x.x === 'row' && (x.k === 'cine' || x.k === 'whg-ev' || x.k === 'whg-dev' || x.k === 'akl-con' || x.k === 'top40' || x.k === 'religion' || x.k === 'vidrow')));
   }
   function place(order, nPins, card, now, bias) {
     if (!card) return order;

@@ -1,0 +1,51 @@
+{
+  "updated": "2026-11-21",
+  "note": "Respectful, informational pieces only. Nothing here was invented. Live fetch adds more when a source is reachable.",
+  "items": [
+    {
+      "id": "rel-rnz-amoamo-2026-11-20",
+      "t": "Te Whakatōhea mourns pou tikanga Dr Te Riaki Amoamo",
+      "s": "For more than 60 years, Dr Te Riaki Amoamo passed on the reo, whakapapa and tikanga of Te Whakatōhea so younger generations could stand and speak for their people.",
+      "url": "https://www.rnz.co.nz/news/te-manu-korihi/2694092/te-whakatohea-mourns-pou-tikanga-dr-te-riaki-amoamo",
+      "sn": "RNZ Te Manu Korihi",
+      "published": "2026-11-20",
+      "kind": "tikanga"
+    },
+    {
+      "id": "rel-rnz-poukai-2026-11-17",
+      "t": "Māori Queen makes historic visit to Tai Rāwhiti",
+      "s": "The Poukai is an annual circuit of visits by Te Arikinui to marae associated with the Kiingitanga.",
+      "url": "https://www.rnz.co.nz/news/te-manu-korihi/2635449/maori-queen-makes-historic-visit-to-tai-rawhiti",
+      "sn": "RNZ Te Manu Korihi",
+      "published": "2026-11-17",
+      "kind": "tikanga"
+    },
+    {
+      "id": "rel-rnz-temara-2026-11-10",
+      "t": "Ngāi Tūhoe mourns treasured son Tā Pou Temara",
+      "s": "The celebrated academic, author, historian and teacher — a leading voice in tikanga, reo and history — returned to Mataatua marae, to his hapū Te Urewera.",
+      "url": "https://www.rnz.co.nz/news/te-manu-korihi/2508118/ngai-tuhoe-mourns-treasured-son-ta-pou-temara",
+      "sn": "RNZ Te Manu Korihi",
+      "published": "2026-11-10",
+      "kind": "tikanga"
+    },
+    {
+      "id": "rel-teara-rongoa",
+      "t": "Rongoā — medicinal use of plants",
+      "s": "Te Ara’s encyclopedia entry on traditional Māori healing, including rongoā rākau and the wider practice of rongoā.",
+      "url": "https://teara.govt.nz/en/rongoa-medicinal-use-of-plants",
+      "sn": "Te Ara — Encyclopedia of New Zealand",
+      "published": "",
+      "kind": "rongoa"
+    },
+    {
+      "id": "rel-teara-karakia",
+      "t": "Traditional Māori religion — ngā karakia a te Māori",
+      "s": "Te Ara’s encyclopedia entry on traditional Māori belief, atua, karakia, and related ideas of the spiritual world, including wairua.",
+      "url": "https://teara.govt.nz/en/traditional-maori-religion-nga-karakia-a-te-maori",
+      "sn": "Te Ara — Encyclopedia of New Zealand",
+      "published": "",
+      "kind": "tikanga"
+    }
+  ]
+}

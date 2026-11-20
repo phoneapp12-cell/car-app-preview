@@ -345,6 +345,15 @@ html.candy .hrhd h2{color:#c2448a}
 #feed > .card.nzsum{--band-g:linear-gradient(135deg,#6cc7ff,#a5f3fc)}
 #feed > .card.streaks{--band-e:'🔥';--band-g:linear-gradient(135deg,#ffa24c,#ff5e7e)}
 @media (prefers-color-scheme:dark){#feed > .card.xc:not(:has(.media,.pimg,.fph,.bdpic,.hero))::before{filter:saturate(.9) brightness(.78)}}
+/* Ask cards: no tall 16/6 rainbow band, so Yes/No stay on a phone screen under the Today hero. */
+#feed > .card.xc.relask::before,#feed > .card.xc.sportask::before{display:none!important;content:none!important;aspect-ratio:auto!important;height:0!important}
+#feed > .card.relask .hd,html.today-look #feed > .card.relask .hd{padding:6px 14px 0}
+#feed > .card.relask .bd,html.today-look #feed > .card.relask .bd{padding-top:2px;padding-bottom:10px}
+#feed > .card.relask .bd h3{margin:0 0 8px}
+#feed > .card.relask .xbtns,#feed > .card.sportask .xbtns{display:flex;flex-wrap:nowrap;gap:8px;margin:0 0 8px;align-items:stretch}
+#feed > .card.relask .xbtns .btn,#feed > .card.sportask .xbtns .btn{flex:1 1 0;width:auto;min-width:0;min-height:44px;margin-top:0}
+#feed > .card.relask .bd p{margin:0}
+
 .pinbox .pbtn,.pbtn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:11px 18px;border-radius:14px;background:linear-gradient(135deg,#ff7eb6,#ffa24c);box-shadow:0 4px 14px rgba(255,126,182,.35),inset 0 -3px 0 rgba(0,0,0,.12);text-shadow:0 1px 1px rgba(0,0,0,.15)}
 .xbtns .btn,.pbtn{min-height:44px;font-size:1rem}
 .pollo::before{background:linear-gradient(90deg,#ff9ccc,#c4a8ff,#8fdcff)}.pollo.on{border-color:#ff5ea8;box-shadow:0 0 0 3px #ff9ccc66}
@@ -678,6 +687,13 @@ html.portal-on #feed > .sk{visibility:hidden}
 html.portal-on #feed > .card:not(.portal-rise),html.portal-on #feed > .hrow:not(.portal-rise){visibility:hidden}
 #feed > .card.portal-rose,#feed > .hrow.portal-rose{animation:none}
 #ibportal{position:fixed;inset:0;z-index:30;pointer-events:none;background:rgba(3,7,14,.92);isolation:isolate}
+#ibportal.ib-intro-film{z-index:80;background:#eef6fb;pointer-events:none;isolation:isolate}
+#ibportal.ib-intro-film video,#ibportal.ib-intro-film .ib-intro-poster{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#eef6fb}
+#ibportal.ib-intro-film .ib-intro-word{position:absolute;left:0;right:0;top:57%;margin:0;padding:0 16px;text-align:center;font-family:Fraunces,Georgia,"Times New Roman",serif;font-weight:700;font-size:clamp(30px,8.2vw,46px);letter-spacing:-.03em;line-height:1.05;color:#1B1916;opacity:0;transform:translateY(6px);transition:opacity .35s ease,transform .35s ease;z-index:2;pointer-events:none}
+#ibportal.ib-intro-film .ib-intro-word.on{opacity:1;transform:none}
+#ibportal.ib-intro-film .ib-intro-skip{position:absolute;top:max(12px,env(safe-area-inset-top,0px));right:max(12px,env(safe-area-inset-right,0px));z-index:3;min-height:44px;min-width:72px;padding:8px 16px;border:0;border-radius:22px;background:rgba(255,255,255,.92);color:#1B1916;font-weight:800;font-size:16px;cursor:pointer;pointer-events:auto}
+@media (prefers-reduced-motion:reduce){#ibportal.ib-intro-film{display:block}#ibportal.ib-intro-film video{display:none}}
+
 #ibrise{position:fixed;inset:0;z-index:100;pointer-events:none}
 #ibrise .ib-ghost{animation:none;margin:0;min-height:220px;transform-origin:50% 50%;box-sizing:border-box}
 #ibrise .ib-ghost.ib-go{animation:ibRise 1.2s linear both;animation-delay:var(--rise,0s)}
@@ -745,6 +761,7 @@ body[data-artopen] .artwin{overscroll-behavior:none}body[data-artopen] .artbar{o
 <script src="back.js?v=1.9.297"></script>
 <script src="today.js?v=1.9.297"></script>
 <script src="reader.js?v=1.9.297"></script>
+<script src="ib-preview.js?v=1.9.297"></script>
 <script>
 /* 1.9.82 self-heal: if the feed is still skeletons after 9s (crash/stale cache), offer a manual reload.
    Auto-reload only on a real JS error, at most once per 10 minutes (localStorage). No controllerchange reload —
