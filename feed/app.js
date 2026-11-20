@@ -1135,6 +1135,9 @@ function settings() {
     ${typeof CELEB !== 'undefined' && CELEB.can ? `<h2 style="margin-top:18px">Celebrity &amp; reality TV news</h2>
     <p>Stories like the Kardashians, Love Island and Real Housewives, from NZ Herald Entertainment, Now to Love, E! News and Us Weekly. Sport is never included. You can switch this off or back on any time.</p>
     <button class="ich${CELEB.news ? ' on' : ''}" id="celebt" aria-pressed="${CELEB.news ? 'true' : 'false'}">${CELEB.news ? '✓ On in your feed' : 'Off'}</button>` : ''}
+    ${typeof ibWhg !== 'undefined' && ibWhg.showSportSettings() ? `<h2 style="margin-top:18px">Local sport events</h2>
+    <p>One-off matches, games and races around Whangārei. Recurring fixtures and sport news from the rest of the feed stay out. You can switch this off or back on any time.</p>
+    <button class="ich${ibWhg.sportEventsOn() ? ' on' : ''}" id="sportsvt" aria-pressed="${ibWhg.sportEventsOn() ? 'true' : 'false'}">${ibWhg.sportEventsOn() ? '✓ On in your feed' : 'Off'}</button>` : ''}
     <h2 style="margin-top:18px">Time of day</h2>
     <p>Mornings (5–11am) lean to news, what’s on and the election; 11am–7pm is the normal mix; from 7pm it winds down, and 9pm–3am leans hardest to cute animals, calm nature, lofi, cosy cooking, gardening and space, with less hard news and fewer loud trailers. Nothing is hidden, and your votes still count. Uses this phone’s clock.</p>
     <button class="ich${MOOD_OFF ? '' : ' on'}" id="moodt" aria-pressed="${!MOOD_OFF}">${MOOD_OFF ? 'Off: same mix all day' : '✓ On' + (MOODS[moodBand()][0] ? ' · now ' + MOODS[moodBand()][0] : ' · now the normal mix')}</button>
@@ -1175,6 +1178,7 @@ document.addEventListener('click', e => {
   if (t.id === 'st') { settings(); return; }
   if (t.dataset && t.dataset.ts) { setTextSize(t.dataset.ts); const y = $('#sheet').scrollTop; settings(); $('#sheet').scrollTop = y; toast('Text size: ' + t.textContent.replace('✓ ', '')); return; } // 1.8.7
   if (t.id === 'celebt') { if (typeof setCelebNews === 'function') { const y = $('#sheet').scrollTop; setCelebNews(!CELEB.news).then(() => { settings(); $('#sheet').scrollTop = y; }); } return; }
+  if (t.id === 'sportsvt') { if (typeof setSportEvents === 'function') { const y = $('#sheet').scrollTop; setSportEvents(!(typeof ibWhg !== 'undefined' && ibWhg.sportEventsOn())); settings(); $('#sheet').scrollTop = y; } return; }
   if (t.id === 'moodt') { MOOD_OFF = !MOOD_OFF; ls.set('moodOff', MOOD_OFF); const y = $('#sheet').scrollTop; settings(); $('#sheet').scrollTop = y; draw(); toast(MOOD_OFF ? 'Time of day: off' : 'Time of day: on'); return; }
   const ib = t.closest('[data-int]'); if (ib && !ib.closest('#mfdrawer')) { const n = ib.dataset.int; if (INT_OFF[n]) delete INT_OFF[n]; else INT_OFF[n] = 1; ls.set('intOff', INT_OFF); const y = $('#sheet').scrollTop; for (const i of (FEED && FEED.items) || []) delete i._ints; settings(); $('#sheet').scrollTop = y; draw(); toast((INT_OFF[n] ? 'Off: ' : 'On: ') + n); return; }
   const rv = t.closest('[data-revive]'); if (rv) { REVIVE[rv.dataset.revive] = Date.now(); ls.set('revive', REVIVE); settings(); draw(); toast('Brought back'); return; }

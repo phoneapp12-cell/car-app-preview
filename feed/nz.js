@@ -1,7 +1,8 @@
-/* 1.9.108 Keep TV and gardening honest, and sometimes show one current
-   Event Cinemas Whangārei film. The feed data service is not in this repo, so this
-   is a display filter. Films come from the existing relay GET /events `cinema`
-   field (Event Cinemas' public JSON for cinema 503, 18 James Street). */
+/* 1.9.108 Keep TV and gardening honest. Event Cinemas Whangārei films show as one
+   swipeable row when more than one title is on. The feed data service is not in this
+   repo, so this is a display filter. Films and local events come from the existing
+   relay GET /events (cinema 503, 18 James Street). Preview origins fall back to
+   whg-local.json when the relay origin allowlist blocks them. */
 (function (root) {
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const RELAY = 'https://due-dates-calendar-relay.phoneapp12.workers.dev/events';
@@ -158,25 +159,44 @@
       <div class="xbtns"><a class="btn pri" href="${esc(f.sessions)}" target="_blank" rel="noopener">Whangārei sessions ↗</a><a class="btn" href="${esc(f.link)}" target="_blank" rel="noopener">Film page ↗</a></div>
       <p class="plsrc">Event Cinemas · cinema 503 · eventcinemas.co.nz</p></div></article>`;
   }
-  function insertCinema(order, nPins, film, now) {
-    if (!film) return order;
+  function cineish(x) {
+    return x && (x.x === 'cine' || x.x === 'sportask' || (x.x === 'row' && (x.k === 'cine' || x.k === 'whg-ev' || x.k === 'whg-dev')));
+  }
+  function insertCinema(order, nPins, filmOrFilms, now) {
+    const list = !filmOrFilms ? [] : (Array.isArray(filmOrFilms) ? filmOrFilms : [filmOrFilms]);
+    if (!list.length) return order;
     const out = order.slice(), lo = Math.max(nPins | 0, 2);
     const day = Math.floor((now || Date.now()) / 864e5);
     let at = Math.min(out.length, lo + 11 + (day % 3));
-    const busy = i => { const x = out[i]; return x && (x.x === 'play' || x.x === 'zoomq' || x.x === 'fallq' || x.x === 'tetq' || x.x === 'cine'); };
+    const busy = i => { const x = out[i]; return x && (x.x === 'play' || x.x === 'zoomq' || x.x === 'fallq' || x.x === 'tetq' || cineish(x)); };
     let g = 0; while (g++ < 8 && (busy(at) || busy(at - 1) || busy(at + 1))) at = Math.min(out.length, at + 3);
-    out.splice(at, 0, { id: 'cine-' + film.id + '-' + day, x: 'cine', film, topic: 'events', t: fTitle(film) });
+    const items = list.map(film => ({ id: 'cine-' + film.id + '-' + day, x: 'cine', film, topic: 'events', t: fTitle(film) }));
+    const card = items.length === 1 ? items[0] : { id: 'cine-row-' + day, x: 'row', k: 'cine', title: 'At the movies · Event Cinemas Whangārei', items, topic: 'events' };
+    out.splice(at, 0, card);
     return out;
   }
   function fTitle(f) { return f.title; }
-  function cachedFilms(now) {
+  function cachedPack() {
     try {
       const raw = root.localStorage && root.localStorage.getItem(CACHE);
-      if (!raw) return [];
+      if (!raw) return null;
       const pack = JSON.parse(raw);
-      if (!pack || Date.now() - pack.at > 6 * 3600e3) return [];
-      return currentFilms(pack, now);
-    } catch (e) { return []; }
+      if (!pack || Date.now() - pack.at > 6 * 3600e3) return null;
+      return pack;
+    } catch (e) { return null; }
+  }
+  function cachedFilms(now) {
+    const pack = cachedPack();
+    return pack ? currentFilms(pack, now) : [];
+  }
+  function cachedEvents() {
+    const pack = cachedPack();
+    return pack && Array.isArray(pack.events) ? pack.events : [];
+  }
+  function fallbackUrl() {
+    const src = (root.document && root.document.currentScript && root.document.currentScript.src) || '';
+    const v = /[?&]v=([^&]+)/.exec(src);
+    return 'whg-local.json' + (v ? '?v=' + v[1] : '');
   }
   function videoFate(i) {
   if (!i) return 'photo';
@@ -203,6 +223,11 @@ function presentVideos(order) {
         if (fate === 'drop') continue;
         (fate === 'full' || it.vid || it.x === 'vlog' ? vids : keep).push(it);
       }
+      if (i.k === 'cine' || i.k === 'whg-ev' || i.k === 'whg-dev') {
+        if (keep.length) out.push(Object.assign({}, i, { items: keep }));
+        vids.forEach(v => out.push(v));
+        continue;
+      }
       if (i.k !== 'vid' && i.k !== 'vlog' && keep.length >= 3) out.push(Object.assign({}, i, { items: keep }));
       vids.forEach(v => out.push(v));
       continue;
@@ -213,7 +238,7 @@ function presentVideos(order) {
   return out;
 }
 function keptItems(list) { return (list || []).filter(i => !drop(i)); }
-  root.ibNz = { neon, blockedService, usNetworkPromo, tetrisCard, streamingCard, nzVerified, tvDrop, watchDrop, gardenDrop, drop, aired, keptItems, wrongSeason, currentFilms, pickFilm, insertCinema, cineCard, nzStamp, videoFate, presentVideos, CACHE, RELAY };
+  root.ibNz = { neon, blockedService, usNetworkPromo, tetrisCard, streamingCard, nzVerified, tvDrop, watchDrop, gardenDrop, drop, aired, keptItems, wrongSeason, currentFilms, pickFilm, insertCinema, cineCard, cineish, nzStamp, videoFate, presentVideos, cachedPack, cachedFilms, cachedEvents, CACHE, RELAY };
   if (!root.document) return;
   const prevVisible = root.visible;
   if (typeof prevVisible === 'function') root.visible = function () { return prevVisible().filter(i => !drop(i) && videoFate(i) !== 'drop'); };
@@ -232,17 +257,39 @@ function keptItems(list) { return (list || []).filter(i => !drop(i)); }
     order = prevFest ? prevFest(order, nPins) : (order || []);
     order = order.filter(i => !drop(i));
     const films = cachedFilms(Date.now());
-    const seed = (typeof root.ibPlay === 'object' && root.ibPlay.hash) ? root.ibPlay.hash(String(Math.floor(Date.now() / 864e5))) : 1;
-    return insertCinema(order, nPins, pickFilm(films, seed), Date.now());
+    return insertCinema(order, nPins, films, Date.now());
   };
+  let drewCine = false;
+  function savePack(j, had) {
+    const c = j && j.cinema;
+    const events = (j && Array.isArray(j.events)) ? j.events : [];
+    const movies = (c && Array.isArray(c.movies)) ? c.movies : [];
+    if (!c && !events.length) return;
+    try {
+      root.localStorage.setItem(CACHE, JSON.stringify({
+        at: Date.now(),
+        name: (c && c.name) || '',
+        address: (c && c.address) || '',
+        movies,
+        events
+      }));
+    } catch (e) {}
+    // First visit has no cache yet, so festive ran empty. Paint once after the pack lands.
+    // Later refreshes stay quiet so a card never jumps while someone is reading.
+    if (!had && !drewCine && typeof root.draw === 'function') {
+      drewCine = true;
+      try { root.draw(); } catch (e) { drewCine = false; }
+    }
+  }
   function refresh() {
+    const had = !!cachedPack();
     const ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
     const timer = ac ? setTimeout(() => ac.abort(), 20000) : 0;
     fetch(RELAY, { headers: { Accept: 'application/json' }, signal: ac ? ac.signal : undefined }).then(r => { if (!r.ok) throw new Error('events ' + r.status); return r.json(); }).then(j => {
-      const c = j && j.cinema; if (!c || !Array.isArray(c.movies)) return;
-      root.localStorage.setItem(CACHE, JSON.stringify({ at: Date.now(), name: c.name, address: c.address, movies: c.movies }));
-      // Do not redraw. The next refresh or reopen uses the saved list, so a card never jumps while someone is reading.
-    }).catch(() => {}).finally(() => clearTimeout(timer));
+      savePack(j, had);
+    }).catch(() => {
+      fetch(fallbackUrl(), { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error('fallback ' + r.status); return r.json(); }).then(j => savePack(j, had)).catch(() => {});
+    }).finally(() => clearTimeout(timer));
   }
   setTimeout(refresh, 400);
 })(typeof window !== 'undefined' ? window : globalThis);
