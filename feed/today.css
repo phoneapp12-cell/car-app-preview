@@ -1,0 +1,154 @@
+/* Info Book 1.9.286 — Today magazine look (light default), plus tab bar, side menu and double-tap heart.
+   Builds on existing theme variables so dark, auto, ocean, spring and candy still work. */
+@font-face{font-family:Fraunces;src:url("fonts/Fraunces.ttf") format("truetype");font-weight:100 900;font-style:normal;font-display:swap}
+@font-face{font-family:Fraunces;src:url("fonts/Fraunces-Italic.ttf") format("truetype");font-weight:100 900;font-style:italic;font-display:swap}
+@font-face{font-family:"IBM Plex Sans";src:url("fonts/IBMPlexSans.ttf") format("truetype");font-weight:100 700;font-style:normal;font-display:swap}
+
+html.today-look{--paper:#F4F1EB;--rule:#DAD3C8;--press:#8B2E2E;--sage:#3F6E55;--sky:#7EB4D6;--tab-h:74px;--today-serif:Fraunces,Georgia,"Times New Roman",serif;--today-sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
+html.today-look,html.today-look body{font-family:var(--today-sans)}
+html.today-look.force-light,html.today-look:not(.force-dark):not(.th-ocean){
+  --bg:#F4F1EB;--card:#FFFcf7;--ink:#1B1916;--mute:#6B655C;--line:#DAD3C8;--chip:#EFE8DC;
+  --shadow:0 8px 24px rgba(40,30,16,.07)
+}
+html.today-look.force-light body,html.today-look:not(.force-dark):not(.th-ocean) body{
+  background:linear-gradient(180deg,#C9E4F6 0%,#E8F1F6 140px,var(--paper) 320px)
+}
+html.today-look.force-dark{
+  --paper:#16141B;--rule:#2C2A33;--press:#E8B4B4;--sage:#8FBF9A;--sky:#7EB4D6;
+  --bg:#16141B;--card:#1E1C24;--ink:#F3F0EA;--mute:#A8A199;--line:#2C2A33;--chip:#2A2830;
+  --shadow:0 8px 24px rgba(0,0,0,.35)
+}
+html.today-look.force-dark body{background:linear-gradient(180deg,#1A2430 0%,#16141B 280px)}
+html.today-look.th-ocean body{background:linear-gradient(180deg,#06344c 0%,#04202f 280px)}
+html.today-look.th-spring{--paper:#f2fbe9;--rule:#d6ecc4;--press:#8B2E2E;--sage:#3F6E55}
+html.today-look.th-spring body{background:linear-gradient(180deg,#e5f6d6 0%,#f2fbe9 280px)}
+
+/* Header */
+html.today-look header.top{background:color-mix(in srgb,var(--bg) 82%,transparent);border-bottom:1px solid color-mix(in srgb,var(--line) 70%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+html.today-look.force-light header.top,html.today-look:not(.force-dark):not(.th-ocean) header.top{background:linear-gradient(180deg,rgba(201,228,246,.9),rgba(244,241,235,.82))}
+html.today-look.th-candy header.top{/* candy theme keeps its tint, calmer than the rainbow bar */}
+html.today-look .logo .ttl,html.today-look .logo span.ttl{font-family:var(--today-serif);font-weight:700;font-size:1.28rem;letter-spacing:-.03em;background:none;-webkit-background-clip:unset;background-clip:unset;color:var(--ink)}
+html.today-look .logo .ttl{font-style:normal}
+html.today-look .logo .greet{display:none}
+html.today-look .stchip{display:none!important}
+html.today-look .mood{display:none}
+html.today-look .ib,html.today-look #mfbtn,html.today-look #rf,html.today-look #st{
+  width:36px;height:36px;border-radius:50%;background:color-mix(in srgb,var(--card) 80%,#fff);border:1px solid color-mix(in srgb,var(--line) 80%,transparent);
+  box-shadow:0 2px 8px rgba(40,30,16,.06);font-size:1.05rem}
+html.today-look.force-dark .ib,html.today-look.force-dark #mfbtn{background:var(--chip);box-shadow:none}
+html.today-look #mfbtn{order:-1}
+html.today-look .logo img{border-radius:10px}
+
+/* Hide stories on the magazine Today feed; back-to-feed pill stays when needed */
+html.today-look.ib-tab-all #stories-host,
+html.today-look.ib-tab-people #stories-host,
+html.today-look.ib-tab-games #stories-host,
+html.today-look.ib-tab-you #stories-host{display:none}
+
+/* Hero */
+.today-hero{margin:8px 12px 14px;background:linear-gradient(165deg,color-mix(in srgb,var(--card) 92%,#fff) 0%,color-mix(in srgb,var(--sky) 14%,var(--card)) 60%,color-mix(in srgb,var(--paper) 80%,var(--card)) 100%);
+  border:1px solid color-mix(in srgb,var(--line) 80%,transparent);border-radius:8px 8px 24px 24px;padding:18px 18px 16px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.today-hero::before{content:"";position:absolute;inset:0 auto auto 0;width:100%;height:3px;background:linear-gradient(90deg,var(--sky),#C9A227 55%,var(--press))}
+.today-hero .kicker{font-size:.68rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--sage);margin:0 0 6px}
+.today-hero h1{font-family:var(--today-serif);font-weight:600;font-size:2.05rem;letter-spacing:-.03em;line-height:.95;margin:0;color:var(--ink)}
+.today-hero h1 small{display:block;font-size:1.02rem;font-style:italic;font-weight:500;color:var(--mute);letter-spacing:0;margin-top:4px}
+.today-wx{display:flex;align-items:flex-end;gap:12px;margin:16px 0 14px}
+.today-wx .deg{font-family:var(--today-serif);font-size:3.2rem;font-weight:600;line-height:.8;letter-spacing:-.04em}
+.today-wx .wxmeta b{display:block;font-size:.92rem}
+.today-wx .wxmeta small{color:var(--mute);font-size:.78rem}
+.today-bits{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.today-bit{background:color-mix(in srgb,var(--card) 80%,transparent);border:1px solid var(--line);border-radius:14px;padding:9px 8px 8px;text-align:left;color:inherit;font:inherit;cursor:pointer;min-height:64px}
+.today-bit em{display:block;font-style:normal;font-size:1.05rem;margin-bottom:2px}
+.today-bit b{display:block;font-size:.72rem;letter-spacing:-.01em;font-weight:700}
+.today-bit small{display:block;color:var(--mute);font-size:.65rem;margin-top:1px}
+.today-sec{display:flex;align-items:baseline;justify-content:space-between;padding:2px 16px 8px}
+.today-sec h2{font-size:.68rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;margin:0;color:var(--mute)}
+.today-sec button,.today-sec .today-write{font-size:.78rem;color:var(--sage);font-weight:600;background:none;border:0;padding:4px 0}
+.today-composer{margin:0 12px 12px;display:flex;gap:8px}
+.today-composer button{flex:1;min-height:44px;border-radius:14px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:600 .82rem var(--today-sans);box-shadow:var(--shadow)}
+
+/* Editorial cards: turn off full-screen snap so the magazine feed can scroll */
+html.today-look #feed{gap:14px;padding-bottom:calc(var(--tab-h) + 16px + env(safe-area-inset-bottom,0px))}
+html.today-look #feed > .card{min-height:0!important;border-radius:4px 4px 18px 18px!important;border:1px solid var(--line)!important;box-shadow:var(--shadow)!important;background:var(--card)}
+html.today-look #feed > .card{border-top:3px solid color-mix(in srgb,var(--press) 35%,var(--line))!important}
+html.today-look.candy #feed > .card,html.today-look #feed > .card{/* drop candy rainbow top bars */}
+html.today-look #feed > .hrow,html.today-look #feed > section{min-height:0!important}
+html.today-look{scroll-snap-type:none}
+html.today-look #feed > .card .tp{position:absolute;left:14px;top:10px;max-width:none;background:none;padding:0;font-size:.62rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--press);border-radius:0;line-height:1.2;-webkit-line-clamp:1}
+html.today-look #feed > .card{position:relative}
+html.today-look #feed > .card .hd{padding:28px 14px 8px;align-items:center}
+html.today-look #feed > .card .av{display:none}
+html.today-look #feed > .card .who b{font-size:.8rem;font-weight:600}
+html.today-look #feed > .card .who small{font-size:.75rem}
+html.today-look #feed > .card .bd h3,html.today-look #feed > .card.words .wdbody,html.today-look #feed > .card .shby + .wdbody{
+  font-family:var(--today-serif);font-weight:600;letter-spacing:-.02em;line-height:1.25}
+html.today-look #feed > .card .bd h3{font-size:1.22rem;padding:0;margin:0 0 4px}
+html.today-look #feed > .card.words .wdbody{font-size:1.2rem;font-weight:600;padding:4px 16px 12px}
+html.today-look #feed > .card .media:not(.vid) img,html.today-look #feed > .card .pimg img,html.today-look #feed > .card .bdpic img,html.today-look #feed > .card .fph.n1 img{
+  aspect-ratio:16/10!important;max-height:min(52vh,360px)!important;min-height:0!important;height:auto!important}
+html.today-look #feed > .card .shby{padding:28px 14px 6px;font-size:.8rem;color:var(--mute)}
+html.today-look #feed > .upbs{display:none} /* replaced by today-composer on Today; People/Games have their own actions */
+html.today-look.ib-tab-family #feed > .upbs{display:flex}
+html.today-look .load.note,html.today-look #feed > .load{font-size:.8rem;padding:4px 16px 10px}
+
+/* Tab bar */
+.ib-tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;height:calc(var(--tab-h) + env(safe-area-inset-bottom,0px));
+  padding:8px 8px calc(10px + env(safe-area-inset-bottom,0px));display:flex;justify-content:space-around;align-items:flex-start;
+  background:color-mix(in srgb,var(--paper) 92%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border-top:1px solid var(--line)}
+.ib-tabs a,.ib-tabs button{flex:1;text-align:center;text-decoration:none;color:var(--mute);font-size:.62rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:none;border:0;padding:0;min-height:44px;font-family:var(--today-sans)}
+.ib-tabs .ic{display:block;font-size:1.2rem;line-height:1.2;margin-bottom:1px;font-weight:400;text-transform:none;letter-spacing:0}
+.ib-tabs .on{color:var(--ink)}
+
+/* People / Games / You pages */
+.today-page{padding:8px 16px calc(var(--tab-h) + 24px)}
+.today-page h1{font-family:var(--today-serif);font-weight:600;font-size:1.9rem;letter-spacing:-.03em;margin:8px 0 4px}
+.today-page .lede{color:var(--mute);margin:0 0 16px;font-size:.9rem}
+.today-drow{display:flex;gap:14px;padding:12px 0;border-top:1px solid var(--line);align-items:center}
+.today-drow .av{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;font-weight:700;color:#fff;flex:none;font-family:var(--today-serif);font-size:.95rem}
+.today-drow .who{flex:1;min-width:0}
+.today-drow .who b{display:block;font-size:1rem}
+.today-drow .who small{color:var(--mute);font-size:.78rem}
+.today-drow .when{font-size:.72rem;color:var(--mute);text-align:right;font-weight:600}
+.today-badge{display:inline-block;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--line);padding:2px 6px;border-radius:999px;margin-top:3px}
+.today-games{display:flex;flex-direction:column;gap:10px;margin:8px 0 16px}
+.today-game{display:block;width:100%;border:0;border-radius:18px;padding:16px 16px;color:#fff;text-align:left;font:700 1.05rem var(--today-sans);min-height:72px;box-shadow:0 6px 0 rgba(0,0,0,.08);cursor:pointer}
+.today-game small{display:block;font-weight:600;opacity:.92;margin-top:3px;font-size:.8rem}
+.today-game.sr{background:linear-gradient(135deg,#ff7eb6,#ffa24c)}
+.today-game.sc{background:linear-gradient(135deg,#6cc7ff,#b18cff)}
+.today-game.te{background:linear-gradient(135deg,#5fe0b6,#3ccf9a);color:#083326}
+.today-appear{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0 16px}
+.today-appear button{min-height:48px;border-radius:14px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:600 .88rem var(--today-sans);text-align:left;padding:10px 12px}
+.today-appear button.on{border-color:var(--sage);box-shadow:inset 0 0 0 2px var(--sage)}
+
+/* Magazine side menu */
+html.today-look .mfdrawer .mfpanel{background:var(--paper);color:var(--ink);max-width:min(380px,92vw)}
+html.today-look .mfhd{align-items:center;padding:16px 16px 8px;border-bottom:1px solid var(--line)}
+html.today-look .mfhd b{font-family:var(--today-serif);font-size:1.35rem;font-weight:600}
+html.today-look .mfsec{font-size:.68rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);margin:16px 16px 8px}
+html.today-look .mfopt{min-height:52px;border-radius:14px;margin:0 10px 6px;width:calc(100% - 20px);border:1px solid transparent;background:var(--card);font-weight:600}
+html.today-look .mfopt.on{border-color:var(--sage);background:color-mix(in srgb,var(--sage) 10%,var(--card))}
+html.today-look .mfnote{padding:8px 16px 24px}
+html.today-look .mf-games{display:flex;flex-direction:column;gap:8px;padding:4px 12px 8px}
+html.today-look .mf-games .today-game{min-height:64px;font-size:1rem;box-shadow:0 4px 0 rgba(0,0,0,.08)}
+
+html.today-look .mf-cal{padding:4px 12px 12px}
+html.today-look .today-cal{display:block;width:100%;border:0;border-radius:18px;padding:14px 14px 10px;text-align:left;cursor:pointer;
+  background:linear-gradient(180deg,#f7f3ea,#efe6d4);color:var(--ink);box-shadow:0 4px 0 rgba(90,60,20,.10);min-height:72px}
+html.today-look.force-dark .today-cal,html.today-look.th-ocean .today-cal{background:linear-gradient(180deg,#2a3340,#1e2530);color:var(--ink);box-shadow:0 4px 0 rgba(0,0,0,.25)}
+html.today-look.th-spring .today-cal{background:linear-gradient(180deg,#eef8e6,#e0f0d0)}
+html.today-look .today-cal-hd{display:flex;align-items:center;gap:8px;font-family:var(--today-serif);font-size:1.2rem;font-weight:700;letter-spacing:-.02em;margin-bottom:4px}
+html.today-look .today-cal-hd .mfe{font-size:1.15rem;font-style:normal}
+html.today-look .today-cal-row{display:flex;align-items:flex-start;gap:8px;padding:8px 0 2px;border-top:1px solid color-mix(in srgb,var(--rule) 80%,transparent);margin-top:6px}
+html.today-look .today-cal-row em{font-style:normal;font-size:1.05rem;line-height:1.3}
+html.today-look .today-cal-row span{display:flex;flex-direction:column;min-width:0}
+html.today-look .today-cal-row b{font-size:.95rem;font-weight:700;line-height:1.25}
+html.today-look .today-cal-row small{font-size:.78rem;font-weight:600;color:var(--mute);margin-top:1px}
+html.today-look .today-cal-empty{display:block;margin:6px 0 2px;font-size:.86rem;font-weight:600;color:var(--mute)}
+
+/* Double-tap heart */
+.ib-heart{position:fixed;z-index:80;width:86px;height:86px;margin:-43px 0 0 -43px;pointer-events:none;transform:scale(.35);opacity:0;
+  animation:ibHeart .7s ease-out forwards;filter:drop-shadow(0 8px 16px rgba(139,46,46,.35));font-size:80px;line-height:86px;text-align:center}
+@keyframes ibHeart{0%{transform:scale(.2);opacity:0}18%{transform:scale(1.15);opacity:1}45%{transform:scale(.95);opacity:1}100%{transform:scale(1.25) translateY(-18px);opacity:0}}
+.ib-heart.hold{animation:none;opacity:1;transform:scale(1.12)}
+@media (prefers-reduced-motion:reduce){.ib-heart{animation-duration:.01s;opacity:1}}

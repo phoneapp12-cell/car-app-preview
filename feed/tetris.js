@@ -9736,6 +9736,12 @@
     }
     return on;
   }
+  function isPwaShell() {
+    try {
+      const mm = q => !!(root.matchMedia && root.matchMedia(q).matches);
+      return mm('(display-mode: standalone)') || mm('(display-mode: fullscreen)') || root.navigator.standalone === true;
+    } catch (e) { return false; }
+  }
   function setFull(on, from) {
     const html = doc.documentElement, body = doc.body;
     on = !!on;
@@ -9749,10 +9755,10 @@
     } else if (on) {
       const can = html.requestFullscreen || html.webkitRequestFullscreen;
       const inFs = !!(doc.fullscreenElement || doc.webkitFullscreenElement);
-      if (can && !inFs && from !== 'boot' && from !== 'show') {
+      if (can && !inFs && from !== 'boot' && from !== 'show' && !isPwaShell()) {
         const p = can.call(html);
         if (p && p.catch) p.catch(() => { html.classList.add('fs-overlay'); });
-      } else if (!can || from === 'boot' || from === 'show') html.classList.add('fs-overlay');
+      } else if (!can || from === 'boot' || from === 'show' || isPwaShell()) html.classList.add('fs-overlay');
     } else {
       html.classList.remove('fs-overlay', 'fs-from-parent');
       if (doc.fullscreenElement || doc.webkitFullscreenElement) {

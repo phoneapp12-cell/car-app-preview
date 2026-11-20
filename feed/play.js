@@ -234,7 +234,14 @@
     root.document.addEventListener('fullscreenchange', () => { if (!root.document.fullscreenElement && artWin) { artWin.classList.remove('artfull'); tellFrame(false); } });
     root.document.addEventListener('webkitfullscreenchange', () => { if (!root.document.webkitFullscreenElement && artWin) { artWin.classList.remove('artfull'); tellFrame(false); } });
   }
-  // Full screen: real browser full screen where allowed (Android), otherwise the window just fills the screen without its bar (iPhone).
+  // Full screen: real browser full screen where allowed (Android tab), otherwise the window just fills the screen without its bar (iPhone / installed PWA).
+  // An installed PWA is already full screen, so requestFullscreen is skipped — Chrome would otherwise toast “drag from the top to exit full screen”.
+  function isPwaShell() {
+    try {
+      const mm = q => !!(root.matchMedia && root.matchMedia(q).matches);
+      return mm('(display-mode: standalone)') || mm('(display-mode: fullscreen)') || root.navigator.standalone === true;
+    } catch (e) { return false; }
+  }
   function tellFrame(on) {
     if (!artFrame || !artFrame.contentWindow) return;
     try { artFrame.contentWindow.postMessage({ type: 'ib-artfull', on: !!on }, '*'); } catch (e) { }
@@ -244,8 +251,10 @@
     const d = root.document;
     artWin.classList.toggle('artfull', !!on);
     try {
-      if (on) { const req = artWin.requestFullscreen || artWin.webkitRequestFullscreen; if (req) { const p = req.call(artWin); if (p && p.catch) p.catch(() => { }); } }
-      else if (d.fullscreenElement || d.webkitFullscreenElement) { const ex = d.exitFullscreen || d.webkitExitFullscreen; if (ex) { const p = ex.call(d); if (p && p.catch) p.catch(() => { }); } }
+      if (!isPwaShell()) {
+        if (on) { const req = artWin.requestFullscreen || artWin.webkitRequestFullscreen; if (req) { const p = req.call(artWin); if (p && p.catch) p.catch(() => { }); } }
+        else if (d.fullscreenElement || d.webkitFullscreenElement) { const ex = d.exitFullscreen || d.webkitExitFullscreen; if (ex) { const p = ex.call(d); if (p && p.catch) p.catch(() => { }); } }
+      }
     } catch (e) { }
     tellFrame(on);
     if (artKind === 'tetris') persistArt();
