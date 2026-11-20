@@ -1024,9 +1024,24 @@
   function westPacXY(lat, lon) { return { x: 60 + (lon - 156) * 280 / 24, y: 1580 + (-lat - 8) * 88 / 15 }; }
   function pacXY(lat, lon) { return { x: 70 + 16.86 * (((lon % 360) + 360) % 360 - 184.8), y: 1350 + 21.6 * (-lat - 13.83) }; }
   function ausXY(lat, lon) { return { x: 8.533 * lon - 937.8, y: 1808 + 10.97 * (-lat - 10.707) }; }
-  // 1.9.249 The map grows farther west for Iran and north for the Silk Road route, on the same geographic scale.
-  const MAP_X0 = -580, MAP_W = 640, MAP_H = 2240, MAP_VW = MAP_W - MAP_X0;
+  // 1.9.283 One world projection. Everything is drawn on the ausXY scale, so New Zealand is its true size next to
+  // Australia, and the Pacific islands sit in their real places. New Zealand art drawn on nzXY is re-projected exactly.
+  function nzToWorld(x, y) {
+    const a = (x - NZ_PROJ.ox) / NZ_PROJ.sx, b = (y - NZ_PROJ.oy) / NZ_PROJ.sy, c = Math.cos(NZ_PROJ.rot), s = Math.sin(NZ_PROJ.rot);
+    const u = a * c + b * s, v = -a * s + b * c;
+    return ausXY(-v - 40.5, u / NZ_PROJ.cos + 173.5);
+  }
+  function mapPairs(d, f) {
+    return d.replace(/(-?\d+(?:\.\d+)?)[ ,]+(-?\d+(?:\.\d+)?)/g, function (m, x, y) { const q = f(+x, +y); return q.x.toFixed(1) + ' ' + q.y.toFixed(1); });
+  }
+  function nzWorldPath(d) { return mapPairs(d, nzToWorld); }
+  // The Whangārei close-up keeps its 30x picture, now as a small panel in the Tasman Sea west of Northland.
+  const NZ_INSET_BOX = { x0: 4, y0: 334, wx: 484, wy: 2049, k: 46 / 256 };
+  function insetWorld(x, y) { return { x: NZ_INSET_BOX.wx + (x - NZ_INSET_BOX.x0) * NZ_INSET_BOX.k, y: NZ_INSET_BOX.wy + (y - NZ_INSET_BOX.y0) * NZ_INSET_BOX.k }; }
+  function worldXY(lat, lon) { return ausXY(lat, ((lon % 360) + 360) % 360); }
+  const MAP_X0 = -600, MAP_W = 820, MAP_Y0 = 1040, MAP_H = 2250, MAP_VW = MAP_W - MAP_X0, MAP_VH = MAP_H - MAP_Y0;
   function mapXPct(x) { return ((x - MAP_X0) / MAP_VW * 100) + '%'; }
+  function mapYPct(y) { return ((y - MAP_Y0) / MAP_VH * 100) + '%'; }
   const MAP_STOPS = [
     { n: 1, x: 148, y: 432, place: "Onerahi", kind: 'town', label: 'left', lat: -35.77, lon: 174.37, inset: 'whangarei' },
     { n: 2, x: 204, y: 432, place: "Sarah's House", kind: 'house', label: 'below', lat: -35.762, lon: 174.385, inset: 'whangarei', nudged: true },
@@ -1127,6 +1142,39 @@
     ['Palau', 'Federated States of Micronesia', 'Marshall Islands', 'Nauru', 'Kiribati']
   );
   function countryForLevel(n) { return MAP_COUNTRIES[(n | 0) - 1] || ''; }
+  // 1.9.283 Every stop at its real place on the one world projection (the three Whangārei close-up stops stay
+  // in their panel). Cities closer than a pin's width are eased apart inside their own country only.
+  function placeWorldStops(stops) {
+    stops.forEach(function (s, i) {
+      // NZ road waypoints were drawn for the old blown-up NZ panel; on the true-scale map the road goes direct.
+      if (s.via && MAP_COUNTRIES[i] === 'New Zealand') delete s.via;
+      if (s.inset === 'whangarei') { const q = insetWorld(s.x, s.y); s.x = +q.x.toFixed(1); s.y = +q.y.toFixed(1); return; }
+      if (s.lat == null || s.lon == null) return;
+      const q = worldXY(s.lat, s.lon);
+      s.x = +q.x.toFixed(1); s.y = +q.y.toFixed(1);
+    });
+    const groups = {};
+    stops.forEach(function (s, i) { if (s.inset) return; const c = MAP_COUNTRIES[i] || s.place; (groups[c] = groups[c] || []).push(s); });
+    Object.keys(groups).forEach(function (c) {
+      const g = groups[c];
+      if (g.length < 2) return;
+      const xs = g.map(function (s) { return s.x; }), ys = g.map(function (s) { return s.y; });
+      const extent = Math.max(Math.max.apply(null, xs) - Math.min.apply(null, xs), Math.max.apply(null, ys) - Math.min.apply(null, ys));
+      const min = Math.max(6, extent * 0.045);
+      for (let it = 0; it < 80; it++) {
+        for (let i = 0; i < g.length; i++) for (let j = i + 1; j < g.length; j++) {
+          let dx = g[j].x - g[i].x, dy = g[j].y - g[i].y, d = Math.hypot(dx, dy);
+          if (d >= min) continue;
+          if (d < 0.01) { dx = 1; dy = 0.5; d = Math.hypot(dx, dy); }
+          const push = (min - d) / 2 * 0.5;
+          g[i].x -= dx / d * push; g[i].y -= dy / d * push; g[j].x += dx / d * push; g[j].y += dy / d * push;
+        }
+      }
+      g.forEach(function (s) { s.x = +s.x.toFixed(1); s.y = +s.y.toFixed(1); });
+    });
+    return stops;
+  }
+  placeWorldStops(MAP_STOPS);
   const POSTCARD_COUNT = 4;
   // Keep the separate Postcard Hunt's original 65-level country roster stable as the campaign grows.
   const POSTCARD_COUNTRIES = [...new Set(MAP_COUNTRIES.slice(0, 65))];
@@ -1162,6 +1210,7 @@
     { place: 'Darwin', x: 179, y: 1827, label: 'left', lat: -12.46, lon: 130.84 },
     { place: 'Cairns', x: 306, y: 1876, label: 'left', lat: -16.92, lon: 145.77 }
   ];
+  FUTURE_STOPS.forEach(function (s) { if (s.lat != null) { const q = worldXY(s.lat, s.lon); s.x = +q.x.toFixed(1); s.y = +q.y.toFixed(1); } });
   const LV_COUNT = LEVELS.length;
   function stopForLevel(n) { return MAP_STOPS[(n | 0) - 1] || null; }
   function icingPath(pts) {
@@ -1331,6 +1380,10 @@
   function mapTerrain() {
     const hills = [[311, 158, .72], [106, 1000, .62], [177, 1948, 1.05], [224, 1916, .74], [-270, 1238, .72], [-132, 1520, .58], [288, 1240, .62]];
     const groves = [[326, 210, .55], [318, 251, .48], [93, 980, .55], [194, 1927, .68], [148, 1980, .62], [252, 1867, .5], [-148, 1548, .52], [281, 1460, .48]];
+    // 1.9.283 entries above y 1150 were drawn on the old New Zealand scale; move them onto the world map.
+    const toWorld = function (p) { if (p[1] >= 1150) return p; const q = nzToWorld(p[0], p[1]); return [+q.x.toFixed(1), +q.y.toFixed(1), +(p[2] * 0.18).toFixed(3)]; };
+    hills.forEach(function (p, i) { hills[i] = toWorld(p); });
+    groves.forEach(function (p, i) { groves[i] = toWorld(p); });
     const hillSvg = hills.map(function (p, i) {
       const fill = ['#9ed9a7', '#b7e5a7', '#a9dfb2'][i % 3];
       return '<g transform="translate(' + p[0] + ' ' + p[1] + ') scale(' + p[2] + ')" opacity=".72"><path d="M-34 12 C-28 -1 -19 -9 -9 -6 C-1 -22 12 -20 19 -6 C29 -12 38 -3 40 12 Z" fill="' + fill + '" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/><path d="M-20 5 Q-8 -2 3 5 T27 5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity=".8"/></g>';
@@ -1342,11 +1395,15 @@
   }
   function mapLandmarks() {
     const image = function (id, file, x, y, w, h, kind, opacity) {
+      if (y < 1150) { const c = nzToWorld(x + w / 2, y + h / 2); w = +(w * 0.18).toFixed(1); h = +(h * 0.18).toFixed(1); x = +(c.x - w / 2).toFixed(1); y = +(c.y - h / 2).toFixed(1); }
+      else if (kind === 'volcano') { const cx = x + w / 2, cy = y + h / 2; w = +(w * 0.36).toFixed(1); h = +(h * 0.36).toFixed(1); x = +(cx - w / 2).toFixed(1); y = +(cy - h / 2).toFixed(1); } // true-scale volcanoes
       return '<g id="' + id + '" class="sr-landmark sr-' + kind + '" pointer-events="none" opacity="' + (opacity == null ? 1 : opacity) + '"><image href="img/sugar-rush/landmarks/' + file + '.webp" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" preserveAspectRatio="xMidYMid meet"/></g>';
     };
     const plaque = function (id, x, y, text) {
       const w = Math.max(42, text.length * 5.2 + 12);
-      return '<g id="' + id + '" class="sr-landmark-label" transform="translate(' + x + ' ' + y + ')" pointer-events="none"><rect x="' + (-w / 2) + '" y="-8" width="' + w + '" height="16" rx="8" fill="#fff8e9" fill-opacity=".94" stroke="#fff" stroke-width="1.8" filter="url(#sr-soft)"/><text x="0" y="3" text-anchor="middle" font-size="8" font-weight="900" letter-spacing=".65" fill="#326f7e" font-family="ui-rounded,system-ui,sans-serif">' + text + '</text></g>';
+      let k = 1;
+      if (y < 1150) { const c = nzToWorld(x, y); x = +c.x.toFixed(1); y = +c.y.toFixed(1); k = 0.22; }
+      return '<g id="' + id + '" class="sr-landmark-label" transform="translate(' + x + ' ' + y + ') scale(' + k + ')" pointer-events="none"><rect x="' + (-w / 2) + '" y="-8" width="' + w + '" height="16" rx="8" fill="#fff8e9" fill-opacity=".94" stroke="#fff" stroke-width="1.8" filter="url(#sr-soft)"/><text x="0" y="3" text-anchor="middle" font-size="8" font-weight="900" letter-spacing=".65" fill="#326f7e" font-family="ui-rounded,system-ui,sans-serif">' + text + '</text></g>';
     };
     return '<g class="sr-landmarks" aria-hidden="true" pointer-events="none">' +
       image('landmark-lake-taupo', 'lake', 257, 310, 80, 40, 'lake') +
@@ -1363,6 +1420,34 @@
       plaque('landmark-label-tongariro', 256, 414, 'TONGARIRO') +
       '</g>';
   }
+  function nzLand(sw, d) {
+    return '<path fill="url(#sr-land)" stroke="#fff" stroke-width="' + sw + '" stroke-linejoin="round" d="' + nzWorldPath(d) + '"/>';
+  }
+  // 1.9.283 Whangārei close-up panel on the world map, with a leader line to where Whangārei really is.
+  function insetSvg() {
+    const w = worldXY(WHANGAREI_INSET.lat, WHANGAREI_INSET.lon), a = insetWorld(4, 334), b = insetWorld(260, 522), t = insetWorld(18, 512);
+    return '<g class="sr-inset">' +
+      '<path d="M ' + w.x.toFixed(1) + ' ' + w.y.toFixed(1) + ' L ' + b.x.toFixed(1) + ' ' + ((a.y + b.y) / 2).toFixed(1) + '" stroke="#fff" stroke-width=".5" stroke-dasharray="1 1" stroke-linecap="round"/>' +
+      '<circle cx="' + w.x.toFixed(1) + '" cy="' + w.y.toFixed(1) + '" r="1.2" fill="none" stroke="#ff4f93" stroke-width=".5"/>' +
+      '<rect x="' + a.x.toFixed(1) + '" y="' + a.y.toFixed(1) + '" width="' + (b.x - a.x).toFixed(1) + '" height="' + (b.y - a.y).toFixed(1) + '" rx="4" fill="#d8f4ff" stroke="#fff" stroke-width=".8"/>' +
+      '<path d="' + mapPairs('M 24 336 L 240 336 L 258 406 C 128 418 88 442 130 472 C 64 488 24 462 6 472 Z', insetWorld) + '" fill="url(#sr-land)" opacity=".9"/>' +
+      '<text x="' + t.x.toFixed(1) + '" y="' + t.y.toFixed(1) + '" text-anchor="start" font-size="2.1" font-weight="900" fill="#2a6a88" font-family="ui-rounded,system-ui,sans-serif">Whangārei close-up</text>' +
+      '</g>';
+  }
+  // 1.9.283 Samoa, Tonga and Rarotonga in their real places (no inset panel). Small islands get a minimum visible
+  // size of about 2 map units (roughly 20 km) and are never drawn bigger than that.
+  const PACIFIC_ISLES = [
+    ['Savaiʻi', -13.62, -172.45, 3.6, 2.3, -10], ['Upolu', -13.92, -171.75, 3.4, 1.5, -12],
+    ['Tongatapu', -21.17, -175.2, 3, 1.9, 0], ['Haʻapai', -19.8, -174.35, 1.2, 1.2, 0], ['Vavaʻu', -18.65, -174.0, 1.5, 1.3, 0],
+    ['Rarotonga', -21.23, -159.78, 2.6, 2.6, 0]
+  ];
+  function pacificSvg() {
+    return '<g class="sr-pacific">' + PACIFIC_ISLES.map(function (q) {
+      const a = worldXY(q[1], q[2]), x = a.x.toFixed(1), y = a.y.toFixed(1);
+      const reef = q[0] === 'Rarotonga' ? '<circle cx="' + x + '" cy="' + y + '" r="3.8" fill="#bff5ec" opacity=".8"/><circle cx="' + x + '" cy="' + y + '" r="3.4" fill="none" stroke="#fff" stroke-width=".35" stroke-dasharray=".8 .8"/>' : '';
+      return reef + '<ellipse data-island="' + q[0] + '" cx="' + x + '" cy="' + y + '" rx="' + q[3] + '" ry="' + q[4] + '" transform="rotate(' + q[5] + ' ' + x + ' ' + y + ')" fill="url(#sr-land)" stroke="#fff" stroke-width=".6"/>';
+    }).join('') + '</g>';
+  }
   function nzMapSvg() {
     const live = ''; // the icing is filled in from the stops this player has already cleared
     const future = ''; // 1.9.222 coming-soon cities are markers only
@@ -1371,7 +1456,7 @@
       'sr-candy-grape', 'sr-candy-lemon', 'sr-candy-grape', 'sr-candy-peach', 'sr-candy-lemon', 'sr-candy-mint', 'sr-candy-blueberry'];
     const islandCandy = ['sr-candy-mint', 'sr-candy-blueberry', 'sr-candy-grape', 'sr-candy-strawberry', 'sr-candy-peach', 'sr-candy-lemon'];
     return (
-      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + MAP_X0 + ' 0 ' + MAP_VW + ' ' + MAP_H + '" width="' + MAP_VW + '" height="' + MAP_H + '" aria-hidden="true" class="nzsvg">' +
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + MAP_X0 + ' ' + MAP_Y0 + ' ' + MAP_VW + ' ' + MAP_VH + '" width="' + MAP_VW + '" height="' + MAP_VH + '" aria-hidden="true" class="nzsvg sr-world">' +
       '<defs>' +
       '<linearGradient id="sr-sea" x1="0" y1="0" x2="0" y2="1">' +
       '<stop offset="0" stop-color="#7ee8f5"/><stop offset=".45" stop-color="#8fe8f0"/><stop offset="1" stop-color="#b6f3e6"/>' +
@@ -1392,7 +1477,7 @@
       '<feDropShadow dx="0" dy="3" stdDeviation="3.2" flood-color="#5aa0c0" flood-opacity=".32"/>' +
       '</filter>' +
       '</defs>' +
-      '<rect x="' + MAP_X0 + '" width="' + MAP_VW + '" height="' + MAP_H + '" fill="url(#sr-sea)"/>' +
+      '<rect x="' + MAP_X0 + '" y="' + MAP_Y0 + '" width="' + MAP_VW + '" height="' + MAP_VH + '" fill="url(#sr-sea)"/>' +
       mapRipples() +
       '<circle class="sr-bob" cx="250" cy="60" r="7" fill="#ff8ab8" opacity=".55"/>' +
       '<circle class="sr-bob" cx="264" cy="74" r="5" fill="#ffe066" opacity=".65"/>' +
@@ -1404,24 +1489,17 @@
       '<g transform="rotate(-20 360 82)"><text x="360" y="58" text-anchor="middle" font-size="13" font-weight="800" fill="#2a6a88" font-family="ui-rounded,system-ui,sans-serif">N</text>' +
       '<path d="M360 64 L360 100 M360 64 L353 74 M360 64 L367 74" fill="none" stroke="#2a6a88" stroke-width="2.4" stroke-linecap="round"/></g>' +
       // North and South Islands and Stewart Island, from real coastline points (see NZ_PROJ).
-      '<path filter="url(#sr-soft)" fill="url(#sr-land)" stroke="#fff" stroke-width="7" stroke-linejoin="round" d="M 223 572 L 228 570 L 241 536 L 248 527 L 250 525 L 248 534 L 251 538 L 251 555 L 254 550 L 253 539 L 255 535 L 252 530 L 261 524 L 262 527 L 266 525 L 265 537 L 260 547 L 265 545 L 271 529 L 273 535 L 270 547 L 266 554 L 266 559 L 274 566 L 273 576 L 276 573 L 283 576 L 283 586 L 277 613 L 279 625 L 273 649 L 271 690 L 261 708 L 257 722 L 254 726 L 260 729 L 255 742 L 261 736 L 264 736 L 270 746 L 283 743 L 288 750 L 288 757 L 282 762 L 277 763 L 273 761 L 263 769 L 265 762 L 259 761 L 257 774 L 255 776 L 240 771 L 251 781 L 235 809 L 227 816 L 226 826 L 222 830 L 226 831 L 234 878 L 228 882 L 236 883 L 236 888 L 234 905 L 236 944 L 242 949 L 244 955 L 230 969 L 228 975 L 226 990 L 220 1009 L 216 1030 L 203 1044 L 193 1051 L 178 1054 L 171 1062 L 166 1063 L 163 1067 L 159 1064 L 156 1057 L 151 1055 L 143 1056 L 134 1063 L 123 1055 L 116 1055 L 111 1066 L 88 1078 L 83 1079 L 81 1075 L 85 1057 L 79 1069 L 76 1070 L 77 1062 L 75 1058 L 72 1065 L 67 1068 L 64 1057 L 77 1046 L 82 1038 L 74 1042 L 72 1038 L 77 1026 L 66 1033 L 65 1022 L 71 1018 L 66 1013 L 81 1013 L 77 1007 L 81 1002 L 71 1003 L 68 996 L 70 988 L 74 990 L 76 987 L 71 983 L 76 965 L 82 973 L 78 962 L 83 945 L 86 939 L 93 941 L 86 931 L 97 889 L 106 874 L 113 871 L 120 856 L 126 857 L 122 851 L 123 847 L 133 828 L 144 814 L 142 808 L 145 806 L 142 805 L 147 796 L 151 777 L 153 774 L 158 775 L 156 772 L 153 772 L 157 763 L 165 763 L 159 759 L 164 752 L 169 755 L 166 748 L 170 728 L 173 730 L 176 738 L 172 725 L 174 707 L 178 701 L 174 698 L 168 649 L 176 638 L 181 620 L 178 592 L 174 573 L 174 557 L 179 542 L 186 527 L 196 523 L 188 530 L 190 540 L 195 545 L 206 545 Z"/>' +
-      '<path filter="url(#sr-soft)" fill="url(#sr-land)" stroke="#fff" stroke-width="7" stroke-linejoin="round" d="M 66 120 L 68 123 L 71 109 L 73 116 L 74 116 L 85 115 L 91 117 L 92 112 L 106 114 L 112 124 L 114 123 L 118 116 L 136 134 L 136 141 L 142 148 L 134 152 L 135 153 L 165 179 L 168 193 L 174 200 L 175 219 L 179 218 L 184 219 L 185 214 L 191 216 L 203 215 L 212 228 L 219 224 L 219 220 L 203 189 L 196 182 L 195 178 L 197 174 L 213 188 L 216 185 L 227 198 L 244 229 L 252 233 L 253 236 L 250 237 L 250 240 L 254 241 L 262 239 L 288 242 L 312 237 L 318 230 L 321 223 L 323 205 L 331 187 L 342 182 L 356 184 L 358 206 L 367 251 L 364 266 L 360 271 L 365 294 L 370 301 L 370 309 L 362 303 L 350 307 L 342 316 L 335 328 L 334 342 L 338 356 L 340 358 L 348 360 L 349 400 L 344 448 L 342 489 L 334 518 L 323 541 L 318 541 L 312 531 L 307 532 L 300 539 L 296 526 L 294 525 L 293 526 L 295 530 L 292 535 L 287 537 L 291 475 L 286 449 L 268 432 L 257 430 L 246 433 L 232 426 L 211 427 L 202 421 L 198 414 L 198 403 L 205 390 L 217 377 L 220 359 L 211 317 L 211 299 L 206 291 L 209 282 L 191 262 L 190 253 L 187 253 L 176 240 L 177 238 L 179 238 L 186 245 L 186 236 L 190 231 L 181 224 L 174 232 L 168 232 L 158 219 L 144 207 L 146 205 L 156 210 L 156 206 L 154 198 L 148 195 L 146 184 L 139 182 L 141 189 L 128 185 L 118 173 L 121 181 L 139 196 L 138 202 L 87 160 L 90 138 L 86 145 L 85 157 L 76 149 L 74 149 L 66 143 L 67 136 L 64 128 L 30 100 L 43 90 L 43 100 Z"/>' +
-      '<path filter="url(#sr-soft)" fill="url(#sr-land)" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="M 159 1091 L 160 1094 L 156 1095 L 157 1098 L 163 1099 L 166 1097 L 169 1103 L 160 1112 L 158 1119 L 152 1122 L 150 1129 L 144 1134 L 143 1130 L 145 1123 L 144 1116 L 146 1112 L 146 1102 L 140 1088 L 147 1084 Z"/>' +
-      '<path filter="url(#sr-soft)" fill="url(#sr-land)" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="M 195 159 L 197 162 L 193 163 L 185 159 L 183 154 L 184 147 L 191 152 Z"/>' +
-      '<path filter="url(#sr-soft)" fill="url(#sr-land)" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="M 70 1040 L 71 1046 L 63 1049 L 62 1044 L 66 1039 Z"/>' +
-      '<path filter="url(#sr-soft)" fill="url(#sr-land)" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="M 245 523 L 241 531 L 239 521 L 241 516 L 244 511 Z"/>' +
+      nzLand(1.4, 'M 223 572 L 228 570 L 241 536 L 248 527 L 250 525 L 248 534 L 251 538 L 251 555 L 254 550 L 253 539 L 255 535 L 252 530 L 261 524 L 262 527 L 266 525 L 265 537 L 260 547 L 265 545 L 271 529 L 273 535 L 270 547 L 266 554 L 266 559 L 274 566 L 273 576 L 276 573 L 283 576 L 283 586 L 277 613 L 279 625 L 273 649 L 271 690 L 261 708 L 257 722 L 254 726 L 260 729 L 255 742 L 261 736 L 264 736 L 270 746 L 283 743 L 288 750 L 288 757 L 282 762 L 277 763 L 273 761 L 263 769 L 265 762 L 259 761 L 257 774 L 255 776 L 240 771 L 251 781 L 235 809 L 227 816 L 226 826 L 222 830 L 226 831 L 234 878 L 228 882 L 236 883 L 236 888 L 234 905 L 236 944 L 242 949 L 244 955 L 230 969 L 228 975 L 226 990 L 220 1009 L 216 1030 L 203 1044 L 193 1051 L 178 1054 L 171 1062 L 166 1063 L 163 1067 L 159 1064 L 156 1057 L 151 1055 L 143 1056 L 134 1063 L 123 1055 L 116 1055 L 111 1066 L 88 1078 L 83 1079 L 81 1075 L 85 1057 L 79 1069 L 76 1070 L 77 1062 L 75 1058 L 72 1065 L 67 1068 L 64 1057 L 77 1046 L 82 1038 L 74 1042 L 72 1038 L 77 1026 L 66 1033 L 65 1022 L 71 1018 L 66 1013 L 81 1013 L 77 1007 L 81 1002 L 71 1003 L 68 996 L 70 988 L 74 990 L 76 987 L 71 983 L 76 965 L 82 973 L 78 962 L 83 945 L 86 939 L 93 941 L 86 931 L 97 889 L 106 874 L 113 871 L 120 856 L 126 857 L 122 851 L 123 847 L 133 828 L 144 814 L 142 808 L 145 806 L 142 805 L 147 796 L 151 777 L 153 774 L 158 775 L 156 772 L 153 772 L 157 763 L 165 763 L 159 759 L 164 752 L 169 755 L 166 748 L 170 728 L 173 730 L 176 738 L 172 725 L 174 707 L 178 701 L 174 698 L 168 649 L 176 638 L 181 620 L 178 592 L 174 573 L 174 557 L 179 542 L 186 527 L 196 523 L 188 530 L 190 540 L 195 545 L 206 545 Z') +
+      nzLand(1.4, 'M 66 120 L 68 123 L 71 109 L 73 116 L 74 116 L 85 115 L 91 117 L 92 112 L 106 114 L 112 124 L 114 123 L 118 116 L 136 134 L 136 141 L 142 148 L 134 152 L 135 153 L 165 179 L 168 193 L 174 200 L 175 219 L 179 218 L 184 219 L 185 214 L 191 216 L 203 215 L 212 228 L 219 224 L 219 220 L 203 189 L 196 182 L 195 178 L 197 174 L 213 188 L 216 185 L 227 198 L 244 229 L 252 233 L 253 236 L 250 237 L 250 240 L 254 241 L 262 239 L 288 242 L 312 237 L 318 230 L 321 223 L 323 205 L 331 187 L 342 182 L 356 184 L 358 206 L 367 251 L 364 266 L 360 271 L 365 294 L 370 301 L 370 309 L 362 303 L 350 307 L 342 316 L 335 328 L 334 342 L 338 356 L 340 358 L 348 360 L 349 400 L 344 448 L 342 489 L 334 518 L 323 541 L 318 541 L 312 531 L 307 532 L 300 539 L 296 526 L 294 525 L 293 526 L 295 530 L 292 535 L 287 537 L 291 475 L 286 449 L 268 432 L 257 430 L 246 433 L 232 426 L 211 427 L 202 421 L 198 414 L 198 403 L 205 390 L 217 377 L 220 359 L 211 317 L 211 299 L 206 291 L 209 282 L 191 262 L 190 253 L 187 253 L 176 240 L 177 238 L 179 238 L 186 245 L 186 236 L 190 231 L 181 224 L 174 232 L 168 232 L 158 219 L 144 207 L 146 205 L 156 210 L 156 206 L 154 198 L 148 195 L 146 184 L 139 182 L 141 189 L 128 185 L 118 173 L 121 181 L 139 196 L 138 202 L 87 160 L 90 138 L 86 145 L 85 157 L 76 149 L 74 149 L 66 143 L 67 136 L 64 128 L 30 100 L 43 90 L 43 100 Z') +
+      nzLand(0.9, 'M 159 1091 L 160 1094 L 156 1095 L 157 1098 L 163 1099 L 166 1097 L 169 1103 L 160 1112 L 158 1119 L 152 1122 L 150 1129 L 144 1134 L 143 1130 L 145 1123 L 144 1116 L 146 1112 L 146 1102 L 140 1088 L 147 1084 Z') +
+      nzLand(0.9, 'M 195 159 L 197 162 L 193 163 L 185 159 L 183 154 L 184 147 L 191 152 Z') +
+      nzLand(0.9, 'M 70 1040 L 71 1046 L 63 1049 L 62 1044 L 66 1039 Z') +
+      nzLand(0.9, 'M 245 523 L 241 531 L 239 521 L 241 516 L 244 511 Z') +
       // Ferry across Cook Strait (Wellington to Picton)
-      '<path d="M 286 536 C 278 552 274 547 264 551" fill="none" stroke="#fff" stroke-width="2.4" stroke-dasharray="5 7" stroke-linecap="round" opacity=".85"/>' +
+      '<path d="' + nzWorldPath('M 286 536 C 278 552 274 547 264 551') + '" fill="none" stroke="#fff" stroke-width=".45" stroke-dasharray="1 1.3" stroke-linecap="round" opacity=".85"/>' +
       // 1.9.227 Whangārei close-up (30x): Whangārei and Onerahi at their real relative places, Sarah\'s House beside Onerahi,
       // linked by a dashed leader line to the ring where Whangārei really sits on the coast.
-      '<g class="sr-inset">' +
-      '<path d="M 130 150 L 54 334" stroke="#fff" stroke-width="2.5" stroke-dasharray="4 5" stroke-linecap="round"/>' +
-      '<circle cx="130" cy="150" r="6" fill="none" stroke="#ff4f93" stroke-width="2.5"/>' +
-      '<rect x="4" y="334" width="256" height="188" rx="22" fill="#d8f4ff" stroke="#fff" stroke-width="4"/>' +
-      // Whangārei Harbour opens to the south-east, below Onerahi
-      '<path d="M 24 336 L 240 336 L 258 406 C 128 418 88 442 130 472 C 64 488 24 462 6 472 Z" fill="url(#sr-land)" opacity=".9"/>' +
-      '<text x="18" y="512" text-anchor="start" font-size="11" font-weight="900" fill="#2a6a88" font-family="ui-rounded,system-ui,sans-serif">Whangārei close-up</text>' +
-      '</g>' +
+      insetSvg() +
       // A little plane on the flight out of Dunedin
       // 1.9.222 Australia: same full-screen style as New Zealand, with Tasmania and a heading pill.
       '<g class="sr-aus">' +
@@ -1431,28 +1509,13 @@
       '<path filter="url(#sr-soft)" fill="url(#sr-candy-strawberry)" stroke="#fff" stroke-width="5" stroke-linejoin="round" d="' + ausPath(PNG_PTS) + '"/>' +
       '<path fill="url(#sr-candy-strawberry)" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="' + ausPath(NEW_BRITAIN_PTS) + '"/>' +
       '<text x="306" y="1711" text-anchor="middle" font-size="10" font-weight="900" fill="#2f7a4a" font-family="ui-rounded,system-ui,sans-serif">Papua New Guinea</text>' +
-      EAST_ISLES.map(function (q, i) { const a = ausXY(q[0], q[1]); return '<ellipse cx="' + a.x.toFixed(1) + '" cy="' + a.y.toFixed(1) + '" rx="' + q[2] + '" ry="' + q[3] + '" transform="rotate(' + q[4] + ' ' + a.x.toFixed(1) + ' ' + a.y.toFixed(1) + ')" fill="url(#' + islandCandy[i % islandCandy.length] + ')" stroke="#fff" stroke-width="3"/>'; }).join('') +
+      EAST_ISLES.map(function (q, i) { const a = ausXY(q[0], q[1]), rx = i >= 12 ? Math.min(q[2], 2.4) : q[2], ry = i >= 12 ? Math.min(q[3], 1.5) : q[3]; return '<ellipse cx="' + a.x.toFixed(1) + '" cy="' + a.y.toFixed(1) + '" rx="' + rx + '" ry="' + ry + '" transform="rotate(' + q[4] + ' ' + a.x.toFixed(1) + ' ' + a.y.toFixed(1) + ')" fill="url(#' + islandCandy[i % islandCandy.length] + ')" stroke="#fff" stroke-width="3"/>'; }).join('') +
       // Asia polygon order: Southeast/South Asia and Silk Road countries, followed by East Asia.
       ASIA_LAND.map(function (pts, i) { return '<path filter="url(#sr-soft)" fill="url(#' + asiaCandy[i % asiaCandy.length] + ')" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="' + ausPath(pts) + '"/>'; }).join('') +
       ASIA_EAST_LAND.map(function (pts, i) { return '<path filter="url(#sr-soft)" fill="url(#' + asiaCandy[(i + 3) % asiaCandy.length] + ')" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="' + ausPath(pts) + '"/>'; }).join('') +
       // 1.9.269 Pacific inset is painted after Asia so Samoa, Tonga and Rarotonga stay on top.
       // 1.9.220 Pacific Islands inset: a lagoon-blue panel with Rarotonga, Tonga and Samoa.
-      '<g class="sr-pacific">' +
-      '<rect x="16" y="1236" width="368" height="448" rx="30" fill="#7fe6dc" opacity=".96" stroke="#fff" stroke-width="4" stroke-dasharray="10 8"/>' +
-      // 1.9.227 Islands at their real relative positions (see pacXY): Samoa north, Tonga and Rarotonga side by side.
-      // Samoa: Savai\'i and Upolu
-      '<ellipse cx="122" cy="1348" rx="30" ry="20" fill="#bff5ec" opacity=".8"/><ellipse cx="110" cy="1345" rx="13" ry="8" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
-      '<ellipse cx="138" cy="1356" rx="12" ry="6" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
-      // Tonga: Tongatapu, with Ha\'apai and Vava\'u to the north
-      '<ellipse cx="70" cy="1508" rx="34" ry="20" fill="#bff5ec" opacity=".8"/><path d="M48 1510 c6 -10 30 -12 44 -4 c4 8 -10 14 -24 13 c-10 1 -18 -3 -20 -9 Z" fill="url(#sr-land)" stroke="#fff" stroke-width="3"/>' +
-      '<circle cx="90" cy="1454" r="5" fill="url(#sr-land)" stroke="#fff" stroke-width="2"/><circle cx="84" cy="1479" r="4" fill="url(#sr-land)" stroke="#fff" stroke-width="2"/>' +
-      // Rarotonga: a round island with its reef ring
-      '<circle cx="330" cy="1509" r="30" fill="#bff5ec" opacity=".85"/><circle cx="330" cy="1509" r="26" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="4 4"/><circle cx="330" cy="1509" r="16" fill="url(#sr-land)" stroke="#fff" stroke-width="4"/>' +
-      '<path d="M323 1507 l9 -9 5 11 Z" fill="#7ac77a"/>' +
-      [[102, 1339], [150, 1354], [94, 1522], [350, 1503]].map(function (q) { return '<path d="M' + q[0] + ' ' + q[1] + ' v-12 M' + q[0] + ' ' + (q[1] - 12) + ' q-6 -2 -9 3 M' + q[0] + ' ' + (q[1] - 12) + ' q6 -2 9 3 M' + q[0] + ' ' + (q[1] - 12) + ' q-2 -6 -7 -6 M' + q[0] + ' ' + (q[1] - 12) + ' q2 -6 7 -6" stroke="#2f9a5a" stroke-width="2.4" fill="none" stroke-linecap="round"/>'; }).join('') +
-      '<path d="M250 1440 q12 -5 24 0" stroke="#fff" stroke-width="2.5" fill="none" opacity=".7"/>' +
-      '<text x="122" y="1310" text-anchor="middle" font-size="14" font-weight="900" fill="#145e56" font-family="ui-rounded,system-ui,sans-serif">Samoa</text>' +
-      '</g>' +
+      pacificSvg() +
       mapTerrain() +
       mapLandmarks() +
       '<path d="M120 1960 C150 1940 190 1950 210 1980 C190 1990 150 1990 120 1960 Z" fill="#ffd9a8" opacity=".6"/>' +
@@ -4425,7 +4488,7 @@
     return true;
   }
 
-  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_X0, MAP_VW, MAP_STOPS, FUTURE_STOPS, NZ_PROJ, nzXY, WHANGAREI_INSET, insetXY, pacXY, ausXY, westPacXY, LV_COUNT, lvId, levelIds, stopId, LEGACY_220_IDS, migrateProg, stopForLevel, icingPath, beenPath, aheadPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, bubLeft, liqLeft, flowLeft, chocoLeft, tickTimer, spreadLiq, beltDirection, shiftBelts, LIQ_IDLE, goalCounts, cloneState, bestMove, hintMoveFor, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
+  root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_X0, MAP_VW, MAP_Y0, MAP_VH, worldXY, nzToWorld, PACIFIC_ISLES, MAP_STOPS, FUTURE_STOPS, NZ_PROJ, nzXY, WHANGAREI_INSET, insetXY, pacXY, ausXY, westPacXY, LV_COUNT, lvId, levelIds, stopId, LEGACY_220_IDS, migrateProg, stopForLevel, icingPath, beenPath, aheadPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, bubLeft, liqLeft, flowLeft, chocoLeft, tickTimer, spreadLiq, beltDirection, shiftBelts, LIQ_IDLE, goalCounts, cloneState, bestMove, hintMoveFor, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
     allowed: () => true, // 1.9.228 open to every family member
     SAY_REST_MS, SAY_BIG, sayBig, COMBO_KINDS, COMBO_BONUS, comboKind, comboSwap, adjacentSpecials, isSpecialTile, HARD_LINES, hardLine, CANDY_STYLES, candySfxPlan, playCandySfx, SAY_SHOW_MS, SAY_AFTER_MS, sayShowGap, SPEAK_GAP, SPEAK_PITCH, SPEAK_RATE, SPEAK_VOL, pickSpeechVoice, speechGender, speakWorthy, SAY_SPRITES, SAY_CLIPS, sayClip, nextSayVoice, SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL, XF,
     VOICE_FILES, VOICE_RANK, MEDIA_HASH, mediaUrl, gameTrack, SONG_PLAN, SONG_FILES, SONG_FROM, songMood, attachSfxBus, playTone, playChime, playMovesWarnChime, playClip, voiceForStep,
@@ -6216,7 +6279,7 @@
         el.dataset.name = racerFirst(r.name);
         el.dataset.stop = String(n);
         el.style.left = mapXPct(stop.x);
-        el.style.top = (stop.y / MAP_H * 100) + '%';
+        el.style.top = mapYPct(stop.y);
         el.style.transform = 'translate(calc(-50% + ' + off.x + 'px), calc(-50% + ' + off.y + 'px))';
         el.innerHTML = '<span class="face" style="--ic:' + ic.color + '">' + ic.emoji + '</span><span class="nm">' + racerFirst(r.name) + '</span>';
         el.setAttribute('aria-label', racerFirst(r.name) + ' is at ' + stop.place + (r.mine ? ' (you)' : ''));
@@ -6589,7 +6652,7 @@
       b.dataset.n = String(n);
       b.dataset.country = country;
       b.style.left = mapXPct(stop.x);
-      b.style.top = (stop.y / MAP_H * 100) + '%';
+      b.style.top = mapYPct(stop.y);
       const mark = stop.kind === 'house' ? '🏠' : (stop.kind === 'post' ? '✉️' : (stop.kind === 'station' ? '🚂' : (stop.kind === 'island' ? '🌴' : '')));
       const starHtml = [0, 1, 2].map(k => '<span class="' + (k < stars ? 'on' : '') + '">★</span>').join('');
       const badge = prog.badges[i] && lv.badge ? '<span class="gotbadge" aria-hidden="true">' + lv.badge.icon + '</span>' : '';
@@ -6609,7 +6672,7 @@
       el.className = 'future-stop lab-' + (stop.label || 'right') + (stop.inset ? ' inset-' + stop.inset : '');
       el.dataset.place = stop.place;
       el.style.left = mapXPct(stop.x);
-      el.style.top = (stop.y / MAP_H * 100) + '%';
+      el.style.top = mapYPct(stop.y);
       el.innerHTML = '<span class="pin"></span><span class="meta"><b>' + stop.place + '</b><em>Coming soon</em></span>';
       el.setAttribute('aria-label', 'Coming soon: ' + stop.place);
       path.appendChild(el);
@@ -7452,12 +7515,23 @@
     if (!a || !b) return;
     me.classList.add('hopping');
     me.style.left = mapXPct(a.x);
-    me.style.top = (a.y / MAP_H * 100) + '%';
+    me.style.top = mapYPct(a.y);
     await wait(reduce ? 20 : 40);
     me.style.left = mapXPct(b.x);
-    me.style.top = (b.y / MAP_H * 100) + '%';
+    me.style.top = mapYPct(b.y);
     await wait(reduce ? 80 : 750);
     me.classList.remove('hopping');
+  }
+  // 1.9.283 The route strokes are sized in screen px, so they look the same at any zoom of the true-scale map.
+  const ROUTE_STROKES = [['#sr-future-border', 9, [2.2, 6]], ['#sr-future', 5, [2.2, 6]], ['#sr-path-wide', 7], ['#sr-path-dash', 2.2, [5, 7]], ['#sr-path-win', 8]];
+  function fitRouteStrokes(pxPerUnit) {
+    const u = Math.max(0.01, pxPerUnit || 1);
+    ROUTE_STROKES.forEach(function (r) {
+      const el = doc.querySelector(r[0]);
+      if (!el) return;
+      el.style.strokeWidth = (r[1] / u).toFixed(3);
+      if (r[2] && r[0] !== '#sr-path-win') el.style.strokeDasharray = (r[2][0] / u).toFixed(2) + ' ' + (r[2][1] / u).toFixed(2);
+    });
   }
   async function cinematicTravel(fromN, toN) {
     const view = $('mapview'), stage = $('mapstage'), svg = stage && stage.querySelector('svg.nzsvg');
@@ -7499,8 +7573,17 @@
       stage.style.transform = 'none';
       const sw = stage.clientWidth, sh = stage.clientHeight, vw = view.clientWidth, vh = view.clientHeight;
       if (!sw || !sh || !vw || !vh) return false;
-      const sx = sw / MAP_VW, sy = sh / MAP_H;
-      const toStage = function (p) { return { x: (p.x - MAP_X0) * sx, y: p.y * sy }; };
+      const sx = sw / MAP_VW, sy = sh / MAP_VH;
+      const toStage = function (p) { return { x: (p.x - MAP_X0) * sx, y: (p.y - MAP_Y0) * sy }; };
+      // 1.9.283 On the true-scale world map a road trip can be a few map units long: zoom in to fit the trip,
+      // and keep the car, plane and track the same size on screen as before.
+      let tb = { width: 40, height: 40 };
+      try { tb = track.getBBox(); } catch (e) { }
+      const span = Math.max(tb.width * sx, tb.height * sy, 1);
+      const closeScaleFit = Math.max(1.45, Math.min(9, Math.min(vw, vh) * 0.5 / span));
+      const vk = 0.7 / (closeScaleFit * sx);
+      track.setAttribute('stroke-width', ((isFlight ? 5.5 : 11) * vk).toFixed(2));
+      fitRouteStrokes(closeScaleFit * sx);
       const camera = function (scale, p) {
         const tx = vw / 2 - p.x * scale, ty = vh / 2 - p.y * scale;
         stage.style.transform = 'translate3d(' + tx.toFixed(1) + 'px,' + ty.toFixed(1) + 'px,0) scale(' + scale.toFixed(3) + ')';
@@ -7508,10 +7591,10 @@
       const setVehicle = function (p, p1, p2) {
         const dx = p2.x - p1.x, dy = p2.y - p1.y;
         const deg = Math.atan2(dy, dx) * 180 / Math.PI + (isFlight ? 90 : 0);
-        vehicle.setAttribute('transform', 'translate(' + p.x.toFixed(2) + ' ' + p.y.toFixed(2) + ') rotate(' + deg.toFixed(1) + ')');
+        vehicle.setAttribute('transform', 'translate(' + p.x.toFixed(2) + ' ' + p.y.toFixed(2) + ') rotate(' + deg.toFixed(1) + ') scale(' + vk.toFixed(3) + ')');
       };
       const first = track.getPointAtLength(0), last = track.getPointAtLength(length);
-      const farScale = Math.min(vw / sw, vh / sh) * .92, closeScale = 1.45;
+      const farScale = Math.min(vw / sw, vh / sh) * .92, closeScale = closeScaleFit;
       stage.style.transform = 'translate3d(0,0,0) scale(1)';
       void stage.offsetWidth;
       stage.style.transition = 'transform 460ms cubic-bezier(.2,.8,.2,1)';
