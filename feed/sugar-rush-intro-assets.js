@@ -1,62 +1,31 @@
 /* Sugar Rush open intro assets and playback.
    Play starts unmuted inside the same user gesture as "Play Sugar Rush".
    If play() with sound is rejected, fall back to muted and unmute on the first touch.
-   First open plays the long ~23s film (5dab8424). Later fresh opens play the 7s film
-   (95641ff8). Resume plays no intro. The long cut is lazy-loaded on first open and
-   is not service-worker precached. longSong stays empty: audio is already in the video. */
+   Every fresh open plays the ~23s film (5dab8424). Resume plays no intro.
+   The film is lazy-loaded and is not service-worker precached. song stays empty:
+   audio is already in the video. */
 (function (root) {
   const INTRO = {
-    poster: 'img/sugar-rush/sugar-rush-intro-poster-75cbb408.jpg',
-    webm: 'img/sugar-rush/sugar-rush-intro-95641ff8.webm',
-    mp4: 'img/sugar-rush/sugar-rush-intro-95641ff8.mp4',
-    song: 'img/sugar-rush/sugar-rush-intro-song-95641ff8.m4a',
-    songMp3: 'img/sugar-rush/sugar-rush-intro-song-95641ff8.mp3',
-    videoHasAudio: true,
-    longPoster: 'img/sugar-rush/sugar-rush-intro-long-5dab8424-poster.jpg',
-    longWebm: 'img/sugar-rush/sugar-rush-intro-long-5dab8424.webm',
-    longMp4: 'img/sugar-rush/sugar-rush-intro-long-5dab8424.mp4',
-    longSong: '',
-    longSongMp3: '',
-    longVideoHasAudio: true
+    poster: 'img/sugar-rush/sugar-rush-intro-long-5dab8424-poster.jpg',
+    webm: 'img/sugar-rush/sugar-rush-intro-long-5dab8424.webm',
+    mp4: 'img/sugar-rush/sugar-rush-intro-long-5dab8424.mp4',
+    song: '',
+    songMp3: '',
+    videoHasAudio: true
   };
   root.SUGAR_INTRO = INTRO;
 
-  function memberTag() {
-    try {
-      const who = root.IBScores && root.IBScores.who && root.IBScores.who();
-      if (who && who.id) return ':' + who.id;
-    } catch (e) { }
-    try {
-      const me = JSON.parse((root.localStorage && root.localStorage.getItem('mf.member')) || 'null');
-      if (me && me.id) return ':' + me.id;
-    } catch (e) { }
-    return '';
-  }
-  function seenKey() { return 'sr-long-intro-seen' + memberTag(); }
-  function hasSeenLong() {
-    try { return (root.localStorage && root.localStorage.getItem(seenKey())) === '1'; } catch (e) { return false; }
-  }
-  function markLongSeen() {
-    try { if (root.localStorage) root.localStorage.setItem(seenKey(), '1'); } catch (e) { }
-  }
-  function hasLongFile() { return !!(INTRO.longMp4 || INTRO.longWebm); }
   function pickIntro() {
-    const first = !hasSeenLong();
-    const useLong = first && hasLongFile();
     return {
-      first: first,
-      useLong: useLong,
-      poster: (useLong && INTRO.longPoster) || INTRO.poster,
-      webm: useLong ? (INTRO.longWebm || INTRO.webm) : INTRO.webm,
-      mp4: useLong ? (INTRO.longMp4 || INTRO.mp4) : INTRO.mp4,
-      song: useLong ? (INTRO.longSong || '') : INTRO.song,
-      songMp3: useLong ? (INTRO.longSongMp3 || '') : INTRO.songMp3,
-      videoHasAudio: useLong ? !!INTRO.longVideoHasAudio : !!INTRO.videoHasAudio
+      useLong: true,
+      poster: INTRO.poster,
+      webm: INTRO.webm,
+      mp4: INTRO.mp4,
+      song: INTRO.song,
+      songMp3: INTRO.songMp3,
+      videoHasAudio: !!INTRO.videoHasAudio
     };
   }
-  root.sugarIntroSeenKey = seenKey;
-  root.sugarIntroHasSeenLong = hasSeenLong;
-  root.sugarIntroMarkLongSeen = markLongSeen;
   root.sugarIntroPick = pickIntro;
 
   const STYLE_ID = 'sr-intro-style';
@@ -179,7 +148,6 @@
     function finish() {
       if (done) return;
       done = true;
-      if (pick.first) markLongSeen();
       if (safety) try { root.clearTimeout(safety); } catch (e) { }
       overlay.classList.add('fade');
       try { video.pause(); } catch (e) { }
@@ -199,7 +167,7 @@
     video.onplaying = function () {
       if (poster) poster.hidden = true;
       if (safety) try { root.clearTimeout(safety); } catch (e) { }
-      const left = Math.max(2000, ((video.duration || (pick.useLong ? 23 : 7)) * 1000) + 2500);
+      const left = Math.max(2000, ((video.duration || 23) * 1000) + 2500);
       safety = root.setTimeout(finish, left);
     };
     video.onerror = function () {
@@ -213,8 +181,8 @@
       finish();
     };
 
-    // 7s film ends itself; a first-open long cut is ~20s. Wait long enough for either.
-    safety = root.setTimeout(finish, pick.useLong ? 40000 : 12000);
+    // ~23s film; wait long enough for it to end itself.
+    safety = root.setTimeout(finish, 40000);
 
     const tasks = [tryUnmuted(video)];
     if (useSong) tasks.push(tryUnmuted(songEl));

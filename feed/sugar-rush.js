@@ -8735,7 +8735,7 @@
       let opened = false;
       function goMap() { if (opened) return; opened = true; showMap(); }
       if (parentIntroStatus() === 'done') { goMap(); return; }
-      const to = root.setTimeout(goMap, 15000);
+      const to = root.setTimeout(goMap, 40000);
       function onMsg(e) {
         if (e && e.data && e.data.type === 'ib-sugar-intro-done') {
           try { root.clearTimeout(to); } catch (err) { }

@@ -15,46 +15,39 @@ const sw = read('feed/sw.js');
 const todayJs = read('feed/today.js');
 const todayCss = read('feed/today.css');
 
-const MP4 = 'img/sugar-rush/sugar-rush-intro-95641ff8.mp4';
-const WEBM = 'img/sugar-rush/sugar-rush-intro-95641ff8.webm';
-const POSTER = 'img/sugar-rush/sugar-rush-intro-poster-75cbb408.jpg';
-const SONG = 'img/sugar-rush/sugar-rush-intro-song-95641ff8.m4a';
-const SONG_MP3 = 'img/sugar-rush/sugar-rush-intro-song-95641ff8.mp3';
 const LONG_MP4 = 'img/sugar-rush/sugar-rush-intro-long-5dab8424.mp4';
 const LONG_WEBM = 'img/sugar-rush/sugar-rush-intro-long-5dab8424.webm';
 const LONG_POSTER = 'img/sugar-rush/sugar-rush-intro-long-5dab8424-poster.jpg';
+const OLD_7S = '95641ff8';
 
-test('hashed intro video, song and poster files are in the feed folder', () => {
-  for (const rel of [MP4, WEBM, POSTER, SONG, SONG_MP3, LONG_MP4, LONG_WEBM, LONG_POSTER]) {
+test('hashed 23s intro video and poster files are in the feed folder', () => {
+  for (const rel of [LONG_MP4, LONG_WEBM, LONG_POSTER]) {
     assert.ok(existsSync(join(root, 'feed', rel)), rel);
   }
 });
 
-test('intro assets use the muxed 7s film, a song fallback, and the long first-open film', () => {
+test('intro assets always use the muxed 23s film, with a muted fallback and no first-open gate', () => {
   assert.match(assets, /videoHasAudio:\s*true/);
-  assert.ok(assets.includes(MP4) && assets.includes(WEBM) && assets.includes(POSTER));
-  assert.ok(assets.includes(SONG) && assets.includes(SONG_MP3));
   assert.ok(assets.includes(LONG_MP4) && assets.includes(LONG_WEBM) && assets.includes(LONG_POSTER));
-  assert.match(assets, /longSong:\s*''/);
-  assert.match(assets, /longVideoHasAudio:\s*true/);
-  assert.match(assets, /sr-long-intro-seen/);
+  assert.match(assets, /song:\s*''/);
+  assert.doesNotMatch(assets, new RegExp(OLD_7S));
+  assert.doesNotMatch(assets, /sr-long-intro-seen/);
+  assert.doesNotMatch(assets, /hasSeenLong|markLongSeen/);
   assert.match(assets, /function pickIntro/);
-  assert.match(assets, /useLong = first && hasLongFile/);
-  assert.match(assets, /function hasSeenLong/);
-  assert.match(assets, /function markLongSeen/);
+  assert.match(assets, /useLong:\s*true/);
   assert.match(assets, /root\.playSugarIntro/);
-  assert.match(assets, /NotAllowedError|armUnmute|startMuted/);
+  assert.match(assets, /armUnmute|startMuted/);
 });
 
-test('the service worker caches the muxed 7s intro and song, not the silent drafts or the long film', () => {
-  assert.ok(sw.includes(MP4) && sw.includes(WEBM) && sw.includes(POSTER));
-  assert.ok(sw.includes(SONG) && sw.includes(SONG_MP3));
+test('the service worker does not precache the 23s intro film, and the 7s cut is gone', () => {
   assert.ok(sw.includes('sugar-rush-intro-assets.js?v='));
   assert.doesNotMatch(sw, /893745cb|865aa326/);
   assert.doesNotMatch(sw, /5dab8424/);
+  assert.doesNotMatch(sw, new RegExp(OLD_7S));
+  assert.doesNotMatch(sw, /75cbb408/);
 });
 
-test('a fresh open plays an intro; resume does not; first open can use the long cut', () => {
+test('a fresh open plays the 23s intro; resume does not; Skip stays in the same place', () => {
   assert.match(play, /playSugarIntro/);
   assert.match(play, /afterIntro=1/);
   assert.match(play, /resume=1/);
@@ -66,7 +59,12 @@ test('a fresh open plays an intro; resume does not; first open can use the long 
   assert.match(gameJs, /parentIntroStatus/);
   assert.match(gameJs, /playSugarIntro/);
   assert.ok(html.includes('id="sr-open-intro"') && html.includes('id="sr-intro-skip"'));
-  assert.ok(html.includes(MP4) && html.includes(WEBM) && html.includes(POSTER));
+  assert.ok(html.includes(LONG_MP4) && html.includes(LONG_WEBM) && html.includes(LONG_POSTER));
+  assert.doesNotMatch(html, new RegExp(OLD_7S));
+  assert.doesNotMatch(html, /sr-long-intro-seen|sr-first-long/);
+  const skipCss = '#sr-intro-skip{position:absolute;top:max(12px,env(safe-area-inset-top,0px));right:max(12px,env(safe-area-inset-right,0px));z-index:2;min-height:44px;min-width:72px;padding:8px 16px;border:0;border-radius:22px;background:rgba(255,255,255,.92);color:#111;font-weight:800;font-size:16px;cursor:pointer}';
+  assert.ok(html.includes(skipCss) && assets.includes(skipCss), 'Skip stays in the same place as the 7s intro');
+  assert.match(html, /preload="none"/);
 });
 
 test('wrapped sweets and the awning stay hidden until a level is on screen', () => {
