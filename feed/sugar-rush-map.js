@@ -79,7 +79,15 @@
       '.sr-country-card .sr-bit span{font:700 10px/1.15 ui-rounded,system-ui,sans-serif;color:#5c6b82;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}',
       '#sr-path-wide{stroke:#f48fb1;stroke-width:10}',
       '#sr-path-dash{stroke:#fff;stroke-width:2.4;opacity:.9}',
-      '#sr-future{stroke:#fff;stroke-width:5;stroke-dasharray:8 12;opacity:.75}'
+      '#sr-future{stroke:#fff;stroke-width:5;stroke-dasharray:8 12;opacity:.75}',
+      '.sr-zoom{position:absolute;inset:0;z-index:12;display:none;background:linear-gradient(180deg,#8eecf6,#7ee0ee 40%,#b7f3e4);overflow:hidden}',
+      '.sr-zoom.on{display:block}',
+      '.sr-zoom svg{position:absolute;inset:0;width:100%;height:100%}',
+      '.sr-zoom .sr-ride{position:absolute;left:8%;top:68%;animation:srRide 2.6s ease-in-out forwards}',
+      '@keyframes srRide{from{transform:translate(0,0)}to{transform:translate(62vw,-34vh)}}',
+      '.sr-zoom .sr-fly{position:absolute;left:10%;top:46%;animation:srFly 2.6s ease-in-out forwards}',
+      '@keyframes srFly{from{transform:translate(0,10px) rotate(-8deg)}to{transform:translate(70vw,-26vh) rotate(6deg)}}',
+      '.sr-zoom-label{position:absolute;left:50%;top:64px;transform:translateX(-50%);padding:8px 14px;border-radius:16px;background:rgba(255,255,255,.96);color:#d6246e;font:900 16px/1.2 ui-rounded,system-ui,sans-serif;box-shadow:0 4px 12px rgba(90,140,170,.18);white-space:nowrap}'
     ].join('');
     document.head.appendChild(css);
   }
@@ -200,11 +208,58 @@
     setMode(plane, sameCountryTrip());
   }
 
+  function zoomScene(car) {
+    var ride = car
+      ? '<g class="sr-ride"><rect x="0" y="0" width="54" height="26" rx="8" fill="#e23b4a" stroke="#fff" stroke-width="2"/><rect x="10" y="-10" width="28" height="14" rx="5" fill="#7ec8ff" stroke="#fff" stroke-width="1.5"/><circle cx="12" cy="26" r="7" fill="#243044"/><circle cx="42" cy="26" r="7" fill="#243044"/></g>'
+      : '<g class="sr-fly"><path d="M28 4 L34 16 L52 22 L52 26 L34 24 L32 36 L40 40 L40 44 L28 40 L16 44 L16 40 L24 36 L22 24 L4 26 L4 22 L22 16 Z" fill="#fff" stroke="#2878c8" stroke-width="2"/><ellipse cx="28" cy="24" rx="8" ry="4" fill="#7ec8ff"/></g>';
+    return '<svg viewBox="0 0 360 640" preserveAspectRatio="xMidYMid slice" aria-hidden="true">' +
+      '<defs><linearGradient id="srzsea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8eecf6"/><stop offset="1" stop-color="#b7f3e4"/></linearGradient></defs>' +
+      '<rect width="360" height="640" fill="url(#srzsea)"/>' +
+      '<path d="M0 210 C 80 190 140 230 220 200 C 280 180 320 210 360 190 L360 640 L0 640 Z" fill="#d7f4ea" opacity=".7"/>' +
+      '<path d="M-10 250 C 70 220 120 280 190 250 C 250 226 300 270 370 240 L370 640 L-10 640 Z" fill="#cfead8" stroke="#fff" stroke-width="8"/>' +
+      '<path d="M-10 430 C 40 390 90 450 150 410 C 210 372 250 430 310 400 C 340 388 370 410 380 400" fill="none" stroke="#f48fb1" stroke-width="16" stroke-linecap="round"/>' +
+      '<path d="M-10 430 C 40 390 90 450 150 410 C 210 372 250 430 310 400 C 340 388 370 410 380 400" fill="none" stroke="#fff" stroke-width="3" stroke-dasharray="8 10" opacity=".8"/>' +
+      '<circle cx="300" cy="392" r="16" fill="#fff" stroke="#f0c14b" stroke-width="4"/>' +
+      '<circle cx="300" cy="392" r="28" fill="none" stroke="#ffe08a" stroke-width="6" opacity=".7"/>' +
+      '<ellipse cx="70" cy="90" rx="34" ry="16" fill="#fff" opacity=".85"/>' +
+      '<ellipse cx="250" cy="70" rx="40" ry="18" fill="#fff" opacity=".8"/>' +
+      ride +
+      '</svg>';
+  }
+
+  function syncZoom() {
+    var map = document.getElementById('map');
+    var stage = document.getElementById('mapstage');
+    if (!map || !stage) return;
+    var panel = document.getElementById('sr-zoom');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'sr-zoom';
+      panel.className = 'sr-zoom';
+      map.appendChild(panel);
+    }
+    var traveling = stage.classList.contains('travel-shot');
+    if (!traveling) {
+      panel.classList.remove('on');
+      panel.dataset.mode = '';
+      return;
+    }
+    var car = sameCountryTrip();
+    var mode = car ? 'car' : 'plane';
+    if (panel.dataset.mode === mode && panel.classList.contains('on')) return;
+    panel.dataset.mode = mode;
+    panel.innerHTML = zoomScene(car) +
+      '<div class="sr-zoom-label">' + (car ? 'Driving' : 'Flying') + ' · ' +
+      ((document.querySelector('.stops .lv.here') || {}).dataset || {}).country + '</div>';
+    panel.classList.add('on');
+  }
+
   function tick() {
     injectStyle();
     decorate();
     showCard();
     syncTravel();
+    syncZoom();
   }
 
   var obs = new MutationObserver(tick);

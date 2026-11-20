@@ -1,4 +1,4 @@
-/* Info Book 1.9.271 – Sugar Rush, levels 1–75. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.272 – Sugar Rush, levels 1–75. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -1414,7 +1414,7 @@
       '<path id="sr-path-wide" d="' + live + '" fill="none" stroke="url(#sr-icing)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>' +
       '<path id="sr-path-dash" d="' + live + '" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 10" opacity=".9"/>' +
       '<path id="sr-path-win" d="" fill="none" stroke="#fff6a8" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>' +
-      '<g id="sr-travel-plane" display="none" pointer-events="none" filter="url(#sr-soft)"><circle r="24" fill="#fff6c8" fill-opacity=".92" stroke="#fff" stroke-width="4"/><circle r="18" fill="none" stroke="#ff6fa8" stroke-width="2.5"/><path d="M0 -14 L3 -4 L14 2 L14 5 L3 2 L2 10 L6 13 L6 15 L0 13 L-6 15 L-6 13 L-2 10 L-3 2 L-14 5 L-14 2 L-3 -4 Z" fill="#fff" stroke="#2878c8" stroke-width="2"/></g>' +
+      '<g id="sr-travel-plane" display="none" pointer-events="none" filter="url(#sr-soft)"><g transform="scale(1.7)"><circle r="24" fill="#fff6c8" fill-opacity=".92" stroke="#fff" stroke-width="4"/><circle r="18" fill="none" stroke="#ff6fa8" stroke-width="2.5"/><path d="M0 -14 L3 -4 L14 2 L14 5 L3 2 L2 10 L6 13 L6 15 L0 13 L-6 15 L-6 13 L-2 10 L-3 2 L-14 5 L-14 2 L-3 -4 Z" fill="#fff" stroke="#2878c8" stroke-width="2"/></g></g>' +
       '</svg>'
     );
   }
@@ -7444,7 +7444,7 @@
         plane.setAttribute('transform', 'translate(' + p.x.toFixed(2) + ' ' + p.y.toFixed(2) + ') rotate(' + deg.toFixed(1) + ')');
       };
       const first = track.getPointAtLength(0), last = track.getPointAtLength(length);
-      const farScale = Math.min(vw / sw, vh / sh) * .92, closeScale = 1.45;
+      const farScale = Math.min(vw / sw, vh / sh) * .92, closeScale = 2.8;
       stage.style.transform = 'translate3d(0,0,0) scale(1)';
       void stage.offsetWidth;
       stage.style.transition = 'transform 460ms cubic-bezier(.2,.8,.2,1)';
