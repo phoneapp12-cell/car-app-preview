@@ -55,7 +55,7 @@
     return COUNTRIES[key] || ['📍', [['📍', 'a new stop'], ['🗺️', 'on the trail'], ['🍬', 'sweet shop']]];
   }
 
-  /* 1.9.281 Three unique things for every real place on the trail.
+  /* 1.9.282 Three unique things for every real place on the trail.
      Short, checked facts. No sport. Icons sit in round pastel chips. */
   var PLACES = {
     'onerahi': [['🌊', 'Sits on the shore of Whangārei Harbour'], ['✈️', 'Home to Whangārei\'s airport'], ['🚂', 'An old railway line is now a harbour walkway']],
@@ -508,7 +508,7 @@
       '.sr-nav button{width:48px;height:48px;border:0;border-radius:50%;background:#ff4f88;color:#fff;font:900 26px/1 ui-rounded,system-ui,sans-serif;box-shadow:0 3px 0 #d6246e}',
       '.sr-nav button:disabled{opacity:.35}',
       '.sr-nav span{min-width:120px;text-align:center;font:900 14px/1.1 ui-rounded,system-ui,sans-serif;color:#d6246e}',
-      /* 1.9.281 player + badges stay a fixed size on screen when zoomed */
+      /* 1.9.282 player + badges stay a fixed size on screen when zoomed */
       '#racers .racer.me .face{width:30px;height:30px;font-size:16px;border-width:2.5px}',
       '#racers .racer .nm{opacity:.92}',
       '.stops .lv .sr-medal{transform-origin:0 0;scale:calc(1 / var(--sr-k, 1))}',
