@@ -1,4 +1,4 @@
-/* Info Book 1.9.289 — magazine article reader (Today look) */
+/* Info Book magazine article reader (Today look) */
 html.ib-reader-on #ib-tabs{display:none}
 html.ib-reader-on #stories-host{display:none}
 html.ib-reader-on{overflow:hidden}
@@ -51,4 +51,47 @@ html.today-look .ibr-empty{color:var(--mute);font-size:.95rem}
 @media (min-width:720px){
   html.today-look .ibr-body{column-count:2;column-gap:2em}
   html.today-look .ibr-body.ibr-drop > p:first-of-type::first-letter{font-size:2.8em}
+}
+
+html.today-look .ibr-summary,html.today-look .ibr-facts,html.today-look .ibr-fromsrc,html.today-look .ibr-related{
+  margin:0 0 18px;padding:14px 16px;border:1px solid var(--line,#DAD3C8);border-radius:14px;
+  background:color-mix(in srgb,var(--chip,#EFE8DC) 45%,var(--card,#fffdf8))}
+html.today-look .ibr-summary h2,html.today-look .ibr-facts h2,html.today-look .ibr-fromsrc h2,html.today-look .ibr-related h2,
+html.today-look .ibr-body h2{
+  margin:0 0 8px;font-size:.68rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--sage,#3F6E55);
+  font-family:var(--today-sans,system-ui,sans-serif);column-span:all}
+html.today-look .ibr-body h2{margin:1.4em 0 .6em}
+html.today-look .ibr-summary p{margin:0;font-size:1.02rem;line-height:1.55}
+html.today-look .ibr-facts dl{margin:0;display:grid;grid-template-columns:1fr;gap:8px 16px}
+html.today-look .ibr-facts dl div{display:grid;grid-template-columns:minmax(5.5em,32%) 1fr;gap:8px;padding:4px 0;border-top:1px solid color-mix(in srgb,var(--line,#DAD3C8) 70%,transparent)}
+html.today-look .ibr-facts dl div:first-child{border-top:0}
+html.today-look .ibr-facts dt{font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);padding-top:.15em}
+html.today-look .ibr-facts dd{margin:0;font-size:.95rem;color:var(--ink)}
+html.today-look .ibr-fig{margin:1.1em 0;border-radius:14px;overflow:hidden;background:color-mix(in srgb,var(--chip) 60%,var(--card));column-span:all}
+html.today-look .ibr-fig img{display:block;width:100%;height:auto;max-height:42vh;object-fit:cover}
+html.today-look .ibr-fig figcaption{padding:8px 12px 10px;font-size:.75rem;color:var(--mute)}
+html.today-look .ibr-fromsrc h3{font-family:var(--today-serif,Fraunces,Georgia,serif);font-size:1.1rem;margin:1em 0 .4em}
+html.today-look .ibr-fromsrc p,html.today-look .ibr-related p{margin:0 0 .8em;font-size:1.02rem;line-height:1.6}
+html.today-look .ibr-excerpt-note{color:var(--mute);font-size:.88rem !important}
+html.today-look .ibr-related details{border-top:1px solid var(--line,#DAD3C8);padding:6px 0}
+html.today-look .ibr-related details:first-of-type{border-top:0}
+html.today-look .ibr-related summary{cursor:pointer;font-family:var(--today-serif,Fraunces,Georgia,serif);font-weight:600;font-size:1.05rem;padding:8px 0;list-style:none}
+html.today-look .ibr-related summary::-webkit-details-marker{display:none}
+html.today-look .ibr-related summary::after{content:"▾";float:right;color:var(--sage,#3F6E55)}
+html.today-look .ibr-related details[open] summary::after{content:"▴"}
+html.today-look .ibr-rel-link{font-size:.82rem !important;color:var(--mute)}
+html.today-look .ibr-rel-link a{color:var(--press,#8B2E2E);font-weight:600}
+html.today-look .ibr-loading{color:var(--mute);font-size:.9rem;margin:0 0 1em}
+html.today-look .ibr-skel{margin:8px 0 16px}
+html.today-look .ibr-skel-line{height:12px;border-radius:8px;margin:0 0 10px;background:linear-gradient(90deg,color-mix(in srgb,var(--chip) 70%,var(--line)) 0%,color-mix(in srgb,var(--card) 80%,#fff) 50%,color-mix(in srgb,var(--chip) 70%,var(--line)) 100%);background-size:200% 100%;animation:ibrSkel 1.2s ease-in-out infinite}
+html.today-look .ibr-skel-line.short{width:62%}
+@keyframes ibrSkel{0%{background-position:100% 0}100%{background-position:-100% 0}}
+@media (prefers-reduced-motion:reduce){
+  html.today-look .ibr-skel-line{animation:none}
+}
+@media (min-width:560px){
+  html.today-look .ibr-facts dl{grid-template-columns:1fr 1fr}
+}
+@media (min-width:720px){
+  html.today-look .ibr-body h2,html.today-look .ibr-fig{column-span:all}
 }

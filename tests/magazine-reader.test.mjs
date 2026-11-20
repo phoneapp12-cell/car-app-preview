@@ -39,6 +39,9 @@ test('magazine reader assets are wired into the feed shell', () => {
   assert.match(sw, /reader\.js\?v=' \+ VERSION/);
   assert.match(css, /ibr-drop/);
   assert.match(css, /ibr-pull/);
+  assert.match(css, /ibr-facts/);
+  assert.match(css, /ibr-summary/);
+  assert.match(css, /ibr-skel/);
   assert.match(css, /prefers-reduced-motion/);
   assert.match(css, /ibrTurnIn/);
   assert.match(today, /openReaderOrLink/);
@@ -127,4 +130,121 @@ test('pull quotes are copied verbatim from source text only', () => {
   const text = 'The tree is common in Northland. “Large crimson flowers cover the crown in early summer.” Birds visit often.';
   assert.equal(ibReader.pullQuotesFrom(text).join('\n'), 'Large crimson flowers cover the crown in early summer.');
   assert.equal(ibReader.pullQuotesFrom('No quotes here at all, just a sentence about trees blooming along the coast of Northland this week.').length, 0);
+});
+
+
+test('extractEntities picks places and names, and scoreCandidate prefers a clear topic', () => {
+  const { ibReader } = load();
+  const ents = ibReader.extractEntities('Pōhutukawa starting to bloom along the coast.', 'The first red flowers are out on Northland’s shores this week.');
+  assert.ok(ents.some(e => /p[oō]hutukawa/i.test(e)), ents);
+  assert.equal(ibReader.scoreCandidate('Pōhutukawa', '', 'Pōhutukawa starting to bloom along the coast.', ''), 0.96);
+  assert.ok(ibReader.scoreCandidate('Pōhutukawa', '', "Northland's pōhutukawa trees are starting to bloom", '') >= 0.86);
+  assert.ok(ibReader.scoreCandidate('New Zealand', '', 'Pōhutukawa starting to bloom along the coast.', '') < 0.75);
+  assert.ok(ibReader.scoreCandidate('Coast', '', 'Pōhutukawa starting to bloom along the coast.', '') < 0.75);
+  assert.equal(ibReader.confidenceOk(0.86, 'Pōhutukawa', "Northland's pōhutukawa trees are starting to bloom", false), true);
+  assert.equal(ibReader.confidenceOk(0.86, 'New Zealand', 'Pōhutukawa starting to bloom along the coast.', false), false);
+  assert.equal(ibReader.confidenceOk(0.86, 'Whangārei', 'A pink sky over Whangārei, and the dogs already dreaming.', true), false);
+});
+
+test('sectionsFromText keeps the lead and key headings, and drops references', () => {
+  const { ibReader } = load();
+  const text = `The pōhutukawa is a coastal evergreen tree in the myrtle family, producing large crimson flowers.
+
+It is commonly found around the north of the North Island.
+
+== Description ==
+The tree typically grows to 20 metres, with spreading branches and a gnarled trunk.
+
+Leaves are leathery and dark green, with a felted underside that helps the tree cope with salt spray.
+
+== Ecology ==
+Tūī, bellbirds and bats visit the flowers for nectar in early summer.
+
+== See also ==
+Rata is a related tree.
+
+== References ==
+A list of papers.
+`;
+  const secs = ibReader.sectionsFromText(text);
+  assert.equal(secs[0].heading, '');
+  assert.match(secs[0].paras[0], /coastal evergreen tree/);
+  assert.ok(secs.some(s => s.heading === 'Description'));
+  assert.ok(secs.some(s => s.heading === 'Ecology'));
+  assert.ok(!secs.some(s => /see also|references/i.test(s.heading)));
+  const paras = ibReader.paragraphsFromText(text, 8);
+  assert.ok(paras.length >= 4);
+  assert.ok(paras.some(p => /20 metres/.test(p)));
+});
+
+test('viewHtml shows a quick summary, key facts, sections, related topics and a source excerpt', () => {
+  const { ibReader } = load();
+  const item = { id: 'n1', t: 'Pōhutukawa starting to bloom along the coast.', s: 'The first red flowers are out.', url: 'https://www.rnz.co.nz/pohutukawa', sn: 'RNZ', kind: 'news' };
+  const html = ibReader.viewHtml(item, {
+    wiki: { title: 'Pōhutukawa', sum: { title: 'Pōhutukawa', extract: 'The pōhutukawa is a coastal evergreen tree.', content_urls: { desktop: { page: 'https://en.wikipedia.org/wiki/P%C5%8Dhutukawa' } } } },
+    summary: 'The pōhutukawa is a coastal evergreen tree in the myrtle family.',
+    facts: [{ label: 'Type', value: 'Taxon' }, { label: 'Scientific name', value: 'Metrosideros excelsa' }],
+    sections: [
+      { heading: '', paras: ['The pōhutukawa is a coastal evergreen tree in the myrtle family, producing large crimson flowers.'] },
+      { heading: 'Description', paras: ['The tree typically grows to 20 metres, with spreading branches and a gnarled trunk.'] }
+    ],
+    paras: ['The pōhutukawa is a coastal evergreen tree in the myrtle family, producing large crimson flowers.'],
+    images: [{ src: 'https://upload.wikimedia.org/example.jpg', caption: 'Flowers in December' }],
+    related: [{ title: 'Metrosideros', extract: 'A genus of trees in the myrtle family, including the pōhutukawa and rātā.', url: 'https://en.wikipedia.org/wiki/Metrosideros' }],
+    quotes: [],
+    source: { ok: true, site: 'RNZ', excerpt: true, paras: [{ text: 'The first red flowers are out on Northland’s shores this week, turning a familiar stretch of coast a deep crimson.' }, { text: 'Pōhutukawa trees usually reach their peak in December, but a warm spring has brought the bloom forward.' }] }
+  });
+  assert.match(html, /Quick summary/);
+  assert.match(html, /Key facts/);
+  assert.match(html, /Metrosideros excelsa/);
+  assert.match(html, /<h2>Description<\/h2>/);
+  assert.match(html, /grows to 20 metres/);
+  assert.match(html, /More on this topic/);
+  assert.match(html, /Metrosideros/);
+  assert.match(html, /From the original on RNZ/);
+  assert.match(html, /short excerpt/);
+  assert.match(html, /Flowers in December/);
+  assert.match(html, /From/);
+  assert.match(html, /Wikipedia/);
+  assert.match(html, /creativecommons.org\/licenses\/by-sa\/4\.0/);
+  assert.match(html, /Read the original on RNZ/);
+  assert.doesNotMatch(html, /invent|lorem|sample article/i);
+  assert.doesNotMatch(html, /ibr-skel/);
+});
+
+test('viewHtml shows a skeleton while more information is loading', () => {
+  const { ibReader } = load();
+  const item = { id: 'n1', t: 'Headline', s: 'A short intro from the card.', url: 'https://www.rnz.co.nz/x', sn: 'RNZ' };
+  const html = ibReader.viewHtml(item, { wiki: null, paras: [], quotes: [], pending: true });
+  assert.match(html, /ibr-skel/);
+  assert.match(html, /Looking up more about this story/);
+  assert.match(html, /A short intro from the card/);
+});
+
+test('findWiki accepts a strong entity match and still rejects a loose country page', async () => {
+  const calls = [];
+  const fetchFn = async (url) => {
+    calls.push(String(url));
+    const u = String(url);
+    if (/list=search/.test(u)) {
+      const q = decodeURIComponent((u.match(/srsearch=([^&]+)/) || [])[1] || '');
+      if (/p[oō]hutukawa/i.test(q)) {
+        return { ok: true, json: async () => ({ query: { search: [{ title: 'Pōhutukawa', snippet: 'A coastal evergreen tree of New Zealand.' }] } }) };
+      }
+      return { ok: true, json: async () => ({ query: { search: [{ title: 'New Zealand' }, { title: 'Coastal geography' }] } }) };
+    }
+    if (/page\/summary\//.test(u)) {
+      const title = decodeURIComponent(u.split('/summary/')[1] || '');
+      return { ok: true, json: async () => ({ title: title.replace(/_/g, ' '), type: 'standard', extract: 'The pōhutukawa is a coastal evergreen tree.', content_urls: { desktop: { page: 'https://en.wikipedia.org/wiki/P%C5%8Dhutukawa' } } }) };
+    }
+    return { ok: true, json: async () => ({}) };
+  };
+  const { ibReader } = load({ fetch: fetchFn });
+  const hit = await ibReader.findWiki({ t: "Northland's pōhutukawa trees are starting to bloom", s: 'The first red flowers are out.', url: 'https://www.rnz.co.nz/x' });
+  assert.ok(hit);
+  assert.match(hit.title, /Pōhutukawa/);
+  assert.ok(hit.confidence >= 0.75);
+  const miss = await ibReader.findWiki({ t: 'A quiet morning walk along the shore', s: 'Just the usual tide and a few dogs.', url: 'https://www.rnz.co.nz/y' });
+  assert.equal(miss, null);
+  assert.ok(!calls.some(u => /page\/summary\/New_Zealand/.test(u)));
 });
