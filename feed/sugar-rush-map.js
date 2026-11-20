@@ -156,6 +156,8 @@
     placeOpen = null;
     var map = document.getElementById('map');
     if (map) map.classList.remove('sr-placing');
+    var stage = document.getElementById('mapstage');
+    if (stage && stage.dataset.placeShift) { stage.dataset.placeShift = ''; stage.dataset.framed = ''; }
   }
 
   function showPlace(opts) {
@@ -195,8 +197,33 @@
         ? '<button type="button" class="sr-pc-play" data-sr-place="play"' + (opts.name ? ' title="' + esc(opts.name) + '"' : '') + '>▶ Play level ' + esc(opts.n) + '</button>'
         : '<p class="sr-pc-lock">🔒 Finish level ' + esc((opts.n || 2) - 1) + ' to unlock</p>');
     placeOpen = opts;
+    var cc = document.getElementById('sr-country-card');
+    var ctop = cc && !cc.hidden && cc.offsetHeight ? cc.getBoundingClientRect().bottom + 8 : 64;
+    card.style.setProperty('--sr-pc-top', Math.round(ctop) + 'px');
     card.hidden = false;
     map.classList.add('sr-placing');
+    clearStop(opts.n, card);
+  }
+
+  /* Keep the tapped stop (and the star) visible: slide the map so the stop sits in the open sea
+     between the place card and the country buttons. */
+  function clearStop(n, card) {
+    var stage = document.getElementById('mapstage');
+    var pin = document.querySelector('.stops .lv[data-n="' + n + '"] .pin');
+    if (!stage || !pin || stage.classList.contains('travel-shot')) return;
+    var m = /translate(?:3d)?\(\s*([-\d.]+)px,\s*([-\d.]+)px/.exec(stage.style.transform || '');
+    if (!m) return;
+    var r = pin.getBoundingClientRect(), c = card.getBoundingClientRect();
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var zoneTop = c.bottom + 56, zoneBot = vh - 175;
+    var x = r.left + r.width / 2, y = r.top + r.height / 2;
+    var want = zoneBot > zoneTop ? (zoneTop + zoneBot) / 2 : zoneTop;
+    var dy = (y >= zoneTop && y <= zoneBot) ? 0 : want - y;
+    var dx = x < 40 ? 40 - x : (x > vw - 40 ? vw - 40 - x : 0);
+    if (!dx && !dy) return;
+    stage.style.transition = 'transform .35s ease';
+    stage.style.transform = stage.style.transform.replace(m[0], m[0].replace(m[1] + 'px', (+m[1] + dx).toFixed(1) + 'px').replace(m[2] + 'px', (+m[2] + dy).toFixed(1) + 'px'));
+    stage.dataset.placeShift = '1';
   }
 
   function stageScale(stage) {
@@ -267,6 +294,16 @@
         '<path d="M20 9.5 L22.9 15.6 L29.5 16.4 L24.6 20.9 L25.9 27.4 L20 24.2 L14.1 27.4 L15.4 20.9 L10.5 16.4 L17.1 15.6 Z" fill="#ffd54a" stroke="#f0a400" stroke-width="1" stroke-linejoin="round"/>' +
         '<ellipse cx="14" cy="12" rx="4" ry="2.4" fill="#fff" opacity=".45" transform="rotate(-30 14 12)"/></svg>';
       here.appendChild(star);
+    }
+    var lab = here && here.querySelector('.sr-star-label');
+    if (here && !lab) {
+      lab = document.createElement('b');
+      lab.className = 'sr-star-label';
+      here.querySelector('.sr-star').appendChild(lab);
+    }
+    if (lab) {
+      var lt = "You're here · Level " + here.dataset.n;
+      if (lab.textContent !== lt) lab.textContent = lt;
     }
   }
 
@@ -556,17 +593,16 @@
       '@keyframes srStarGlow{0%,100%{filter:drop-shadow(0 0 5px rgba(255,70,90,.6)) drop-shadow(0 3px 2px rgba(120,10,30,.25))}50%{filter:drop-shadow(0 0 13px rgba(255,90,110,.95)) drop-shadow(0 3px 2px rgba(120,10,30,.25))}}',
       '@media (prefers-reduced-motion:reduce){.sr-star{animation:none}}',
       /* three unique things card */
-      '.sr-place-card{position:absolute;left:50%;top:58px;transform:translateX(-50%);z-index:22;width:min(90%,340px);box-sizing:border-box;padding:16px 18px 14px;border-radius:24px;background:#fff;box-shadow:0 10px 28px rgba(60,110,140,.25),0 2px 0 rgba(255,255,255,.9) inset;text-align:left;font-family:ui-rounded,system-ui,sans-serif}',
+      '.sr-place-card{position:fixed;left:10px;right:10px;top:var(--sr-pc-top,140px);transform:none;z-index:40;width:auto;max-width:430px;margin:0 auto;max-height:calc(100% - var(--sr-pc-top,140px) - 160px);overflow-y:auto;overflow-x:hidden;box-sizing:border-box;padding:16px 18px 14px;border-radius:24px;background:#fff;box-shadow:0 10px 28px rgba(60,110,140,.25),0 2px 0 rgba(255,255,255,.9) inset;text-align:left;font-family:ui-rounded,system-ui,sans-serif}',
       '.sr-place-card[hidden]{display:none}',
       'body:not(.onmap) .sr-place-card{display:none}',
-      '#map.sr-placing .sr-country-card{display:none}',
       '.sr-pc-x{position:absolute;right:10px;top:8px;width:32px;height:32px;border:0;border-radius:50%;background:#f1f6f8;color:#6b7f90;font:700 20px/1 ui-rounded,system-ui,sans-serif;cursor:pointer}',
-      '.sr-pc-name{margin:0 34px 0 0;color:#159a9c;font:900 21px/1.1 ui-rounded,system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase}',
+      '.sr-pc-name{overflow-wrap:anywhere;margin:0 34px 0 0;color:#159a9c;font:900 21px/1.1 ui-rounded,system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase}',
       '.sr-pc-country{margin:3px 0 0;color:#7c8ea0;font:700 12px/1.2 ui-rounded,system-ui,sans-serif}',
       '.sr-pc-rule{border:0;border-top:1.5px solid #e3edf0;margin:10px 0 9px}',
       '.sr-pc-head{margin:0 0 8px;color:#f2706a;font:900 12px/1.2 ui-rounded,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase}',
       '.sr-pc-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}',
-      '.sr-pc-list li{display:flex;align-items:center;gap:10px;color:#3d4a62;font:700 14px/1.25 ui-rounded,system-ui,sans-serif}',
+      '.sr-pc-list li span{min-width:0;overflow-wrap:anywhere}','.sr-pc-list li{display:flex;align-items:center;gap:10px;color:#3d4a62;font:700 14px/1.25 ui-rounded,system-ui,sans-serif}',
       '.sr-pc-list i{flex:0 0 34px;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:18px;box-shadow:0 1px 0 rgba(255,255,255,.9) inset,0 2px 4px rgba(90,140,170,.15)}',
       '.sr-pc-play{display:block;width:100%;margin-top:12px;padding:11px 12px;border:0;border-radius:16px;background:#ff4f88;color:#fff;font:900 15px/1.2 ui-rounded,system-ui,sans-serif;box-shadow:0 3px 0 #d6246e;cursor:pointer}',
       '.sr-pc-lock{margin:12px 0 0;padding:9px 12px;border-radius:14px;background:#fdf1f5;color:#b45a7f;font:800 13px/1.2 ui-rounded,system-ui,sans-serif;text-align:center}',
@@ -610,9 +646,27 @@
       '.mapstage.sr-world-view .sr-medal i u{font-size:15px}',
       '.mapstage.sr-world-view .sr-medal i b{display:none}',
       '.mapstage.sr-world-view .stops .lv.here .sr-medal i{box-shadow:0 0 0 2.5px #ff4f88,0 3px 6px rgba(40,110,140,.28)}',
-      '.mapstage.sr-world-view .sr-star{display:none}',
       '.stops .lv .gotbadge{scale:calc(1 / var(--sr-k, 1))}',
-      '.mapstage.sr-world-view .stops .lv .gotbadge{display:none}'
+      '.mapstage.sr-world-view .stops .lv .gotbadge{display:none}',
+      /* 1.9.284 find my level: numbered stops, a labelled star, a level chip with Play, Find me */
+      '.mapstage .stops.path{margin:0}', /* the old grid .path margin pushed every pin ~90px off the route when zoomed */
+      '.stops .lv .pin{width:20px;height:20px}',
+      '.stops .lv .pin .no{font:900 10px/1 ui-rounded,system-ui,sans-serif;color:#c2477a;letter-spacing:-.02em}',
+      '.stops .lv.locked .pin .no{color:#a8948a}',
+      '.stops .lv.here .pin .no{opacity:0}',
+      '.stops .lv.here{z-index:30}',
+      '.sr-star-label{position:absolute;left:50%;bottom:100%;transform:translateX(-50%);margin-bottom:4px;white-space:nowrap;padding:5px 10px;border-radius:13px;background:#ff3d6e;color:#fff;font:900 12px/1 ui-rounded,system-ui,sans-serif;box-shadow:0 2px 0 #c41d4f,0 4px 10px rgba(120,10,40,.25);pointer-events:none}',
+      '.stops .lv.here.sr-pulse .sr-star{animation:srFindMe .5s ease-in-out 3}',
+      '@keyframes srFindMe{0%,100%{transform:scale(1)}50%{transform:scale(1.35)}}',
+      '.racer.me .nm{background:#ff3d6e;color:#fff}',
+      '.sr-level-chip{position:absolute;left:10px;right:10px;top:var(--sr-lc-top,140px);z-index:20;max-width:430px;margin:0 auto;display:flex;align-items:center;gap:8px;box-sizing:border-box;padding:6px 6px 6px 12px;border-radius:22px;background:#fff;box-shadow:0 3px 0 #f4a0c4,0 6px 14px rgba(40,110,140,.2);font-family:ui-rounded,system-ui,sans-serif}',
+      '.sr-level-chip[hidden],body:not(.onmap) .sr-level-chip,#map.sr-placing .sr-level-chip{display:none}',
+      '.sr-lc-where{flex:1 1 auto;min-width:0;display:flex;align-items:baseline;gap:5px;border:0;background:none;padding:4px 0;color:#3d4a62;font:800 14px/1.2 ui-rounded,system-ui,sans-serif;text-align:left;cursor:pointer;white-space:nowrap;overflow:hidden}',
+      '.sr-lc-where b{color:#e0306c;font-weight:900;flex:none}',
+      '.sr-lc-where span{overflow:hidden;text-overflow:ellipsis}',
+      '.sr-lc-play{flex:none;border:0;border-radius:17px;padding:11px 18px;background:#ff4f88;color:#fff;font:900 16px/1 ui-rounded,system-ui,sans-serif;box-shadow:0 3px 0 #d6246e;cursor:pointer}',
+      '.sr-findme-btn{position:absolute;left:12px;bottom:152px;z-index:21;padding:9px 13px;border:2px solid #ff8ab8;border-radius:18px;background:#fff;color:#d6246e;font:900 13px/1 ui-rounded,system-ui,sans-serif;box-shadow:0 3px 0 #f4a0c4;cursor:pointer}',
+      'body:not(.onmap) .sr-findme-btn{display:none}'
     ].join('');
     document.head.appendChild(css);
   }
@@ -693,6 +747,8 @@
       if (on && pin.classList.contains('lv')) pins.push(pin);
     });
     if (!pins.length) return;
+    // 1.9.284 the game's showMap scrolls #mapview to the stop; the overlay frames with a transform, so keep the view unscrolled
+    if (view.scrollLeft || view.scrollTop) { view.scrollLeft = 0; view.scrollTop = 0; }
     var key = country + ':' + pins.length;
     if (stage.dataset.framed === key) return;
     stage.dataset.framed = key;
@@ -700,7 +756,10 @@
     if (!sw || !sh || !vw || !vh) return;
     var svg = stage.querySelector('svg.nzsvg');
     var perUnit = svg && svg.viewBox && svg.viewBox.baseVal && svg.viewBox.baseVal.width ? sw / svg.viewBox.baseVal.width : 1;
-    var top = 175, bottom = 150; // title card above, country buttons below
+    var top = 175, bottom = 200; // title card (and the level chip) above; Find me / World and the country buttons below
+    var chipEl = document.getElementById('sr-level-chip');
+    if (chipEl && !chipEl.hidden && chipEl.offsetHeight) top = Math.max(top, chipEl.offsetTop + chipEl.offsetHeight + 14);
+    var herePin = document.querySelector('.stops .lv.here');
     var scale, cx, cy;
     if (world) {
       scale = Math.min(vw / sw, (vh - top - bottom) / sh) * 0.98;
@@ -723,14 +782,19 @@
       cx = (minX + maxX) / 2;
       cy = (minY + maxY) / 2;
       scale = Math.min(vw / bw, (vh - top - bottom) / bh);
-      scale = Math.max(0.3, Math.min(scale, 14));
+      // 1.9.284 at most 7x: keeps the neighbours in view and keeps phones from running out of map tiles
+      scale = Math.max(0.3, Math.min(scale, 7));
+      if (herePin && herePin.dataset.country === country) {
+        cx = parseFloat(herePin.style.left) / 100 * sw;
+        cy = parseFloat(herePin.style.top) / 100 * sh;
+      }
     }
     var tx = vw / 2 - cx * scale;
     var ty = (top + (vh - bottom - top) / 2) - cy * scale;
     view.style.overflow = 'hidden';
     stage.style.transformOrigin = '0 0';
     stage.style.transition = 'transform .35s ease';
-    stage.style.transform = 'translate3d(' + tx.toFixed(1) + 'px,' + ty.toFixed(1) + 'px,0) scale(' + scale.toFixed(3) + ')';
+    stage.style.transform = 'translate(' + tx.toFixed(1) + 'px,' + ty.toFixed(1) + 'px) scale(' + scale.toFixed(3) + ')';
   }
 
   function stepCountry(dir) {
@@ -747,6 +811,84 @@
     frameCountry(picked);
     showCard();
     syncNav();
+  }
+
+  function findMe() {
+    hidePlace();
+    picked = currentCountry() || countryList()[0] || '';
+    var stage = document.getElementById('mapstage');
+    if (stage) stage.dataset.framed = '';
+    frameCountry(picked);
+    showCard();
+    syncNav();
+    var here = document.querySelector('.stops .lv.here');
+    if (here) {
+      here.classList.remove('sr-pulse');
+      void here.offsetWidth;
+      here.classList.add('sr-pulse');
+      setTimeout(function () { here.classList.remove('sr-pulse'); }, 1700);
+    }
+  }
+
+  function hereInfo() {
+    var here = document.querySelector('.stops .lv.here');
+    if (!here) return null;
+    var b = here.querySelector('.meta b');
+    return { n: +here.dataset.n, place: b ? b.textContent : '', country: here.dataset.country || '', open: !here.classList.contains('locked') };
+  }
+
+  function syncLevelChip() {
+    var map = document.getElementById('map');
+    if (!map) return;
+    var chip = document.getElementById('sr-level-chip');
+    if (!chip) {
+      chip = document.createElement('div');
+      chip.id = 'sr-level-chip';
+      chip.className = 'sr-level-chip';
+      chip.innerHTML = '<button type="button" class="sr-lc-where" aria-label="Find my level"></button><button type="button" class="sr-lc-play">▶ Play</button>';
+      chip.querySelector('.sr-lc-where').addEventListener('click', findMe);
+      chip.querySelector('.sr-lc-play').addEventListener('click', function () {
+        var h = hereInfo(), ui = window.SugarRush && window.SugarRush.ui;
+        if (!h || !ui || !ui.openLevel) return;
+        try { if (ui.unlockAudio) ui.unlockAudio(); } catch (e) {}
+        ui.openLevel(h.n);
+      });
+      map.appendChild(chip);
+    }
+    var h = hereInfo();
+    chip.hidden = !h;
+    if (!h) return;
+    var card = document.getElementById('sr-country-card');
+    var top = card && !card.hidden && card.offsetHeight ? card.offsetTop + card.offsetHeight + 8 : 140;
+    var tv = top + 'px';
+    if (chip.style.getPropertyValue('--sr-lc-top') !== tv) chip.style.setProperty('--sr-lc-top', tv);
+    var html = '<b>Level ' + h.n + '</b><span>· ' + esc(h.place) + '</span>';
+    var where = chip.querySelector('.sr-lc-where');
+    if (where.dataset.key !== html) { where.dataset.key = html; where.innerHTML = html; }
+    chip.querySelector('.sr-lc-play').setAttribute('aria-label', 'Play level ' + h.n + ', ' + h.place);
+    var fb = document.getElementById('sr-findme-btn');
+    if (!fb) {
+      fb = document.createElement('button');
+      fb.type = 'button';
+      fb.id = 'sr-findme-btn';
+      fb.className = 'sr-findme-btn';
+      fb.textContent = '◎ Find me';
+      fb.setAttribute('aria-label', 'Find me: show my level on the map');
+      fb.addEventListener('click', findMe);
+      map.appendChild(fb);
+    }
+  }
+
+  var wasOnMap = false;
+  function openOnMyLevel() {
+    var on = document.body.classList.contains('onmap');
+    if (on && !wasOnMap && currentCountry()) {
+      picked = currentCountry();
+      lastHere = picked;
+      var stage = document.getElementById('mapstage');
+      if (stage) stage.dataset.framed = '';
+    }
+    wasOnMap = on;
   }
 
   function gotoCountry(c) {
@@ -792,7 +934,7 @@
     nav.querySelector('#sr-next').disabled = !inWorld && (i < 0 || i >= list.length - 1);
     if (nav.dataset.country !== country) {
       nav.dataset.country = country;
-      nav.querySelector('span').innerHTML = (inWorld ? 'World map' : (country || 'Country')) + '<small style="display:block;font-size:10px;color:#7a4a62">1.9.283</small>';
+      nav.querySelector('span').innerHTML = (inWorld ? 'World map' : (country || 'Country')) + '<small style="display:block;font-size:10px;color:#7a4a62">1.9.284</small>';
     }
     nav.style.display = document.body.classList.contains('onmap') ? '' : 'none';
   }
@@ -945,6 +1087,9 @@
     try {
       injectStyle();
       decorate();
+      openOnMyLevel();
+      showCard();
+      syncLevelChip();
       var stage = document.getElementById('mapstage');
       if (stage && stage.classList.contains('travel-shot')) {
         stage.dataset.wasTravel = '1';
@@ -978,7 +1123,7 @@
     e.stopPropagation();
     gotoCountry(lv.dataset.country);
   }, true);
-  window.SugarRushMap = { gotoCountry: function (c) { gotoCountry(c || WORLD); }, WORLD: WORLD, showPlace: showPlace, hidePlace: hidePlace, placeFacts: placeFacts, PLACES: PLACES };
+  window.SugarRushMap = { gotoCountry: function (c) { gotoCountry(c || WORLD); }, findMe: findMe, WORLD: WORLD, showPlace: showPlace, hidePlace: hidePlace, placeFacts: placeFacts, PLACES: PLACES };
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && placeOpen) hidePlace(); });
 
   var obs = new MutationObserver(function () { tick(); });
