@@ -48,6 +48,8 @@
     kiribati: ['🌅', [['🌅', 'sunrise'], ['⭕', 'atolls'], ['🛶', 'canoe']]]
   };
 
+  var SHORT = { 'federated states of micronesia': 'Micronesia' };
+
   function info(country) {
     var key = String(country || '').trim().toLowerCase();
     return COUNTRIES[key] || ['📍', [['📍', 'a new stop'], ['🗺️', 'on the trail'], ['🍬', 'sweet shop']]];
@@ -239,6 +241,231 @@
     }
   }
 
+  /* 1.9.282 Map art v2, after Shane's two references: raised pastel land with
+     cliff sides and a soft shadow, white foam along every coast, a turquoise
+     swirl sea, rocky islets, bushes and pebbles, and a thick pink route with
+     cream nodes. Painted once per map, no SVG filters, so phones stay smooth. */
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  var V2_FILL = {
+    'sr-land': 'v2-meadow', 'sr-candy-strawberry': 'v2-peach', 'sr-candy-peach': 'v2-peach',
+    'sr-candy-lemon': 'v2-mint', 'sr-candy-mint': 'v2-mint', 'sr-candy-blueberry': 'v2-lilac', 'sr-candy-grape': 'v2-lilac'
+  };
+  var V2_DEFS =
+    '<linearGradient id="v2-meadow" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d4f0c6"/><stop offset=".42" stop-color="#c3e9bd"/><stop offset=".7" stop-color="#f3dcc0"/><stop offset="1" stop-color="#f6c2ab"/></linearGradient>' +
+    '<linearGradient id="v2-mint" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e2f8ea"/><stop offset="1" stop-color="#b9e8cf"/></linearGradient>' +
+    '<linearGradient id="v2-peach" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe7d9"/><stop offset="1" stop-color="#f8c4ad"/></linearGradient>' +
+    '<linearGradient id="v2-lilac" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#eee4fb"/><stop offset="1" stop-color="#d3c1f0"/></linearGradient>' +
+    '<pattern id="v2-swirl" width="260" height="260" patternUnits="userSpaceOnUse">' +
+    '<path d="M-10 60 C 40 20 90 100 140 60 S 230 30 270 70" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".35"/>' +
+    '<path d="M20 180 C 60 150 100 210 150 180 C 190 156 210 196 240 176" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" opacity=".28"/>' +
+    '<path d="M150 118 c 18 -16 46 -10 44 10 c -2 16 -24 18 -28 6" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" opacity=".3"/>' +
+    '<path d="M30 240 c 14 -12 36 -8 34 8" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".25"/>' +
+    '</pattern>' +
+    '<g id="v2-bush"><ellipse cx="0" cy="3.2" rx="7.5" ry="2.6" fill="#5b9b78" opacity=".28"/><circle cx="-3.6" cy="0" r="3.6" fill="#78c08a"/><circle cx="3.6" cy="0.4" r="3.4" fill="#6cb682"/><circle cx="0" cy="-2.6" r="4" fill="#8fd09a"/><circle cx="-1.2" cy="-4" r="1.5" fill="#c4ecc0"/></g>' +
+    '<g id="v2-pebbles" fill="#fff6e8"><circle cx="0" cy="0" r="1.5"/><circle cx="4" cy="1" r="1.3"/><circle cx="8" cy="0" r="1.5"/><circle cx="2" cy="3.5" r="1.3"/><circle cx="6" cy="4" r="1.5"/><circle cx="10" cy="3" r="1.2"/><circle cx="4" cy="7" r="1.3"/></g>' +
+    '<g id="v2-islet"><ellipse cx="0" cy="5" rx="15" ry="6.5" fill="#fff" opacity=".55"/><path d="M-9 2 L-7 -5 L-2 -8 L5 -7 L9 -2 L9 3 Q0 6 -9 2 Z" fill="#e4bfa8"/><path d="M-9 -1 L-7 -6 L-2 -9 L5 -8 L9 -3 L8 0 Q0 2.5 -9 -1 Z" fill="#f6e3d2" stroke="#fff" stroke-width="1"/></g>' +
+    '<g id="v2-islet-green"><ellipse cx="0" cy="6" rx="18" ry="7" fill="#fff" opacity=".55"/><path d="M-12 1 Q-12 -6 0 -7 Q12 -6 12 1 L11 5 Q0 8 -11 5 Z" fill="#e8b49e"/><ellipse cx="0" cy="-2" rx="12" ry="6" fill="#bfe6b3" stroke="#fff" stroke-width="1"/><circle cx="-3" cy="-4" r="3.5" fill="#7cc48c"/><circle cx="3" cy="-3.4" r="3" fill="#6cb682"/></g>';
+
+  function v2rng(seed) {
+    var a = seed >>> 0;
+    return function () { a = (a + 0x6D2B79F5) >>> 0; var t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+  function el(tag, attrs) {
+    var n = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+  function stopPoints(svg) {
+    var vb = svg.viewBox.baseVal;
+    return Array.prototype.map.call(document.querySelectorAll('.stops .lv'), function (b) {
+      return { n: +b.dataset.n, country: b.dataset.country, done: b.classList.contains('done'), here: b.classList.contains('here'),
+        x: vb.x + parseFloat(b.style.left) / 100 * vb.width, y: parseFloat(b.style.top) / 100 * vb.height };
+    });
+  }
+
+  function paintMap() {
+    var svg = document.querySelector('#mapstage svg.nzsvg');
+    if (!svg || svg.__v2) return;
+    if (!document.querySelector('.stops .lv')) return;
+    svg.__v2 = true;
+    var t0 = performance.now();
+    svg.classList.add('sr-v2');
+    var defs = svg.querySelector('defs');
+    var holder = el('g', {});
+    holder.innerHTML = V2_DEFS;
+    while (holder.firstChild) defs.appendChild(holder.firstChild);
+    var sea = svg.querySelector('#sr-sea');
+    if (sea) {
+      var cols = ['#5ad6ea', '#43c9e2', '#62d7e6'];
+      sea.querySelectorAll('stop').forEach(function (s, i) { s.setAttribute('stop-color', cols[Math.min(i, 2)]); });
+    }
+    var seaRect = svg.querySelector('rect[fill="url(#sr-sea)"]');
+    var vb = svg.viewBox.baseVal;
+    var swirl = el('rect', { x: vb.x, y: 0, width: vb.width, height: vb.height, fill: 'url(#v2-swirl)', 'class': 'sr-v2-swirl', 'pointer-events': 'none' });
+    if (seaRect) seaRect.parentNode.insertBefore(swirl, seaRect.nextSibling);
+    svg.querySelectorAll('.sr-pacific > rect').forEach(function (r) {
+      r.setAttribute('fill', '#8ae8ee'); r.setAttribute('opacity', '.5'); r.setAttribute('stroke', '#fff'); r.setAttribute('stroke-width', '3'); r.removeAttribute('stroke-dasharray');
+    });
+
+    var lands = Array.prototype.filter.call(svg.querySelectorAll('path[fill^="url(#sr-"],ellipse[fill^="url(#sr-"],circle[fill^="url(#sr-"]'), function (n) {
+      var id = (n.getAttribute('fill').match(/#([\w-]+)/) || [])[1];
+      return V2_FILL[id] && !n.closest('.sr-terrain,.sr-landmarks');
+    });
+    var stops = stopPoints(svg);
+    var byParent = new Map();
+    lands.forEach(function (n) {
+      var id = n.getAttribute('fill').match(/#([\w-]+)/)[1];
+      n.setAttribute('fill', 'url(#' + V2_FILL[id] + ')');
+      n.removeAttribute('filter');
+      if (n.closest('.sr-inset')) return;
+      if (!byParent.has(n.parentNode)) byParent.set(n.parentNode, []);
+      byParent.get(n.parentNode).push(n);
+    });
+    var rand = v2rng(20261120);
+    var bushes = 0, pebbles = 0;
+    var bigLands = [];
+    byParent.forEach(function (list, parent) {
+      var under = el('g', { 'class': 'sr-v2-under', 'pointer-events': 'none' });
+      var shadow = el('g', { opacity: '.17' }), foamOut = el('g', { opacity: '.2' }), foamIn = el('g', { opacity: '.6' }), cliff = el('g', {});
+      under.appendChild(shadow); under.appendChild(foamOut); under.appendChild(foamIn); under.appendChild(cliff);
+      var tex = el('g', { 'class': 'sr-v2-texture', 'pointer-events': 'none' });
+      list.forEach(function (n) {
+        var bb; try { bb = n.getBBox(); } catch (e) { return; }
+        var size = Math.max(bb.width, bb.height);
+        var d = Math.max(2, Math.min(14, size * 0.035));
+        var sw = parseFloat(n.getAttribute('stroke-width') || '3');
+        function copy(dy, attrs, into) {
+          var g = el('g', { transform: 'translate(0 ' + dy.toFixed(1) + ')' });
+          var c = n.cloneNode(false);
+          c.removeAttribute('class'); c.removeAttribute('id');
+          for (var k in attrs) c.setAttribute(k, attrs[k]);
+          g.appendChild(c); into.appendChild(g);
+        }
+        copy(d + Math.max(3, d * 0.7), { fill: '#1d7d9c', stroke: '#1d7d9c', 'stroke-width': sw + 2 }, shadow);
+        copy(d, { fill: 'none', stroke: '#fff', 'stroke-width': sw + 26 }, foamOut);
+        copy(d, { fill: 'none', stroke: '#fff', 'stroke-width': sw + 9 }, foamIn);
+        copy(d, { fill: '#d98f7c', stroke: '#d98f7c', 'stroke-width': sw }, cliff);
+        if (d >= 4) copy(d * 0.6, { fill: '#e8a68f', stroke: '#e8a68f', 'stroke-width': sw }, cliff);
+        copy(d * 0.28, { fill: '#f2bda6', stroke: '#f2bda6', 'stroke-width': sw }, cliff);
+        if (n.tagName.toLowerCase() !== 'path' || n.getAttribute('transform') || bb.width * bb.height < 1400) return;
+        bigLands.push(n);
+        var area = bb.width * bb.height;
+        var wantB = Math.min(38, Math.round(area / 1500)), wantP = Math.min(22, Math.round(area / 2600));
+        var pt = svg.createSVGPoint();
+        function inside(x, y, m) {
+          pt.x = x; pt.y = y; if (!n.isPointInFill(pt)) return false;
+          pt.x = x - m; if (!n.isPointInFill(pt)) return false;
+          pt.x = x + m; if (!n.isPointInFill(pt)) return false;
+          pt.x = x; pt.y = y + m; return n.isPointInFill(pt);
+        }
+        function nearStop(x, y, r) {
+          for (var i = 0; i < stops.length; i++) { var dx = stops[i].x - x, dy = stops[i].y - y; if (dx * dx + dy * dy < r * r) return true; }
+          return false;
+        }
+        var tries = 0, gotB = 0, gotP = 0;
+        while ((gotB < wantB || gotP < wantP) && tries < (wantB + wantP) * 4 && bushes < 230 && pebbles < 150) {
+          tries++;
+          var x = bb.x + rand() * bb.width, y = bb.y + rand() * bb.height;
+          if (nearStop(x, y, 16) || !inside(x, y, 9)) continue;
+          var s = (0.75 + rand() * 0.6).toFixed(2);
+          if (gotB < wantB && (gotP >= wantP || rand() < 0.62)) {
+            var cl = el('g', { transform: 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ') scale(' + s + ')' });
+            cl.appendChild(el('use', { href: '#v2-bush' }));
+            if (rand() < 0.55) cl.appendChild(el('use', { href: '#v2-bush', x: (6 + rand() * 4).toFixed(1), y: (2 + rand() * 3).toFixed(1) }));
+            tex.appendChild(cl); gotB++; bushes++;
+          } else {
+            tex.appendChild(el('use', { href: '#v2-pebbles', transform: 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ') scale(' + s + ')' }));
+            gotP++; pebbles++;
+          }
+        }
+      });
+      parent.insertBefore(under, list[0]);
+      var last = list[list.length - 1];
+      parent.insertBefore(tex, last.nextSibling);
+    });
+
+    // Rocky islets out at sea, away from coasts, stops and the inset panels.
+    var panels = Array.prototype.map.call(svg.querySelectorAll('.sr-pacific > rect, .sr-inset > rect'), function (r) { return r.getBBox(); });
+    var isle = el('g', { 'class': 'sr-v2-islets', 'pointer-events': 'none' });
+    var placed = [], pt2 = svg.createSVGPoint(), tries2 = 0;
+    function onLand(x, y) {
+      for (var i = 0; i < lands.length; i++) {
+        pt2.x = x; pt2.y = y;
+        try { if (lands[i].isPointInFill(pt2)) return true; } catch (e) {}
+      }
+      return false;
+    }
+    while (placed.length < 30 && tries2 < 600) {
+      tries2++;
+      var x = vb.x + 20 + rand() * (vb.width - 40), y = 30 + rand() * (vb.height - 60);
+      var bad = panels.some(function (b) { return x > b.x - 30 && x < b.x + b.width + 30 && y > b.y - 30 && y < b.y + b.height + 30; });
+      if (bad) continue;
+      if (stops.some(function (s) { return Math.abs(s.x - x) < 70 && Math.abs(s.y - y) < 70; })) continue;
+      if (placed.some(function (p) { return Math.abs(p[0] - x) < 90 && Math.abs(p[1] - y) < 90; })) continue;
+      if (onLand(x, y) || onLand(x - 40, y) || onLand(x + 40, y) || onLand(x, y - 40) || onLand(x, y + 40)) continue;
+      placed.push([x, y]);
+      var big = rand() < 0.4;
+      isle.appendChild(el('use', { href: big ? '#v2-islet-green' : '#v2-islet', transform: 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ') scale(' + (0.9 + rand() * 0.7).toFixed(2) + ')' }));
+    }
+    swirl.parentNode.insertBefore(isle, swirl.nextSibling);
+    svg.dataset.v2 = bushes + '/' + pebbles + '/' + placed.length + '/' + Math.round(performance.now() - t0) + 'ms';
+  }
+
+  /* Thick pink route through the framed country's stops, cream nodes on top. */
+  function catmull(p) {
+    if (p.length < 2) return '';
+    var d = 'M' + p[0].x.toFixed(1) + ' ' + p[0].y.toFixed(1);
+    for (var i = 0; i < p.length - 1; i++) {
+      var a = p[i - 1] || p[i], b = p[i], c = p[i + 1], e = p[i + 2] || c;
+      d += ' C' + (b.x + (c.x - a.x) / 6).toFixed(1) + ' ' + (b.y + (c.y - a.y) / 6).toFixed(1) + ' ' +
+        (c.x - (e.x - b.x) / 6).toFixed(1) + ' ' + (c.y - (e.y - b.y) / 6).toFixed(1) + ' ' + c.x.toFixed(1) + ' ' + c.y.toFixed(1);
+    }
+    return d;
+  }
+  function syncRoute(country) {
+    var svg = document.querySelector('#mapstage svg.nzsvg');
+    var stage = document.getElementById('mapstage');
+    if (!svg || !stage || !svg.__v2) return;
+    var k = stageScale(stage);
+    var unit = (stage.clientWidth || 1) / svg.viewBox.baseVal.width * k; // screen px per map unit
+    var pts = stopPoints(svg).filter(function (s) { return s.country === country; }).sort(function (a, b) { return a.n - b.n; });
+    var hereI = -1;
+    pts.forEach(function (p, i) { if (p.here) hereI = i; else if (p.done && hereI < 0) hereI = Math.max(hereI, -1); });
+    var lastDone = -1;
+    pts.forEach(function (p, i) { if (p.done || p.here) lastDone = i; });
+    var key = country + ':' + pts.length + ':' + lastDone + ':' + unit.toFixed(2);
+    var g = svg.querySelector('#sr-v2-route');
+    if (g && g.dataset.key === key) return;
+    if (!g) {
+      g = el('g', { id: 'sr-v2-route', 'pointer-events': 'none' });
+      var before = svg.querySelector('#sr-path-win') || svg.querySelector('#sr-travel-plane');
+      if (before && before.parentNode) before.parentNode.insertBefore(g, before); else svg.appendChild(g);
+    }
+    g.dataset.key = key;
+    var w = 9 / unit;
+    var all = catmull(pts), done = lastDone > 0 ? catmull(pts.slice(0, lastDone + 1)) : '';
+    g.innerHTML = all ? (
+      '<path d="' + all + '" fill="none" stroke="#c9547f" stroke-opacity=".18" stroke-width="' + (w * 2.1).toFixed(2) + '" stroke-linecap="round" stroke-linejoin="round" transform="translate(0 ' + (2.5 / unit).toFixed(2) + ')"/>' +
+      '<path d="' + all + '" fill="none" stroke="#fff" stroke-width="' + (w * 1.75).toFixed(2) + '" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path d="' + all + '" fill="none" stroke="#f9bcd2" stroke-width="' + w.toFixed(2) + '" stroke-linecap="round" stroke-linejoin="round"/>' +
+      (done ? '<path d="' + done + '" fill="none" stroke="#f483ac" stroke-width="' + w.toFixed(2) + '" stroke-linecap="round" stroke-linejoin="round"/>' : '') +
+      '<path d="' + all + '" fill="none" stroke="#fff" stroke-opacity=".85" stroke-width="' + (1.6 / unit).toFixed(2) + '" stroke-dasharray="' + (7 / unit).toFixed(1) + ' ' + (8 / unit).toFixed(1) + '" stroke-linecap="round"/>'
+    ) : '';
+  }
+
+  /* Big puffy clouds in the corners of the screen, like the reference. */
+  var CLOUD = '<svg viewBox="0 0 200 110" aria-hidden="true"><ellipse cx="100" cy="98" rx="86" ry="9" fill="#2a8fb0" opacity=".14"/><path d="M30 92 C6 92 4 64 26 60 C22 36 52 26 66 42 C72 16 112 10 122 36 C134 22 164 26 164 50 C188 48 198 72 182 86 C176 94 166 96 156 94 Z" fill="#fff"/><path d="M30 92 C14 90 10 78 18 70 C30 82 60 86 90 84 C120 86 158 82 184 76 C186 88 174 96 156 94 Z" fill="#dbe9f2" opacity=".75"/><ellipse cx="70" cy="48" rx="16" ry="9" fill="#fff" opacity=".9"/></svg>';
+  function syncClouds() {
+    var map = document.getElementById('map');
+    if (!map || document.getElementById('sr-v2-clouds')) return;
+    var box = document.createElement('div');
+    box.id = 'sr-v2-clouds';
+    box.className = 'sr-v2-clouds';
+    box.setAttribute('aria-hidden', 'true');
+    box.innerHTML = ['tl', 'tr', 'ml', 'br'].map(function (c) { return '<i class="sr-v2-cloud c-' + c + '">' + CLOUD + '</i>'; }).join('');
+    map.appendChild(box);
+  }
+
   function injectStyle() {
     if (document.getElementById('sr-map-extra-style')) return;
     var css = document.createElement('style');
@@ -308,7 +535,36 @@
       '.sr-pc-list i{flex:0 0 34px;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:18px;box-shadow:0 1px 0 rgba(255,255,255,.9) inset,0 2px 4px rgba(90,140,170,.15)}',
       '.sr-pc-play{display:block;width:100%;margin-top:12px;padding:11px 12px;border:0;border-radius:16px;background:#ff4f88;color:#fff;font:900 15px/1.2 ui-rounded,system-ui,sans-serif;box-shadow:0 3px 0 #d6246e;cursor:pointer}',
       '.sr-pc-lock{margin:12px 0 0;padding:9px 12px;border-radius:14px;background:#fdf1f5;color:#b45a7f;font:800 13px/1.2 ui-rounded,system-ui,sans-serif;text-align:center}',
-      '.stops .lv.locked{cursor:pointer}'
+      '.stops .lv.locked{cursor:pointer}',
+      /* 1.9.282 map art v2 */
+      '.mapview{background:#4fcfe6}',
+      '.nzsvg.sr-v2 .sr-ripples{display:none}',
+      '.mapstage:not(.travel-shot) .nzsvg.sr-v2 #sr-future,.mapstage:not(.travel-shot) .nzsvg.sr-v2 #sr-future-border,.mapstage:not(.travel-shot) .nzsvg.sr-v2 #sr-path-wide,.mapstage:not(.travel-shot) .nzsvg.sr-v2 #sr-path-dash{display:none}',
+      '.mapstage.travel-shot #sr-v2-route{display:none}',
+      '.stops .lv .pin{width:13px;height:13px;border:2.5px solid #fff;background:#fff6e4;box-shadow:0 0 0 1.5px #e9bf98,0 2px 3px rgba(150,80,60,.22);scale:calc(1 / var(--sr-k, 1))}',
+      '.stops .lv.done .pin{background:#fff1cf;box-shadow:0 0 0 1.5px #f0a7c0,0 2px 3px rgba(150,80,60,.22)}',
+      '.stops .lv.locked .pin{background:#fff8ee;border-color:#fff;box-shadow:0 0 0 1.5px #eed6c4,0 2px 3px rgba(150,80,60,.16)}',
+      '.stops .lv .pin::before{content:"";position:absolute;inset:-14px;border-radius:50%}',
+      '.sr-medal{transform:translate(-50%,calc(-100% - 16px))}',
+      '.sr-medal i{width:54px;height:54px;flex-direction:column;gap:1px;border:0;background:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.9),0 4px 0 rgba(200,120,150,.16),0 8px 14px rgba(40,110,140,.22)}',
+      '.sr-medal i u{text-decoration:none;font-size:19px;line-height:1}',
+      '.sr-medal i b{margin:0;padding:0 3px;background:none;box-shadow:none;color:#2f4a5c;font:800 8px/1.05 ui-rounded,system-ui,sans-serif;white-space:normal;text-align:center;max-width:50px}',
+      '.sr-country-card{padding:10px 12px 12px;border-radius:24px;box-shadow:0 6px 0 rgba(255,255,255,.6) inset,0 8px 18px rgba(40,110,140,.22)}',
+      '.sr-country-card .sr-cname{font-size:26px;color:#ee5f8f}',
+      '.sr-country-card .sr-bit{flex-direction:row;justify-content:center;gap:4px}',
+      '.sr-country-card .sr-bit+.sr-bit{border-left:1.5px solid #f0e2ea}',
+      '.sr-country-card .sr-bit i{font-size:17px}',
+      '.sr-country-card .sr-bit span{display:inline-block;font-size:10.5px;color:#3d4a62;white-space:normal;line-height:1.1;text-align:left}','.sr-country-card .sr-bit span::first-letter{text-transform:uppercase}',
+      '.sr-v2-clouds{position:absolute;inset:0;z-index:8;pointer-events:none;overflow:hidden}',
+      'body:not(.onmap) .sr-v2-clouds{display:none}',
+      '.sr-v2-cloud{position:absolute;display:block;width:190px;animation:srV2Cloud 28s ease-in-out infinite alternate}',
+      '.sr-v2-cloud svg{display:block;width:100%;height:auto}',
+      '.sr-v2-cloud.c-tl{left:-70px;top:150px;width:170px;animation-duration:31s}',
+      '.sr-v2-cloud.c-tr{right:-80px;top:240px;width:210px;animation-duration:26s}',
+      '.sr-v2-cloud.c-ml{left:-90px;bottom:190px;width:220px;animation-duration:34s}',
+      '.sr-v2-cloud.c-br{right:-60px;bottom:150px;width:180px;animation-duration:29s}',
+      '@keyframes srV2Cloud{from{transform:translateX(0)}to{transform:translateX(18px)}}',
+      '@media (prefers-reduced-motion:reduce){.sr-v2-cloud{animation:none}}'
     ].join('');
     document.head.appendChild(css);
   }
@@ -331,7 +587,7 @@
       var medal = document.createElement('span');
       medal.className = 'sr-medal';
       medal.dataset.country = country;
-      medal.innerHTML = '<i aria-hidden="true">' + pair[0] + '</i><b>' + country + '</b>';
+      medal.innerHTML = '<i aria-hidden="true"><u>' + pair[0] + '</u><b>' + (SHORT[key] || country) + '</b></i>';
       pin.appendChild(medal);
     });
   }
@@ -449,7 +705,7 @@
     nav.querySelector('#sr-next').disabled = i < 0 || i >= list.length - 1;
     if (nav.dataset.country !== country) {
       nav.dataset.country = country;
-      nav.querySelector('span').innerHTML = (country || 'Country') + '<small style="display:block;font-size:10px;color:#7a4a62">1.9.281</small>';
+      nav.querySelector('span').innerHTML = (country || 'Country') + '<small style="display:block;font-size:10px;color:#7a4a62">1.9.282</small>';
     }
     nav.style.display = document.body.classList.contains('onmap') ? '' : 'none';
   }
@@ -610,6 +866,9 @@
         }
         frameCountry(ensurePicked());
       }
+      paintMap();
+      syncRoute(ensurePicked());
+      syncClouds();
       showCard();
       syncNav();
       fitMarkers();
