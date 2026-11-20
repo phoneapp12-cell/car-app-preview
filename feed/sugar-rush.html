@@ -76,9 +76,9 @@
   .lv .st .on { color: #ffb400; }
   .lv.sarah { border-color: #ff7eb0; background: linear-gradient(180deg, #fff, #ffe0ee); }
   .lv.sarah .no { color: #d6246e; }
-  .lv.open:not([disabled]) { cursor: pointer; }
+  .lv.open:not([disabled]):not(.locked) { cursor: pointer; }
   .lv.done { border-color: #f0c14b; }
-  .lv[disabled] { background: #f4e6ec; color: #c49aaa; box-shadow: none; }
+  .lv[disabled], .lv.locked { background: #f4e6ec; color: #c49aaa; box-shadow: none; }
   .shelf-t { font-size: 13px; font-weight: 800; color: #b3487c; text-transform: uppercase; letter-spacing: .06em; margin: 4px 0 8px; }
   .shelf { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 10px; border-radius: 16px; background: rgba(255,255,255,.7); border: 2px solid #ffc2dc; }
   .badge { display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 64px; }
@@ -118,11 +118,11 @@
   .stops .lv.sarah .pin { border-color: #ff7eb0; background: linear-gradient(180deg, #fff, #ffe0ee); }
   .stops .lv.sarah .pin .mark { border-color: #ff7eb0; }
   .stops .lv.sarah .pin .no { font-size: 16px; color: #d6246e; }
-  .stops .lv.open:not([disabled]) { cursor: pointer; }
-  .stops .lv.open:not([disabled]) .pin:hover { transform: scale(1.06); }
+  .stops .lv.open:not([disabled]):not(.locked) { cursor: pointer; }
+  .stops .lv.open:not([disabled]):not(.locked) .pin:hover { transform: scale(1.06); }
   .stops .lv.done .pin { border-color: #f0c14b; }
-  .stops .lv[disabled] { cursor: default; }
-  .stops .lv[disabled] .pin { background: #f4e6ec; color: #c49aaa; box-shadow: none; border-color: #efc2d4; }
+  .stops .lv[disabled], .stops .lv.locked { cursor: default; }
+  .stops .lv[disabled] .pin, .stops .lv.locked .pin { background: #f4e6ec; color: #c49aaa; box-shadow: none; border-color: #efc2d4; }
   .stops .lv.here .pin { box-shadow: 0 0 0 4px rgba(255,180,0,.55), 0 3px 0 #f4a0c4; }
   .stops .lv .st { font-size: 11px; letter-spacing: 1px; color: #e6c7d6; height: 14px; margin-top: 2px; }
   .stops .lv .st .on { color: #ffb400; }
@@ -146,7 +146,7 @@
   @keyframes herepulse { 0%, 100% { box-shadow: 0 0 0 4px rgba(255,180,0,.45), 0 3px 0 #f4a0c4; } 50% { box-shadow: 0 0 0 8px rgba(255,180,0,.18), 0 3px 0 #f4a0c4; } }
   @keyframes srbob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
   @keyframes srripple { 0% { transform: scale(.68); opacity: .12; } 24% { opacity: .62; } 78% { opacity: .28; } 100% { transform: scale(1.5); opacity: .05; } }
-  .stops .lv.here:not([disabled]) .pin { animation: herepulse 1.8s ease-in-out infinite; }
+  .stops .lv.here:not([disabled]):not(.locked) .pin { animation: herepulse 1.8s ease-in-out infinite; }
   .nzsvg .sr-bob { transform-box: fill-box; transform-origin: center; animation: srbob 3.6s ease-in-out infinite; }
   .nzsvg .sr-ripple-ring { fill: none; stroke: #fff; stroke-width: 2.6; stroke-opacity: .9; opacity: 0; transform-box: fill-box; transform-origin: center; animation: srripple var(--d, 5.2s) ease-out var(--dl, 0s) infinite; }
 

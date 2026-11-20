@@ -6585,7 +6585,7 @@
       const b = doc.createElement('button');
       b.type = 'button';
       b.className = 'lv lab-' + (stop.label || 'right') + (stop.lift ? ' lift' : '') + (lv.theme === 'sarah' ? ' sarah' : '') + (lv.hard ? ' hard hard' + lv.hard : '') + (countryStop ? ' country-stop' : '') + (open ? ' open' : '') + (stars ? ' done' : '') + (n === here ? ' here' : '') + ' kind-' + (stop.kind || 'town');
-      b.disabled = !open;
+      if (!open) { b.classList.add('locked'); b.setAttribute('aria-disabled', 'true'); }
       b.dataset.n = String(n);
       b.dataset.country = country;
       b.style.left = mapXPct(stop.x);
@@ -6596,7 +6596,12 @@
       b.innerHTML = '<span class="pin"><span class="no">' + n + '</span>' + (mark ? '<span class="mark" aria-hidden="true">' + mark + '</span>' : '') + (lv.hard ? '<span class="hardmark" aria-hidden="true">🔥</span>' : '') + '</span><span class="st">' + starHtml + '</span>' +
         '<span class="meta"><b>' + stop.place + '</b><em>' + lv.name + '</em>' + (country && !countryStop ? '<i class="country">' + country + '</i>' : '') + '</span>' + badge;
       b.setAttribute('aria-label', (open ? 'Play ' : 'Locked: ') + 'level ' + n + ', ' + lv.name + ', ' + stop.place + (country && !countryStop ? ', ' + country : '') + (lv.hard ? ', ' + hardLabel(lv.hard) : '') + (stars ? ', ' + stars + ' stars' : '') + (prog.badges[i] && lv.badge ? ', badge ' + lv.badge.name : ''));
-      if (open) b.addEventListener('click', () => { unlockAudio(); openLevel(n); });
+      b.addEventListener('click', () => {
+        const card = typeof window !== 'undefined' && window.SugarRushMap && window.SugarRushMap.showPlace;
+        const play = () => { unlockAudio(); openLevel(n); };
+        if (card) { card({ n, place: stop.place, country, name: lv.name, open, play }); return; }
+        if (open) play();
+      });
       path.appendChild(b);
     });
     FUTURE_STOPS.forEach(function (stop) {
