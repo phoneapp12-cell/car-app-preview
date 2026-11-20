@@ -233,6 +233,35 @@
   .introprev .ice { width: 52px; height: 36px; border-radius: 12px; background: linear-gradient(180deg, #fff, #f4c2d8); border: 3px solid #f4a0c4; box-shadow: inset 0 0 0 4px rgba(255,255,255,.6); }
   .introprev .dbl { display: flex; flex-direction: column; gap: 3px; } .introprev .dbl i { display: block; width: 48px; height: 14px; border-radius: 8px; background: rgba(180,60,200,.65); }
   .introprev .ing { font-size: 40px; animation: prevdrop 1.8s ease-in-out infinite; }
+  /* 1.9.285 New-mechanic intro panel and previews */
+  .intronew { display: flex; align-items: center; gap: 10px; margin: -2px auto 10px; padding: 8px 12px; max-width: 320px; border-radius: 14px; background: linear-gradient(135deg, #fff6c8, #ffe0f0); border: 2px solid #ffb400; box-shadow: 0 3px 0 rgba(200,120,0,.25); text-align: left; animation: nwpop .5s cubic-bezier(.2,1.6,.4,1); }
+  .intronew[hidden] { display: none; }
+  .intronew.twist { border-color: #a066e8; background: linear-gradient(135deg, #f3eaff, #ffe8f6); box-shadow: 0 3px 0 rgba(110,60,190,.22); }
+  .intronew .nw-tag { flex: none; font: 900 12px/1 ui-rounded, system-ui, sans-serif; color: #fff; background: #ff4f9a; padding: 5px 7px; border-radius: 8px; transform: rotate(-6deg); text-transform: uppercase; letter-spacing: .04em; }
+  .intronew.twist .nw-tag { background: #8a3cf0; }
+  .intronew .nw-ic { flex: none; font-size: 28px; }
+  .intronew .nw-tx { font: 600 13px/1.3 ui-rounded, system-ui, sans-serif; color: #5a1838; }
+  .intronew .nw-tx b { display: block; font-weight: 900; font-size: 14px; color: #c2185b; }
+  @keyframes nwpop { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+  .introprev .fusep { width: 42px; height: 42px; border-radius: 50%; display: inline-block; position: relative; background: radial-gradient(circle at 35% 30%, #ffe0c0, #f97316); border: 5px solid #2b1830; animation: prevbob 1.6s ease-in-out infinite; }
+  .introprev .fusep b { position: absolute; right: -10px; bottom: -8px; width: 22px; height: 22px; border-radius: 50%; background: #2b1830; color: #fff; font: 900 13px/22px ui-rounded, system-ui, sans-serif; border: 2px solid #fff; }
+  .introprev .fusep.low { border-color: #e0182f; } .introprev .fusep.low b { background: #e0182f; animation: fusepulse .5s ease-in-out infinite alternate; }
+  @keyframes fusepulse { to { transform: scale(1.25); } }
+  .introprev .bossp { position: relative; font-size: 50px; line-height: 1; display: inline-flex; flex-direction: column; align-items: center; animation: prevbob 1.6s ease-in-out infinite; }
+  .introprev .bossp i { display: block; width: 64px; height: 8px; border-radius: 6px; background: rgba(40,8,40,.7); margin-top: 4px; overflow: hidden; }
+  .introprev .bossp i u { display: block; width: 70%; height: 100%; background: linear-gradient(90deg, #ff3b5c, #ffb400, #5dd47a); }
+  .introprev .cannonp { width: 30px; height: 40px; border-radius: 6px 6px 10px 10px; background: linear-gradient(90deg, #c2185b, #ff7eb3, #c2185b); box-shadow: 0 6px 0 #8a1040; }
+  .introprev .portalp { width: 44px; height: 18px; border-radius: 50%; background: radial-gradient(ellipse, #fff 0 20%, #e3c8ff 40%, rgba(163,92,255,.2) 100%); border: 3px solid #a35cff; animation: prevbob 1.4s ease-in-out infinite; }
+  .introprev .portalp.out { background: radial-gradient(ellipse, #fff 0 20%, #ffe0b8 40%, rgba(255,154,46,.2) 100%); border-color: #ff9a2e; }
+  .introprev .orderp, .introprev .timerp { font-size: 44px; }
+  .introprev .timerp { animation: prevbob 1s ease-in-out infinite; }
+  .introprev .beltp { width: 120px; height: 30px; border-radius: 8px; background: repeating-linear-gradient(90deg, rgba(22,174,190,.25) 0 18px, rgba(8,112,136,.6) 18px 22px); animation: beltslide 1s linear infinite; }
+  @keyframes beltslide { to { background-position: 22px 0; } }
+  /* 1.9.285 Per-country board frame */
+  body.ingame:not(.hard1):not(.hard2):not(.sarah):not(.hammering) .tray[data-board] { background: radial-gradient(120% 90% at 50% 0%, rgba(255,255,255,.85), var(--bbg) 46%, var(--bbg)); box-shadow: 0 0 0 4px var(--bf), 0 8px 0 4px var(--bfd), 0 18px 28px rgba(40,18,56,.28), inset 0 2px 0 #fff, inset 0 -10px 16px rgba(0,0,0,.06); }
+  body.ingame:not(.hard1):not(.hard2):not(.sarah) .tray[data-board]::after { content: ""; position: absolute; inset: -4px; border-radius: 22px; pointer-events: none; background: radial-gradient(circle at 0 0, var(--bf) 0 7px, transparent 8px), radial-gradient(circle at 100% 0, var(--bf) 0 7px, transparent 8px), radial-gradient(circle at 0 100%, var(--bf) 0 7px, transparent 8px), radial-gradient(circle at 100% 100%, var(--bf) 0 7px, transparent 8px); opacity: .9; }
+  .tray.shk3 { animation: shk3 .62s ease-out; }
+  @keyframes shk3 { 0%, 100% { transform: none; } 8% { transform: translate(-10px, 4px) rotate(-1deg) scale(1.01); } 20% { transform: translate(10px, -5px) rotate(1deg); } 34% { transform: translate(-8px, 5px) rotate(-.7deg); } 50% { transform: translate(7px, -3px) rotate(.4deg); } 66% { transform: translate(-4px, 2px); } 82% { transform: translate(2px, -1px); } }
   .introprev .choco { width: 50px; height: 36px; border-radius: 8px; background: linear-gradient(180deg, #6b3a1f, #3d2214); box-shadow: 6px 8px 0 #4a2a18; }
   .introprev .hearts { font-size: 48px; }
   @keyframes prevbob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
@@ -564,7 +593,7 @@
     .chest { transform: scale(.8); margin: -6px auto -4px; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .scs, .scs .fallin, .tray.shk1, .tray.shk2, .crushban .cbw, .crushban .cbf, .stars .on.fly, .chest.shake, .chest.open .chest-rays, .loot.show .lootchip, .spinbtn.ready, .wheelsvg .bulb0, .wheelsvg .bulb1, .stat.streak.up, .streakpop.go, .scr-in, .card { animation: none !important; }
+    .scs, .scs .fallin, .tray.shk1, .tray.shk2, .tray.shk3, .intronew, .introprev .fusep, .introprev .fusep b, .introprev .bossp, .introprev .portalp, .introprev .timerp, .introprev .beltp, .crushban .cbw, .crushban .cbf, .stars .on.fly, .chest.shake, .chest.open .chest-rays, .loot.show .lootchip, .spinbtn.ready, .wheelsvg .bulb0, .wheelsvg .bulb1, .stat.streak.up, .streakpop.go, .scr-in, .card { animation: none !important; }
     .lootchip { opacity: 1; transform: none; }
     .sc-rise, .sc-shoot { opacity: .6; }
     .sr-cloud, .sr-wind, .sr-map-spark, .sr-map-balloon { animation: none !important; }
@@ -894,6 +923,7 @@
       <div class="hardtag" id="introhard" hidden></div>
       <h2 id="introtitle">The Sweet Shop</h2>
       <div class="introprev" id="introprev" aria-hidden="true"></div>
+      <div class="intronew" id="intronew" hidden></div>
       <div class="introgoal"><span class="gicon" id="introicon">🎯</span><p id="introgoal"></p></div>
       <p class="intromoves" id="intromoves"></p>
       <p class="introtip" id="introbody"></p>

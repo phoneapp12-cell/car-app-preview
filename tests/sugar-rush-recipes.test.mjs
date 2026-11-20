@@ -35,9 +35,12 @@ test('a recipe only wins after the requested colours and a wrapped sweet have bo
   assert.equal(game.goalsMet(state), false, 'collecting colours alone does not finish the recipe');
 
   const special = level.recipe.specials[0];
-  const made = Object.assign(emptyStep(), { made: [{ k: key(0, 0), color: 1, s: special.kind }] });
-  game.applyStep(state.board, made, state.rand, state.kinds, 1, state);
-  assert.equal(state.specialsMade[special.kind], 1);
+  for (let i = 0; i < special.n; i++) {
+    if (i === special.n - 1) assert.equal(game.goalsMet(state), false, 'one special short of the order');
+    const made = Object.assign(emptyStep(), { made: [{ k: key(0, i), color: 1, s: special.kind }] });
+    game.applyStep(state.board, made, state.rand, state.kinds, 1, state);
+  }
+  assert.equal(state.specialsMade[special.kind], special.n);
   assert.equal(game.goalsMet(state), true);
 });
 
@@ -115,7 +118,7 @@ test('the 90-second lantern clock can end in either a win or a timeout loss', ()
   assert.equal(lost.won, false);
 });
 
-test('mixed delivery and score objectives require all their conditions', () => {
+test('mixed delivery and boss objectives require all their conditions', () => {
   const delivery = game.newGame({ level: game.LEVELS[63], seed: 508 });
   assert.equal(game.goalsMet(delivery), false);
   delivery.collected[3] = 10;
@@ -123,8 +126,14 @@ test('mixed delivery and score objectives require all their conditions', () => {
   for (const row of delivery.board) for (const tile of row) if (tile) { tile.choco = 0; tile.liq = 0; }
   assert.equal(game.goalsMet(delivery), true);
 
-  const score = game.newGame({ level: game.LEVELS[64], seed: 509 });
-  assert.equal(game.goalsMet(score), false);
-  score.score = game.LEVELS[64].scoreGoal;
-  assert.equal(game.goalsMet(score), true);
+  // 1.9.285 Level 65 is a boss level now: goals stay objectives, never a score target.
+  assert.equal(game.LEVELS[64].scoreGoal, undefined);
+  const boss = game.newGame({ level: game.LEVELS[64], seed: 509 });
+  assert.equal(game.goalsMet(boss), false);
+  boss.score = 999999;
+  assert.equal(game.goalsMet(boss), false, 'score alone never wins');
+  if (boss.jelly) boss.jelly = boss.jelly.map(row => row.map(() => 0));
+  assert.equal(game.goalsMet(boss), false, 'the boss still has health');
+  boss.boss.hp = 0;
+  assert.equal(game.goalsMet(boss), true);
 });
