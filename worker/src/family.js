@@ -15,6 +15,19 @@ import { isFriend, isFam, sees, seeRows, seeIds, memberRow, shareVisible, friend
 import { isShane } from './scrabble.js';
 
 const ORIGINS = /^https:\/\/([a-z0-9]+\.)?shane-my-app\.pages\.dev$|^http:\/\/localhost:\d+$/;
+
+/* Celebrity & reality TV news opt-in (21 Nov 2026). Only these active family members are asked:
+   Sarah, Millesha, Monique, Nicole and Miracle — each has pronouns “she” on their member record.
+   Left out: Shane and Dion (“he”); Cass (“they”); the current Sinead record (no pronouns, never seen);
+   Romia (a friend, no pronouns); and removed members, including Sam. */
+export const CELEB_ASK = new Set(['m8e5feaf41519', 'mc2fc6a0e9f91', 'mde3c8e85cded', 'm078211284db3', 'mdecd8c04ff70']);
+export function celebState(me, prefs) {
+  const canCeleb = !!(me && CELEB_ASK.has(me.id));
+  const raw = prefs && prefs.celebNews;
+  const celebNews = (raw === true || raw === 1 || raw === 'yes') ? true : (raw === false || raw === 0 || raw === 'no') ? false : null;
+  return { canCeleb, celebNews, askCeleb: canCeleb && celebNews === null };
+}
+
 const PRIVATE_ID = /:|^tip\d/;                        // Shane's own cards (life:, app:, ph:, you:) and the app's tips: never commentable
 // 1.8.0 family photos: kept as SQLite blobs in this Durable Object (R2 isn't switched on for the account). Each photo is
 // shrunk and re-saved on the phone (≤1600px JPEG, which drops EXIF/GPS); the server checks it's a JPEG, strips any
@@ -552,8 +565,8 @@ export class Family extends DurableObject {
     }
 
     // ---- each person's own feed settings (interests, mood), so a new phone picks them up
-    if (p === '/prefs' && m === 'GET') { const r = this.one(`SELECT j,at FROM prefs WHERE mid=?`, me.id), pr = this.one(`SELECT stage, sugg, sit, age FROM mprof WHERE mid=?`, me.id), nudge = pr ? nudgeFor(pr.stage, pr.sugg, pr.sit, pr.age) : null; return J(r ? { at: r.at, prefs: JSON.parse(r.j), nudge } : { nudge }); } // 1.9.0 nudge: suggestions only (the stage itself stays with Shane)
-    if (p === '/prefs' && m === 'PUT') { const t = await req.text(); if (t.length > 20000) return J({ err: 'too big' }, 400); let np; try { np = JSON.parse(t); } catch (e) { return J({ err: 'bad' }, 400); } const op = this.one(`SELECT j FROM prefs WHERE mid=?`, me.id); if (op) { try { const o = JSON.parse(op.j); if (o.adds) np.adds = [...new Set([...(o.adds || []), ...(np.adds || [])])]; if (o.vlTags) np.vlTags = o.vlTags; } catch (e) { } } this.sql.exec(`INSERT INTO prefs (mid,j,at) VALUES (?,?,?) ON CONFLICT(mid) DO UPDATE SET j=excluded.j, at=excluded.at`, me.id, JSON.stringify(np), now); return J({ ok: 1 }); }
+    if (p === '/prefs' && m === 'GET') { const r = this.one(`SELECT j,at FROM prefs WHERE mid=?`, me.id), pr = this.one(`SELECT stage, sugg, sit, age FROM mprof WHERE mid=?`, me.id), nudge = pr ? nudgeFor(pr.stage, pr.sugg, pr.sit, pr.age) : null; const prefs = r ? JSON.parse(r.j) : null; const celeb = celebState(me, prefs); return J(r ? { at: r.at, prefs, nudge, ...celeb } : { nudge, ...celeb }); } // 1.9.0 nudge: suggestions only (the stage itself stays with Shane). 1.9.291 celeb opt-in flags are per member.
+    if (p === '/prefs' && m === 'PUT') { const t = await req.text(); if (t.length > 20000) return J({ err: 'too big' }, 400); let np; try { np = JSON.parse(t); } catch (e) { return J({ err: 'bad' }, 400); } const op = this.one(`SELECT j FROM prefs WHERE mid=?`, me.id); if (op) { try { const o = JSON.parse(op.j); if (o.adds) np.adds = [...new Set([...(o.adds || []), ...(np.adds || [])])]; if (o.vlTags) np.vlTags = o.vlTags; if (!('celebNews' in np) && 'celebNews' in o) np.celebNews = o.celebNews; } catch (e) { } } if ('celebNews' in np) { if (!CELEB_ASK.has(me.id)) delete np.celebNews; else np.celebNews = (np.celebNews === true || np.celebNews === 1 || np.celebNews === 'yes'); } this.sql.exec(`INSERT INTO prefs (mid,j,at) VALUES (?,?,?) ON CONFLICT(mid) DO UPDATE SET j=excluded.j, at=excluded.at`, me.id, JSON.stringify(np), now); return J({ ok: 1, ...celebState(me, np) }); }
 
     const rr = await this.rt.route(p, m, u, req, me, admin, J, body); if (rr) return rr; // 1.9.0
     return J({ err: 'unknown' }, 404);

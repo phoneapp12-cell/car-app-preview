@@ -10,6 +10,7 @@ const TOPICS = [
   ['family', typeof IS_FRIEND !== 'undefined' && IS_FRIEND ? 'Friends' : 'Family', '💬', '#be185d', '#7c3aed'], // 1.7.0: shared by the family, and what they're talking about (members only)
   ['election', 'Election 2026', '🗳️', '#1d4ed8', '#b91c1c'], // 1.6.0: until election night (7 Nov 2026), then it goes by itself
   ['sitcoms', 'Sitcoms', '😂', '#f59e0b', '#ef4444'],
+  ['celeb', 'Celebrity & reality TV', '🌟', '#be185d', '#f59e0b'], // 1.9.291 opt-in only, asked of some family members
   ['garden', 'Gardening', '🌱', '#16a34a', '#65a30d'],
   ['music', 'Music', '🎵', '#db2777', '#9333ea'],
   ['scifi', 'Sci-fi & Space', '🚀', '#2563eb', '#7c3aed'],
@@ -60,7 +61,7 @@ const TOPICS = [
 ];
 const TOPIC = Object.fromEntries(TOPICS.map(t => [t[0], t]));
 Object.defineProperty(TOPIC.life, 1, { get: () => forMe(1), enumerable: true }); // 1.9.74 📌 For Shane / For Sarah … // 1.4.0: About-you chips are added to this as they're found
-const BASE = { hp: 0.95, monarch: 0.95, nd: 0.9, candy: 0.9, pets: 1.35, parent: 0.85, rainbow: 0.85, social: 0.85, tarot: 0.8, craft: 0.85, vgames: 0.8, boardg: 0.8, fantasy: 0.8, election: 0.35, gf: 1.0, kids: 0.9, sitcoms: 1.55, garden: 1.1, music: 1, scifi: 1.15, nz: 0.7, dogs: 1.45, nature: 1.35, events: 0.95, food: 0.95, meals: 1.1, tech: 0.7, aiassist: 1.1, smart: 1.1, innov: 1.15, diy: 0.85, science: 0.55, travel: 0.9, fitness: 0.85, selling: 0.7, creative: 1.15, culture: 0.75, learn: 1.2, games: 1.05, collect: 0.75, outdoors: 1.0, cars: 0.75, illusions: 0.9, odd: 1.0, colour: 0.9, looks: 0.95, reef: 0.95, dolls: 0.9, keeps: 0.9, glass: 0.9, kites: 0.9, lanterns: 0.9, art3d: 0.95 }; // 1.9.84 fun: sitcoms/animals/wow/facts up; news/science/election down. 1.9.112 new picture subjects stay lighter than sitcoms and dogs
+const BASE = { hp: 0.95, monarch: 0.95, nd: 0.9, candy: 0.9, pets: 1.35, parent: 0.85, rainbow: 0.85, social: 0.85, tarot: 0.8, craft: 0.85, vgames: 0.8, boardg: 0.8, fantasy: 0.8, election: 0.35, gf: 1.0, kids: 0.9, sitcoms: 1.55, celeb: 1.35, garden: 1.1, music: 1, scifi: 1.15, nz: 0.7, dogs: 1.45, nature: 1.35, events: 0.95, food: 0.95, meals: 1.1, tech: 0.7, aiassist: 1.1, smart: 1.1, innov: 1.15, diy: 0.85, science: 0.55, travel: 0.9, fitness: 0.85, selling: 0.7, creative: 1.15, culture: 0.75, learn: 1.2, games: 1.05, collect: 0.75, outdoors: 1.0, cars: 0.75, illusions: 0.9, odd: 1.0, colour: 0.9, looks: 0.95, reef: 0.95, dolls: 0.9, keeps: 0.9, glass: 0.9, kites: 0.9, lanterns: 0.9, art3d: 0.95 }; // 1.9.84 fun: sitcoms/animals/wow/facts up; news/science/election down. 1.9.112 new picture subjects stay lighter than sitcoms and dogs
 const baseOf = t => BASE[t] || (String(t).startsWith('you:') ? 0.8 : 1);
 const SPORT1 = /\b(sports?|rugby|all blacks|black ferns|super rugby|league|nrl|warriors|cricket|black ?caps|netball|silver ferns|football|soccer|fifa|premier league|afl|basketball|nba|nfl|golf|tennis|motorsport|formula ?1|f1|grand prix|supercars|boxing|ufc|mma|wrestling|athletics|olympics?|commonwealth games|hockey|rowing|america'?s cup|sailgp|triathlon|horse racing|darts|snooker|volleyball|baseball|world cup|bledisloe|test match|tyson fury|heavyweight)\b/i;
 const NON_NZ_FOOD = /\b(walmart|wal-?mart|trader joe'?s|traderjoes|kroger|aldi\b|tesco|asda|sainsbury'?s?|waitrose|lidl|costco\s*(usa?|us|america)|sam'?s club|target(?!\s*(nz|new zealand))|whole foods|heb\b|publix|meijer|wegmans|shoprite|food lion|dollar general|walgreens|cvs\b|home depot|lowe'?s|usd\b|usda\b)\b/i; // 1.9.79
@@ -212,7 +213,7 @@ function intHidden(i) {
 }
 const GROUP_TOPICS = ['hp', 'monarch', 'nd', 'parent', 'rainbow', 'social', 'candy', 'pets', 'election', 'gf', 'kids', 'tarot', 'craft', 'vgames', 'boardg', 'fantasy', 'fitness', 'selling', 'creative', 'culture', 'learn', 'games', 'collect', 'outdoors', 'cars', 'illusions', 'odd', 'colour', 'looks', 'reef', 'dolls', 'keeps', 'glass', 'kites', 'lanterns', 'art3d'];
 // 1.9.0 topics nobody gets unless they pick them (members: in their interests; Shane: switched on in a suggestion or ⚙️)
-const OPTIN = new Set(['parent', 'rainbow', 'social', 'candy', 'pets', 'nd', 'hp', 'monarch', 'aiassist', 'smart', 'innov']);
+const OPTIN = new Set(['parent', 'rainbow', 'social', 'candy', 'pets', 'nd', 'hp', 'monarch', 'aiassist', 'smart', 'innov', 'celeb']);
 function optedIn(t) { return PICK ? PICK.includes(t) : ls.get('optIn', []).includes(t); }
 const topicOn = t => pickOk(t) && (!OPTIN.has(t) || optedIn(t)) && (!GROUP_TOPICS.includes(t) || INTERESTS.some(x => x.topic === t && !INT_OFF[x.name]));
 window.topicOn = topicOn; // picture scripts (sights, 3D art) read this when a card is mixed in
@@ -1131,6 +1132,9 @@ function settings() {
     <p>📌 <b>For You</b> cards come from My App on this phone and are mixed through All at random: cars, birthdays, calendar, to-dos, garden, pets, meals and recipes (your own recipe photos too), weather, UV and power (kWh), roads, deliveries, plus every board and hub. Your own things never leave this phone, and bills and money are always left out.</p>
     <p>🖼️ <b>My Photos</b>: ${PHOTO_INFO.all ? `${PHOTO_INFO.used} of the ${PHOTO_INFO.all} photos on My App’s Photos page${PHOTO_INFO.approved ? ' (the ones you tagged approved, feed, keep or favourite)' : ''}` : 'photos from My App’s Photos page'}. Receipts, warranties, documents, screenshots and anything tagged <b>nofeed</b> or <b>private</b> are left out. Tag photos <b>approved</b> or <b>feed</b> in My App to show only those. Read on this phone only.</p>
     ` : ''}
+    ${typeof CELEB !== 'undefined' && CELEB.can ? `<h2 style="margin-top:18px">Celebrity &amp; reality TV news</h2>
+    <p>Stories like the Kardashians, Love Island and Real Housewives, from NZ Herald Entertainment, Now to Love, E! News and Us Weekly. Sport is never included. You can switch this off or back on any time.</p>
+    <button class="ich${CELEB.news ? ' on' : ''}" id="celebt" aria-pressed="${CELEB.news ? 'true' : 'false'}">${CELEB.news ? '✓ On in your feed' : 'Off'}</button>` : ''}
     <h2 style="margin-top:18px">Time of day</h2>
     <p>Mornings (5–11am) lean to news, what’s on and the election; 11am–7pm is the normal mix; from 7pm it winds down, and 9pm–3am leans hardest to cute animals, calm nature, lofi, cosy cooking, gardening and space, with less hard news and fewer loud trailers. Nothing is hidden, and your votes still count. Uses this phone’s clock.</p>
     <button class="ich${MOOD_OFF ? '' : ' on'}" id="moodt" aria-pressed="${!MOOD_OFF}">${MOOD_OFF ? 'Off: same mix all day' : '✓ On' + (MOODS[moodBand()][0] ? ' · now ' + MOODS[moodBand()][0] : ' · now the normal mix')}</button>
@@ -1170,6 +1174,7 @@ document.addEventListener('click', e => {
   if (t.id === 'rf') { load(true); return; }
   if (t.id === 'st') { settings(); return; }
   if (t.dataset && t.dataset.ts) { setTextSize(t.dataset.ts); const y = $('#sheet').scrollTop; settings(); $('#sheet').scrollTop = y; toast('Text size: ' + t.textContent.replace('✓ ', '')); return; } // 1.8.7
+  if (t.id === 'celebt') { if (typeof setCelebNews === 'function') { const y = $('#sheet').scrollTop; setCelebNews(!CELEB.news).then(() => { settings(); $('#sheet').scrollTop = y; }); } return; }
   if (t.id === 'moodt') { MOOD_OFF = !MOOD_OFF; ls.set('moodOff', MOOD_OFF); const y = $('#sheet').scrollTop; settings(); $('#sheet').scrollTop = y; draw(); toast(MOOD_OFF ? 'Time of day: off' : 'Time of day: on'); return; }
   const ib = t.closest('[data-int]'); if (ib && !ib.closest('#mfdrawer')) { const n = ib.dataset.int; if (INT_OFF[n]) delete INT_OFF[n]; else INT_OFF[n] = 1; ls.set('intOff', INT_OFF); const y = $('#sheet').scrollTop; for (const i of (FEED && FEED.items) || []) delete i._ints; settings(); $('#sheet').scrollTop = y; draw(); toast((INT_OFF[n] ? 'Off: ' : 'On: ') + n); return; }
   const rv = t.closest('[data-revive]'); if (rv) { REVIVE[rv.dataset.revive] = Date.now(); ls.set('revive', REVIVE); settings(); draw(); toast('Brought back'); return; }

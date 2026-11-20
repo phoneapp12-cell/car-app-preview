@@ -8,6 +8,7 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const calSrc = read('../feed/cal.js');
 const css = read('../feed/cal-book.css');
 const extras = read('../feed/extras.js');
+const today = read('../feed/today.js');
 
 function loadCal(extra = {}) {
   const ctx = {
@@ -120,6 +121,8 @@ test('a personal WOF date already entered is not duplicated from /cars', () => {
 test('this change does not add car WOF or rego cards to the feed', () => {
   assert.doesNotMatch(extras, /transact\.nzta\.govt\.nz/);
   assert.doesNotMatch(extras, /Check expiry on NZTA/);
-  const diff = execSync('git diff origin/main -- feed/extras.js feed/today.js', { cwd: new URL('..', import.meta.url), encoding: 'utf8' });
+  assert.doesNotMatch(today, /transact\.nzta\.govt\.nz/);
+  assert.doesNotMatch(today, /Check expiry on NZTA/);
+  const diff = execSync('git diff origin/main -- feed/extras.js', { cwd: new URL('..', import.meta.url), encoding: 'utf8' });
   assert.equal(diff, '');
 });
