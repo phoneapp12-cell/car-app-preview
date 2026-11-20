@@ -1,4 +1,4 @@
-/* Info Book 1.9.288 – Sugar Rush, levels 1–75. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.289 – Sugar Rush, levels 1–75. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -8543,7 +8543,7 @@
   function ensureMapExtras() {
     if (document.querySelector('script[src*="sugar-rush-map"]')) return;
     var s = document.createElement('script');
-    s.src = 'sugar-rush-map.js?v=1.9.288';
+    s.src = 'sugar-rush-map.js?v=1.9.289';
     s.async = false;
     document.body.appendChild(s);
   }

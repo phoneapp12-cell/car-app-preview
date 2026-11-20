@@ -1,4 +1,4 @@
-/* Info Book 1.9.288 — magazine article reader.
+/* Info Book 1.9.289 — magazine article reader.
    Single-tap on a news, article or family post turns the page into a full
    magazine view. Wikipedia text is fetched only when the topic clearly matches;
    otherwise the original post is shown as it is. Nothing is invented. */
