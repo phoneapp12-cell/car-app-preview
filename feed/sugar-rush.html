@@ -475,7 +475,7 @@
   @keyframes scpulse { from { opacity: .25; } to { opacity: .9; } }
   @keyframes scshoot { 0%, 82% { transform: translate(0, 0); opacity: 0; } 86% { opacity: 1; } 100% { transform: translate(140%, 60%); opacity: 0; } }
   @keyframes scfall { from { transform: translateY(0); } to { transform: translateY(26px); } }
-  body.ingame #game h1 { display: inline-block; padding: 6px 112px 10px 16px; margin-bottom: 6px; border-radius: 16px; background: linear-gradient(180deg, #ffd4e4, #ffb4cc); border: 2px solid #ff8ab8; box-shadow: 0 3px 0 rgba(214,36,110,.35); }
+  body.ingame #game h1 { display: inline-block; padding: 6px 16px 10px 16px; margin-bottom: 6px; border-radius: 16px; background: linear-gradient(180deg, #ffd4e4, #ffb4cc); border: 2px solid #ff8ab8; box-shadow: 0 3px 0 rgba(214,36,110,.35); }
   body.ingame .goalstrip { background: rgba(255,255,255,.9); box-shadow: 0 3px 0 rgba(242,123,176,.35); }
   body.ingame .stat { background: rgba(255,255,255,.88); box-shadow: 0 3px 0 rgba(242,123,176,.3); }
   body.ingame .goal { background: rgba(255,255,255,.9); }
@@ -759,7 +759,9 @@
   .hearts .hn { font-style: normal; font-size: 11px; font-weight: 800; color: #b0457a; margin-left: 3px; font-variant-numeric: tabular-nums; }
   .hearts.inlevel .hn { font-size: 10px; }
   .hearts.onmap { position: absolute; left: 10px; top: 58px; z-index: 28; }
-  .hearts.inlevel { position: absolute; right: 20px; top: 22px; z-index: 3; }
+  /* 1.9.300 Lives sit in the goal/moves row, left of Moves left (no longer under Exit/Minimise). */
+  .hearts.inlevel { position: static; flex: 0 0 auto; align-self: center; min-height: 44px; padding: 6px 10px 6px 8px; }
+  #goalstrip { display: flex; align-items: stretch; gap: 8px; }
   body.ingame #game h1 .frost { display: block; }
   body.ingame #game h1 small { display: block; margin: 2px 0 0 2px; color: #7a2048; }
   #game { position: relative; }
@@ -832,17 +834,16 @@
     color: #9d2458;
     border-color: #f4a0c4;
   }
+  /* 1.9.300 Exit/Minimise sit above the level and scroll away; not sticky. */
   .gamebar {
-    position: sticky;
-    top: 0;
-    z-index: 9;
+    position: relative;
+    z-index: 3;
     display: flex;
     align-items: center;
     gap: 8px;
     margin: 0 0 8px;
     padding: 6px 0;
     padding-top: max(6px, env(safe-area-inset-top, 0px));
-    background: linear-gradient(180deg, rgba(255,246,252,.98) 0%, rgba(255,246,252,.86) 70%, rgba(255,246,252,0) 100%);
   }
   /* JOB 7: open intro. playSugarIntro also injects this; keep it here for standalone. */
   #sr-open-intro{position:fixed;inset:0;z-index:20000;background:#16010c;display:flex;align-items:center;justify-content:center;color:#fff}
@@ -958,12 +959,12 @@
         <button type="button" class="pri" id="gameexit" aria-label="Exit">Exit</button>
         <button type="button" id="gamemin" aria-label="Minimise">Minimise</button>
       </div>
-      <button type="button" class="hearts inlevel" id="hearts2" aria-label="Lives"><i aria-hidden="true">❤️</i><b>3</b></button>
       <h1><span class="frost">Sugar Rush</span> <small id="lvname">Level 1</small></h1>
       <div id="postcardHud" class="postcard-hud" hidden></div>
       <div class="racebar inlevel" id="racebar2" hidden role="status"></div>
       <div class="goalstrip" id="goalstrip">
         <div class="cd-items" id="cditems"><div class="cd-item" data-kind="collect"><span class="cd-icon" id="gicon">🍒</span><span class="cd-num">20</span><span class="cd-lab">left</span></div></div>
+        <button type="button" class="hearts inlevel" id="hearts2" aria-label="Lives"><i aria-hidden="true">❤️</i><b>3</b></button>
         <div class="movecount" id="movecount"><span>Moves left</span><strong id="moves">20</strong></div>
         <p class="help" id="help">Collect 20 cherry gumdrops · 20 moves</p>
       </div>

@@ -93,6 +93,23 @@ test('gameplay and the map have a tappable Exit and Minimise, and progress is sa
   assert.match(play, /isSugarSession/);
 });
 
+test('in-game Exit and Minimise scroll away, and lives sit left of Moves left', () => {
+  assert.match(html, /class="gamebar"/);
+  assert.match(html, /\.gamebar\s*\{[^}]*position:\s*relative/);
+  assert.doesNotMatch(html, /\.gamebar\s*\{[^}]*position:\s*sticky/);
+  assert.match(html, /id="goalstrip"[\s\S]*?id="hearts2"[\s\S]*?id="movecount"/);
+  assert.match(html, /\.hearts\.inlevel\s*\{[^}]*position:\s*static/);
+  assert.doesNotMatch(html, /\.hearts\.inlevel\s*\{[^}]*position:\s*absolute/);
+  assert.match(gameJs, /function scrollPastGameChrome/);
+  assert.match(gameJs, /revealSugarUi\(\);\s*scrollPastGameChrome\(\);/);
+  const boot = gameJs.match(/function bootLevel[\s\S]*?function beginLevel/);
+  assert.ok(boot, 'bootLevel is present');
+  assert.equal([...boot[0].matchAll(/scrollPastGameChrome\(\)/g)].length, 2);
+  const showMap = gameJs.match(/function showMap[\s\S]*?function /);
+  assert.ok(showMap);
+  assert.doesNotMatch(showMap[0], /scrollPastGameChrome/);
+});
+
 test('Pick your icon stays available after the first choice, and the family race is easy to open', () => {
   assert.match(html, /id="pickicon"/);
   assert.match(html, /Pick your icon/);
