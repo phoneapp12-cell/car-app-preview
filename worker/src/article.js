@@ -1,4 +1,4 @@
-/* 1.9.290 Info Book magazine reader: a readability-style excerpt of a source article.
+/* 1.9.291 Info Book magazine reader: a readability-style excerpt of a source article.
    Public GET /article?u=… on shane-my-feed-data. Respects robots.txt, paywalls, login walls
    and nosnippet. Returns a short excerpt only, never a full copy. Nothing is invented. */
 import { safeUrl } from './preview.js';
