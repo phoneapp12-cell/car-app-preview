@@ -232,8 +232,11 @@
     nav.querySelector('span').innerHTML = (country || 'Country') + '<small style="display:block;font-size:10px;color:#7a4a62">1.9.276</small>';
     nav.querySelector('#sr-prev').disabled = i <= 0;
     nav.querySelector('#sr-next').disabled = i < 0 || i >= list.length - 1;
-    if (!document.body.classList.contains('onmap')) nav.style.display = 'none';
-    else nav.style.display = '';
+    if (nav.dataset.country !== country) {
+      nav.dataset.country = country;
+      nav.querySelector('span').innerHTML = (country || 'Country') + '<small style="display:block;font-size:10px;color:#7a4a62">1.9.277</small>';
+    }
+    nav.style.display = document.body.classList.contains('onmap') ? '' : 'none';
   }
 
   function showCard() {
@@ -374,34 +377,44 @@
     panel.classList.add('on');
   }
 
+  var busy = false;
   function tick() {
-    injectStyle();
-    decorate();
-    var stage = document.getElementById('mapstage');
-    if (stage && stage.classList.contains('travel-shot')) {
-      stage.dataset.wasTravel = '1';
-    } else {
-      if (stage && stage.dataset.wasTravel === '1') {
-        stage.dataset.wasTravel = '';
-        stage.dataset.framed = '';
+    if (busy) return;
+    busy = true;
+    try { obs.disconnect(); } catch (e) {}
+    try {
+      injectStyle();
+      decorate();
+      var stage = document.getElementById('mapstage');
+      if (stage && stage.classList.contains('travel-shot')) {
+        stage.dataset.wasTravel = '1';
+      } else {
+        if (stage && stage.dataset.wasTravel === '1') {
+          stage.dataset.wasTravel = '';
+          stage.dataset.framed = '';
+        }
+        frameCountry(ensurePicked());
       }
-      frameCountry(ensurePicked());
+      showCard();
+      syncNav();
+      syncTravel();
+      syncZoom();
+    } finally {
+      busy = false;
+      var root = document.getElementById('map');
+      if (root) obs.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
     }
-    showCard();
-    syncNav();
-    syncTravel();
-    syncZoom();
   }
 
-  var obs = new MutationObserver(tick);
+  var obs = new MutationObserver(function () { tick(); });
   function arm() {
     var root = document.getElementById('map') || document.body;
     if (!root) return;
-    obs.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['display', 'class', 'transform'] });
+    obs.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
     tick();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', arm);
   else arm();
-  setInterval(tick, 700);
+  setInterval(tick, 1500);
 })();
