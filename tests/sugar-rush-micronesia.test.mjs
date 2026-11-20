@@ -116,3 +116,19 @@ test('release assets and service worker are synchronized at 1.9.292', () => {
     assert.ok(worker.includes('img/sugar-rush/landmarks/' + asset), `${asset} is cached by the release worker`);
   }
 });
+
+test('map chrome is pinned to the small viewport so the footer cannot loop', () => {
+  const html = fs.readFileSync('feed/sugar-rush.html', 'utf8');
+  const onmap = html.match(/body\.onmap\s*\{[^}]+\}/);
+  assert.ok(onmap, 'body.onmap rule exists');
+  assert.match(onmap[0], /height:\s*100svh/);
+  assert.match(onmap[0], /min-height:\s*100svh/);
+  assert.match(onmap[0], /max-height:\s*100svh/);
+  assert.doesNotMatch(onmap[0], /100dvh/);
+  const mapview = html.match(/\.mapview\s*\{[^}]+\}/);
+  assert.ok(mapview, 'mapview rule exists');
+  assert.match(mapview[0], /overflow:\s*hidden/);
+  assert.doesNotMatch(mapview[0], /overflow:\s*auto/);
+  const mapJs = fs.readFileSync('feed/sugar-rush-map.js', 'utf8');
+  assert.match(mapJs, /\.mapview\{background:#7ee8f5;overflow:hidden/);
+});
