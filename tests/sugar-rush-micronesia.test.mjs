@@ -102,16 +102,16 @@ test('Postcard Hunt and established Australia/India audio mappings remain unchan
   assert.equal(SR.gameTrack(75), 'sugar-rush-travel.m4a');
 });
 
-test('release assets and service worker are synchronized at 1.9.282', () => {
+test('release assets and service worker are synchronized at 1.9.283', () => {
   const shell = fs.readFileSync('feed/index.html', 'utf8');
   const game = fs.readFileSync('feed/sugar-rush.html', 'utf8');
   const app = fs.readFileSync('feed/app.js', 'utf8');
   const worker = fs.readFileSync('feed/sw.js', 'utf8');
-  assert.ok(shell.includes('sights.js?v=1.9.282'));
-  assert.ok(game.includes('sugar-rush.js?v=1.9.282'));
-  assert.ok(game.includes('scores.js?v=1.9.282'));
-  assert.ok(app.includes("const APP_VERSION = '1.9.282'"));
-  assert.ok(worker.includes("const VERSION = '1.9.282'"));
+  assert.ok(shell.includes('sights.js?v=1.9.283'));
+  assert.ok(game.includes('sugar-rush.js?v=1.9.283'));
+  assert.ok(game.includes('scores.js?v=1.9.283'));
+  assert.ok(app.includes("const APP_VERSION = '1.9.283'"));
+  assert.ok(worker.includes("const VERSION = '1.9.283'"));
   for (const asset of ['lake.webp', 'mountains.webp', 'volcano.webp']) {
     assert.ok(worker.includes('img/sugar-rush/landmarks/' + asset), `${asset} is cached by the release worker`);
   }
