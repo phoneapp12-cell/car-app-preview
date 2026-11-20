@@ -1138,6 +1138,11 @@
     Singapore: '🌆', Cambodia: '🛕', Philippines: '⛵', Laos: '🌿', Bhutan: '🏔️',
     Pakistan: '🏔️', Afghanistan: '🧿', Iran: '🌷', Uzbekistan: '🕌', Kazakhstan: '🐎', China: '🐉'
   };
+  const MAP_COUNTRY_ICONS = Object.assign({}, POSTCARD_ICONS, {
+    Taiwan: '🧋', Japan: '🌸', 'South Korea': '🥁', Palau: '🐠',
+    'Federated States of Micronesia': '🪸', 'Marshall Islands': '🌊', Nauru: '🏝️', Kiribati: '🌅'
+  });
+  function mapCountryIconForLevel(n) { return MAP_COUNTRY_ICONS[countryForLevel(n)] || '✦'; }
   function normalizePostcardProgress(raw) {
     const source = raw && raw.countries && typeof raw.countries === 'object' ? raw.countries : {};
     const countries = {};
@@ -1347,6 +1352,44 @@
       '<g transform="translate(-226 1300)" opacity=".82"><path d="M-42 20 L-19 -19 L0 13 L19 -31 L48 20 Z" fill="#efc99b" stroke="#fff" stroke-width="3" stroke-linejoin="round"/><path d="M-26 -7 L-19 -19 L-12 -7 L-18 -10 Z M11 -17 L19 -31 L28 -13 L19 -19 Z" fill="#fff"/><path d="M-35 21 Q0 10 40 21" fill="none" stroke="#c7e8ba" stroke-width="6" stroke-linecap="round"/></g>' +
       '</g>';
   }
+  function mapLandmarks() {
+    const lake = function (id, x, y, rx, ry, label) {
+      return '<g id="' + id + '" class="sr-landmark sr-lake" transform="translate(' + x + ' ' + y + ')" pointer-events="none">' +
+        '<ellipse cx="0" cy="0" rx="' + rx + '" ry="' + ry + '" fill="#55cfe4" stroke="#fff" stroke-width="4"/>' +
+        '<ellipse cx="0" cy="0" rx="' + (rx * .72).toFixed(1) + '" ry="' + (ry * .55).toFixed(1) + '" fill="#a7f2f1" opacity=".55"/>' +
+        '<path d="M-' + (rx * .65).toFixed(1) + ' 0 Q-' + (rx * .28).toFixed(1) + ' -' + (ry * .35).toFixed(1) + ' 0 0 T' + (rx * .65).toFixed(1) + ' 0" fill="none" stroke="#efffff" stroke-width="2.2" stroke-linecap="round"/>' +
+        (label ? '<text x="0" y="4" text-anchor="middle" font-size="7" font-weight="900" fill="#216d84" stroke="#fff" stroke-width="2.5" paint-order="stroke" font-family="ui-rounded,system-ui,sans-serif">' + label + '</text>' : '') + '</g>';
+    };
+    const mountainRange = function (id, x, y, scale, label) {
+      return '<g id="' + id + '" class="sr-landmark sr-mountains" transform="translate(' + x + ' ' + y + ') scale(' + scale + ')" pointer-events="none">' +
+        '<path d="M-90 35 L-69 6 L-54 23 L-28 -20 L-12 3 L4 -48 L25 -5 L39 -26 L56 12 L73 -2 L96 35 Z" fill="#a9c1cc" stroke="#fff" stroke-width="4" stroke-linejoin="round"/>' +
+        '<path d="M4 -48 L15 -22 L5 -29 L-2 -13 L-5 -29 Z M39 -26 L49 -4 L39 -10 L32 3 L28 -8 Z M-28 -20 L-19 -1 L-29 -7 L-35 5 Z M73 -2 L82 16 L71 10 L67 19 Z" fill="#fff" stroke="#ecfbff" stroke-width="2" stroke-linejoin="round"/>' +
+        '<path d="M-90 36 C-64 27 -46 39 -22 32 C1 25 18 38 42 32 C62 27 75 38 94 34" fill="none" stroke="#78bf8e" stroke-width="5" stroke-linecap="round" opacity=".82"/>' +
+        (label ? '<text x="0" y="57" text-anchor="middle" font-size="9" font-weight="900" letter-spacing=".8" fill="#326f7e" stroke="#fff" stroke-width="3" paint-order="stroke" font-family="ui-rounded,system-ui,sans-serif">' + label + '</text>' : '') + '</g>';
+    };
+    const volcano = function (id, x, y, scale, label) {
+      return '<g id="' + id + '" class="sr-landmark sr-volcano" transform="translate(' + x + ' ' + y + ') scale(' + scale + ')" pointer-events="none">' +
+        '<ellipse cx="0" cy="25" rx="38" ry="7" fill="#568b79" opacity=".24"/>' +
+        '<path d="M-34 24 L-10 -22 Q-3 -38 3 -34 Q10 -28 13 -21 L36 24 Z" fill="#c98578" stroke="#fff" stroke-width="3.5" stroke-linejoin="round"/>' +
+        '<path d="M-10 -22 Q0 -28 11 -21 L5 -15 L0 -19 L-5 -15 Z" fill="#ffe9d5" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/>' +
+        '<ellipse cx="1" cy="-21" rx="8" ry="3.4" fill="#ff8855" stroke="#a95756" stroke-width="1.3"/>' +
+        '<path d="M1 -17 Q1 -7 8 2" fill="none" stroke="#fa674e" stroke-width="4" stroke-linecap="round"/>' +
+        '<path d="M-7 -38 C-18 -45 -15 -54 -6 -53 C-3 -64 10 -60 10 -51 C22 -53 23 -42 12 -37" fill="#fff8f1" stroke="#fff" stroke-width="2" opacity=".9"/>' +
+        (label ? '<text x="0" y="40" text-anchor="middle" font-size="8" font-weight="900" letter-spacing=".6" fill="#714d63" stroke="#fff" stroke-width="3" paint-order="stroke" font-family="ui-rounded,system-ui,sans-serif">' + label + '</text>' : '') + '</g>';
+    };
+    return '<g class="sr-landmarks" aria-hidden="true">' +
+      lake('landmark-lake-taupo', 303, 332, 29, 17, 'TAUPŌ') +
+      lake('landmark-lake-pukaki', 208, 815, 24, 9, '') +
+      lake('landmark-lake-wakatipu', 125, 920, 25, 10, '') +
+      mountainRange('landmark-southern-alps', 163, 850, .78, '') +
+      mountainRange('landmark-himalaya', -220, 1270, .92, 'HIMALAYA') +
+      mountainRange('landmark-great-dividing-range', 289, 1936, .68, 'GREAT DIVIDING RANGE') +
+      mountainRange('landmark-mt-fuji', 220, 1278, .55, 'MT. FUJI') +
+      volcano('landmark-tongariro-volcano', 247, 382, 1.02, 'TONGARIRO') +
+      volcano('landmark-java-volcano', 10, 1772, .72, '') +
+      volcano('landmark-yasur-volcano', 538, 1846, .62, '') +
+      '</g>';
+  }
   function nzMapSvg() {
     const live = ''; // the icing is filled in from the stops this player has already cleared
     const future = ''; // 1.9.222 coming-soon cities are markers only
@@ -1441,6 +1484,7 @@
       ASIA_LAND.map(function (pts, i) { return '<path filter="url(#sr-soft)" fill="url(#' + asiaCandy[i % asiaCandy.length] + ')" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="' + ausPath(pts) + '"/>'; }).join('') +
       ASIA_EAST_LAND.map(function (pts, i) { return '<path filter="url(#sr-soft)" fill="url(#' + asiaCandy[(i + 3) % asiaCandy.length] + ')" stroke="#fff" stroke-width="4" stroke-linejoin="round" d="' + ausPath(pts) + '"/>'; }).join('') +
       mapTerrain() +
+      mapLandmarks() +
       '<path d="M120 1960 C150 1940 190 1950 210 1980 C190 1990 150 1990 120 1960 Z" fill="#ffd9a8" opacity=".6"/>' +
       '<path d="M236 1930 C250 1918 270 1922 276 1936 C264 1944 246 1942 236 1930 Z" fill="#ffd9a8" opacity=".55"/>' +
       '<circle class="sr-bob" cx="380" cy="1860" r="6" fill="#ffb347" opacity=".5"/><circle class="sr-bob" cx="30" cy="2160" r="7" fill="#ff8ab8" opacity=".45"/>' +
@@ -4457,6 +4501,7 @@
   root.SugarRush.normalizePostcardProgress = normalizePostcardProgress;
   root.SugarRush.addPostcardPiece = addPostcardPiece;
   root.SugarRush.countryForLevel = countryForLevel;
+  root.SugarRush.mapCountryIconForLevel = mapCountryIconForLevel;
   root.SugarRush.flightPath = flightPath;
   root.SugarRush.journeyPath = journeyPath;
   root.SugarRush.createSessionLevelAccess = createSessionLevelAccess;
@@ -6601,6 +6646,7 @@
       const n = i + 1, open = sessionLevelAccess.allows(n, prog.open), stars = prog.stars[i] || 0, stop = MAP_STOPS[i], country = countryForLevel(n);
       const countryStop = country && country.toLowerCase() === stop.place.toLowerCase();
       const countryStart = country && country !== countryForLevel(n - 1);
+      const countryIcon = countryStart ? mapCountryIconForLevel(n) : '';
       const b = doc.createElement('button');
       b.type = 'button';
       b.className = 'lv lab-' + (stop.label || 'right') + (stop.lift ? ' lift' : '') + (lv.theme === 'sarah' ? ' sarah' : '') + (lv.hard ? ' hard hard' + lv.hard : '') + (countryStop ? ' country-stop' : '') + (countryStart ? ' country-start' : '') + (open ? ' open' : '') + (stars ? ' done' : '') + (n === here ? ' here' : '') + ' kind-' + (stop.kind || 'town');
@@ -6612,7 +6658,7 @@
       const mark = stop.kind === 'house' ? '🏠' : (stop.kind === 'post' ? '✉️' : (stop.kind === 'station' ? '🚂' : (stop.kind === 'island' ? '🌴' : '')));
       const starHtml = [0, 1, 2].map(k => '<span class="' + (k < stars ? 'on' : '') + '">★</span>').join('');
       const badge = prog.badges[i] && lv.badge ? '<span class="gotbadge" aria-hidden="true">' + lv.badge.icon + '</span>' : '';
-      b.innerHTML = '<span class="pin"><span class="no">' + n + '</span>' + (mark ? '<span class="mark" aria-hidden="true">' + mark + '</span>' : '') + (lv.hard ? '<span class="hardmark" aria-hidden="true">🔥</span>' : '') + '</span><span class="st">' + starHtml + '</span>' +
+      b.innerHTML = '<span class="pin"><span class="no">' + n + '</span>' + (countryIcon ? '<span class="country-mark" aria-hidden="true">' + countryIcon + '</span>' : '') + (mark ? '<span class="mark" aria-hidden="true">' + mark + '</span>' : '') + (lv.hard ? '<span class="hardmark" aria-hidden="true">🔥</span>' : '') + '</span><span class="st">' + starHtml + '</span>' +
         '<span class="meta"><b>' + stop.place + '</b><em>' + lv.name + '</em>' + (country && !countryStop ? '<i class="country">' + country + '</i>' : '') + '</span>' + badge;
       b.setAttribute('aria-label', (open ? 'Play ' : 'Locked: ') + 'level ' + n + ', ' + lv.name + ', ' + stop.place + (country && !countryStop ? ', ' + country : '') + (lv.hard ? ', ' + hardLabel(lv.hard) : '') + (stars ? ', ' + stars + ' stars' : '') + (prog.badges[i] && lv.badge ? ', badge ' + lv.badge.name : ''));
       if (open) b.addEventListener('click', () => { unlockAudio(); openLevel(n); });

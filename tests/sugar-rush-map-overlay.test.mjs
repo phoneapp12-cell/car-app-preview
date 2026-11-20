@@ -1,9 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 
 const html = readFileSync(new URL('../feed/sugar-rush.html', import.meta.url), 'utf8');
 const css = html.match(/<style>([\s\S]*?)<\/style>/i)?.[1] || '';
+const require = createRequire(import.meta.url);
+require('../feed/sugar-rush.js');
+const game = globalThis.SugarRush;
 
 function rule(selector) {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -22,4 +26,26 @@ test('mobile map scrolling layer stays below the fixed level intro dialog', () =
   assert.ok(Number(mapZ[1]) < Number(overlayZ[1]), 'the map must stack below dialogs');
   assert.match(mapView, /overflow\s*:\s*auto/i, 'the map remains scrollable');
   assert.match(mapView, /-webkit-overflow-scrolling\s*:\s*touch/i, 'native mobile momentum scrolling remains enabled');
+});
+
+test('every country-entry level has its own representative map icon badge', () => {
+  const starts = [];
+  for (let i = 0; i < game.MAP_COUNTRIES.length; i++) {
+    if (i === 0 || game.MAP_COUNTRIES[i] !== game.MAP_COUNTRIES[i - 1]) {
+      const icon = game.mapCountryIconForLevel(i + 1);
+      assert.ok(icon && icon !== '✦', `country icon exists for ${game.MAP_COUNTRIES[i]}`);
+      starts.push(game.MAP_COUNTRIES[i]);
+    }
+  }
+  assert.ok(starts.length > 30, 'country icons cover the full world tour');
+  assert.match(rule('.stops .lv .pin .country-mark'), /position\s*:\s*absolute/i, 'country icon badges sit on map pins');
+});
+
+test('map SVG contains labeled lakes, snowcapped ranges, and volcano landmarks', () => {
+  const svg = game.nzMapSvg();
+  for (const id of [
+    'landmark-lake-taupo', 'landmark-lake-pukaki', 'landmark-lake-wakatipu',
+    'landmark-southern-alps', 'landmark-himalaya', 'landmark-tongariro-volcano',
+    'landmark-java-volcano', 'landmark-yasur-volcano', 'landmark-mt-fuji'
+  ]) assert.ok(svg.includes(`id="${id}"`), `illustrated landmark ${id} remains present`);
 });
