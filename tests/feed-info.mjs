@@ -1080,18 +1080,23 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   const sugarFiles = ['sugar-rush-music.mp3', 'sugar-rush-l1.mp3', 'sugar-rush-l2.mp3', 'sugar-rush-menu.mp3', 'sugar-rush-win.mp3', 'sugar-rush-yum.mp3',
     'sugar-rush-voice-yay.mp3', 'sugar-rush-voice-great.mp3', 'sugar-rush-voice-awesome.mp3',
     'sugar-rush-voice-sweetas.mp3', 'sugar-rush-voice-succulent.mp3',
-    'sugar-rush-swap.mp3', 'sugar-rush-swap-lo.mp3', 'sugar-rush-swap-hi.mp3', 'sugar-rush-swap-bad.mp3'];
+    'sugar-rush-swap.mp3', 'sugar-rush-swap-lo.mp3', 'sugar-rush-swap-hi.mp3', 'sugar-rush-swap-bad.mp3',
+    'sugar-rush-boom.mp3'];
   for (const f of sugarFiles) assert.ok(fs.existsSync('feed/' + SR.mediaUrl(f)), 'audio ' + f);
   assert.strictEqual(SR.MEDIA_HASH['sugar-rush-swap.mp3'], 'a48d245c');
   assert.strictEqual(SR.MEDIA_HASH['sugar-rush-swap-lo.mp3'], '9e2b08ee');
   assert.strictEqual(SR.MEDIA_HASH['sugar-rush-swap-hi.mp3'], '49127f7a');
   assert.strictEqual(SR.MEDIA_HASH['sugar-rush-swap-bad.mp3'], '610e5e44');
+  assert.strictEqual(SR.MEDIA_HASH['sugar-rush-boom.mp3'], '81b9bd0a');
+  assert.ok(SR.BOOM_VOL > 0 && SR.BOOM_VOL < SR.VOICE_VOL);
+  assert.ok(srJs.includes('shake(3); playFuseBoom()') && srJs.includes('playZap(true)'));
   assert.ok(SR.SWAP_VOL >= 0.18 && SR.SWAP_VOL <= 0.22);
   assert.ok(SR.SWAP_VALID.length === 3 && ['swap', 'swap_lo', 'swap_hi'].every(k => Array.from(SR.SWAP_VALID).includes(k)));
   assert.ok(srJs.includes('if (res && res.valid) playValidSwap()') && srJs.includes('playBadSwap()'));
   assert.ok(srJs.includes('playClip(ctx, out, b') && srJs.includes('SWAP_VOL'));
   const swShell = fs.readFileSync('feed/sw.js', 'utf8');
   assert.ok(!swShell.includes('sugar-rush-swap') && !swShell.includes('053277f7') && !swShell.includes('74356646'), 'swap and new praise clips stay lazy, not SW-precached');
+  assert.ok(!swShell.includes('sugar-rush-boom') && !swShell.includes('81b9bd0a'), 'countdown boom stays lazy, not SW-precached');
   for (const old of ['pop', 'crush', 'bomb', 'hammer', 'spread', 'fail']) {
     const leftovers = fs.readdirSync('feed').filter(n => n.startsWith('sugar-rush-sfx-' + old));
     assert.deepStrictEqual(leftovers, [], 'removed old pack clip ' + old);
@@ -1460,7 +1465,8 @@ if (live) {
   const sugarFiles = ['sugar-rush-music.mp3', 'sugar-rush-l1.mp3', 'sugar-rush-l2.mp3', 'sugar-rush-menu.mp3', 'sugar-rush-win.mp3', 'sugar-rush-yum.mp3',
     'sugar-rush-voice-yay.mp3', 'sugar-rush-voice-great.mp3', 'sugar-rush-voice-awesome.mp3',
     'sugar-rush-voice-sweetas.mp3', 'sugar-rush-voice-succulent.mp3',
-    'sugar-rush-swap.mp3', 'sugar-rush-swap-lo.mp3', 'sugar-rush-swap-hi.mp3', 'sugar-rush-swap-bad.mp3'];
+    'sugar-rush-swap.mp3', 'sugar-rush-swap-lo.mp3', 'sugar-rush-swap-hi.mp3', 'sugar-rush-swap-bad.mp3',
+    'sugar-rush-boom.mp3'];
   const SR = load('feed/sugar-rush.js').SugarRush;
   for (const f of sugarFiles) {
     const url = SR.mediaUrl(f);
@@ -3221,7 +3227,8 @@ if (live) {
   assert.strictEqual(Number(tetGame.SHAPES[8][0][0]), 8);
   assert.strictEqual(tetGame.foodKind(8), 'cherry');
   assert.strictEqual(tetGame.foodSoundFor(8), 'boom');
-  assert.strictEqual(tetGame.FOOD_HASH.boom, '70ec46f6');
+  assert.strictEqual(tetGame.FOOD_HASH.boom, '81b9bd0a');
+  assert.ok(tetGame.FOOD_VOL.boom <= 0.5, 'food boom stays mellow');
   assert.ok(fs.existsSync('feed/' + tetGame.foodSrc('boom')), 'cherry boom sfx');
   assert.strictEqual(tetGame.blockColor(8, 30, 4), '#e11d48');
   const g = tetGame.newGame({ level: 4, practice: true });
@@ -3341,7 +3348,8 @@ if (live) {
   assert.strictEqual(tetGame.isBanana(3), true);
   assert.strictEqual(tetGame.isBanana(1), false);
   assert.strictEqual(tetGame.isBanana(8), false);
-  assert.ok(fs.existsSync('feed/' + tetGame.foodSrc('boom')), 'reuses the food-boom style sfx');
+  assert.ok(fs.existsSync('feed/' + tetGame.foodSrc('boom')), 'cherry and banana blasts use Shane\'s boom');
+  assert.ok(src.includes("kind === 'boom'") && src.includes('frequency.value = 3600'), 'boom keeps its low end');
 
   function place(g, t, rot, x, y) {
     const m = tetGame.rotShape(t, rot);

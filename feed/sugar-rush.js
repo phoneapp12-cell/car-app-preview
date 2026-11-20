@@ -2788,7 +2788,7 @@
   // that always restores, a compressor on the bus.
   const BGM_VOL = 0.12, END_VOL = 0.20, MENU_VOL = 0.12, BGM_DUCK = 0.078, XF = 0.3;
   const SFX_MASTER = 0.96, SFX_NOTE = 0.10, SFX_LP = 2500, SFX_MAX_HZ = 800;
-  const VOICE_VOL = 0.36, CHIME_VOL = 0.10, CHIME_DUR = 0.20, VOICE_GAP = 1.5, SWAP_VOL = 0.20;
+  const VOICE_VOL = 0.36, CHIME_VOL = 0.10, CHIME_DUR = 0.20, VOICE_GAP = 1.5, SWAP_VOL = 0.20, BOOM_VOL = 0.24;
   const SWAP_VALID = ['swap', 'swap_lo', 'swap_hi'];
   const SCALE = [440.0, 523.3, 587.3, 659.3, 784.0];
   // 1.9.223 Spoken sayings: the game reads out the same inventive line that pops up on screen, instead of a generic
@@ -2932,6 +2932,8 @@
     // 1.9.296 Drier praise takes, plus short swap / invalid-swap swishes (lazy-loaded, not SW-precached).
     'sugar-rush-swap.mp3': 'a48d245c', 'sugar-rush-swap-lo.mp3': '9e2b08ee', 'sugar-rush-swap-hi.mp3': '49127f7a',
     'sugar-rush-swap-bad.mp3': '610e5e44',
+    // 1.9.297 Shane's mellow countdown-bomb boom (lazy-loaded, not SW-precached).
+    'sugar-rush-boom.mp3': '81b9bd0a',
     // 1.9.224 Shane's songs (made with Suno), -17 LUFS like the other tunes, AAC 96k with an mp3 twin.
     'sugar-rush-travel.m4a': 'd4c901aa', 'sugar-rush-travel.mp3': '662a7337',
     'sugar-rush-kiss.m4a': '24aced8c', 'sugar-rush-kiss.mp3': '8c1174e4',
@@ -4817,7 +4819,7 @@
 
   root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, LEVEL_INTROS, levelIntro, TUTORIAL_STEPS, TUTORIALS, tutorialFor, TUTORIAL_KEY, sameTutMove, MAP_W, MAP_H, MAP_X0, MAP_VW, MAP_Y0, MAP_VH, worldXY, nzToWorld, PACIFIC_ISLES, MAP_STOPS, FUTURE_STOPS, MECHANICS, MECHANIC_FIRST, newsFor, LEVEL_REWORK_285, ingTotal, fusesOn, endOfMove, NZ_PROJ, nzXY, WHANGAREI_INSET, insetXY, pacXY, ausXY, westPacXY, LV_COUNT, lvId, levelIds, stopId, LEGACY_220_IDS, migrateProg, stopForLevel, icingPath, beenPath, aheadPath, nzMapSvg, RACE_ICONS, raceIcon, isRaceIcon, raceStars, raceStop, allocateIcon, rankRacers, stackOffsets, racerFirst, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, grantPlayOutSpecial, runPlayOut, fireSpecialAt, settleBoard, listSpecials, listPlayOutCandies, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, locksLeft, bubLeft, liqLeft, flowLeft, chocoLeft, tickTimer, spreadLiq, beltDirection, shiftBelts, LIQ_IDLE, goalCounts, cloneState, bestMove, hintMoveFor, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
     allowed: () => true, // 1.9.228 open to every family member
-    SAY_REST_MS, SAY_BIG, sayBig, COMBO_KINDS, COMBO_BONUS, comboKind, comboSwap, adjacentSpecials, isSpecialTile, HARD_LINES, hardLine, CANDY_STYLES, candySfxPlan, playCandySfx, SAY_SHOW_MS, SAY_AFTER_MS, sayShowGap, SPEAK_GAP, SPEAK_PITCH, SPEAK_RATE, SPEAK_VOL, pickSpeechVoice, speechGender, speakWorthy, SAY_SPRITES, SAY_CLIPS, sayClip, nextSayVoice, SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, SWAP_VOL, SWAP_VALID, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL, XF,
+    SAY_REST_MS, SAY_BIG, sayBig, COMBO_KINDS, COMBO_BONUS, comboKind, comboSwap, adjacentSpecials, isSpecialTile, HARD_LINES, hardLine, CANDY_STYLES, candySfxPlan, playCandySfx, SAY_SHOW_MS, SAY_AFTER_MS, sayShowGap, SPEAK_GAP, SPEAK_PITCH, SPEAK_RATE, SPEAK_VOL, pickSpeechVoice, speechGender, speakWorthy, SAY_SPRITES, SAY_CLIPS, sayClip, nextSayVoice, SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, SWAP_VOL, SWAP_VALID, BOOM_VOL, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL, XF,
     VOICE_FILES, VOICE_RANK, MEDIA_HASH, mediaUrl, gameTrack, SONG_PLAN, SONG_FILES, SONG_FROM, songMood, attachSfxBus, playTone, playChime, playMovesWarnChime, playClip, voiceForStep,
     SAYINGS, SAYING_COLORS, SAYING_VOICE, sayingKind, pickSaying, sayingColor, MOVES_WARN_AT, MOVES_WARN_MS, HINT_IDLE_MS, HINT_REPEAT_MS,
     SPARKLE_MIN_MS, SPARKLE_MAX_MS, SPARKLE_MAX, SPARKLE_MAX_REDUCE, SHIMMER_MS, sparkleCap, sparkleEase, shimmerAt, drawStarGlint, drawCandyShine,
@@ -4926,7 +4928,7 @@
       .then(b => { bufs[kind] = b; return b; }).catch(() => { loading[kind] = null; return null; });
     return loading[kind];
   }
-  const TRACKS = { say_f: SAY_SPRITES.f, say_m: SAY_SPRITES.m, game: 'sugar-rush-music.mp3', game1: 'sugar-rush-l1.mp3', game2: 'sugar-rush-l2.mp3', menu: 'sugar-rush-menu.mp3', win: 'sugar-rush-win.mp3', yum: 'sugar-rush-yum.mp3', yay: VOICE_FILES.yay, great: VOICE_FILES.great, awesome: VOICE_FILES.awesome, sweetas: VOICE_FILES.sweetas, succulent: VOICE_FILES.succulent, swap: 'sugar-rush-swap.mp3', swap_lo: 'sugar-rush-swap-lo.mp3', swap_hi: 'sugar-rush-swap-hi.mp3', swap_bad: 'sugar-rush-swap-bad.mp3' };
+  const TRACKS = { say_f: SAY_SPRITES.f, say_m: SAY_SPRITES.m, game: 'sugar-rush-music.mp3', game1: 'sugar-rush-l1.mp3', game2: 'sugar-rush-l2.mp3', menu: 'sugar-rush-menu.mp3', win: 'sugar-rush-win.mp3', yum: 'sugar-rush-yum.mp3', yay: VOICE_FILES.yay, great: VOICE_FILES.great, awesome: VOICE_FILES.awesome, sweetas: VOICE_FILES.sweetas, succulent: VOICE_FILES.succulent, swap: 'sugar-rush-swap.mp3', swap_lo: 'sugar-rush-swap-lo.mp3', swap_hi: 'sugar-rush-swap-hi.mp3', swap_bad: 'sugar-rush-swap-bad.mp3', boom: 'sugar-rush-boom.mp3' };
   function primeSwapSfx() {
     SWAP_VALID.concat(['swap_bad']).forEach(function (k) { loadBuf(k); });
   }
@@ -4943,6 +4945,16 @@
     playSwapSfx(SWAP_VALID[Math.floor(Math.random() * SWAP_VALID.length)]);
   }
   function playBadSwap() { playSwapSfx('swap_bad'); }
+  function playFuseBoom() {
+    if (!soundOn) return;
+    const ctx = audio();
+    if (!ctx || !out) return;
+    loadBuf('boom').then(function (b) {
+      if (!b || !soundOn) return;
+      playClip(ctx, out, b, ctx.currentTime + 0.01, 1, BOOM_VOL);
+    });
+  }
+  root.SugarRush.playFuseBoom = playFuseBoom;
   root.SugarRush.playSwapSfx = playSwapSfx;
   root.SugarRush.playValidSwap = playValidSwap;
   root.SugarRush.playBadSwap = playBadSwap;
@@ -5106,7 +5118,7 @@
     const p = (ac.state === 'suspended' || ac.state === 'interrupted') ? ac.resume() : Promise.resolve();
     p.then(() => { if (musicOn) playKind(wantKind()); }).catch(() => { });
     if (soundOn && voiceOn) { primeSpeech(); loadSayClips(); } // 1.9.226 on the first touch, so clips are ready before the first match
-    if (soundOn) primeSwapSfx();
+    if (soundOn) { primeSwapSfx(); loadBuf('boom'); }
   }
 
   function stopVoice() {
@@ -7563,7 +7575,7 @@
       fx.push({ type: 'boom', x, y, t0: now(), dur: 900, big: 5, col: '#ff3b2f' });
       fx.push({ type: 'screenflash', t0: now(), dur: 520, col: '#ffb27a' });
       addText('BOOM!', x, y, 40, '#ffe066');
-      shake(3); playZap(true);
+      shake(3); playFuseBoom();
       await wait(800);
     } else if (res.fuseTicks && res.fuseTicks.some(function (f) { return f.n <= 3; })) {
       const f = res.fuseTicks.reduce(function (a, b) { return b.n < a.n ? b : a; });
