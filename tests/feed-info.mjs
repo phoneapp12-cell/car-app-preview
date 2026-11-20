@@ -270,6 +270,138 @@ for (const j of [-1, 1]) {
   if (n) assert.ok(!['play', 'zoomq', 'fallq'].includes(n.x));
 }
 
+// cinema swipe row: two or more current films become one scroll-snap row
+const twoFilms = [films[0], { ...films[0], id: 8, title: 'Forgotten Island' }];
+const cineRowOrder = nz.insertCinema(play.insert(feed, 2, NOW), 2, twoFilms, NOW);
+const cineRow = cineRowOrder.find(x => x.x === 'row' && x.k === 'cine');
+assert.ok(cineRow, 'expected a cine swipe row');
+assert.strictEqual(cineRow.items.length, 2);
+assert.ok(cineRow.items.every(x => x.x === 'cine' && x.film && x.film.poster));
+assert.ok(cineRow.title.includes('Event Cinemas Whangārei'));
+assert.strictEqual(cineRowOrder.filter(x => x.x === 'cine').length, 0);
+const keptRow = nz.presentVideos([cineRow]);
+assert.strictEqual(keptRow.length, 1);
+assert.strictEqual(keptRow[0].k, 'cine');
+assert.strictEqual(keptRow[0].items.length, 2);
+
+// Whangārei one-off events, developments, and per-member sport opt-in
+const whg = load('feed/whg.js').ibWhg;
+const WHG_NOW = Date.parse('2026-11-20T20:00:00Z'); // Sat 21 Nov 2026, 09:00 Auckland
+const evFix = [
+  { id: 'growers-2026-11-21', title: 'Whangārei Growers Market', date: '2026-11-21', venue: '17 Water Street', url: 'https://example.test/growers', cats: ['Markets'] },
+  { id: 'tiki-2026-11-21', title: 'Tikipunga Growers Market', date: '2026-11-21', venue: 'Tikipunga High School', url: 'https://example.test/tiki', cats: ['Markets'] },
+  { id: 'ef-957507-2026-11-21', title: 'Gypsy Fair', date: '2026-11-21', venue: 'Whangārei', url: 'https://www.eventfinda.co.nz/2026/gypsy-fair/whangarei', cats: ['Markets'] },
+  { id: 'wdc-parade', title: 'CDL Santa Parade', date: '2026-11-28', venue: 'Cameron Street Mall', url: 'https://www.wdc.govt.nz/Events/Whats-On/Santa', cats: ['Christmas'] },
+  { id: 'wdc-chopper', title: "Heath Franklin's Chopper", date: '2026-11-27', venue: 'Forum North, 7 Rust Avenue', url: 'https://www.wdc.govt.nz/Events/Whats-On/Chopper', cats: ['Comedy'] },
+  { id: 'wdc-dis-1', title: 'Disenchanted!', date: '2026-11-21', end: '', time: '20:00', timeKnown: true, venue: 'Octagon Theatre', url: 'https://www.wdc.govt.nz/Events/Whats-On/Disenchanted-20261120', cats: ['Theatre'] },
+  { id: 'wdc-dis-2', title: 'Disenchanted!', date: '2026-11-22', time: '14:00', timeKnown: true, venue: 'Octagon Theatre', url: 'https://www.wdc.govt.nz/Events/Whats-On/Disenchanted-20261120', cats: ['Theatre'] },
+  { id: 'wdc-dis-3', title: 'Disenchanted!', date: '2026-12-05', time: '19:30', timeKnown: true, venue: 'Octagon Theatre', url: 'https://www.wdc.govt.nz/Events/Whats-On/Disenchanted-20261120', cats: ['Theatre'] },
+  { id: 'mov-1', title: 'Wildwood', date: '2026-11-21', venue: 'Event Cinemas, 18 James Street', url: 'https://www.eventcinemas.co.nz/movie/wildwood', cats: ['Movies'] },
+  { id: 'ef-hyrox', title: 'Kensington Fitness In-House HYROX', date: '2026-12-05', venue: 'McKay Stadium, 97 Western Hills Drive', url: 'https://www.eventfinda.co.nz/2026/hyrox/whangarei', cats: ['Christmas', 'Sport'] },
+  { id: 'wdc-races', title: 'Ruakākā Christmas at the Races', date: '2026-12-16', venue: 'Ruakākā Racing, Peter Snell Road', url: 'https://www.wdc.govt.nz/Events/Whats-On/Races', cats: ['Christmas', 'Sport'] },
+  { id: 'ef-far', title: 'Mangawhai Tavern Market', date: '2026-11-21', venue: 'The Mangawhai Tavern', url: 'https://www.eventfinda.co.nz/2025/mangawhai-tavern-market/mangawhai', cats: ['Markets'] },
+  { id: 'ef-club', title: 'Club Night', date: '2026-11-22', venue: 'Roost Restaurant and Bar, 28 Bank Street, Whangārei', url: 'https://www.eventfinda.co.nz/2026/club-night/whangarei', cats: ['Nightlife'] },
+  { id: 'wdc-lunch-1', title: 'Free Lunchtime Live Music in Whangārei', date: '2026-11-25', venue: 'Cameron Street Mall stage', url: 'https://www.wdc.govt.nz/Events/Whats-On/Lunch', cats: ['Live music'] },
+  { id: 'wdc-lunch-2', title: 'Free Lunchtime Live Music in Whangārei', date: '2026-12-02', venue: 'Cameron Street Mall stage', url: 'https://www.wdc.govt.nz/Events/Whats-On/Lunch', cats: ['Live music'] },
+  { id: 'wdc-lunch-3', title: 'Free Lunchtime Live Music in Whangārei', date: '2026-12-09', venue: 'Cameron Street Mall stage', url: 'https://www.wdc.govt.nz/Events/Whats-On/Lunch', cats: ['Live music'] },
+  { id: 'wdc-lunch-4', title: 'Free Lunchtime Live Music in Whangārei', date: '2026-12-16', venue: 'Cameron Street Mall stage', url: 'https://www.wdc.govt.nz/Events/Whats-On/Lunch', cats: ['Live music'] },
+  { id: 'art-1', title: 'The Artisans Market', date: '2026-11-21', venue: 'Whangārei', url: 'https://www.eventfinda.co.nz/2026/the-artisans-market/whangarei', cats: ['Markets'] },
+  { id: 'art-2', title: 'The Artisans Market Christmas Markets', date: '2026-12-05', venue: 'Whangārei', url: 'https://www.eventfinda.co.nz/2026/the-artisans-market/whangarei', cats: ['Markets'] },
+  { id: 'art-3', title: 'The Artisans Market Christmas Markets', date: '2026-12-19', venue: 'Whangārei', url: 'https://www.eventfinda.co.nz/2026/the-artisans-market/whangarei', cats: ['Markets'] },
+  { id: 'past-1', title: 'Yesterday only', date: '2026-11-20', venue: 'Forum North', url: 'https://www.wdc.govt.nz/Events/Whats-On/Yest', cats: ['Live music'] }
+];
+const kept = whg.oneOffEvents(evFix, WHG_NOW);
+const keptTitles = kept.map(e => e.title);
+assert.ok(keptTitles.includes('Gypsy Fair'), keptTitles.join('|'));
+assert.ok(keptTitles.includes('CDL Santa Parade'));
+assert.ok(keptTitles.includes("Heath Franklin's Chopper"));
+assert.ok(!keptTitles.some(t => /growers|tikipunga/i.test(t)), 'recurring markets');
+assert.ok(!keptTitles.includes('Wildwood'), 'cinema stays in the movie row');
+assert.ok(!keptTitles.includes('Kensington Fitness In-House HYROX'), 'sport off by default');
+assert.ok(!keptTitles.includes('Ruakākā Christmas at the Races'), 'sport off by default');
+assert.ok(!keptTitles.includes('Mangawhai Tavern Market'), 'too far');
+assert.ok(!keptTitles.includes('Club Night'), 'recurring name');
+assert.ok(!keptTitles.some(t => /lunchtime live music/i.test(t)), 'scattered series');
+assert.ok(!keptTitles.some(t => /artisans market/i.test(t)), 'fortnightly market');
+assert.ok(!keptTitles.includes('Yesterday only'), 'past events hidden in NZ time');
+const dis = kept.find(e => e.title === 'Disenchanted!');
+assert.ok(dis);
+assert.strictEqual(dis.date, '2026-11-21');
+assert.strictEqual(dis.end, '2026-12-05');
+const withSport = whg.oneOffEvents(evFix, WHG_NOW, { sport: true }).map(e => e.title);
+assert.ok(withSport.includes('Kensington Fitness In-House HYROX'));
+assert.ok(withSport.includes('Ruakākā Christmas at the Races'));
+
+const memLs = (box => ({ get: (k, d) => (k in box ? box[k] : d), set: (k, v) => { box[k] = v; }, box }))({});
+const member = { FAM_ON: true, IS_ADMIN: false, PRIVATE_OK: false, ls: memLs };
+const shaneA = { FAM_ON: true, IS_ADMIN: true, PRIVATE_OK: true, ls: memLs };
+const shaneB = { FAM_ON: false, IS_ADMIN: false, PRIVATE_OK: true, ls: { get: () => true, set() {} } };
+assert.strictEqual(whg.isShaneProfile(shaneA), true);
+assert.strictEqual(whg.isShaneProfile(shaneB), true);
+assert.strictEqual(whg.shouldAskSport(shaneA), false);
+assert.strictEqual(whg.shouldAskSport(shaneB), false);
+assert.strictEqual(whg.sportEventsOn(shaneA), false);
+assert.strictEqual(whg.sportEventsOn(shaneB), false);
+assert.strictEqual(whg.showSportSettings(shaneA), false);
+assert.strictEqual(whg.shouldAskSport(member), true);
+assert.strictEqual(whg.sportEventsOn(member), false);
+assert.strictEqual(whg.showSportSettings(member), true);
+whg.setSportEvents(true, member);
+assert.strictEqual(whg.sportPref(member), true);
+assert.strictEqual(whg.sportEventsOn(member), true);
+assert.strictEqual(whg.shouldAskSport(member), false);
+whg.setSportEvents(false, member);
+assert.strictEqual(whg.sportEventsOn(member), false);
+assert.strictEqual(whg.shouldAskSport(member), false);
+assert.ok(whg.sportAskCard({ id: 'ask' }).includes('Want local sport events in your feed?'));
+assert.ok(whg.sportAskCard({ id: 'ask' }).includes('data-whg-sport="yes"'));
+const asked = whg.insertLocal([{ id: 'pin', x: 'note' }, { id: 'a' }, { id: 'b' }, { id: 'c' }], 1, WHG_NOW, evFix, [], { FAM_ON: true, IS_ADMIN: false, PRIVATE_OK: false, ls: { get: () => null, set() {} } });
+assert.ok(asked.some(x => x.x === 'sportask'));
+const shaneFeed = whg.insertLocal([{ id: 'pin', x: 'note' }, { id: 'a' }, { id: 'b' }, { id: 'c' }], 1, WHG_NOW, evFix, [], shaneA);
+assert.ok(!shaneFeed.some(x => x.x === 'sportask'));
+assert.ok(!shaneFeed.some(x => x.x === 'whgev' && x.event && x.event.sport));
+
+const devFix = [
+  { title: 'Construction starts on wastewater capacity increase', url: 'https://www.wdc.govt.nz/Whats-new/News-and-notices/Ruakaka-WWTP-20261117', published: '2026-11-16T23:00:00.000Z', src: 'Whangārei District Council', desc: 'Construction starting on a new interim wastewater solution this week.' },
+  { title: "Mayor's column – The way forward for our city", url: 'https://www.wdc.govt.nz/Whats-new/News-and-notices/MC-20261116', published: '2026-11-15T23:00:00.000Z', src: 'Whangārei District Council', desc: 'The Government’s approval of funding for NorthTec.' },
+  { title: 'Looking for property information? Start with us', url: 'https://www.wdc.govt.nz/Whats-new/News-and-notices/LIM-20261118', published: '2026-11-17T23:00:00.000Z', src: 'Whangārei District Council', desc: 'Apply for a LIM directly through Council.' },
+  { title: 'Habitat for Humanity and Whangārei District Council open affordable housing project for older people', url: 'https://www.nzherald.co.nz/northern-advocate/news/habitat', published: '2026-11-12T17:00:00.000Z', src: 'Northern Advocate', desc: '' },
+  { title: 'Work begins on Warkworth to Te Hana motorway', url: 'https://www.beehive.govt.nz/release/work-begins-warkworth-te-hana-motorway', published: '2026-10-29T20:32:52.000Z', src: 'NZ Government (Beehive)', desc: '' },
+  { title: 'Kaiikanui Road repairs get underway', url: 'https://www.wdc.govt.nz/Whats-new/News-and-notices/Kaiikanui-Road-repairs-20261103', published: '2026-11-02T23:00:00.000Z', src: 'Whangārei District Council', desc: 'Kaiikanui Road repairs get underway.' },
+  { title: 'Notification of plan change operative date', url: 'https://www.wdc.govt.nz/Whats-new/News-and-notices/Notification-operative-PC4A4C', published: '2026-10-27T23:00:00.000Z', src: 'Whangārei District Council', desc: 'Council has approved Plan Change 4A and 4C – Temporary Activities and Minor Improvements.' }
+];
+const devs = whg.developmentItems(devFix, WHG_NOW).map(d => d.title);
+assert.ok(devs.includes('Construction starts on wastewater capacity increase'), devs.join('|'));
+assert.ok(devs.includes('Habitat for Humanity and Whangārei District Council open affordable housing project for older people'));
+assert.ok(devs.includes('Kaiikanui Road repairs get underway'));
+assert.ok(!devs.some(t => /mayor'?s column/i.test(t)));
+assert.ok(!devs.some(t => /property information/i.test(t)));
+assert.ok(!devs.some(t => /Warkworth to Te Hana/i.test(t)));
+assert.ok(!devs.some(t => /plan change operative/i.test(t)));
+const evHtml = whg.evCard({ id: 'e1', event: kept.find(e => e.title === 'Gypsy Fair') });
+assert.ok(evHtml.includes('Gypsy Fair'));
+assert.ok(evHtml.includes('eventfinda.co.nz'));
+const devHtml = whg.devCard({ id: 'd1', dev: whg.developmentItems(devFix, WHG_NOW)[0] });
+assert.ok(devHtml.includes('wastewater') || devHtml.includes('Construction'));
+assert.ok(devHtml.includes('wdc.govt.nz') || devHtml.includes('Read the story'));
+
+if (fs.existsSync('feed/whg-local.json')) {
+  const snap = JSON.parse(fs.readFileSync('feed/whg-local.json', 'utf8'));
+  const live = whg.oneOffEvents(snap.events, WHG_NOW);
+  assert.ok(live.some(e => /gypsy fair/i.test(e.title)), 'snapshot should include Gypsy Fair on 21 Nov');
+  assert.ok(live.every(e => e.date >= '2026-11-21'));
+  assert.ok(!live.some(e => /growers market/i.test(e.title)));
+  assert.ok(!live.some(e => e.sport), 'snapshot sport stays off by default');
+  const liveSport = whg.oneOffEvents(snap.events, WHG_NOW, { sport: true });
+  assert.ok(liveSport.some(e => e.sport), 'opt-in keeps local sport from the snapshot');
+  const built = whg.developmentItems((snap.planning && snap.planning.items) || snap.items, WHG_NOW);
+  assert.ok(built.some(d => /wastewater capacity/i.test(d.title)));
+  const filmsNow = nz.currentFilms(snap.cinema, WHG_NOW);
+  assert.ok(filmsNow.length >= 2, 'several family-rated films still on in mid-November');
+  const row = nz.insertCinema([], 0, filmsNow, WHG_NOW).find(x => x.x === 'row' && x.k === 'cine');
+  assert.ok(row && row.items.length === filmsNow.length);
+}
+
 // reading time
 assert.strictEqual(read.creditMs(true, false, 800), 0);
 assert.strictEqual(read.creditMs(false, true, 10000), 0);
@@ -374,12 +506,12 @@ for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 3, at.join(',
 const appSrc = fs.readFileSync('feed/app.js', 'utf8');
 for (const id of sights.TOPICS) assert.ok(appSrc.includes("'" + id + "'"), id);
 assert.ok(!/Math\.pow\(baseOf\(t\), 3\)/.test(appSrc));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.260'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.260'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.260'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.291'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.291'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.291'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.cdot.tv'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.bd ul.sum'));
-assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.260'"));
+assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.291'"));
 function swVersion(src) { const m = String(src).match(/const VERSION = '([^']+)'/); assert.ok(m, 'parent sw.js VERSION'); return m[1]; }
 const parentHere = swVersion(fs.readFileSync('sw.js', 'utf8'));
 let parentMain = parentHere;
@@ -418,10 +550,13 @@ assert.equal(artB.length, 1);
 assert.notEqual(artB[0].id, artA.id);
 seenArt.wasSeen = () => true;
 assert.equal(seenArt.ibArt.cards(0).length, 0);
-assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.260'"));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.291'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'art3d.js?v=' + VERSION"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'portal.js?v=' + VERSION"));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.260'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.291'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('whg.js?v=1.9.291'));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'whg.js?v=' + VERSION"));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'whg-local.json?v=' + VERSION"));
 const portalSrc = fs.readFileSync('feed/portal.js', 'utf8');
 assert.ok(portalSrc.includes('prefers-reduced-motion'));
 assert.ok(portalSrc.includes("sessionStorage.getItem(KEY)"));
@@ -449,7 +584,7 @@ assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("cache: 'reload'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("u.pathname + '?v=' + VERSION"), 'game scripts are fetched at this VERSION, not from a stale unversioned cache');
 assert.ok(appSrc.includes('ibPortalRise'));
 assert.ok(!/portal-style\.jpg|attachments\/image/.test(portalSrc + fs.readFileSync('feed/index.html', 'utf8')));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.260'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.291'));
 assert.ok(appSrc.includes("['art3d', '3D art'"));
 assert.ok(appSrc.includes("['3D art', 'art3d'"));
 assert.ok(appSrc.includes("'art3d'"));
@@ -4997,7 +5132,7 @@ console.log('1.9.227 echo and 3 s pace ok');
   const map = SR.nzMapSvg();
   assert.ok(map.includes('class="sr-atlas"') && map.includes('AOTEAROA') && map.includes('Pacific Islands') && map.includes('SOUTHEAST ASIA') && map.includes('viewBox="-580 0 1220 2240"'));
   SR.MAP_STOPS.slice(26, 31).forEach(function (s) { assert.ok(Math.hypot(s.x - SR.ausXY(s.lat, s.lon).x, s.y - SR.ausXY(s.lat, s.lon).y) < 1.5, s.place + ' sits where it belongs beside Australia'); });
-  assert.ok(html.includes('sugar-rush.js?v=1.9.260'));
+  assert.ok(html.includes('sugar-rush.js?v=1.9.291'));
   for (const n of [27, 28, 29, 30, 31]) {
     const lv = SR.LEVELS[n - 1];
     assert.ok(!lv.target && !lv.hard);
@@ -5102,8 +5237,8 @@ console.log('1.9.227 echo and 3 s pace ok');
   assert.strictEqual(game.turns, 1);
   assert.strictEqual(SR.cloneState(game).turns, 1, 'simulation clones preserve conveyor direction');
   assert.ok(src.includes('function drawBeltLane') && src.includes('beltDirection(st.lv, lane, st.turns)'), 'the board shows its lane and next direction');
-  assert.ok(html.includes('sugar-rush.js?v=1.9.260') && html.includes('scores.js?v=1.9.260'));
-  assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.260'"));
+  assert.ok(html.includes('sugar-rush.js?v=1.9.291') && html.includes('scores.js?v=1.9.291'));
+  assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.291'"));
   console.log('1.9.245 conveyor levels and mechanics ok');
 }
 

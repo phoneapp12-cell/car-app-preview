@@ -316,6 +316,9 @@ html.candy .card{box-shadow:0 2px 0 color-mix(in srgb,var(--c-grape) 22%,transpa
 .hscroll > .card .bd p{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .hscroll > .card .ft,.hscroll > .card .xbtns{padding-left:16px;padding-right:16px;margin-top:auto}
 .hscroll .card .media:not(.vid):not(.lowres) img,.hscroll .card .pimg img{width:100%;height:auto;aspect-ratio:16/9!important;max-height:none!important;object-fit:cover;display:block;background:var(--chip) url(img/card-fallback.svg) center/cover}
+.hscroll > .card.cine > .media{background:#111}
+.hscroll > .card.cine > .media img{aspect-ratio:2/3!important;object-fit:contain!important;background:#111;max-height:52vh}
+.hscroll > .card.cine .bd p{display:block;-webkit-line-clamp:unset;overflow:visible}
 .hscroll .card .media.vid{aspect-ratio:16/9;width:100%}
 .hscroll .card .media.vid.tall{aspect-ratio:9/16;width:100%;max-height:60vh}
 .hscroll .card .media.lowres{aspect-ratio:16/9;min-height:0}
@@ -730,6 +733,7 @@ body[data-artopen] .artwin{overscroll-behavior:none}body[data-artopen] .artbar{o
 <script src="weekly.js?v=1.9.291"></script>
 <script src="play.js?v=1.9.291"></script>
 <script src="nz.js?v=1.9.291"></script>
+<script src="whg.js?v=1.9.291"></script>
 <script src="sights.js?v=1.9.291"></script>
 <script src="art3d.js?v=1.9.291"></script>
 <script src="read.js?v=1.9.291"></script>
