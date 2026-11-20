@@ -358,6 +358,11 @@
     artWin.hidden = false;
     lockFeed(true);
     artWin.classList.toggle('artsugar', kind === 'sugar');
+    if (kind === 'sugar') {
+      // A new address every open, so the phone cannot keep showing a saved Sugar Rush.
+      const fresh = spec.url + (spec.url.indexOf('?') >= 0 ? '&' : '?') + 'fresh=' + Date.now();
+      artFrame.src = fresh;
+    }
     if (kind === 'tetris') {
       if (typeof root.setTetrisChrome === 'function') root.setTetrisChrome(true);
       else if (typeof setTetrisChrome === 'function') setTetrisChrome(true);

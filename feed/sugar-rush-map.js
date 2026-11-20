@@ -229,7 +229,7 @@
     var list = countryList();
     var country = ensurePicked();
     var i = list.indexOf(country);
-    nav.querySelector('span').innerHTML = (country || 'Country') + '<small style="display:block;font-size:10px;color:#7a4a62">1.9.275</small>';
+    nav.querySelector('span').innerHTML = (country || 'Country') + '<small style="display:block;font-size:10px;color:#7a4a62">1.9.276</small>';
     nav.querySelector('#sr-prev').disabled = i <= 0;
     nav.querySelector('#sr-next').disabled = i < 0 || i >= list.length - 1;
     if (!document.body.classList.contains('onmap')) nav.style.display = 'none';
