@@ -33,7 +33,7 @@
     if (!ban) { ban = root.document.createElement('button'); ban.id = 'comeback'; ban.type = 'button'; root.document.body.append(ban); }
     ban.hidden = false; ban.textContent = body; ban.onclick = () => { ban.hidden = true; };
     if (root.Notification && Notification.permission === 'granted' && root.navigator.serviceWorker) {
-      try { const reg = await navigator.serviceWorker.ready; await reg.showNotification('Info Book', { body, tag: 'comeback', icon: 'icons/icon-192.png' }); } catch (e) {}
+      try { const reg = await navigator.serviceWorker.ready; await reg.showNotification('Info Book', { body, tag: 'comeback', icon: 'icons/icon-192-lb.png' }); } catch (e) {}
     }
   }
   async function periodic() {

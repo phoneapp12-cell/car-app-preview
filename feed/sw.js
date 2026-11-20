@@ -1,7 +1,7 @@
 /* Info Book – service worker. To ship an update: change VERSION. */
 const CACHE = 'my-feed-';
 const VERSION = '1.9.285';
-const SHELL = ['./', 'index.html', 'portal.js?v=' + VERSION, 'app.js?v=' + VERSION, 'family.js?v=' + VERSION, 'extras.js?v=' + VERSION, 'jokes.js?v=' + VERSION, 'learn.js?v=' + VERSION, 'common-en.js?v=' + VERSION, 'explain.js?v=' + VERSION, 'effects.js?v=' + VERSION, 'stories.js?v=' + VERSION, 'weekly.js?v=' + VERSION, 'play.js?v=' + VERSION, 'nz.js?v=' + VERSION, 'read.js?v=' + VERSION, 'sights.js?v=' + VERSION, 'art3d.js?v=' + VERSION, 'cal.js?v=' + VERSION, 'back.js?v=' + VERSION, 'manifest.webmanifest', 'icons/icon-192.png', 'icons/logo.svg', 'img/xmas.webp', 'img/newyear.webp', 'img/play/banner-match.svg', 'img/play/banner-sitcom.svg', 'img/play/zoomquilt.svg', 'img/play/falling.svg', 'img/play/tetris.svg', 'tetris', 'tetris.js?v=' + VERSION, 'scrabble', 'scrabble.js?v=' + VERSION, 'scores.js?v=' + VERSION, 'sugar-rush', 'sugar-rush.js?v=' + VERSION, 'sugar-rush-map.js?v=' + VERSION, 'fonts/Pacifico-Regular.ttf?v=' + VERSION, 'img/play/kiwi.svg', 'img/play/tui.svg', 'img/play/pukeko.svg', 'img/play/korora.svg', 'img/play/kea.svg', 'img/play/fantail.svg', 'img/play/ruru.svg', 'img/play/dog.svg', 'img/sugar-rush/landmarks/lake.webp', 'img/sugar-rush/landmarks/mountains.webp', 'img/sugar-rush/landmarks/volcano.webp'];
+const SHELL = ['./', 'index.html', 'today.css?v=' + VERSION, 'today.js?v=' + VERSION, 'fonts/Fraunces.ttf?v=' + VERSION, 'fonts/Fraunces-Italic.ttf?v=' + VERSION, 'fonts/IBMPlexSans.ttf?v=' + VERSION, 'portal.js?v=' + VERSION, 'app.js?v=' + VERSION, 'family.js?v=' + VERSION, 'extras.js?v=' + VERSION, 'jokes.js?v=' + VERSION, 'learn.js?v=' + VERSION, 'common-en.js?v=' + VERSION, 'explain.js?v=' + VERSION, 'effects.js?v=' + VERSION, 'stories.js?v=' + VERSION, 'weekly.js?v=' + VERSION, 'play.js?v=' + VERSION, 'nz.js?v=' + VERSION, 'read.js?v=' + VERSION, 'sights.js?v=' + VERSION, 'art3d.js?v=' + VERSION, 'cal.js?v=' + VERSION, 'back.js?v=' + VERSION, 'manifest.webmanifest', 'icons/icon-192-lb.png?v=' + VERSION, 'icons/icon-512-lb.png?v=' + VERSION, 'icons/logo-lb.svg?v=' + VERSION, 'icons/favicon-32-lb.png?v=' + VERSION, 'icons/apple-touch-icon-lb.png?v=' + VERSION, 'icons/maskable-192-lb.png?v=' + VERSION, 'icons/maskable-512-lb.png?v=' + VERSION, 'img/xmas.webp', 'img/newyear.webp', 'img/play/banner-match.svg', 'img/play/banner-sitcom.svg', 'img/play/zoomquilt.svg', 'img/play/falling.svg', 'img/play/tetris.svg', 'tetris', 'tetris.js?v=' + VERSION, 'scrabble', 'scrabble.js?v=' + VERSION, 'scores.js?v=' + VERSION, 'sugar-rush', 'sugar-rush.js?v=' + VERSION, 'sugar-rush-map.js?v=' + VERSION, 'fonts/Pacifico-Regular.ttf?v=' + VERSION, 'img/play/kiwi.svg', 'img/play/tui.svg', 'img/play/pukeko.svg', 'img/play/korora.svg', 'img/play/kea.svg', 'img/play/fantail.svg', 'img/play/ruru.svg', 'img/play/dog.svg', 'img/sugar-rush/landmarks/lake.webp', 'img/sugar-rush/landmarks/mountains.webp', 'img/sugar-rush/landmarks/volcano.webp'];
 /* 1.9.275 take over on install so a stuck phone gets the new Sugar Rush without waiting */
 self.addEventListener('install', e => {
   self.skipWaiting();
@@ -46,7 +46,7 @@ self.addEventListener('periodicsync', e => {
     const s = await saved.json();
     const now = Date.now();
     if (!s.lastOpen || now - s.lastOpen < 2 * 86400000 || (s.lastNote && now - s.lastNote < 2 * 86400000) || nzQuiet(now)) return;
-    await self.registration.showNotification('Info Book', { body: 'It has been a couple of days. Come back when you have a minute.', tag: 'comeback', icon: 'icons/icon-192.png' });
+    await self.registration.showNotification('Info Book', { body: 'It has been a couple of days. Come back when you have a minute.', tag: 'comeback', icon: 'icons/icon-192-lb.png?v=' + VERSION });
     s.lastNote = now;
     await cache.put('/feed/__comeback', new Response(JSON.stringify(s)));
   })());
@@ -56,14 +56,14 @@ self.addEventListener('push', e => {
     let data = null;
     try { data = e.data && e.data.json(); } catch (err) {}
     if (data && data.type === 'comeback') {
-      await self.registration.showNotification(data.title || 'Info Book', { body: data.body || 'Come back when you have a minute.', tag: 'comeback', icon: 'icons/icon-192.png' });
+      await self.registration.showNotification(data.title || 'Info Book', { body: data.body || 'Come back when you have a minute.', tag: 'comeback', icon: 'icons/icon-192-lb.png?v=' + VERSION });
       return;
     }
     let notes = [];
     try { const a = await (await caches.open('ib-auth')).match('/feed/__ib_auth'); if (a) { const { tok, api } = await a.json(); const r = await fetch(api + '/push/inbox', { headers: { Authorization: 'Bearer ' + tok } }); if (r.ok) notes = (await r.json()).notes || []; } } catch (err) { }
     const title = notes.length > 1 ? `Info Book · ${notes.length} new` : 'Info Book';
     const body = notes.length ? notes.slice(0, 4).map(n => n.text).join('\n') : 'Something new from the family';
-    await self.registration.showNotification(title, { body, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', tag: 'family', renotify: true, data: { card: (notes[0] || {}).card || '' } });
+    await self.registration.showNotification(title, { body, icon: 'icons/icon-192-lb.png?v=' + VERSION, badge: 'icons/icon-192-lb.png?v=' + VERSION, tag: 'family', renotify: true, data: { card: (notes[0] || {}).card || '' } });
   })());
 });
 self.addEventListener('notificationclick', e => {

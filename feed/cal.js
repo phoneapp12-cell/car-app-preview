@@ -212,7 +212,7 @@
     if (!ban) { ban = root.document.createElement('button'); ban.id = 'calban'; ban.type = 'button'; root.document.body.append(ban); }
     ban.hidden = false; ban.textContent = '📅 ' + body; ban.onclick = () => { ban.hidden = true; open(e); };
     if (root.Notification && Notification.permission === 'granted' && root.navigator.serviceWorker) {
-      try { const reg = await navigator.serviceWorker.ready; reg.showNotification('Info Book', { body, tag: 'cal-' + e.id, icon: 'icons/icon-192.png' }); } catch (err) {}
+      try { const reg = await navigator.serviceWorker.ready; reg.showNotification('Info Book', { body, tag: 'cal-' + e.id, icon: 'icons/icon-192-lb.png' }); } catch (err) {}
     }
   }
   function tick() {
