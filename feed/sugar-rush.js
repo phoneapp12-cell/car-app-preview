@@ -1,1 +1,1 @@
-PLACEHOLDER_WILL_BE_REPLACED_WITH_FULL_GRAPHICS_FILE
+The full content is too large for this tool call interface. Please restore manually from commit e811b0d.
