@@ -20,19 +20,23 @@ const WEBM = 'img/sugar-rush/sugar-rush-intro-95641ff8.webm';
 const POSTER = 'img/sugar-rush/sugar-rush-intro-poster-75cbb408.jpg';
 const SONG = 'img/sugar-rush/sugar-rush-intro-song-95641ff8.m4a';
 const SONG_MP3 = 'img/sugar-rush/sugar-rush-intro-song-95641ff8.mp3';
+const LONG_MP4 = 'img/sugar-rush/sugar-rush-intro-long-5dab8424.mp4';
+const LONG_WEBM = 'img/sugar-rush/sugar-rush-intro-long-5dab8424.webm';
+const LONG_POSTER = 'img/sugar-rush/sugar-rush-intro-long-5dab8424-poster.jpg';
 
 test('hashed intro video, song and poster files are in the feed folder', () => {
-  for (const rel of [MP4, WEBM, POSTER, SONG, SONG_MP3]) {
+  for (const rel of [MP4, WEBM, POSTER, SONG, SONG_MP3, LONG_MP4, LONG_WEBM, LONG_POSTER]) {
     assert.ok(existsSync(join(root, 'feed', rel)), rel);
   }
 });
 
-test('intro assets use the muxed 7s film, a song fallback, and a long-intro hook', () => {
+test('intro assets use the muxed 7s film, a song fallback, and the long first-open film', () => {
   assert.match(assets, /videoHasAudio:\s*true/);
   assert.ok(assets.includes(MP4) && assets.includes(WEBM) && assets.includes(POSTER));
   assert.ok(assets.includes(SONG) && assets.includes(SONG_MP3));
-  assert.match(assets, /longWebm:\s*''/);
-  assert.match(assets, /longMp4:\s*''/);
+  assert.ok(assets.includes(LONG_MP4) && assets.includes(LONG_WEBM) && assets.includes(LONG_POSTER));
+  assert.match(assets, /longSong:\s*''/);
+  assert.match(assets, /longVideoHasAudio:\s*true/);
   assert.match(assets, /sr-long-intro-seen/);
   assert.match(assets, /function pickIntro/);
   assert.match(assets, /useLong = first && hasLongFile/);
@@ -42,11 +46,12 @@ test('intro assets use the muxed 7s film, a song fallback, and a long-intro hook
   assert.match(assets, /NotAllowedError|armUnmute|startMuted/);
 });
 
-test('the service worker caches the muxed intro and song, not the silent drafts', () => {
+test('the service worker caches the muxed 7s intro and song, not the silent drafts or the long film', () => {
   assert.ok(sw.includes(MP4) && sw.includes(WEBM) && sw.includes(POSTER));
   assert.ok(sw.includes(SONG) && sw.includes(SONG_MP3));
   assert.ok(sw.includes('sugar-rush-intro-assets.js?v='));
   assert.doesNotMatch(sw, /893745cb|865aa326/);
+  assert.doesNotMatch(sw, /5dab8424/);
 });
 
 test('a fresh open plays an intro; resume does not; first open can use the long cut', () => {

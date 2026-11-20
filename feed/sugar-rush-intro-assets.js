@@ -1,9 +1,9 @@
 /* Sugar Rush open intro assets and playback.
    Play starts unmuted inside the same user gesture as "Play Sugar Rush".
    If play() with sound is rejected, fall back to muted and unmute on the first touch.
-   First open prefers a long intro when those paths are set; otherwise the 7s film is used
-   for both the first open and every later fresh open. Resume plays no intro.
-   Swap or fill the hashed long-* paths here when the ~20s film arrives. */
+   First open plays the long ~23s film (5dab8424). Later fresh opens play the 7s film
+   (95641ff8). Resume plays no intro. The long cut is lazy-loaded on first open and
+   is not service-worker precached. longSong stays empty: audio is already in the video. */
 (function (root) {
   const INTRO = {
     poster: 'img/sugar-rush/sugar-rush-intro-poster-75cbb408.jpg',
@@ -12,9 +12,9 @@
     song: 'img/sugar-rush/sugar-rush-intro-song-95641ff8.m4a',
     songMp3: 'img/sugar-rush/sugar-rush-intro-song-95641ff8.mp3',
     videoHasAudio: true,
-    longPoster: '',
-    longWebm: '',
-    longMp4: '',
+    longPoster: 'img/sugar-rush/sugar-rush-intro-long-5dab8424-poster.jpg',
+    longWebm: 'img/sugar-rush/sugar-rush-intro-long-5dab8424.webm',
+    longMp4: 'img/sugar-rush/sugar-rush-intro-long-5dab8424.mp4',
     longSong: '',
     longSongMp3: '',
     longVideoHasAudio: true
@@ -49,8 +49,8 @@
       poster: (useLong && INTRO.longPoster) || INTRO.poster,
       webm: useLong ? (INTRO.longWebm || INTRO.webm) : INTRO.webm,
       mp4: useLong ? (INTRO.longMp4 || INTRO.mp4) : INTRO.mp4,
-      song: useLong ? (INTRO.longSong || INTRO.song) : INTRO.song,
-      songMp3: useLong ? (INTRO.longSongMp3 || INTRO.songMp3) : INTRO.songMp3,
+      song: useLong ? (INTRO.longSong || '') : INTRO.song,
+      songMp3: useLong ? (INTRO.longSongMp3 || '') : INTRO.songMp3,
       videoHasAudio: useLong ? !!INTRO.longVideoHasAudio : !!INTRO.videoHasAudio
     };
   }
@@ -199,7 +199,7 @@
     video.onplaying = function () {
       if (poster) poster.hidden = true;
       if (safety) try { root.clearTimeout(safety); } catch (e) { }
-      const left = Math.max(2000, ((video.duration || (pick.useLong ? 20 : 7)) * 1000) + 2500);
+      const left = Math.max(2000, ((video.duration || (pick.useLong ? 23 : 7)) * 1000) + 2500);
       safety = root.setTimeout(finish, left);
     };
     video.onerror = function () {
@@ -214,7 +214,7 @@
     };
 
     // 7s film ends itself; a first-open long cut is ~20s. Wait long enough for either.
-    safety = root.setTimeout(finish, pick.useLong ? 30000 : 12000);
+    safety = root.setTimeout(finish, pick.useLong ? 40000 : 12000);
 
     const tasks = [tryUnmuted(video)];
     if (useSong) tasks.push(tryUnmuted(songEl));
