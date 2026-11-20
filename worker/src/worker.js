@@ -13,6 +13,7 @@ export { Family };
 import { SOURCES, SPORT_RE, GARDEN_TIPS, NON_NZ_FOOD } from './sources.js';
 const NON_NZ_FOOD_SRC = new Set(['gfshoestring','recipetin','yt-weissman','yt-babish','minimalistbaker','rd-food']); // 1.9.81 belt-and-braces
 import { enrichExplain, goodEx } from './explain.js';
+import { handleArticle } from './article.js';
 
 const PER_RUN = 7;              // sources per cron run (keeps CPU and subrequests small); the cron runs every 10 minutes
 const MAX_PER_SOURCE = 8;
@@ -443,6 +444,9 @@ export default {
       const out = new Response(r.body, r); for (const [k, v] of Object.entries(h)) out.headers.set(k, v); out.headers.set('Cache-Control', /^\/api\/photos\/\d+$/.test(u.pathname) && r.ok ? 'private, max-age=604800' : 'no-store'); return out;
     }
     if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
+    if (u.pathname === '/article') {
+      return handleArticle(req);
+    }
     if (u.pathname === '/feed.json') {
       const ck = new Request('https://cache.local/feed.json?v=ex6'), hit = await caches.default.match(ck);
       if (hit) return hit;
