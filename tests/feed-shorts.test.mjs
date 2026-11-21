@@ -111,34 +111,26 @@ test('clips follow each member’s interests', () => {
   assert.ok(petsOn.some(x => x.vu === 'derp12345'));
 });
 
-test('YouTube lane mixes music and allowlisted education, about 1 in 5', () => {
+test('Shorts keeps Reddit clips and leaves YouTube out of the reel', () => {
   const S = loadShorts();
-  assert.equal(S.isEduSource('yt-nasa'), true);
-  assert.equal(S.isEduSource('fun-kurzgesagt'), true);
-  assert.equal(S.isEduSource('yt-ted'), true);
-  assert.equal(S.isEduSource('fun-dodo-all'), false);
-  const profile = { optIn: ['pets'], pick: null };
   const built = S.buildCatalog({ items: sample }, top40, { optIn: ['pets'] });
+  assert.ok(built.mixed.length >= 1);
+  assert.ok(built.mixed.every(x => x.kind !== 'youtube' && !S.isYoutubeClip(x)), 'no YouTube in the reel');
+  assert.ok(built.mixed.some(x => x.kind === 'reddit'));
+  assert.equal(built.youtube.length, 0);
+  /* Education and Top 40 lists can still be built from the feed, but they are not mixed in. */
   assert.ok(built.music.length === 2);
   assert.ok(built.edu.some(x => x.videoId === 'nasaVid111'));
-  assert.ok(built.edu.some(x => x.videoId === 'kurzVid111'));
-  assert.ok(!built.edu.some(x => x.videoId === 'dodoVid111'), 'non-allowlisted channels stay out');
-  const yt = built.mixed.filter(x => x.kind === 'youtube');
-  const rd = built.mixed.filter(x => x.kind === 'reddit');
-  assert.ok(rd.length >= 1);
-  assert.ok(yt.length >= 1);
-  /* With a handful of Reddit clips, the 5th slot is YouTube. */
   const manyR = Array.from({ length: 20 }, (_, i) => ({ vk: 'reddit', vu: 'vu' + String(i).padStart(8, '0'), t: 'Clip ' + i, url: 'https://www.reddit.com/r/aww/comments/x/' + i, topic: 'nature', vdur: 10 }));
   const mixed = S.buildCatalog({ items: manyR.concat(sample) }, top40, { optIn: ['pets'] }).mixed;
-  const ytIdx = mixed.map((x, i) => x.kind === 'youtube' ? i : -1).filter(i => i >= 0);
-  assert.ok(ytIdx.includes(4), 'the fifth item is a YouTube clip');
-  const ratio = mixed.filter(x => x.kind === 'youtube').length / mixed.length;
-  assert.ok(ratio > 0.1 && ratio < 0.35, 'YouTube is about 1 in 5, got ' + ratio);
-  const lanes = new Set(mixed.filter(x => x.kind === 'youtube').map(x => x.lane));
-  assert.ok(lanes.has('music') && lanes.has('edu'), 'music and education both appear in the lane');
+  assert.equal(mixed.filter(x => x.kind === 'youtube').length, 0);
+  assert.ok(mixed.length >= 20);
+  assert.ok(S.isYoutubeClip({ kind: 'youtube', videoId: 'abc' }));
+  assert.ok(S.isYoutubeClip({ url: 'https://www.youtube.com/watch?v=abcdefghijk' }));
+  assert.equal(S.isYoutubeClip({ kind: 'reddit', vu: 'ok1234567', url: 'https://www.reddit.com/r/aww/comments/x/k/' }), false);
 });
 
-test('the player keeps swipe, close, back, Reddit CMAF audio and a YouTube ads label', () => {
+test('the player keeps swipe, close, back and Reddit CMAF audio', () => {
   assert.match(js, /data-sh-reel/);
   assert.match(css, /scroll-snap-type:\s*y\s+mandatory/);
   assert.match(js, /data-sh-close/);
@@ -147,9 +139,6 @@ test('the player keeps swipe, close, back, Reddit CMAF audio and a YouTube ads l
   assert.match(js, /CMAF_720/);
   assert.match(js, /CMAF_AUDIO_128/);
   assert.match(js, /v\.redd\.it/);
-  assert.match(js, /youtube-nocookie\.com\/embed/);
-  assert.match(js, /YouTube · may show ads/);
-  assert.match(css, /\.sh-ytlab/);
   assert.match(js, /sh-credit/);
   assert.match(stories, /CMAF_AUDIO_128/);
   assert.match(js, /preload = \(j === i \|\| j === i \+ 1\) \? 'auto'/);

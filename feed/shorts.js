@@ -1,5 +1,6 @@
-/* Info Book Shorts — Reddit clips plus a YouTube music/education lane.
-   Preview only. No Worker changes: reads the existing feed.json and top40-local.json.
+/* Info Book Shorts — Reddit clips (Braynix, BeAmazed and the rest).
+   YouTube is kept out of the reel on the client. The Worker may still list
+   YouTube items in feed.json for other cards; Shorts ignores them.
    Mixkit stays as an offline/empty fallback only. */
 (() => {
   'use strict';
@@ -402,6 +403,16 @@
     if (yi === 0 && y.length) out.push(y[yi++]);
     return out;
   }
+  function isYoutubeClip(it) {
+    if (!it) return false;
+    if (it.kind === 'youtube') return true;
+    if (it.videoId && !it.vu) return true;
+    const u = String(it.url || '') + ' ' + String(it.src || '') + ' ' + String(it.credit || '');
+    return /(?:youtube\.com|youtu\.be|youtube-nocookie)/i.test(u);
+  }
+  function withoutYoutube(items) {
+    return (items || []).filter(it => !isYoutubeClip(it));
+  }
   function filterPortrait(items) {
     return (items || []).filter(it => {
       if (it && it.kind === 'youtube') return !!it.videoId;
@@ -414,16 +425,12 @@
     const reddit = filterReddit(items, profile);
     const edu = filterEduYoutube(items, profile);
     const music = top40Clips(top40, profile);
-    /* Alternate music and education so the 1-in-5 lane is not all Top 40. */
+    /* YouTube music/education still exists in the feed and Top 40, but Shorts
+       no longer mixes those clips into the reel. */
     const youtube = [];
-    const n = Math.max(music.length, edu.length);
-    for (let i = 0; i < n; i++) {
-      if (i < music.length) youtube.push(music[i]);
-      if (i < edu.length) youtube.push(edu[i]);
-    }
     const braynix = braynixClips(braynixPack, profile);
     const merged = mergeBraynix(reddit, braynixPack, profile);
-    const mixed = loveRank(frontLoad(mixLane(merged, youtube, YT_EVERY), it => isBraynix(it, braynixPack)), loves || readLoves(), braynixPack);
+    const mixed = withoutYoutube(loveRank(frontLoad(merged, it => isBraynix(it, braynixPack)), loves || readLoves(), braynixPack));
     return { reddit: merged, braynix, edu, music, youtube, mixed, fallback: filterPortrait(FALLBACK) };
   }
 
@@ -904,6 +911,7 @@
     isPortrait, isDirectVideo, isAllowedTopic, isAllowedSub, isEduSource, isRedditClip,
     durationOk, subredditOf, memberAllows, filterReddit, filterEduYoutube, top40Clips,
     mixLane, filterPortrait, buildCatalog, FALLBACK, ALLOW_SUBS, EDU_SRC, MAX_DUR, YT_EVERY,
+    isYoutubeClip, withoutYoutube,
     BOOST_SUBS, BOOST_EVERY, isBoosted, boostSource,
     BRAYNIX_AUTHOR, isBraynix, braynixClips, mergeBraynix, frontLoad,
     loveKey, isLoved, setLoved, loveScore, loveRank, loveWords, readLoves,
