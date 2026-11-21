@@ -61,7 +61,7 @@
     const sm = hero.querySelector('.wxmeta small'); if (sm) sm.textContent = v.wxSub;
   }
 
-  /* ---- tiles: birthday (family only), trivia, streak ---- */
+  /* ---- tiles: birthday (family only), trivia, shorts ---- */
   function nextBirthday() {
     if (typeof FAM_ON === 'undefined' || !FAM_ON) return null;
     if (typeof IS_FRIEND !== 'undefined' && IS_FRIEND) return null; // never show family birthdays to friends
@@ -75,10 +75,8 @@
     const m = t.mine;
     return { em: '❓', title: 'Today’s trivia', sub: m ? 'You got ' + m.score + '/5' : 'Ready to play', go: 'trivia' };
   }
-  function streakTile() {
-    const s = (typeof X !== 'undefined' && X.st) ? X.st : null;
-    if (s && s.cur) return { em: '🔥', title: s.cur + '-day streak', sub: s.best ? 'Best ' + s.best + ' days' : 'Keep it going', go: 'streak' };
-    return { em: '🔥', title: 'Your streak', sub: 'Open tomorrow to start', go: 'streak' };
+  function shortsTile() {
+    return { em: '🎬', title: 'Shorts', sub: 'Watch a few', go: 'shorts' };
   }
 
   function sugarLevel() {
@@ -157,7 +155,7 @@
     const bd = nextBirthday();
     const bdTitle = bd ? (bd.title || 'Birthday').replace(/^🎂\s*/, '') : (typeof IS_FRIEND !== 'undefined' && IS_FRIEND ? 'Friends' : 'Birthdays');
     const bdSub = bd ? (typeof inDays === 'function' ? inDays(bd.days) : (bd.days === 0 ? 'today' : 'in ' + bd.days + ' days')) : (typeof IS_FRIEND !== 'undefined' && IS_FRIEND ? 'Your circle' : 'None coming up');
-    const tr = triviaTile(), st = streakTile();
+    const tr = triviaTile(), sh = shortsTile();
     return `<section class="today-hero" id="today-hero">
       <div class="kicker">${esc(nz.kicker)}</div>
       <h1>${esc(nz.weekday)}<small>${esc(nz.date)}</small></h1>
@@ -166,7 +164,7 @@
       <div class="today-bits">
         <button type="button" class="today-bit" data-today-bit="${bd ? 'bday' : 'people'}"><em>🎂</em><b>${esc(bdTitle)}</b><small>${esc(bdSub)}</small></button>
         <button type="button" class="today-bit" data-today-bit="${tr.go}"><em>${tr.em}</em><b>${esc(tr.title)}</b><small>${esc(tr.sub)}</small></button>
-        <button type="button" class="today-bit" data-today-bit="${st.go}"><em>${st.em}</em><b>${esc(st.title)}</b><small>${esc(st.sub)}</small></button>
+        <button type="button" class="today-bit" data-today-bit="${sh.go}"><em>${sh.em}</em><b>${esc(sh.title)}</b><small>${esc(sh.sub)}</small></button>
       </div>
     </section>
     ${typeof FAM_ON !== 'undefined' && FAM_ON ? `<div class="today-composer">
@@ -530,7 +528,7 @@
       const k = bit.dataset.todayBit;
       if (k === 'trivia' && typeof triviaPlay === 'function') triviaPlay();
       else if (k === 'trivia' && typeof X !== 'undefined' && X.triv) { try { triviaPlay(); } catch (err) { } }
-      else if (k === 'streak' && typeof profileSheet === 'function' && typeof FAM_ON !== 'undefined' && FAM_ON) profileSheet();
+      else if (k === 'shorts' && typeof ibShortsOpen === 'function') { try { ibShortsOpen(); } catch (err) { } }
       else if (k === 'people' || k === 'bday') { try { goTab('people'); } catch (err) { } }
       return;
     }
@@ -541,5 +539,5 @@
   paintTabs();
   if (typeof tab !== 'undefined' && tab === 'all' && $('#feed') && !$('#feed .sk')) { injectHero(); injectTodoCard(); }
 
-  window.ibToday = { nzParts, wxLabel, wxNow, wxView, paintWx, nextBirthday, sugarLevel, loveKeep, TAP_WAIT, IGNORE, heroHtml, celebCardHtml, calPreview, calWhen, fmtTime, daysUntil, isoDate, openReaderOrLink };
+  window.ibToday = { nzParts, wxLabel, wxNow, wxView, paintWx, nextBirthday, sugarLevel, shortsTile, loveKeep, TAP_WAIT, IGNORE, heroHtml, celebCardHtml, calPreview, calWhen, fmtTime, daysUntil, isoDate, openReaderOrLink };
 })();
