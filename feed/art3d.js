@@ -25,7 +25,7 @@
     }
     return [];
   }
-  function busy(x) { return x && (x.x === 'play' || x.x === 'zoomq' || x.x === 'fallq' || x.x === 'tetq' || x.x === 'cine' || x.x === 'sportask' || (x.x === 'row' && (x.k === 'cine' || x.k === 'whg-ev' || x.k === 'whg-dev')) || (x.id && (String(x.id).indexOf('sight-') === 0 || String(x.id).indexOf('art3d-') === 0))); }
+  function busy(x) { return x && (x.x === 'play' || x.x === 'zoomq' || x.x === 'fallq' || x.x === 'artq' || x.x === 'tetq' || x.x === 'cine' || x.x === 'sportask' || (x.x === 'row' && (x.k === 'cine' || x.k === 'whg-ev' || x.k === 'whg-dev')) || (x.id && (String(x.id).indexOf('sight-') === 0 || String(x.id).indexOf('art3d-') === 0))); }
   function insert(order, nPins, now) {
     const out = (order || []).slice();
     const item = cards(now)[0];

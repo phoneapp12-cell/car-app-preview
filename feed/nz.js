@@ -168,7 +168,7 @@
     const out = order.slice(), lo = Math.max(nPins | 0, 2);
     const day = Math.floor((now || Date.now()) / 864e5);
     let at = Math.min(out.length, lo + 11 + (day % 3));
-    const busy = i => { const x = out[i]; return x && (x.x === 'play' || x.x === 'zoomq' || x.x === 'fallq' || x.x === 'tetq' || cineish(x)); };
+    const busy = i => { const x = out[i]; return x && (x.x === 'play' || x.x === 'zoomq' || x.x === 'fallq' || x.x === 'artq' || x.x === 'tetq' || cineish(x)); };
     let g = 0; while (g++ < 8 && (busy(at) || busy(at - 1) || busy(at + 1))) at = Math.min(out.length, at + 3);
     const items = list.map(film => ({ id: 'cine-' + film.id + '-' + day, x: 'cine', film, topic: 'events', t: fTitle(film) }));
     const card = items.length === 1 ? items[0] : { id: 'cine-row-' + day, x: 'row', k: 'cine', title: 'At the movies · Event Cinemas Whangārei', items, topic: 'events' };

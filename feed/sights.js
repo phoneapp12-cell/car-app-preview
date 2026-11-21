@@ -51,7 +51,7 @@
     const on = TOPICS.filter(t => { try { return typeof root.topicOn !== 'function' || root.topicOn(t); } catch (e) { return true; } });
     return on.map((t, n) => forTopic(t, day + n)).filter(Boolean);
   }
-  function busy(x) { return x && (x.x === 'play' || x.x === 'zoomq' || x.x === 'fallq' || x.x === 'tetq' || x.x === 'cine' || x.x === 'sportask' || (x.x === 'row' && (x.k === 'cine' || x.k === 'whg-ev' || x.k === 'whg-dev')) || (x.id && String(x.id).indexOf('sight-') === 0)); }
+  function busy(x) { return x && (x.x === 'play' || x.x === 'zoomq' || x.x === 'fallq' || x.x === 'artq' || x.x === 'tetq' || x.x === 'cine' || x.x === 'sportask' || (x.x === 'row' && (x.k === 'cine' || x.k === 'whg-ev' || x.k === 'whg-dev')) || (x.id && String(x.id).indexOf('sight-') === 0)); }
   function insert(order, nPins, now) {
     const out = (order || []).slice();
     const lo = Math.max(nPins | 0, 2);
