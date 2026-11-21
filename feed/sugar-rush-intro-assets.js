@@ -15,6 +15,16 @@
   };
   root.SUGAR_INTRO = INTRO;
 
+  const SHOP_INTRO = {
+    poster: 'img/sugar-rush/sweet-shop-rush-intro-9030f05b-poster.jpg',
+    webm: 'img/sugar-rush/sweet-shop-rush-intro-9030f05b.webm',
+    mp4: 'img/sugar-rush/sweet-shop-rush-intro-9030f05b.mp4',
+    song: '',
+    songMp3: '',
+    videoHasAudio: true
+  };
+  root.SUGAR_SHOP_INTRO = SHOP_INTRO;
+
   function pickIntro() {
     return {
       useLong: true,
@@ -125,9 +135,10 @@
     opts = opts || {};
     const doc = opts.doc || root.document;
     if (!doc) { if (opts.onDone) opts.onDone(); return { started: false }; }
-    const pick = pickIntro();
+    const pick = (opts && opts.pick) || pickIntro();
     ensureStyle(doc);
     const overlay = ensureOverlay(doc, opts.host);
+    if (opts.label) overlay.setAttribute('aria-label', opts.label);
     const video = overlay.querySelector('video');
     const songEl = overlay.querySelector('audio');
     const poster = overlay.querySelector('.sr-intro-poster');

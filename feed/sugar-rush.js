@@ -1443,6 +1443,44 @@
     if (n >= MAP_STOPS.length) return '';
     return journeyPath(MAP_STOPS.slice(Math.max(0, n - 1)), Math.max(1, n));
   }
+  // 1.9.305 Sweet Shop Rush: a Sydney side path just after level 20 (Sydney Harbour Lights).
+  // It is not a numbered campaign level, so the 75-stop main route and saved progress stay put.
+  // Finishing a shift rejoins the map at Gold Coast (level 21) and unlocks that stop.
+  const SHOP_FROM = 20, SHOP_REJOIN = 21;
+  const SHOP_SECONDS = 150, SHOP_BONUS_SEC = 8, SHOP_IMPATIENT_SEC = 30, SHOP_LEAVE_PENALTY = 5;
+  const SHOP_COINS = 10, SHOP_TIP = 15, SHOP_GRANDMA_MULT = 3;
+  const SHOP_FACES = ['🧒', '👧', '👦', '👩', '👨', '🧑', '👵'];
+  const SHOP_NAMES = ['Mia', 'Tom', 'Lila', 'Jack', 'Ava', 'Noah', 'Aunty Jo', 'Little Leo', 'Sam'];
+  const SHOP_STOP = {
+    id: 'sweet-shop',
+    place: 'Sydney Lolly Shop',
+    name: 'Sweet Shop Rush',
+    kind: 'shop',
+    label: 'right',
+    // Nudged just off Sydney Harbour, a short hook south-east of the Sydney pin,
+    // so the detour is easy to see beside the main road up to the Gold Coast.
+    x: 370, y: 2108,
+    via: [{ x: 360, y: 2092 }],
+    lat: -34.05, lon: 151.22, nudged: true
+  };
+  function shopFromStop() { return MAP_STOPS[SHOP_FROM - 1]; }
+  function shopRejoinStop() { return MAP_STOPS[SHOP_REJOIN - 1]; }
+  function shopSideStops() {
+    const from = shopFromStop(), rejoin = shopRejoinStop();
+    if (!from || !rejoin) return [];
+    return [from, Object.assign({}, SHOP_STOP), Object.assign({}, rejoin, { via: [{ x: 385, y: 2048 }] })];
+  }
+  function shopSidePath() { return icingPath(shopSideStops()); }
+  function shopIsOpen(p) {
+    p = p || {};
+    const stars = p.stars || [];
+    return (stars[SHOP_FROM - 1] || 0) > 0 || ((p.open | 0) >= SHOP_REJOIN);
+  }
+  function shopUnlockRejoin(p) {
+    p = p || { open: 1, stars: [], best: [], badges: [], wins: 0 };
+    const next = Object.assign({}, p, { open: Math.max(p.open | 0, SHOP_REJOIN) });
+    return next;
+  }
   // 1.9.222 Australia outline (from real coastline points; x = lon, y = lat, scaled into the map).
   const AUS_PATH = 'M 28 1932 L 32 1960 L 33 1976 L 38 2004 L 41 2020 L 47 2040 L 47 2058 L 41 2067 L 54 2075 L 67 2075 L 84 2063 L 114 2063 L 136 2045 L 162 2038 L 179 2036 L 196 2043 L 206 2052 L 218 2073 L 226 2062 L 236 2053 L 237 2071 L 243 2073 L 242 2082 L 252 2097 L 261 2108 L 273 2112 L 286 2117 L 296 2109 L 304 2114 L 311 2120 L 321 2108 L 341 2102 L 344 2082 L 353 2062 L 364 2044 L 370 2026 L 373 2005 L 370 1989 L 368 1970 L 355 1954 L 349 1938 L 335 1921 L 325 1910 L 310 1897 L 307 1877 L 303 1860 L 302 1850 L 291 1846 L 285 1828 L 278 1808 L 273 1822 L 270 1840 L 269 1860 L 263 1882 L 252 1881 L 239 1873 L 226 1864 L 218 1855 L 221 1840 L 229 1824 L 220 1822 L 205 1821 L 193 1815 L 181 1823 L 172 1833 L 167 1854 L 155 1858 L 144 1846 L 132 1850 L 120 1868 L 115 1880 L 103 1887 L 95 1903 L 76 1910 L 58 1917 L 46 1921 L 34 1931 Z';
   const TAS_PATH = 'M 296 2138 L 312 2142 L 328 2140 L 328 2154 L 323 2165 L 315 2170 L 307 2167 L 301 2154 L 297 2143 Z';
@@ -1711,6 +1749,9 @@
       '<path id="sr-path-wide" d="' + live + '" fill="none" stroke="url(#sr-icing)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>' +
       '<path id="sr-path-dash" d="' + live + '" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 10" opacity=".9"/>' +
       '<path id="sr-path-win" d="" fill="none" stroke="#fff6a8" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path id="sr-shop-path-border" d="" fill="none" stroke="#fff" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 8" opacity=".9"/>' +
+      '<path id="sr-shop-path" d="" fill="none" stroke="#7c3aed" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 8" opacity=".95"/>' +
+      '<path id="sr-shop-path-icing" d="" fill="none" stroke="url(#sr-icing)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>' +
       '<g id="sr-travel-plane" display="none" pointer-events="none" filter="url(#sr-soft)"><g transform="scale(1.7)"><circle r="24" fill="#fff6c8" fill-opacity=".92" stroke="#fff" stroke-width="4"/><circle r="18" fill="none" stroke="#ff6fa8" stroke-width="2.5"/><path d="M0 -14 L3 -4 L14 2 L14 5 L3 2 L2 10 L6 13 L6 15 L0 13 L-6 15 L-6 13 L-2 10 L-3 2 L-14 5 L-14 2 L-3 -4 Z" fill="#fff" stroke="#2878c8" stroke-width="2"/></g></g>' +
       '<g id="sr-travel-car" display="none" pointer-events="none" filter="url(#sr-soft)"><ellipse cx="0" cy="11" rx="27" ry="6" fill="#3e6674" opacity=".28"/><path d="M-25 5 L-23 -4 Q-22 -7 -17 -8 L-10 -10 L-4 -20 Q-2 -22 2 -22 L12 -22 Q16 -21 18 -17 L24 -8 L29 -5 Q31 -3 31 2 L29 7 Q28 10 24 10 L-20 10 Q-25 9 -25 5 Z" fill="#ee4055" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/><path d="M-8 -10 L-3 -18 Q-2 -19 1 -19 L5 -19 L5 -10 Z M8 -19 L12 -19 Q14 -18 16 -15 L19 -10 L8 -10 Z" fill="#bceeff" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/><path d="M-22 -2 L-17 -5 M24 -2 L28 0" fill="none" stroke="#fff6c8" stroke-width="2.3" stroke-linecap="round"/><circle cx="-15" cy="9" r="6" fill="#3e3844" stroke="#fff" stroke-width="1.7"/><circle cx="18" cy="9" r="6" fill="#3e3844" stroke="#fff" stroke-width="1.7"/><circle cx="-15" cy="9" r="2.5" fill="#dcebf0"/><circle cx="18" cy="9" r="2.5" fill="#dcebf0"/><path d="M-9 -21 Q2 -24 12 -21" fill="none" stroke="#ffb0b4" stroke-width="2" stroke-linecap="round"/></g>' +
       '</svg>'
@@ -2296,6 +2337,7 @@
   }
   function goalsMet(st) {
     const lv = st.lv || LEVEL;
+    if (st.shopRush || (lv && lv.shopRush)) return false;
     if (st.challenge) return Array.isArray(st.postcardFound) && st.postcardFound.length >= POSTCARD_COUNT;
     // Score is never the win condition — only objectives are.
     if (lv.jelly && jellyLeft(st) > 0) return false;
@@ -2435,10 +2477,13 @@
     st.timerLeft = Math.ceil(st.timerMsLeft / 1000);
     if (st.timerMsLeft <= 0) {
       st.timerLeft = 0;
-      st.over = true;
-      st.timerExpired = true;
-      st.won = goalsMet(st);
-      st.stars = st.won ? starsOf(st) : 0;
+      if (st.shopRush || (st.lv && st.lv.shopRush)) finishShopShift(st);
+      else {
+        st.over = true;
+        st.timerExpired = true;
+        st.won = goalsMet(st);
+        st.stars = st.won ? starsOf(st) : 0;
+      }
     }
     return before !== st.timerLeft || !!st.timerExpired;
   }
@@ -2526,6 +2571,7 @@
     return out;
   }
   function finishIfDone(st) {
+    if (st.shopRush || (st.lv && st.lv.shopRush)) return;
     if (st.fuseBlown) { st.over = true; st.won = false; st.stars = 0; return; }
     const reached = goalsMet(st);
     // Score-only levels (including level 1) play out every move, then award the win.
@@ -2941,7 +2987,8 @@
     // 1.9.225 Every saying pre-recorded in a female and a male NZ voice, one small sprite per voice.
     // 1.9.227 More room: reverb RT60 ~1.4 s and echoes at 120/260/420 ms, about 34% wet, ~0.9 s tail inside each clip.
     'sugar-rush-say-f.m4a': 'c16ab81b', 'sugar-rush-say-f.mp3': '25067d1f',
-    'sugar-rush-say-m.m4a': '9e645d94', 'sugar-rush-say-m.mp3': '8e05c831'
+    'sugar-rush-say-m.m4a': '9e645d94', 'sugar-rush-say-m.mp3': '8e05c831',
+    'sugar-rush-shop-bell.mp3': '17a691af', 'sugar-rush-shop-chaching.mp3': '65082481', 'sugar-rush-shop-hmph.mp3': '04da5505'
   };
   // 1.9.225 Spoken sayings as recorded clips, a female voice (Microsoft neural "Molly", en-NZ) and a male one
   // ("Mitchell", en-NZ), so the game mixes the two reliably instead of relying on the phone's voices.
@@ -4713,6 +4760,305 @@
     } catch (e) { return d.toISOString().slice(0, 10); }
   }
   function canSpin(lastDay, ms) { return !lastDay || lastDay !== nzDay(ms); }
+  function weekdayNZ(day) {
+    const parts = String(day || '').split('-').map(Number);
+    if (parts.length < 3 || !parts[0]) return 0;
+    // UTC midnight of that calendar date is still that date in Pacific/Auckland.
+    const d = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 0, 0, 0));
+    const wd = new Intl.DateTimeFormat('en-US', { timeZone: 'Pacific/Auckland', weekday: 'short' }).format(d);
+    return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(wd);
+  }
+  function addNzDay(day, delta) {
+    const parts = String(day || '').split('-').map(Number);
+    const d = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2] + (delta | 0), 0, 0, 0));
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+  }
+  function shopWeekStart(ms) {
+    let day = nzDay(ms);
+    for (let i = 0; i < 7; i++) {
+      if (weekdayNZ(day) === 0) return day;
+      day = addNzDay(day, -1);
+    }
+    return day;
+  }
+  function emptyShopMember(name) {
+    return { name: name || 'Player', day: '', todayCustomers: 0, todayCoins: 0, weekCustomers: 0, weekCoins: 0, grandmaDay: '', cleared: false };
+  }
+  function normalizeShopBoard(raw, now, who) {
+    const week = shopWeekStart(now);
+    const day = nzDay(now);
+    const out = { weekStart: week, crown: null, members: {} };
+    const src = raw && typeof raw === 'object' ? raw : {};
+    const members = src.members && typeof src.members === 'object' ? src.members : {};
+    const oldWeek = src.weekStart || '';
+    const rolled = oldWeek && oldWeek !== week;
+    const lastWeek = {};
+    Object.keys(members).forEach(function (k) {
+      const m = members[k] || {};
+      const row = emptyShopMember(m.name);
+      row.cleared = !!m.cleared;
+      row.grandmaDay = m.grandmaDay === day ? day : '';
+      if (rolled) {
+        lastWeek[k] = { name: m.name || 'Player', customers: m.weekCustomers | 0, coins: m.weekCoins | 0 };
+      } else {
+        row.weekCustomers = m.weekCustomers | 0;
+        row.weekCoins = m.weekCoins | 0;
+      }
+      if (m.day === day) {
+        row.day = day;
+        row.todayCustomers = m.todayCustomers | 0;
+        row.todayCoins = m.todayCoins | 0;
+      }
+      out.members[k] = row;
+    });
+    if (rolled) {
+      let top = null;
+      Object.keys(lastWeek).forEach(function (k) {
+        const r = lastWeek[k];
+        if (!top || r.coins > top.coins || (r.coins === top.coins && r.customers > top.customers) || (r.coins === top.coins && r.customers === top.customers && String(r.name).localeCompare(top.name) < 0)) {
+          top = { key: k, name: r.name, coins: r.coins, customers: r.customers };
+        }
+      });
+      if (top && top.coins > 0) out.crown = { weekStart: week, key: top.key, name: top.name };
+    } else if (src.crown && src.crown.weekStart === week) {
+      out.crown = { weekStart: week, key: src.crown.key, name: src.crown.name };
+    }
+    if (who && who.key) {
+      if (!out.members[who.key]) out.members[who.key] = emptyShopMember(who.name);
+      else if (who.name) out.members[who.key].name = who.name;
+    }
+    return out;
+  }
+  function recordShopTakings(board, key, rec, now, who) {
+    const next = normalizeShopBoard(board, now, who || { key: key, name: rec && rec.name });
+    const row = next.members[key] || emptyShopMember(rec && rec.name);
+    const day = nzDay(now);
+    const customers = Math.max(0, (rec && rec.customers) | 0);
+    const coins = Math.max(0, (rec && rec.coins) | 0);
+    if (row.day !== day) { row.day = day; row.todayCustomers = 0; row.todayCoins = 0; }
+    row.todayCustomers += customers;
+    row.todayCoins += coins;
+    row.weekCustomers += customers;
+    row.weekCoins += coins;
+    if (rec && rec.cleared) row.cleared = true;
+    if (rec && rec.grandma) row.grandmaDay = day;
+    if (rec && rec.name) row.name = rec.name;
+    next.members[key] = row;
+    return next;
+  }
+  function shopGrandmaDue(board, key, now) {
+    const b = normalizeShopBoard(board, now);
+    const row = b.members[key];
+    return !(row && row.grandmaDay === nzDay(now));
+  }
+  function shopScoreRows(board, now) {
+    const b = normalizeShopBoard(board, now);
+    const rows = Object.keys(b.members).map(function (k) {
+      const m = b.members[k];
+      return {
+        key: k,
+        name: m.name || 'Player',
+        todayCustomers: m.todayCustomers | 0,
+        todayCoins: m.todayCoins | 0,
+        weekCustomers: m.weekCustomers | 0,
+        weekCoins: m.weekCoins | 0,
+        crown: !!(b.crown && b.crown.key === k)
+      };
+    }).sort(function (a, b) {
+      return (b.todayCoins - a.todayCoins) || (b.todayCustomers - a.todayCustomers) || String(a.name).localeCompare(String(b.name), 'en');
+    });
+    return { weekStart: b.weekStart, crown: b.crown, rows: rows };
+  }
+  function shopShortName(color) {
+    const n = (NAMES[color] || 'sweets').toLowerCase();
+    if (n.indexOf('jelly') >= 0) return n.replace('orange jelly', 'orange jellies').replace(/y$/, 'ies');
+    if (n.charAt(n.length - 1) !== 's') return n + 's';
+    return n;
+  }
+  function shopOrderLabel(order) {
+    if (!order) return '';
+    const bits = [];
+    (order.candies || []).forEach(function (item) {
+      bits.push(item.n + ' ' + shopShortName(item.color));
+    });
+    (order.specials || []).forEach(function (item) {
+      bits.push(item.n + ' ' + (item.kind === 'w' ? 'wrapped sweet' : 'striped sweet') + (item.n > 1 ? 's' : ''));
+    });
+    return bits.join(' + ');
+  }
+  function makeShopOrder(rand, opt) {
+    opt = opt || {};
+    const r = typeof rand === 'function' ? rand : rng(rand == null ? 1 : rand);
+    const pick = function (a, b) { return a + Math.floor(r() * (b - a + 1)); };
+    const color = pick(0, KINDS - 1);
+    let candies, specials = [], coins = SHOP_COINS, name, face, impatient = !!opt.impatient, grandma = !!opt.grandma;
+    if (grandma) {
+      let color2 = pick(0, KINDS - 1);
+      if (color2 === color) color2 = (color + 2) % KINDS;
+      candies = [{ color: color, n: pick(8, 10) }, { color: color2, n: pick(5, 7) }];
+      if (r() < 0.5) specials = [{ kind: 'stripe', n: 2 }];
+      coins = SHOP_COINS * SHOP_GRANDMA_MULT;
+      name = 'Grandma';
+      face = '👵';
+    } else if (impatient) {
+      candies = [{ color: color, n: pick(4, 6) }];
+      coins = SHOP_COINS;
+      name = SHOP_NAMES[pick(0, SHOP_NAMES.length - 1)];
+      face = SHOP_FACES[pick(0, SHOP_FACES.length - 2)];
+    } else if (r() < 0.45) {
+      candies = [{ color: color, n: pick(6, 8) }];
+      if (r() < 0.4) specials = [{ kind: 'stripe', n: pick(1, 2) }];
+      name = SHOP_NAMES[pick(0, SHOP_NAMES.length - 1)];
+      face = SHOP_FACES[pick(0, SHOP_FACES.length - 2)];
+    } else {
+      let color2 = pick(0, KINDS - 1);
+      if (color2 === color) color2 = (color + 3) % KINDS;
+      candies = [{ color: color, n: pick(5, 7) }, { color: color2, n: pick(4, 6) }];
+      name = SHOP_NAMES[pick(0, SHOP_NAMES.length - 1)];
+      face = SHOP_FACES[pick(0, SHOP_FACES.length - 2)];
+    }
+    const order = {
+      id: pick(1, 1e9),
+      name: name,
+      face: face,
+      candies: candies.map(function (c) { return { color: c.color, n: c.n, left: c.n }; }),
+      specials: specials.map(function (s) { return { kind: s.kind, n: s.n, left: s.n }; }),
+      coins: coins,
+      impatient: impatient,
+      grandma: grandma,
+      leaveIn: impatient ? SHOP_IMPATIENT_SEC * 1000 : 0
+    };
+    order.label = shopOrderLabel(order);
+    return order;
+  }
+  function shopOrderDone(order) {
+    if (!order) return false;
+    const candyLeft = (order.candies || []).some(function (c) { return c.left > 0; });
+    const specialLeft = (order.specials || []).some(function (s) { return s.left > 0; });
+    return !candyLeft && !specialLeft;
+  }
+  function shopGlowColors(shop) {
+    const front = shop && shop.queue && shop.queue[0];
+    if (!front || !front.grandma) return [];
+    return (front.candies || []).filter(function (c) { return c.left > 0; }).map(function (c) { return c.color; });
+  }
+  function newShopState(rand, opt) {
+    opt = opt || {};
+    const r = typeof rand === 'function' ? rand : rng(rand == null ? Date.now() : rand);
+    const queue = [makeShopOrder(r), makeShopOrder(r), makeShopOrder(r)];
+    return {
+      queue: queue,
+      served: 0,
+      coins: 0,
+      tips: 0,
+      grandmaDue: !!opt.grandmaDue,
+      grandmaDone: false,
+      nextImpatientIn: 22000 + Math.floor(r() * 8000),
+      events: []
+    };
+  }
+  function fillShopOrder(shop, candyDelta, specialDelta) {
+    const front = shop && shop.queue && shop.queue[0];
+    if (!front || shop.closed) return { filled: false };
+    candyDelta = candyDelta || [];
+    specialDelta = specialDelta || {};
+    let used = false;
+    (front.candies || []).forEach(function (item) {
+      const got = candyDelta[item.color] || 0;
+      if (got > 0 && item.left > 0) {
+        const n = Math.min(item.left, got);
+        item.left -= n;
+        candyDelta[item.color] -= n;
+        used = true;
+      }
+    });
+    (front.specials || []).forEach(function (item) {
+      let got = 0;
+      if (item.kind === 'stripe') got = (specialDelta.row || 0) + (specialDelta.col || 0);
+      else got = specialDelta[item.kind] || 0;
+      if (got > 0 && item.left > 0) {
+        const n = Math.min(item.left, got);
+        item.left -= n;
+        if (item.kind === 'stripe') {
+          specialDelta.row = 0; specialDelta.col = 0;
+        } else specialDelta[item.kind] -= n;
+        used = true;
+      }
+    });
+    if (shopOrderDone(front)) {
+      const coins = front.coins + (front.impatient ? SHOP_TIP : 0);
+      shop.queue.shift();
+      shop.served += 1;
+      shop.coins += coins;
+      if (front.impatient) shop.tips += SHOP_TIP;
+      if (front.grandma) shop.grandmaDone = true;
+      return { filled: true, served: true, order: front, coins: coins, bonusSec: SHOP_BONUS_SEC, grandma: !!front.grandma, impatient: !!front.impatient };
+    }
+    return { filled: used, served: false };
+  }
+  function shopAddCustomer(shop, rand, opt) {
+    if (!shop || shop.closed) return null;
+    const order = makeShopOrder(rand, opt);
+    if (order.impatient || order.grandma) shop.queue.unshift(order);
+    else shop.queue.push(order);
+    while (shop.queue.length > 3) {
+      const last = shop.queue[shop.queue.length - 1];
+      if (last && !last.impatient && !last.grandma) shop.queue.pop();
+      else break;
+    }
+    if (order.grandma) shop.grandmaDue = false;
+    return order;
+  }
+  function tickShop(shop, dt, rand, opt) {
+    opt = opt || {};
+    const ev = [];
+    if (!shop || shop.closed) return ev;
+    shop.nextImpatientIn = Math.max(0, (shop.nextImpatientIn || 0) - dt);
+    const front = shop.queue[0];
+    if (front && front.impatient) {
+      front.leaveIn = Math.max(0, (front.leaveIn || 0) - dt);
+      if (front.leaveIn <= 0) {
+        shop.queue.shift();
+        ev.push({ type: 'leave', order: front, penaltySec: SHOP_LEAVE_PENALTY });
+      }
+    }
+    if (shop.grandmaDue && !shop.grandmaDone && (shop.served | 0) >= 1 && !(front && front.grandma) && !(front && front.impatient)) {
+      const g = shopAddCustomer(shop, rand, { grandma: true });
+      if (g) ev.push({ type: 'arrive', order: g });
+    } else if (shop.nextImpatientIn <= 0 && !(shop.queue[0] && shop.queue[0].impatient) && !(shop.queue[0] && shop.queue[0].grandma)) {
+      const imp = shopAddCustomer(shop, rand, { impatient: true });
+      if (imp) ev.push({ type: 'arrive', order: imp });
+      shop.nextImpatientIn = 45000 + Math.floor((typeof rand === 'function' ? rand() : Math.random()) * 20000);
+    }
+    while (shop.queue.length < 3) {
+      const n = shopAddCustomer(shop, rand, {});
+      if (!n) break;
+    }
+    return ev;
+  }
+  function shopLevel() {
+    return {
+      n: 0,
+      id: 'sweet-shop',
+      name: 'Sweet Shop Rush · Sydney',
+      target: 0,
+      moves: 999,
+      timer: SHOP_SECONDS,
+      stars: [0, 0, 0],
+      kinds: 6,
+      shopRush: true
+    };
+  }
+  function finishShopShift(st) {
+    if (!st || !st.shop) return st;
+    st.shop.closed = true;
+    st.over = true;
+    st.timerExpired = true;
+    st.won = (st.shop.served | 0) >= 1;
+    st.stars = st.won ? (st.shop.served >= 8 ? 3 : st.shop.served >= 4 ? 2 : 1) : 0;
+    st.score = st.shop.coins | 0;
+    return st;
+  }
   function spinPick(rand) { const r = typeof rand === 'function' ? rand() : Math.random(); return Math.min(SPIN_PRIZES.length - 1, Math.floor(r * SPIN_PRIZES.length)); }
   // Segment i is centred at i * (360 / count) degrees clockwise from the top pointer.
   // Returns the wheel's final rotation (degrees, clockwise) so that segment i lands under the pointer.
@@ -4834,6 +5180,39 @@
   root.SugarRush.countryForLevel = countryForLevel;
   root.SugarRush.journeyPath = journeyPath;
   root.SugarRush.createSessionLevelAccess = createSessionLevelAccess;
+  root.SugarRush.SHOP_FROM = SHOP_FROM;
+  root.SugarRush.SHOP_REJOIN = SHOP_REJOIN;
+  root.SugarRush.SHOP_SECONDS = SHOP_SECONDS;
+  root.SugarRush.SHOP_BONUS_SEC = SHOP_BONUS_SEC;
+  root.SugarRush.SHOP_IMPATIENT_SEC = SHOP_IMPATIENT_SEC;
+  root.SugarRush.SHOP_LEAVE_PENALTY = SHOP_LEAVE_PENALTY;
+  root.SugarRush.SHOP_COINS = SHOP_COINS;
+  root.SugarRush.SHOP_TIP = SHOP_TIP;
+  root.SugarRush.SHOP_GRANDMA_MULT = SHOP_GRANDMA_MULT;
+  root.SugarRush.SHOP_STOP = SHOP_STOP;
+  root.SugarRush.shopFromStop = shopFromStop;
+  root.SugarRush.shopRejoinStop = shopRejoinStop;
+  root.SugarRush.shopSideStops = shopSideStops;
+  root.SugarRush.shopSidePath = shopSidePath;
+  root.SugarRush.shopIsOpen = shopIsOpen;
+  root.SugarRush.shopUnlockRejoin = shopUnlockRejoin;
+  root.SugarRush.shopWeekStart = shopWeekStart;
+  root.SugarRush.weekdayNZ = weekdayNZ;
+  root.SugarRush.addNzDay = addNzDay;
+  root.SugarRush.normalizeShopBoard = normalizeShopBoard;
+  root.SugarRush.recordShopTakings = recordShopTakings;
+  root.SugarRush.shopGrandmaDue = shopGrandmaDue;
+  root.SugarRush.shopScoreRows = shopScoreRows;
+  root.SugarRush.shopOrderLabel = shopOrderLabel;
+  root.SugarRush.makeShopOrder = makeShopOrder;
+  root.SugarRush.shopOrderDone = shopOrderDone;
+  root.SugarRush.shopGlowColors = shopGlowColors;
+  root.SugarRush.newShopState = newShopState;
+  root.SugarRush.fillShopOrder = fillShopOrder;
+  root.SugarRush.shopAddCustomer = shopAddCustomer;
+  root.SugarRush.tickShop = tickShop;
+  root.SugarRush.shopLevel = shopLevel;
+  root.SugarRush.finishShopShift = finishShopShift;
 
   if (!root.document) return;
   const doc = root.document;
@@ -4886,6 +5265,213 @@
   let postcardProgress = normalizePostcardProgress(ls.get(POSTCARD_KEY, null));
   let challengeRun = null;
   function savePostcardProgress() { ls.set(POSTCARD_KEY, postcardProgress); }
+  const SHOP_KEY = 'ib-sugar-shop-rush';
+  function shopWho() {
+    const me = root.IBScores && root.IBScores.who && root.IBScores.who();
+    return { key: (me && (me.id || me.key)) ? String(me.id || me.key) : 'local', name: (me && (me.name || me.first)) || 'Player' };
+  }
+  function shopMemberKey() { return shopWho().key; }
+  function shopMemberRow() {
+    const k = shopMemberKey();
+    return shopBoard && shopBoard.members ? shopBoard.members[k] : null;
+  }
+  let shopBoard = null;
+  function loadShopBoard() { shopBoard = normalizeShopBoard(ls.get(SHOP_KEY, null), Date.now(), shopWho()); return shopBoard; }
+  function saveShopBoard() { ls.set(SHOP_KEY, shopBoard); }
+  loadShopBoard();
+  function playShopSfx(kind) {
+    runAudio(function () {
+      if (!soundOn) return;
+      const k = kind === 'bell' ? 'shop_bell' : kind === 'hmph' ? 'shop_hmph' : 'shop_chaching';
+      loadBuf(k).then(function (buf) {
+        if (buf && ac && out) playClip(ac, out, buf, ac.currentTime + 0.01, 1, 0.7);
+      });
+    });
+  }
+  function addShopTime(sec) {
+    if (!st || !st.lv || !st.lv.timer || st.over) return;
+    const ms = Math.max(0, sec) * 1000;
+    st.timerMsLeft = Math.max(0, (st.timerMsLeft == null ? st.lv.timer * 1000 : st.timerMsLeft) + ms);
+    st.timerLeft = Math.ceil(st.timerMsLeft / 1000);
+    st.timerUpdatedAt = Date.now();
+  }
+  function paintShopQueue() {
+    const hold = $('shopqueue');
+    if (!hold) return;
+    const on = !!(st && st.shopRush && st.shop);
+    hold.hidden = !on;
+    if (!on) return;
+    const shop = st.shop;
+    hold.innerHTML = (shop.queue || []).slice(0, 3).map(function (c, i) {
+      const cls = 'shopcust' + (i === 0 ? ' front' : '') + (c.impatient ? ' impatient' : '') + (c.grandma ? ' grandma' : '');
+      const left = [];
+      (c.candies || []).forEach(function (item) {
+        if (item.left > 0) left.push('<span class="shopneed">' + item.left + ' ' + shopShortName(item.color) + '</span>');
+      });
+      (c.specials || []).forEach(function (item) {
+        if (item.left > 0) left.push('<span class="shopneed">' + item.left + ' ' + (item.kind === 'w' ? 'wrapped' : 'striped') + '</span>');
+      });
+      const clock = c.impatient ? '<em class="shoptick">' + Math.max(1, Math.ceil((c.leaveIn || 0) / 1000)) + 's</em>' : '';
+      const tag = c.grandma ? '<b class="shoptag">Grandma’s order · triple coins</b>' : (c.impatient ? '<b class="shoptag">In a hurry</b>' : '');
+      return '<div class="' + cls + '" data-front="' + (i === 0 ? '1' : '0') + '"><span class="shopface" aria-hidden="true">' + c.face + '</span><span class="shopwho">' + c.name + (i === 0 ? ' · front' : '') + '</span>' + tag + '<span class="shoporder">' + (left.join(' · ') || 'Done!') + '</span>' + clock + '</div>';
+    }).join('');
+    const take = $('shoptakings');
+    if (take) {
+      take.hidden = false;
+      take.innerHTML = '<b>' + (shop.coins || 0) + '</b> coins · <span>' + (shop.served || 0) + ' served</span>';
+    }
+  }
+  function paintShopBoard(showOv) {
+    loadShopBoard();
+    const table = shopScoreRows(shopBoard, Date.now());
+    const html = !table.rows.length
+      ? '<p class="shopempty">Play a shift to start today’s takings.</p>'
+      : '<ol>' + table.rows.map(function (r) {
+        return '<li class="' + (r.key === shopMemberKey() ? 'mine' : '') + '">' +
+          '<span class="sb-name">' + (r.crown ? '👑 ' : '') + r.name + '</span>' +
+          '<span class="sb-today">' + r.todayCustomers + ' served · ' + r.todayCoins + ' coins today</span>' +
+          '<span class="sb-week">' + r.weekCoins + ' this week</span></li>';
+      }).join('') + '</ol>';
+    const noteTx = table.crown
+      ? (table.crown.name + ' wears the crown this week for last week’s best takings. The week resets on Sunday.')
+      : 'Weekly takings reset on Sunday. The top seller gets a crown next week.';
+    Array.prototype.forEach.call(doc.querySelectorAll('.shopboardlist'), function (body) { body.innerHTML = html; });
+    Array.prototype.forEach.call(doc.querySelectorAll('.shopboardnote'), function (note) { note.textContent = noteTx; });
+    const panel = $('shopboard');
+    if (panel) panel.hidden = false;
+    const ov = $('shopboardov');
+    if (ov && showOv) ov.hidden = false;
+  }
+  function hideShopBoard() {
+    if ($('shopboardov')) $('shopboardov').hidden = true;
+  }
+  function applyShopMatches() {
+    if (!st || !st.shopRush || !st.shop || st.over) return null;
+    const last = st._shopSnap;
+    if (!last) {
+      st._shopSnap = { collected: (st.collected || []).slice(), specials: Object.assign({}, st.specialsMade || {}) };
+      return null;
+    }
+    const candyDelta = [];
+    for (let i = 0; i < KINDS; i++) candyDelta[i] = Math.max(0, (st.collected[i] || 0) - (last.collected[i] || 0));
+    const specialDelta = {};
+    Object.keys(st.specialsMade || {}).forEach(function (k) {
+      specialDelta[k] = Math.max(0, (st.specialsMade[k] || 0) - (last.specials[k] || 0));
+    });
+    st._shopSnap = { collected: (st.collected || []).slice(), specials: Object.assign({}, st.specialsMade || {}) };
+    const res = fillShopOrder(st.shop, candyDelta, specialDelta);
+    if (res && res.served) {
+      addShopTime(res.bonusSec);
+      playShopSfx('chaching');
+      addText('+' + res.bonusSec + 's  +' + res.coins + ' coins', W / 2, W * .16, 22, '#5b21b6');
+      if (res.impatient) addText('Tip!', W / 2, W * .26, 20, '#b45309');
+      if (res.grandma) addText("Grandma's order!", W / 2, W * .26, 22, '#7c3aed');
+      while (st.shop.queue.length < 3) shopAddCustomer(st.shop, st.rand, {});
+    }
+    paintShopQueue();
+    hud();
+    return res;
+  }
+  function handleShopTicks(dt) {
+    if (!st || !st.shopRush || !st.shop || st.over || livePaused) return;
+    const ev = tickShop(st.shop, dt, st.rand);
+    ev.forEach(function (e) {
+      if (e.type === 'leave') {
+        addShopTime(-e.penaltySec);
+        playShopSfx('hmph');
+        addText('Hmph! −' + e.penaltySec + 's', W / 2, W * .18, 20, '#7c3aed');
+      } else if (e.type === 'arrive') {
+        playShopSfx('bell');
+        addText(e.order.grandma ? "Grandma's order!" : 'Hurry!', W / 2, W * .16, 22, e.order.grandma ? '#7c3aed' : '#b45309');
+      }
+    });
+    if (ev.length) paintShopQueue();
+  }
+  function recordShopShift() {
+    if (!st || !st.shop || st.shop.recorded) return;
+    st.shop.recorded = true;
+    const who = shopWho();
+    shopBoard = recordShopTakings(shopBoard, who.key, {
+      name: who.name,
+      customers: st.shop.served | 0,
+      coins: st.shop.coins | 0,
+      cleared: st.won,
+      grandma: st.shop.grandmaDone
+    }, Date.now(), who);
+    if (st.won) {
+      const next = shopUnlockRejoin(prog);
+      prog.open = next.open;
+      saveProg();
+    }
+    saveShopBoard();
+  }
+  function bootShopRush(opt) {
+    opt = opt || {};
+    settleLife();
+    challengeRun = null;
+    $('intro').hidden = true; $('end').hidden = true; $('map').hidden = true;
+    if ($('postcards')) $('postcards').hidden = true;
+    $('game').hidden = false;
+    if ($('goalban')) $('goalban').hidden = true;
+    if ($('goalnext')) $('goalnext').hidden = true;
+    hideTutUi(); hideRecap(); hideHardBan();
+    doc.body.classList.remove('onmap', 'onpostcards', 'oncrush', 'sarah', 'hard1', 'hard2', 'postcard-game');
+    doc.body.classList.add('ingame', 'shoprush');
+    screen = 'game';
+    loadSayClips();
+    lvNum = 0;
+    const lv = shopLevel();
+    paintScene(SHOP_FROM);
+    enterScreen($('game'));
+    setHammer(false); stopOverlay();
+    paintHearts();
+    $('lvname').textContent = 'Sweet Shop Rush · Sydney';
+    $('mapbtn').textContent = 'Map';
+    $('endmap').textContent = 'Map';
+    $('restartbtn').textContent = 'New shift';
+    if ($('hearts2')) $('hearts2').hidden = true;
+    paintGoalStrip(lv);
+    if (opt.restore) {
+      st = loadLiveState(opt.restore, lv);
+      st.shopRush = true;
+      st.lv = lv;
+    } else {
+      st = newGame({ level: lv });
+      st.shopRush = true;
+      st.lifeDone = true;
+      loadShopBoard();
+      const grandmaDue = shopGrandmaDue(shopBoard, shopMemberKey(), Date.now());
+      st.shop = newShopState(st.rand, { grandmaDue: grandmaDue });
+      st._shopSnap = { collected: (st.collected || []).slice(), specials: Object.assign({}, st.specialsMade || {}) };
+    }
+    sel = null; busy = false; lastAct = now();
+    crush = null; warned3 = false; hintOn = false; hintHold = false; hintMove = null; hideHintHand(); hideMovesWarn(); lastSaying = ''; sayUntil = 0; clearSayQueue(); hideSaying();
+    resetStreak(); hideCrushBan();
+    fitCanvas(); syncAll(); hud();
+    paintGoalStrip(lv, st);
+    paintShopQueue();
+    hintMove = findMove(st.board, st.mask);
+    for (const s of sprites.values()) { s.y = s.r - N - 1 + (N - s.r) * .2; moveTo(s, s.r, s.c, 300 + (N - s.r) * 40, easeOut); }
+    if (musicOn) playKind(wantKind());
+    playShopSfx('bell');
+    revealSugarUi();
+    scrollPastGameChrome();
+  }
+  function openShopRush() {
+    if (!shopIsOpen(prog)) return;
+    pendingLv = 'shop';
+    hideIntro();
+    function go() { bootShopRush(); }
+    if (typeof root.playSugarIntro === 'function' && root.SUGAR_SHOP_INTRO) {
+      root.playSugarIntro({
+        doc: doc,
+        root: root,
+        pick: root.SUGAR_SHOP_INTRO,
+        label: 'Sweet Shop Rush intro',
+        onDone: go
+      });
+    } else go();
+  }
   let race = { racers: [], friends: [], friendCount: 0, group: 'family', offline: true, mine: null };
   let raceDemo = false; // test / screenshot only: never POST to the family backend
   let raceLw = 0; // 1.9.222 the level just won, sent once with the next race post
@@ -4928,7 +5514,7 @@
       .then(b => { bufs[kind] = b; return b; }).catch(() => { loading[kind] = null; return null; });
     return loading[kind];
   }
-  const TRACKS = { say_f: SAY_SPRITES.f, say_m: SAY_SPRITES.m, game: 'sugar-rush-music.mp3', game1: 'sugar-rush-l1.mp3', game2: 'sugar-rush-l2.mp3', menu: 'sugar-rush-menu.mp3', win: 'sugar-rush-win.mp3', yum: 'sugar-rush-yum.mp3', yay: VOICE_FILES.yay, great: VOICE_FILES.great, awesome: VOICE_FILES.awesome, sweetas: VOICE_FILES.sweetas, succulent: VOICE_FILES.succulent, swap: 'sugar-rush-swap.mp3', swap_lo: 'sugar-rush-swap-lo.mp3', swap_hi: 'sugar-rush-swap-hi.mp3', swap_bad: 'sugar-rush-swap-bad.mp3', boom: 'sugar-rush-boom.mp3' };
+  const TRACKS = { say_f: SAY_SPRITES.f, say_m: SAY_SPRITES.m, game: 'sugar-rush-music.mp3', game1: 'sugar-rush-l1.mp3', game2: 'sugar-rush-l2.mp3', menu: 'sugar-rush-menu.mp3', win: 'sugar-rush-win.mp3', yum: 'sugar-rush-yum.mp3', yay: VOICE_FILES.yay, great: VOICE_FILES.great, awesome: VOICE_FILES.awesome, sweetas: VOICE_FILES.sweetas, succulent: VOICE_FILES.succulent, swap: 'sugar-rush-swap.mp3', swap_lo: 'sugar-rush-swap-lo.mp3', swap_hi: 'sugar-rush-swap-hi.mp3', swap_bad: 'sugar-rush-swap-bad.mp3', boom: 'sugar-rush-boom.mp3', shop_bell: 'sugar-rush-shop-bell.mp3', shop_chaching: 'sugar-rush-shop-chaching.mp3', shop_hmph: 'sugar-rush-shop-hmph.mp3' };
   function primeSwapSfx() {
     SWAP_VALID.concat(['swap_bad']).forEach(function (k) { loadBuf(k); });
   }
@@ -4962,6 +5548,7 @@
 
   function volFor(kind) { return kind === 'menu' ? MENU_VOL : BGM_VOL; }
   function gameKind(level) {
+    if ((level == null ? lvNum : level) === 0 || (st && st.shopRush)) return 'song_aussie';
     const n = level == null ? lvNum : level;
     const mood = songMood(n);
     if (mood && SONG_FILES[mood]) return 'song_' + mood;
@@ -5746,9 +6333,13 @@
   function frame() {
     if (screen === 'game' && st) {
       if (!livePaused && tickTimer(st, Date.now())) hud();
+      if (st.shopRush && st._shopTickAt) handleShopTicks(Date.now() - st._shopTickAt);
+      st._shopTickAt = Date.now();
       if (st.timerExpired && !st.timerEndHandled && !busy) {
         st.timerEndHandled = true;
-        if (st.won) beginGoalFinish(); else showEnd();
+        if (st.shopRush) showEnd();
+        else if (st.won) beginGoalFinish();
+        else showEnd();
       }
       const t = sparkleHoldT != null ? sparkleHoldT : now();
       ctx.clearRect(0, 0, W, W);
@@ -5794,6 +6385,20 @@
         if (s.land) { const p = (t - s.land) / 240; if (p >= 1) s.land = 0; else land = 1 + 0.12 * Math.sin(p * Math.PI) * (1 - p) - 0.04 * Math.sin(p * Math.PI * 2) * p; }
         const px = s.x * CS + CS / 2, py = s.y * CS + CS / 2 + bob;
         if (s.t.s && !s.pop && !crushing && (isCandy(s.t) || isBomb(s.t))) drawSpecialGlow(s.t, px, py, R, t, s.al);
+        if (st.shopRush && st.shop && !s.pop) {
+          const glow = shopGlowColors(st.shop);
+          if (glow.indexOf(s.t.c) >= 0) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            const g = ctx.createRadialGradient(px, py, R * .2, px, py, R * 1.55);
+            const pulse = 0.45 + 0.25 * Math.sin(t / 220);
+            g.addColorStop(0, 'rgba(255, 236, 140,' + (0.55 * pulse * (s.al || 1)) + ')');
+            g.addColorStop(1, 'rgba(255, 210, 60, 0)');
+            ctx.fillStyle = g;
+            ctx.beginPath(); ctx.arc(px, py, R * 1.55, 0, Math.PI * 2); ctx.fill();
+            ctx.restore();
+          }
+        }
         drawSweet(s.t, px, py, R, s.sc * land, s.al, wob);
         if (challengeRun && Number.isInteger(s.t.postcardPiece) && !s.pop) {
           ctx.save(); ctx.globalAlpha = .82; ctx.fillStyle = 'rgba(255,255,255,.86)';
@@ -6059,7 +6664,7 @@
   function setLives(n) { if (sessionLevelAccess.hasUnlimitedLives()) return; const cur = livesState(); addLives((n | 0) - cur.n); }
   function nextLife() { return sessionLevelAccess.hasUnlimitedLives() ? 0 : nextLifeMs(ls.get(livesKey(), null)); }
   function settleLife() {
-    if (!st || st.challenge || st.tutorial || st.won || st.lifeDone) return;
+    if (!st || st.challenge || st.shopRush || st.tutorial || st.won || st.lifeDone) return;
     if (!(st.played || st.over)) return;
     st.lifeDone = true;
     if (!sessionLevelAccess.hasUnlimitedLives()) addLives(-1);
@@ -6207,7 +6812,7 @@
     return (me && me.id) ? ':' + me.id : '';
   }
   const LIVE_TTL = 36 * 3600 * 1000;
-  const LIVE_ST_KEYS = ['score', 'moves', 'target', 'timerLeft', 'timerMsLeft', 'timerUpdatedAt', 'turns', 'over', 'won', 'stars', 'collected', 'specialsMade', 'combosMade', 'hiddenLeft', 'ingsLeft', 'liqIdle', 'defused', 'fuseBlown', 'moveNo', 'played', 'lifeDone', 'challenge', 'tutorial', 'postcardFound', 'timerExpired', 'timerEndHandled', 'cannonDue', 'cannonShots', 'boss', 'jelly', 'flow', 'kinds'];
+  const LIVE_ST_KEYS = ['score', 'moves', 'target', 'timerLeft', 'timerMsLeft', 'timerUpdatedAt', 'turns', 'over', 'won', 'stars', 'collected', 'specialsMade', 'combosMade', 'hiddenLeft', 'ingsLeft', 'liqIdle', 'defused', 'fuseBlown', 'moveNo', 'played', 'lifeDone', 'challenge', 'shopRush', 'shop', 'tutorial', 'postcardFound', 'timerExpired', 'timerEndHandled', 'cannonDue', 'cannonShots', 'boss', 'jelly', 'flow', 'kinds'];
   let liveMem = null, livePaused = false, holdPaused = false, liveSaveTimer = 0;
   function liveKey() { return 'ib-sugar-live' + memberTag(); }
   function snapBoard(b) {
@@ -6419,10 +7024,20 @@
       }
       hold.dataset.sig = sig;
     } else if ($('gicon')) $('gicon').textContent = (counts[0] && counts[0].icon) || info.icon;
+    if (stt && stt.shopRush && stt.shop && hold) {
+      hold.innerHTML = '<div class="cd-item" data-kind="shop"><span class="cd-icon">🍭</span><span class="cd-num">' + (stt.shop.served || 0) + '</span><span class="cd-lab">served</span></div>' +
+        '<div class="cd-item" data-kind="coins"><span class="cd-icon">🪙</span><span class="cd-num">' + (stt.shop.coins || 0) + '</span><span class="cd-lab">coins</span></div>';
+    }
     if ($('help')) {
-      const bits = counts.map(function (c) { return c.text; });
-      if (stt) bits.push(stt.lv && stt.lv.timer ? ('Time ' + Math.floor(stt.timerLeft / 60) + ':' + String(stt.timerLeft % 60).padStart(2, '0')) : (stt.moves + ' moves left'));
-      $('help').textContent = bits.length ? bits.join(' · ') : (stt ? info.goal : info.strip);
+      if (stt && stt.shopRush && stt.shop) {
+        const front = stt.shop.queue && stt.shop.queue[0];
+        $('help').textContent = (front ? ('Front: ' + (front.grandma ? "Grandma's order · " : '') + (front.label || shopOrderLabel(front))) : 'Serve the queue') +
+          ' · ' + Math.floor(stt.timerLeft / 60) + ':' + String(stt.timerLeft % 60).padStart(2, '0') + ' left';
+      } else {
+        const bits = counts.map(function (c) { return c.text; });
+        if (stt) bits.push(stt.lv && stt.lv.timer ? ('Time ' + Math.floor(stt.timerLeft / 60) + ':' + String(stt.timerLeft % 60).padStart(2, '0')) : (stt.moves + ' moves left'));
+        $('help').textContent = bits.length ? bits.join(' · ') : (stt ? info.goal : info.strip);
+      }
     }
     const strip = $('goalstrip');
     if (strip) strip.dataset.n = String(info.n);
@@ -6768,6 +7383,7 @@
   }
   function beginLevel(n) {
     hideIntro();
+    if (n === 'shop') { openShopRush(); return; }
     if (tutorialFor(n) && !tutorialDone(n)) startTutorial({ level: n });
     else startLevel(n);
   }
@@ -7380,6 +7996,15 @@
     if (dash) dash.setAttribute('d', live);
     if (fut) fut.setAttribute('d', future);
     if (futBorder) futBorder.setAttribute('d', future);
+    const shopOpen = shopIsOpen(prog) || (prog.open | 0) >= SHOP_FROM;
+    const shopDone = !!(shopBoard && shopBoard.members && Object.keys(shopBoard.members).some(function (k) { return shopBoard.members[k] && shopBoard.members[k].cleared; }));
+    const side = shopOpen ? shopSidePath() : '';
+    const shopDash = stage && stage.querySelector('#sr-shop-path');
+    const shopBorder = stage && stage.querySelector('#sr-shop-path-border');
+    const shopIcing = stage && stage.querySelector('#sr-shop-path-icing');
+    if (shopDash) { shopDash.setAttribute('d', shopDone ? '' : side); shopDash.style.strokeDasharray = shopOpen && !shopDone ? '3 8' : ''; }
+    if (shopBorder) shopBorder.setAttribute('d', shopDone ? '' : side);
+    if (shopIcing) shopIcing.setAttribute('d', shopDone ? side : '');
     path.innerHTML = '';
     const here = Math.min(LV_COUNT, Math.max(1, prog.open));
     LEVELS.forEach((lv, i) => {
@@ -7407,6 +8032,41 @@
       });
       path.appendChild(b);
     });
+    (function renderShopPin() {
+      const stop = SHOP_STOP, open = shopIsOpen(prog);
+      const done = !!(shopBoard && shopMemberRow() && shopMemberRow().cleared);
+      const b = doc.createElement('button');
+      b.type = 'button';
+      b.className = 'lv lab-' + (stop.label || 'right') + ' kind-shop shop-stop' + (open ? ' open' : '') + (done ? ' done' : '') + (open && !done ? ' here-shop' : '');
+      if (!open) { b.classList.add('locked'); b.setAttribute('aria-disabled', 'true'); }
+      b.dataset.n = 'shop';
+      b.dataset.country = 'Australia';
+      b.style.left = mapXPct(stop.x);
+      b.style.top = mapYPct(stop.y);
+      b.innerHTML = '<span class="pin"><span class="no" aria-hidden="true">🍭</span></span>' +
+        (done ? '<span class="st"><span class="on">★</span></span>' : '<span class="st"></span>') +
+        '<span class="meta"><b>' + stop.place + '</b><em>' + stop.name + '</em><i class="country">Side path · Sydney</i></span>';
+      b.setAttribute('aria-label', (open ? 'Play ' : 'Locked: ') + 'Sweet Shop Rush, Sydney Lolly Shop, a side path after Sydney' + (done ? ', completed' : ''));
+      b.addEventListener('click', function () {
+        const play = function () { unlockAudio(); openShopRush(); };
+        const card = typeof window !== 'undefined' && window.SugarRushMap && window.SugarRushMap.showPlace;
+        if (card) {
+          card({
+            n: 'shop',
+            place: stop.place,
+            country: 'Australia',
+            name: stop.name,
+            open: open,
+            play: open ? play : null,
+            playLabel: '▶ Play Sweet Shop Rush',
+            lockText: '🔒 Finish Sydney Harbour Lights to open this side path'
+          });
+          return;
+        }
+        if (open) play();
+      });
+      path.appendChild(b);
+    })();
     FUTURE_STOPS.forEach(function (stop) {
       const el = doc.createElement('div');
       el.className = 'future-stop lab-' + (stop.label || 'right') + (stop.inset ? ' inset-' + stop.inset : '');
@@ -7495,7 +8155,12 @@
     const fromGame = wasScreen !== 'map' || !$('map').dataset.seen;
     $('game').hidden = true; $('intro').hidden = true; $('end').hidden = true; $('map').hidden = false;
     $('map').dataset.seen = '1';
-    doc.body.classList.remove('sarah', 'ingame', 'hammering', 'hard1', 'hard2', 'postcard-game', 'onpostcards');
+    doc.body.classList.remove('sarah', 'ingame', 'hammering', 'hard1', 'hard2', 'postcard-game', 'onpostcards', 'shoprush');
+    if ($('shopqueue')) $('shopqueue').hidden = true;
+    if ($('shoptakings')) $('shoptakings').hidden = true;
+    if ($('hearts2')) $('hearts2').hidden = false;
+    hideShopBoard();
+    if ($('shopboard')) $('shopboard').hidden = true;
     hideHardBan();
     hammerMode = false;
     doc.body.classList.add('onmap');
@@ -7566,6 +8231,7 @@
     if (res.beltMoves && res.beltMoves.length) await animateBeltMoves(res.beltMoves);
     for (let i = beltAt; i < res.steps.length; i++) await showStep(res.steps[i], i, { streak: !plain });
     collectPostcardFinds(res.steps);
+    if (st.shopRush) applyShopMatches();
     if (plain) addStreak(-1);
     if (res.spread) { const t = st.board[res.spread.r][res.spread.c]; if (t) { const s = sprite(t, res.spread.r, res.spread.c); s.grow = now(); } }
     // 1.9.219 Liquorice creeps after two moves in a row that free none; the move before, it gives a warning.
@@ -8336,7 +9002,7 @@
     me.classList.remove('hopping');
   }
   // 1.9.283 The route strokes are sized in screen px, so they look the same at any zoom of the true-scale map.
-  const ROUTE_STROKES = [['#sr-future-border', 9, [2.2, 6]], ['#sr-future', 5, [2.2, 6]], ['#sr-path-wide', 7], ['#sr-path-dash', 2.2, [5, 7]], ['#sr-path-win', 8]];
+  const ROUTE_STROKES = [['#sr-future-border', 9, [2.2, 6]], ['#sr-future', 5, [2.2, 6]], ['#sr-path-wide', 7], ['#sr-path-dash', 2.2, [5, 7]], ['#sr-path-win', 8], ['#sr-shop-path-border', 8, [2.2, 6]], ['#sr-shop-path', 5, [2.2, 6]], ['#sr-shop-path-icing', 7]];
   function fitRouteStrokes(pxPerUnit) {
     const u = Math.max(0.01, pxPerUnit || 1);
     ROUTE_STROKES.forEach(function (r) {
@@ -8495,6 +9161,27 @@
     if (!st) return;
     opts = opts || {};
     const won = st.won, n = st.stars || 0, lv = st.lv;
+    if (st.shopRush) {
+      recordShopShift();
+      const shop = st.shop || { served: 0, coins: 0 };
+      $('endtitle').textContent = won ? 'Shop closed!' : 'The shop closed';
+      $('endstars').innerHTML = [0, 1, 2].map(function (i) { return '<span class="' + (i < n ? 'on' : '') + '">★</span>'; }).join('');
+      $('endscore').textContent = shop.served + ' customers · ' + shop.coins + ' coins';
+      $('endbadge').hidden = true; if ($('endbadgecap')) $('endbadgecap').hidden = true;
+      if ($('endchest')) $('endchest').hidden = true;
+      if ($('endloot')) $('endloot').hidden = true;
+      if ($('morebtn')) $('morebtn').hidden = true;
+      $('endmsg').textContent = won
+        ? ('You served ' + shop.served + ' customer' + (shop.served === 1 ? '' : 's') + ' and took ' + shop.coins + ' coins. Gold Coast is open on the main road.')
+        : 'Serve at least one customer before closing time to finish the side path and unlock Gold Coast. Have another go — this mode does not use lives.';
+      $('againbtn').textContent = won ? 'New shift' : 'Try again';
+      $('nextbtn').hidden = !won;
+      $('nextbtn').textContent = 'Go to Gold Coast';
+      $('endmap').hidden = false; $('endmap').textContent = 'Map';
+      $('end').hidden = false;
+      paintShopBoard();
+      return;
+    }
     if (st.challenge) {
       $('endtitle').textContent = won ? 'Postcard assembled!' : 'Keep searching!';
       $('endstars').innerHTML = Array.from({ length: POSTCARD_COUNT }, (_, i) => '<span class="' + (i < (challengeRun.pieces || []).length ? 'on' : '') + '">✦</span>').join('');
@@ -8592,6 +9279,7 @@
   function leaveEnd() { stopEnd(); $('end').hidden = true; }
   function restart() {
     if (tut && tut.active) return;
+    if (st && st.shopRush) { leaveEnd(); bootShopRush(); return; }
     if (challengeRun) { const country = challengeRun.country; leaveEnd(); startPostcardChallenge(country); return; }
     leaveEnd();
     startLevel(lvNum);
@@ -8599,16 +9287,18 @@
   function goNext() {
     leaveEnd();
     if ($('goalnext')) $('goalnext').hidden = true;
+    if (st && st.shopRush) { openLevel(SHOP_REJOIN); return; }
     if (lvNum < LV_COUNT) openLevel(lvNum + 1);
     else showMap();
     if (musicOn && !endPlaying) playKind(wantKind());
   }
   function backToMap() {
     if (challengeRun) { showPostcards(); return; }
+    const shopScroll = st && st.shopRush ? SHOP_REJOIN : null;
     leaveEnd();
     if ($('goalnext')) $('goalnext').hidden = true;
     if (tut) { tut = null; hideTutUi(); hideRecap(); }
-    showMap();
+    showMap(shopScroll ? { scroll: shopScroll } : undefined);
   }
 
   function cellAt(e) {
@@ -8651,7 +9341,7 @@
   $('nextbtn').addEventListener('click', goNext);
   $('mapbtn').addEventListener('click', backToMap);
   $('endmap').addEventListener('click', backToMap);
-  $('introbtn').addEventListener('click', () => { unlockAudio(); beginLevel(pendingLv); });
+  $('introbtn').addEventListener('click', () => { unlockAudio(); if (pendingLv === 'shop') openShopRush(); else beginLevel(pendingLv); });
   if ($('introx')) $('introx').addEventListener('click', () => { unlockAudio(); hideIntro(); });
   if ($('intro')) $('intro').addEventListener('click', e => { if (e.target === $('intro')) hideIntro(); });
   if ($('introhow')) $('introhow').addEventListener('click', () => { unlockAudio(); startTutorial({ level: pendingLv }); });
@@ -8672,6 +9362,12 @@
   if ($('pickicon')) $('pickicon').addEventListener('click', () => { unlockAudio(); openIconPicker(); });
   if ($('raceicon')) $('raceicon').addEventListener('click', () => { unlockAudio(); openIconPicker(); });
   if ($('racefoot')) $('racefoot').addEventListener('click', () => { unlockAudio(); setRaceOpen(true); });
+  if ($('shopfoot')) $('shopfoot').addEventListener('click', () => { unlockAudio(); paintShopBoard(true); });
+  if ($('shopboardov')) $('shopboardov').addEventListener('click', function (e) {
+    const t = e.target;
+    if (t === $('shopboardov') || (t.closest && t.closest('[data-shop=close]'))) hideShopBoard();
+  });
+
   if ($('boosters')) $('boosters').addEventListener('click', e => {
     const b = e.target.closest && e.target.closest('[data-boost]');
     if (b) { unlockAudio(); useBoost(b.dataset.boost); }
@@ -8780,7 +9476,7 @@
   })();
 
   root.SugarRush.ui = {
-    state: () => st, attempt, comboTip: maybeComboTip, hud, paintGoalStrip, showEnd, showMap, scrollMapTo, openLevel, startLevel, showIntro, startTutorial, skipTutorial, finishTutorial, showTutStep, beginLevel, beginGoalFinish, showGoalBanner, celebrateOnMap, progress: () => prog, tutorial: () => tut, crush: () => crush,
+    state: () => st, attempt, comboTip: maybeComboTip, hud, paintGoalStrip, showEnd, showMap, scrollMapTo, openLevel, startLevel, showIntro, openShopRush, bootShopRush, paintShopQueue, paintShopBoard, hideShopBoard, recordShopShift, startTutorial, skipTutorial, finishTutorial, showTutStep, beginLevel, beginGoalFinish, showGoalBanner, celebrateOnMap, progress: () => prog, tutorial: () => tut, crush: () => crush,
     seedLives, showLives, openLivesPanel, lives: () => lives(), settleLife, nextLife: () => nextLife(),
     seedRace, seedRaceEvent, showRaceOn, showRaceResult, racePrize, syncRace, openIconPicker, setRaceOpen, requestCloseSugar, requestMinimiseSugar, scrollPastGameChrome, saveLive: writeLive, readLive, applyLive, clearLive, pauseLive, resumeLiveSession, isResumeOpen, race: () => race,
     say, chime, callout, unlockAudio, audio, showSaying, hideSaying, showMovesWarn, hideMovesWarn, maybeWarn3, showHint, hideHintHand, noteActivity,
