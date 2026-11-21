@@ -193,7 +193,7 @@
     }
     let items = [];
     try {
-      const r = await fetch('religion-local.json?v=1.9.312', { cache: 'no-store' });
+      const r = await fetch('religion-local.json?v=1.9.313', { cache: 'no-store' });
       if (r.ok) items = ((await r.json()).items || []).slice();
     } catch (e) { }
     const rss = await Promise.all(REL_FEEDS.map(fetchReligionRss));
@@ -217,7 +217,7 @@
   async function loadConcerts() {
     if (!CON_FALLBACK) {
       try {
-        const r = await fetch('akl-concerts.json?v=1.9.312', { cache: 'no-store' });
+        const r = await fetch('akl-concerts.json?v=1.9.313', { cache: 'no-store' });
         if (r.ok) CON_FALLBACK = (await r.json()).events || [];
       } catch (e) { CON_FALLBACK = []; }
     }
@@ -265,7 +265,7 @@
   async function loadTop40() {
     if (TOP40 && TOP40.songs && TOP40.songs.length) return TOP40;
     try {
-      const r = await fetch('top40-local.json?v=1.9.312', { cache: 'no-store' });
+      const r = await fetch('top40-local.json?v=1.9.313', { cache: 'no-store' });
       if (r.ok) TOP40 = await r.json();
     } catch (e) { }
     try {
