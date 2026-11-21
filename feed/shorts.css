@@ -1,0 +1,20 @@
+/* Info Book Shorts player — cinematic overlay, works on any theme. */
+#ib-shorts{position:fixed;inset:0;z-index:12000;background:#000;color:#fff;display:flex;flex-direction:column}
+#ib-shorts[hidden]{display:none!important}
+html.ib-shorts-on,html.ib-shorts-on body{overflow:hidden;overscroll-behavior:none}
+html.ib-shorts-on #ib-tabs,html.ib-shorts-on #ibportal,html.ib-shorts-on #ibrise,html.ib-shorts-on #instb,html.ib-shorts-on #instwrap{display:none!important}
+.sh-reel{flex:1;height:100%;overflow-y:auto;scroll-snap-type:y mandatory;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.sh-slide{position:relative;height:100%;min-height:100%;scroll-snap-align:start;scroll-snap-stop:always;background:#000}
+.sh-slide video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+.sh-cap{position:absolute;left:0;right:0;bottom:0;padding:48px 18px calc(18px + env(safe-area-inset-bottom,0px));background:linear-gradient(transparent,rgba(0,0,0,.72));font:600 .82rem/1.35 system-ui,sans-serif;text-shadow:0 1px 2px rgba(0,0,0,.6);pointer-events:none;z-index:2}
+.sh-paused{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:72px;height:72px;border-radius:50%;background:rgba(0,0,0,.45);color:#fff;font-size:28px;display:grid;place-items:center;z-index:2;pointer-events:none;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.sh-paused[hidden]{display:none}
+.sh-close,.sh-mute{position:fixed;z-index:12001;width:44px;height:44px;border:0;border-radius:50%;background:rgba(0,0,0,.45);color:#fff;font:700 1.4rem/1 system-ui,sans-serif;cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);-webkit-tap-highlight-color:transparent}
+.sh-close{top:calc(10px + env(safe-area-inset-top,0px));right:12px}
+.sh-mute{top:calc(10px + env(safe-area-inset-top,0px));left:12px;font-size:1.15rem}
+.sh-empty{margin:auto;padding:24px;color:#ddd;text-align:center;font:600 .95rem system-ui,sans-serif}
+
+.sh-slide iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}
+.sh-ytlab{position:absolute;left:12px;top:calc(62px + env(safe-area-inset-top,0px));z-index:3;padding:4px 8px;border-radius:999px;background:rgba(0,0,0,.55);color:#fff;font:600 .68rem/1.2 system-ui,sans-serif;letter-spacing:.01em;pointer-events:none}
+.sh-cap a.sh-credit{color:#fff;text-decoration:underline;text-underline-offset:2px;pointer-events:auto}
+.sh-cap{pointer-events:none}

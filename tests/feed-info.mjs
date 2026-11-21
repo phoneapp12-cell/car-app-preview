@@ -5648,3 +5648,32 @@ console.log('1.9.227 echo and 3 s pace ok');
   assert.ok(html.includes('.nzsvg .sr-atlas-title') && html.includes('.stops .meta .country') && html.includes('.country-stop'));
   console.log('1.9.249 Sugar Rush country atlas and typographic layers ok');
 }
+
+
+// INF-20 Shorts: Reddit clips plus a YouTube music/education lane (preview).
+{
+  const today = fs.readFileSync('feed/today.js', 'utf8');
+  const html = fs.readFileSync('feed/index.html', 'utf8');
+  const sw = fs.readFileSync('feed/sw.js', 'utf8');
+  const js = fs.readFileSync('feed/shorts.js', 'utf8');
+  const css = fs.readFileSync('feed/shorts.css', 'utf8');
+  assert.ok(today.includes("function shortsTile") && today.includes("title: 'Shorts'"));
+  assert.ok(!today.includes('function streakTile'));
+  assert.ok(html.includes('shorts.js?v=') && html.includes('shorts.css?v='));
+  assert.ok(sw.includes('shorts.js?v=') && sw.includes('shorts.css?v='));
+  const S = load('feed/shorts.js').ibShorts;
+  assert.strictEqual(S.isPortrait(720, 1280), true);
+  assert.strictEqual(S.isPortrait(1280, 720), false);
+  assert.ok(S.isAllowedSub('aww') && !S.isAllowedSub('NatureIsFuckingLit'));
+  assert.strictEqual(S.durationOk(91), false);
+  assert.ok(S.isEduSource('yt-nasa') && S.isEduSource('fun-kurzgesagt'));
+  assert.ok(js.includes('CMAF_720') && js.includes('CMAF_AUDIO_128') && js.includes('youtube-nocookie.com/embed'));
+  assert.ok(js.includes('YouTube · may show ads') && css.includes('sh-ytlab'));
+  const reddit = S.filterReddit([
+    { vk: 'reddit', vu: 'ok1234567', t: 'A kitten', url: 'https://www.reddit.com/r/aww/comments/x/k/', topic: 'nature', vdur: 12 },
+    { vk: 'reddit', vu: 'sport1234', t: 'Premier League goals', url: 'https://www.reddit.com/r/aww/comments/x/s/', topic: 'nature', vdur: 12 }
+  ]);
+  assert.strictEqual(reddit.length, 1);
+  assert.ok(S.FALLBACK.every(it => it.fallback && it.width < it.height));
+  console.log('INF-20 Shorts Reddit + YouTube lane ok');
+}
