@@ -8,6 +8,10 @@
   const FEED_DEFAULT = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
   const MAX_DUR = 90;
   const YT_EVERY = 5;
+  /* r/BeAmazed is the live-reel source that best matches Shane asking for more
+     "braining" shorts. Boost it to about one in three, without repeating clips. */
+  const BOOST_SUBS = { beamazed: 1 };
+  const BOOST_EVERY = 3;
   const CMAF_RES = ['CMAF_720', 'CMAF_480', 'DASH_720', 'DASH_480', 'CMAF_360', 'DASH_360'];
   const CMAF_AUDIO = ['CMAF_AUDIO_128', 'CMAF_AUDIO_64', 'DASH_AUDIO_128', 'DASH_audio'];
 
@@ -193,6 +197,28 @@
       url: s.url || ('https://www.youtube.com/watch?v=' + (s.videoId || s.vid))
     }));
   }
+  function isBoosted(it) {
+    if (!it) return false;
+    const credit = String(it.credit || '');
+    const fromCredit = /^r\//i.test(credit) ? credit.slice(2) : '';
+    const sub = fromCredit || it.sub || (it.url && (it.url.match(/reddit\.com\/r\/([^/]+)/i) || [])[1]) || '';
+    return !!BOOST_SUBS[String(sub).toLowerCase()];
+  }
+  function boostSource(items, every) {
+    const step = every || BOOST_EVERY;
+    const list = items || [];
+    const boost = list.filter(isBoosted);
+    const rest = list.filter(it => !isBoosted(it));
+    if (!boost.length) return list.slice();
+    const out = [];
+    let bi = 0, ri = 0;
+    while (bi < boost.length || ri < rest.length) {
+      if ((out.length % step) === 0 && bi < boost.length) out.push(boost[bi++]);
+      else if (ri < rest.length) out.push(rest[ri++]);
+      else out.push(boost[bi++]);
+    }
+    return out;
+  }
   function mixLane(reddit, youtube, every) {
     const step = every || YT_EVERY;
     const r = (reddit || []).slice(), y = (youtube || []).slice();
@@ -226,7 +252,7 @@
       if (i < music.length) youtube.push(music[i]);
       if (i < edu.length) youtube.push(edu[i]);
     }
-    const mixed = mixLane(reddit, youtube, YT_EVERY);
+    const mixed = boostSource(mixLane(reddit, youtube, YT_EVERY), BOOST_EVERY);
     return { reddit, edu, music, youtube, mixed, fallback: filterPortrait(FALLBACK) };
   }
 
@@ -644,6 +670,7 @@
     isPortrait, isDirectVideo, isAllowedTopic, isAllowedSub, isEduSource, isRedditClip,
     durationOk, subredditOf, memberAllows, filterReddit, filterEduYoutube, top40Clips,
     mixLane, filterPortrait, buildCatalog, FALLBACK, ALLOW_SUBS, EDU_SRC, MAX_DUR, YT_EVERY,
+    BOOST_SUBS, BOOST_EVERY, isBoosted, boostSource,
     SPORT, NSFW, NOT_WANT, open, close
   };
 })();

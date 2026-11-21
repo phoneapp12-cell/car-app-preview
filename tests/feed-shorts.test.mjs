@@ -154,3 +154,31 @@ test('the player keeps swipe, close, back, Reddit CMAF audio and a YouTube ads l
   assert.match(stories, /CMAF_AUDIO_128/);
   assert.match(js, /preload = \(j === i \|\| j === i \+ 1\) \? 'auto'/);
 });
+
+
+test('r/BeAmazed is boosted to about one in three and stays family-safe', () => {
+  const S = loadShorts();
+  assert.equal(S.isAllowedSub('BeAmazed'), true);
+  assert.equal(S.BOOST_SUBS.beamazed, 1);
+  assert.equal(S.BOOST_EVERY, 3);
+  const amaz = Array.from({ length: 6 }, (_, i) => ({
+    vk: 'reddit', vu: 'amaz' + String(i).padStart(7, '0'), t: 'A surprising clip ' + i,
+    url: 'https://www.reddit.com/r/BeAmazed/comments/x/' + i, topic: 'learn', vdur: 20
+  }));
+  const other = Array.from({ length: 18 }, (_, i) => ({
+    vk: 'reddit', vu: 'aww' + String(i).padStart(8, '0'), t: 'A sleepy puppy ' + i,
+    url: 'https://www.reddit.com/r/aww/comments/x/' + i, topic: 'nature', vdur: 12
+  }));
+  const blocked = [{
+    vk: 'reddit', vu: 'iaf0000001', t: 'A cool fact',
+    url: 'https://www.reddit.com/r/interestingasfuck/comments/x/fact', topic: 'learn', vdur: 15
+  }];
+  const built = S.buildCatalog({ items: amaz.concat(other).concat(blocked) }, { songs: [] }, { pick: ['learn', 'nature'], optIn: [] });
+  assert.equal(built.reddit.filter(x => x.credit === 'r/BeAmazed').length, 6);
+  assert.ok(!built.reddit.some(x => /interestingasfuck/i.test(x.credit)), 'crude subs stay out');
+  const flags = built.mixed.map(x => S.isBoosted(x));
+  assert.ok(flags[0] && flags[3] && flags[6], 'BeAmazed appears every third slot');
+  const ratio = flags.filter(Boolean).length / built.mixed.length;
+  assert.ok(ratio > 0.2 && ratio < 0.4, 'boost is about 1 in 3, got ' + ratio);
+  assert.ok(flags.filter(Boolean).length === 6, 'every BeAmazed clip is still shown');
+});

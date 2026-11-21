@@ -5822,5 +5822,7 @@ console.log('1.9.227 echo and 3 s pace ok');
   ]);
   assert.strictEqual(reddit.length, 1);
   assert.ok(S.FALLBACK.every(it => it.fallback && it.width < it.height));
-  console.log('INF-20 Shorts Reddit + YouTube lane ok');
+    assert.ok(S.BOOST_SUBS && S.BOOST_SUBS.beamazed && S.BOOST_EVERY === 3);
+  assert.ok(typeof S.boostSource === 'function' && typeof S.isBoosted === 'function');
+console.log('INF-20 Shorts Reddit + YouTube lane ok');
 }
