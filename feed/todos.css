@@ -1,0 +1,51 @@
+/* Info Book to-do list. Uses the same theme tokens as Today, including auto / weather themes. */
+html.ib-todo-on #ib-tabs{display:none}
+html.ib-todo-on #stories-host{display:none}
+html.ib-todo-on #backfeed{display:none}
+
+.tdwrap{padding:8px 12px 28px;max-width:640px;margin:0 auto}
+.tdwrap > .backpill{margin:4px 0 10px}
+.td-hd h2{margin:4px 0 2px;font-family:var(--today-serif,ui-rounded,Georgia,serif);font-size:1.7rem;letter-spacing:-.03em;color:var(--ink)}
+.td-sub{margin:0 0 14px;font-size:.9rem;font-weight:600;color:var(--mute,#6b5a66)}
+.td-add{width:100%;margin:0 0 14px;min-height:44px}
+.td-empty,.td-warn{margin:0 0 14px;padding:12px 14px;border-radius:16px;background:var(--card,#fff);border:1px solid var(--line,#eadfe6);font-size:.95rem;line-height:1.4;color:var(--ink)}
+.td-warn{background:color-mix(in srgb,var(--press,#8B2E2E) 10%,var(--card,#fff))}
+.td-form{display:flex;flex-direction:column;gap:10px;margin:0 0 16px;padding:14px;border-radius:18px;background:var(--card,#fff);border:1px solid var(--line,#eadfe6);box-shadow:var(--shadow,0 4px 16px rgba(0,0,0,.06))}
+.td-form h3{margin:0;font-size:1.05rem}
+.td-form label{display:flex;flex-direction:column;gap:4px;font-weight:700;font-size:.85rem}
+.td-form input{font:inherit;font-weight:600;min-height:44px;padding:8px 12px;border-radius:12px;border:1px solid var(--line,#eadfe6);background:var(--paper,#fffdf8);color:var(--ink)}
+.td-opt{font-weight:600;color:var(--mute,#6b5a66)}
+.td-form .xbtns{display:flex;gap:8px;flex-wrap:wrap}
+.td-list{display:flex;flex-direction:column;gap:10px}
+.td-row{display:flex;gap:10px;align-items:flex-start;padding:12px;border-radius:18px;background:var(--card,#fff);border:1px solid var(--line,#eadfe6);box-shadow:var(--shadow,0 3px 0 color-mix(in srgb,var(--line,#eadfe6) 70%,transparent))}
+.td-row.today{border-color:color-mix(in srgb,var(--sage,#3F6E55) 45%,var(--line,#eadfe6))}
+.td-row.overdue{border-color:color-mix(in srgb,var(--press,#8B2E2E) 55%,var(--line,#eadfe6))}
+.td-row.done{opacity:.78}
+.td-tick{flex:0 0 auto;width:44px;height:44px;border-radius:14px;border:2px solid var(--line,#eadfe6);background:var(--paper,#fffdf8);color:var(--ink);font:800 18px/1 system-ui,sans-serif;cursor:pointer}
+.td-tick[aria-pressed="true"]{background:var(--sage,#3F6E55);border-color:var(--sage,#3F6E55);color:#fff}
+.td-body{min-width:0;flex:1}
+.td-body b{display:block;font-size:1.02rem;line-height:1.3}
+.td-due{display:block;margin-top:3px;font-size:.8rem;font-weight:700;color:var(--mute,#6b5a66)}
+.td-row.overdue .td-due{color:var(--press,#8B2E2E)}
+.td-acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.td-acts button,.td-calbtns .btn,.td-calbtns a.btn{min-height:36px;padding:6px 10px;border-radius:999px;border:1px solid var(--line,#eadfe6);background:var(--chip,#f6f1ea);color:var(--ink);font:700 .8rem system-ui,sans-serif;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center}
+.td-acts .td-del{color:var(--press,#8B2E2E)}
+.td-calout{margin-top:10px;padding:10px 12px;border-radius:14px;background:var(--paper,#fffdf8);border:1px solid var(--line,#eadfe6)}
+.td-calout p{margin:0 0 8px;font-size:.88rem;font-weight:600}
+.td-calbtns{display:flex;flex-wrap:wrap;gap:8px}
+.td-done{margin-top:8px;padding:8px 0 0}
+.td-done summary{cursor:pointer;font-weight:800;padding:8px 0;min-height:44px;display:flex;align-items:center}
+.td-done-acts{margin:0 0 10px}
+.td-done .td-row{margin-top:8px}
+
+html.today-look .td-hd h2{color:var(--ink)}
+html.today-look.force-dark .td-tick,html.today-look.th-ocean .td-tick{background:var(--chip,#2a3340)}
+html.today-look .today-todo{display:block;width:100%;border:0;border-radius:18px;padding:14px;text-align:left;cursor:pointer;background:var(--card,#fff);color:var(--ink);box-shadow:var(--shadow,0 4px 16px rgba(0,0,0,.06));border:1px solid var(--line,#eadfe6)}
+html.today-look.force-dark .today-todo,html.today-look.th-ocean .today-todo{background:linear-gradient(180deg,#2a3340,#1e2530)}
+html.today-look.th-spring .today-todo{background:linear-gradient(180deg,#eef8e6,#e0f0d0)}
+.today-todo-card{margin:0 0 14px}
+
+html.ib-todo-on #feed,html.ib-todo-on #feed *{visibility:visible!important}
+html.ib-todo-on #ibportal,html.ib-todo-on #ibrise,html.ib-todo-on #instb,html.ib-todo-on #instwrap{display:none!important}
+html.ib-todo-on.portal-on #feed,html.ib-todo-on.portal-on #stories-host{visibility:visible}
+html.ib-todo-on #feed{padding-top:0}

@@ -581,6 +581,7 @@
     } catch (err) {}
   }
   root.ibCalOpen = open;
+  root.ibCalClose = closeCal;
   root.ibCalDraw = function () { if (on) draw(); };
   Object.assign(root.ibCal, { weekStart, addDays, addMonths, monthGrid, holidaysOfYear, localNzHolidays, allEvents, familyEvents, holidayEvents, carEvents, carShareList, savePlateDates, plateCardHtml, NZTA_EXPIRY, isFriend, viewHtml,
     getView() { return view; }, setView(v) { view = v; }, getCursor() { return cursor; }, setCursor(d) { cursor = d; }, today, dayLabel, weekLabel, monthLabel, turn, reduceMotion });
