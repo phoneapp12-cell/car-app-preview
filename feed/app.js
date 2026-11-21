@@ -960,6 +960,13 @@ function stillFrame(w, h) {
   if (r < 0.98) return Math.max(r, 0.8).toFixed(4) + ' / 1';
   return '1 / 1';
 }
+function showOpenLink(i) {
+  if (!i || !i.url || i.pin) return false;
+  try {
+    if (typeof ibReader !== 'undefined' && ibReader && typeof ibReader.canOpen === 'function' && ibReader.canOpen(null, i)) return false;
+  } catch (e) {}
+  return true;
+}
 function card(i) {
   const T = TOPIC[i.topic] || TOPIC.all, v = VOTES[i.id] ? VOTES[i.id].v : 0;
   const style = `--c1:${T[3]};--c2:${T[4]}`;
@@ -988,7 +995,7 @@ function card(i) {
     ${typeof exLine === 'function' ? exLine(i) : ''}${rxLine(i)}<div class="ft">
       <button class="vote up${(FAM_ON && rxOf(i) ? (rxOf(i).ups || []).some(isMe) : v > 0) ? ' on' : ''}" data-vote="1" aria-pressed="${v > 0}" aria-label="Thumbs up">${THUMB.up}</button>${upNames(i)}
       <button class="vote dn${v < 0 ? ' on' : ''}" data-vote="-1" aria-pressed="${v < 0}" aria-label="Thumbs down">${THUMB.dn}</button>
-      ${famBar(i)}${i.url && !i.pin ? `<a class="open-l" href="${esc(i.url)}" target="_blank" rel="noopener">${i._share && i.kind === 'link' ? 'Open on ' + esc(i.sn || 'the site') + ' ↗' : 'Open ↗'}</a>` : ''}
+      ${famBar(i)}${showOpenLink(i) ? `<a class="open-l" href="${esc(i.url)}" target="_blank" rel="noopener">${i._share && i.kind === 'link' ? 'Open on ' + esc(i.sn || 'the site') + ' ↗' : 'Open ↗'}</a>` : ''}
     </div></article>`;
 }
 function topicList() {
