@@ -1,4 +1,4 @@
-/* 1.9.304 One-off Whangārei events and local developments in the feed.
+/* 1.9.305 One-off Whangārei events and local developments in the feed.
    Data comes from the existing due-dates relay (GET /events and GET /planning).
    Recurring markets and cinema listings are filtered out here — the Worker and
    relay are left unchanged. Local sport events are off until a family member
