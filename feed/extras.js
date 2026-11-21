@@ -403,8 +403,8 @@ function suggApply(add) {
 const basePopW = popW;
 const REGION_NL = /whang[aā]rei|northland|kerikeri|paihia|russell|dargaville|kaitaia|kaikohe|ruak[aā]k[aā]|waipu|tutukaka|ngunguru|hikurangi|kamo|onerahi|bream bay|mangawhai|kawakawa|opua|hokianga|maungakaramea|tikipunga/i;
 /* ---- 1.9.30 🇳🇿 NZ-first and weather/season-aware ranking (a gentle nudge on top of interests, 👍/👎 and the time-of-day mood) ----
-   Weather: My App's own Whangārei forecast on this phone if there is one (the one the auto theme uses), otherwise the same open-meteo
-   forecast fetched here (once every 30 min). Nothing about the theme changes. */
+   Weather for the Today card (and this ranking nudge) uses this device's location when the person allows it,
+   otherwise Onerahi. Forecast is Open-Meteo, with the existing relay copy as a fallback for the Onerahi area. */
 const NZ_RX = /\.nz\b|new zealand|aotearoa|\bkiwis?\b|whang[aā]rei|northland|auckland|wellington|christchurch|queenstown|rotorua|tauranga|hamilton|dunedin|nelson|napier|taup[oō]|coromandel|bay of islands|countdown|woolworths nz|pak'?n'?save|new world|the warehouse|mitre ?10|bunnings nz|kmart nz|briscoes|farmers|rnz|stuff\.co|nz ?herald|1news|newshub|te reo|m[aā]ori|matariki|waitangi|p[oō]hutukawa|kūmara|kumara|pavlova|\bl&p\b|whitebait|feijoa/i;
 const FOREIGN_RX = /thanksgiving|4th of july|fourth of july|memorial day|labor day|black friday doorbusters?|walmart|target stores?|at target\b|costco|\bcvs\b|walgreens|trader joe'?s|kroger|whole foods|home depot|lowe'?s|\bnfl\b|super bowl|fahrenheit|\d\s?°F\b|\b(us|uk)[- ]only\b|\bnhs\b|tesco|sainsbury'?s|\basda\b|argos|bank holiday|half[- ]term|\bzip code\b|£\s?\d|\$\d+ ?usd/i;
 const WRONG_SUMMER_RX = /\bsnow(fall|man|men|storm|day)?\b|blizzard|winter (warmers?|coats?|is coming|wardrobe|skin ?care|recipes?)|frost(y|bite)?\b|\bski(ing|ers?)?\b|fall foliage|autumn leaves|christmas in july|cold snap|hibernat\w*/i;
@@ -412,14 +412,150 @@ const WX_OUT = /\b(beach|bbq|barbecue|barbie|picnic|garden\w*|\bwalks?\b|walking
 const WX_IN = /\b(cosy|cozy|indoor\w*|soups?|stews?|bak(e|es|ing)|roast\w*|crafts?|knit\w*|crochet|movies?|films?|\btv\b|series|binge|board ?games?|puzzles?|rainy[- ]day|books?|reading|slow cooker|casserole|hot chocolate|lego|colouring|painting|museum|library|cinema)\b/i;
 const WX_SAFE = /\b(storm|power cuts?|outages?|emergency|civil defence|be prepared|get ready|safety|flood\w*|generator|torch|first aid)\b/i;
 const nzSeason = () => { const mth = +new Date().toLocaleDateString('en-NZ', { timeZone: 'Pacific/Auckland', month: 'numeric' }); return [12, 1, 2].includes(mth) ? 'summer' : [3, 4, 5].includes(mth) ? 'autumn' : [6, 7, 8].includes(mth) ? 'winter' : mth === 11 ? 'late spring' : 'spring'; };
+/* ---- Today weather: this device's location, with Onerahi as the fallback ---- */
+const WX_HOME = { lat: -35.77, lon: 174.37, place: 'Onerahi' };
+const WX_OM = 'https://api.open-meteo.com/v1/forecast';
+const WX_RELAY = 'https://due-dates-calendar-relay.phoneapp12.workers.dev/weather';
+const WX_GEO_PHOTON = 'https://photon.komoot.io/reverse';
+const WX_GEO_BDC = 'https://api.bigdatacloud.net/data/reverse-geocode-client';
+const WX_LOC_TTL = 12 * 36e5; // refresh the cached place about twice a day, not on every open
+const WX_NOW_TTL = 30 * 60e3;
+const WX_NOW_MAX = 2 * 36e5;
+function wxHome() { return { lat: WX_HOME.lat, lon: WX_HOME.lon, place: WX_HOME.place, fallback: true }; }
+function wxKm(aLat, aLon, bLat, bLon) {
+  if (![aLat, aLon, bLat, bLon].every(n => typeof n === 'number' && isFinite(n))) return Infinity;
+  const toRad = d => d * Math.PI / 180, dLat = toRad(bLat - aLat), dLon = toRad(bLon - aLon);
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLon / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
+}
+function wxNear(aLat, aLon, bLat, bLon, km) { return wxKm(aLat, aLon, bLat, bLon) <= (km || 1); }
+function wxNearHome(lat, lon) { return wxNear(lat, lon, WX_HOME.lat, WX_HOME.lon, 25); }
+function wxOmUrl(lat, lon) {
+  return WX_OM + '?latitude=' + encodeURIComponent(lat) + '&longitude=' + encodeURIComponent(lon) +
+    '&current=temperature_2m,weather_code,wind_speed_10m,is_day&timezone=auto&wind_speed_unit=kmh';
+}
+function wxPlaceFromGeo(j) {
+  if (!j || typeof j !== 'object') return '';
+  const feat = j.features && j.features[0] && j.features[0].properties;
+  if (feat && typeof feat === 'object') {
+    const name = feat.district || feat.suburb || feat.locality || feat.town || feat.village || feat.city || '';
+    return String(name).trim();
+  }
+  const loc = String(j.locality || '').trim(), city = String(j.city || '').trim();
+  if (loc && city && loc !== city) return loc;
+  return loc || city || String(j.principalSubdivision || '').trim();
+}
+function wxSavedLoc() { try { return ls.get('wxLoc', null); } catch (e) { return null; } }
+function wxPlaceName() {
+  const loc = wxSavedLoc();
+  if (loc && loc.place) return loc.place;
+  return WX_HOME.place;
+}
+function wxUsingHome() {
+  const loc = wxSavedLoc();
+  if (!loc || loc.denied || loc.fallback || loc.unavailable) return true;
+  return wxNearHome(loc.lat, loc.lon);
+}
+async function wxGetJson(url, ms) {
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), ms || 10000);
+  try {
+    const r = await fetch(url, { signal: ctl.signal, cache: 'no-store' });
+    if (!r.ok) throw new Error('http ' + r.status);
+    return await r.json();
+  } finally { clearTimeout(t); }
+}
+async function wxReverseGeocode(lat, lon) {
+  try {
+    const j = await wxGetJson(WX_GEO_PHOTON + '?lat=' + encodeURIComponent(lat) + '&lon=' + encodeURIComponent(lon), 8000);
+    const n = wxPlaceFromGeo(j); if (n) return n;
+  } catch (e) { }
+  try {
+    const j = await wxGetJson(WX_GEO_BDC + '?latitude=' + encodeURIComponent(lat) + '&longitude=' + encodeURIComponent(lon) + '&localityLanguage=en', 8000);
+    const n = wxPlaceFromGeo(j); if (n) return n;
+  } catch (e) { }
+  return '';
+}
+function wxNotify() {
+  WXK_AT = 0;
+  try { if (typeof ibToday !== 'undefined' && typeof ibToday.paintWx === 'function') ibToday.paintWx(); } catch (e) { }
+}
 function wxCurrent() {
-  try { const o = JSON.parse(localStorage.getItem('wx') || 'null'); if (o && o.data && o.data.current && Date.now() - o.at < 3 * 36e5) return o.data.current; } catch (e) { } // My App's own forecast (same phone)
-  const c = ls.get('wxNow', null); return c && Date.now() - c.at < 2 * 36e5 ? c.cur : null;
+  try {
+    const c = ls.get('wxNow', null);
+    if (c && c.cur && typeof c.cur.temperature_2m === 'number' && Date.now() - c.at < WX_NOW_MAX) return c.cur;
+  } catch (e) { }
+  // My App's own forecast on this phone is Whangārei/Onerahi, so only use it when this person is in that area
+  if (wxUsingHome()) {
+    try {
+      const o = JSON.parse(localStorage.getItem('wx') || 'null');
+      const cur = o && o.data && o.data.current;
+      if (cur && typeof cur.temperature_2m === 'number' && Date.now() - o.at < 3 * 36e5) return cur;
+    } catch (e) { }
+  }
+  return null;
+}
+async function wxLoadForecast(loc, force) {
+  if (!loc || loc.lat == null || loc.lon == null) loc = wxHome();
+  const c = ls.get('wxNow', null);
+  if (!force && c && c.cur && Date.now() - c.at < WX_NOW_TTL && wxNear(c.lat, c.lon, loc.lat, loc.lon, 1)) return c;
+  let data = null;
+  try { data = await wxGetJson(wxOmUrl(loc.lat, loc.lon), 10000); } catch (e) { }
+  const home = !!(loc.fallback || loc.denied || loc.unavailable || wxNearHome(loc.lat, loc.lon));
+  if (!(data && data.current) && home) { try { data = await wxGetJson(WX_RELAY, 12000); } catch (e) { } }
+  if (!(data && data.current)) { try { data = await wxGetJson(wxOmUrl(loc.lat, loc.lon), 10000); } catch (e) { } }
+  if (data && data.current && typeof data.current.temperature_2m === 'number') {
+    const cur = data.current;
+    ls.set('wxNow', { at: Date.now(), cur, lat: loc.lat, lon: loc.lon, place: loc.place || wxPlaceName() });
+    try { localStorage.setItem('fxWx', JSON.stringify({ t: Date.now(), w: cur })); } catch (e) { }
+    wxNotify();
+    return cur;
+  }
+  return null;
+}
+let wxLocBusy = false;
+async function wxLocate() {
+  if (wxLocBusy) return wxSavedLoc() || wxHome();
+  if (!navigator.geolocation) {
+    const loc = Object.assign(wxHome(), { at: Date.now(), unavailable: true });
+    ls.set('wxLoc', loc); return loc;
+  }
+  wxLocBusy = true;
+  try {
+    const pos = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: false, timeout: 8000, maximumAge: 15 * 60e3 });
+    });
+    const lat = +pos.coords.latitude, lon = +pos.coords.longitude, prev = wxSavedLoc() || {};
+    const moved = prev.lat == null || wxKm(prev.lat, prev.lon, lat, lon) > 3;
+    let place = prev.place || '';
+    if (!place || moved) {
+      place = await wxReverseGeocode(lat, lon) || place || (wxNearHome(lat, lon) ? WX_HOME.place : 'Your area');
+    }
+    const loc = { at: Date.now(), lat, lon, place };
+    ls.set('wxLoc', loc);
+    await wxLoadForecast(loc, moved || !ls.get('wxNow', null));
+    return loc;
+  } catch (e) {
+    if (e && e.code === 1) { const loc = Object.assign(wxHome(), { at: Date.now(), denied: true }); ls.set('wxLoc', loc); return loc; }
+    return wxSavedLoc() || wxHome();
+  } finally { wxLocBusy = false; }
+}
+async function wxEnsureLoc() {
+  const saved = wxSavedLoc();
+  if (saved && saved.denied) return saved;
+  if (saved && saved.lat != null && Date.now() - saved.at < WX_LOC_TTL) return saved;
+  if (saved && saved.lat != null) { wxLocate(); return saved; } // stale but usable; refresh quietly
+  wxLocate(); // first time: ask once, and show Onerahi until the answer arrives
+  return wxHome();
 }
 async function wxFetchNow() {
-  const c = ls.get('wxNow', null); if (c && Date.now() - c.at < 30 * 60e3) return;
-  try { const d = await (await fetch('https://api.open-meteo.com/v1/forecast?latitude=-35.7251&longitude=174.3237&current=temperature_2m,weather_code,wind_speed_10m&timezone=Pacific%2FAuckland')).json(); if (d && d.current) { ls.set('wxNow', { at: Date.now(), cur: d.current }); WXK_AT = 0; if (tab === 'all' && scrollY < 300) draw(); } } catch (e) { }
+  const loc = await wxEnsureLoc();
+  return wxLoadForecast(loc);
 }
+window.ibWx = { HOME: WX_HOME, RELAY: WX_RELAY, LOC_TTL: WX_LOC_TTL, NOW_TTL: WX_NOW_TTL,
+  home: wxHome, km: wxKm, near: wxNear, nearHome: wxNearHome, omUrl: wxOmUrl, placeFromGeo: wxPlaceFromGeo,
+  placeName: wxPlaceName, usingHome: wxUsingHome, current: wxCurrent, fetchNow: wxFetchNow, locate: wxLocate,
+  ensureLoc: wxEnsureLoc, loadForecast: wxLoadForecast, reverseGeocode: wxReverseGeocode };
+
 let WXK = null, WXK_AT = 0;
 function wxKindIB() { // warm / mild / wet / cold / storm (windy counts with storm) – recomputed every 10 minutes
   if (Date.now() - WXK_AT < 10 * 60e3) return WXK; WXK_AT = Date.now(); const c = wxCurrent(); if (!c) return (WXK = null);

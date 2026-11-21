@@ -4030,6 +4030,254 @@ if (live) {
   assert.ok(src.includes('prefers-reduced-motion'));
 }
 
+// Today weather: device location, Onerahi fallback, and a paint that does not depend on scroll.
+{
+  const extras = fs.readFileSync('feed/extras.js', 'utf8');
+  const todaySrc = fs.readFileSync('feed/today.js', 'utf8');
+  const start = extras.indexOf('/* ---- Today weather:');
+  const end = extras.indexOf('let WXK = null, WXK_AT = 0;');
+  assert.ok(start > 0 && end > start, 'weather helpers are a marked block in extras.js');
+  assert.ok(todaySrc.includes('ibWx.placeName') && todaySrc.includes('function paintWx()') && todaySrc.includes("Tonight in ' + place"));
+  assert.ok(!todaySrc.includes('Onerahi · Whangārei'), 'hero subtitle uses the current place, not a fixed Onerahi · Whangārei line');
+  assert.ok(!extras.slice(start, end).includes('scrollY < 300'), 'weather no longer waits for the top of the page before painting');
+  assert.ok(extras.slice(start, end).includes('ibToday.paintWx') && extras.includes('phoneapp12.workers.dev/weather'));
+
+  function loadWx(opts = {}) {
+    const mem = new Map();
+    const ls = {
+      get(k, d) { return mem.has('ls:' + k) ? mem.get('ls:' + k) : d; },
+      set(k, v) { mem.set('ls:' + k, v); }
+    };
+    const localStorage = {
+      getItem(k) { return mem.has(k) ? mem.get(k) : null; },
+      setItem(k, v) { mem.set(k, String(v)); }
+    };
+    const calls = [];
+    const painted = { n: 0 };
+    const geo = opts.geo || null;
+    const ctx = {
+      ls, localStorage, console, Date, Math, JSON, Object, Number, String, Array, isFinite,
+      encodeURIComponent, AbortController, setTimeout, clearTimeout, Promise,
+      WXK_AT: 0,
+      ibToday: { paintWx() { painted.n++; } },
+      navigator: geo ? { geolocation: geo } : {},
+      window: {},
+      fetch: async (url) => {
+        calls.push(String(url));
+        const res = (opts.fetch || (() => { throw new Error('unexpected ' + url); }))(String(url));
+        if (res && typeof res.then === 'function') return res;
+        if (res && typeof res.ok === 'boolean') return res;
+        return { ok: true, json: async () => res };
+      }
+    };
+    ctx.window = ctx;
+    vm.createContext(ctx);
+    vm.runInContext(extras.slice(start, end), ctx);
+    return { W: ctx.ibWx, ls, localStorage, mem, calls, painted, ctx };
+  }
+
+  const { W } = loadWx();
+  assert.strictEqual(W.HOME.lat, -35.77);
+  assert.strictEqual(W.HOME.lon, 174.37);
+  assert.strictEqual(W.HOME.place, 'Onerahi');
+  assert.strictEqual(W.placeName(), 'Onerahi');
+  assert.ok(W.nearHome(-35.77, 174.37) && W.nearHome(-35.7251, 174.3237));
+  assert.ok(!W.nearHome(-36.85, 174.76), 'Auckland is not treated as Onerahi');
+  assert.ok(W.omUrl(-36.85, 174.76).includes('latitude=-36.85') && W.omUrl(-36.85, 174.76).includes('longitude=174.76'));
+  assert.ok(!W.omUrl(-36.85, 174.76).includes('latitude=-35.77'));
+  assert.strictEqual(W.placeFromGeo({
+    features: [{ properties: { housenumber: '101', street: 'Church Street', district: 'Onerahi', city: 'Whangārei', type: 'house' } }]
+  }), 'Onerahi');
+  assert.strictEqual(W.placeFromGeo({ features: [{ properties: { city: 'Auckland' } }] }), 'Auckland');
+  assert.strictEqual(W.placeFromGeo({ locality: 'Ponsonby', city: 'Auckland' }), 'Ponsonby');
+  assert.strictEqual(W.placeFromGeo({ locality: 'Whangarei', city: 'Whangarei', principalSubdivision: 'Northland' }), 'Whangarei');
+  assert.strictEqual(W.placeFromGeo(null), '');
+
+  {
+    const { W, ls, painted, calls, localStorage } = loadWx({
+      fetch(url) {
+        if (url.includes('open-meteo.com')) return { current: { temperature_2m: 18.4, weather_code: 3, wind_speed_10m: 13.4, is_day: 1 } };
+        throw new Error('relay should not be used when Open-Meteo works: ' + url);
+      }
+    });
+    await W.loadForecast(W.home());
+    const cur = W.current();
+    assert.ok(cur && cur.weather_code === 3 && Math.round(cur.temperature_2m) === 18);
+    assert.strictEqual(painted.n, 1);
+    assert.ok(calls.some(u => u.includes('open-meteo.com') && u.includes('latitude=-35.77')));
+    assert.ok(!calls.some(u => u.includes('workers.dev/weather')));
+    assert.ok(JSON.parse(localStorage.getItem('fxWx')).w.weather_code === 3);
+    assert.strictEqual(ls.get('wxNow').place, 'Onerahi');
+  }
+
+  {
+    const { W, calls, painted } = loadWx({
+      fetch(url) {
+        if (url.includes('open-meteo.com')) throw new Error('blocked');
+        if (url.includes('workers.dev/weather')) return { current: { temperature_2m: 17.6, weather_code: 3, wind_speed_10m: 13 } };
+        throw new Error(url);
+      }
+    });
+    await W.loadForecast(W.home());
+    assert.ok(W.current() && W.current().temperature_2m === 17.6);
+    assert.ok(calls.some(u => u.includes('open-meteo.com')));
+    assert.ok(calls.some(u => u.includes('workers.dev/weather')));
+    assert.strictEqual(painted.n, 1);
+  }
+
+  {
+    const { W, calls } = loadWx({
+      fetch(url) {
+        if (url.includes('open-meteo.com')) throw new Error('blocked');
+        throw new Error('relay must not be used for a far-away place: ' + url);
+      }
+    });
+    const cur = await W.loadForecast({ lat: -36.85, lon: 174.76, place: 'Auckland' });
+    assert.strictEqual(cur, null);
+    assert.ok(calls.filter(u => u.includes('open-meteo.com')).length >= 2, 'Open-Meteo is retried');
+    assert.ok(!calls.some(u => u.includes('workers.dev/weather')));
+  }
+
+  {
+    const { W, calls, localStorage } = loadWx({
+      fetch() { throw new Error('should use the parent cache, not the network'); }
+    });
+    localStorage.setItem('wx', JSON.stringify({ at: Date.now(), data: { current: { temperature_2m: 19, weather_code: 1 } } }));
+    assert.strictEqual(W.current().temperature_2m, 19);
+    assert.strictEqual(calls.length, 0);
+  }
+
+  {
+    const { W, ls, localStorage } = loadWx({
+      fetch() { throw new Error('must not use the Whangārei parent cache for Auckland'); }
+    });
+    ls.set('wxLoc', { at: Date.now(), lat: -36.85, lon: 174.76, place: 'Auckland' });
+    localStorage.setItem('wx', JSON.stringify({ at: Date.now(), data: { current: { temperature_2m: 19, weather_code: 1 } } }));
+    assert.strictEqual(W.placeName(), 'Auckland');
+    assert.strictEqual(W.usingHome(), false);
+    assert.strictEqual(W.current(), null);
+  }
+
+  {
+    const { W, ls, calls } = loadWx({
+      fetch(url) {
+        if (url.includes('open-meteo.com')) return { current: { temperature_2m: 16, weather_code: 2, wind_speed_10m: 8 } };
+        throw new Error(url);
+      }
+    });
+    ls.set('wxNow', { at: Date.now() - 1000, cur: { temperature_2m: 16, weather_code: 2 }, lat: -35.77, lon: 174.37, place: 'Onerahi' });
+    await W.loadForecast(W.home());
+    assert.strictEqual(calls.length, 0, 'a fresh forecast is not refetched');
+  }
+
+  {
+    let geoCalls = 0;
+    const { W } = loadWx({
+      geo: {
+        getCurrentPosition(ok, err) { geoCalls++; err({ code: 1, message: 'denied' }); }
+      },
+      fetch(url) {
+        if (url.includes('open-meteo.com') || url.includes('workers.dev/weather')) return { current: { temperature_2m: 18, weather_code: 3, wind_speed_10m: 10 } };
+        throw new Error(url);
+      }
+    });
+    const loc = await W.locate();
+    assert.strictEqual(loc.place, 'Onerahi');
+    assert.strictEqual(loc.denied, true);
+    assert.strictEqual(W.placeName(), 'Onerahi');
+    const again = await W.ensureLoc();
+    assert.strictEqual(again.denied, true);
+    assert.strictEqual(geoCalls, 1, 'permission is only asked once after a denial');
+  }
+
+  {
+    let geoCalls = 0;
+    const { W, ls, calls } = loadWx({
+      geo: {
+        getCurrentPosition(ok) { geoCalls++; ok({ coords: { latitude: -36.8509, longitude: 174.7645 } }); }
+      },
+      fetch(url) {
+        if (url.includes('photon.komoot.io')) return { features: [{ properties: { district: 'Auckland Central', city: 'Auckland' } }] };
+        if (url.includes('open-meteo.com') && url.includes('latitude=-36.8509')) return { current: { temperature_2m: 21.2, weather_code: 0, wind_speed_10m: 18 } };
+        throw new Error(url);
+      }
+    });
+    const loc = await W.locate();
+    assert.strictEqual(loc.place, 'Auckland Central');
+    assert.ok(W.current() && Math.round(W.current().temperature_2m) === 21 && W.current().weather_code === 0);
+    assert.ok(calls.some(u => u.includes('photon.komoot.io') && u.includes('lat=-36.8509')));
+    ls.set('wxLoc', { ...loc, at: Date.now() });
+    geoCalls = 0;
+    const cached = await W.ensureLoc();
+    assert.strictEqual(cached.place, 'Auckland Central');
+    assert.strictEqual(geoCalls, 0, 'a fresh cached location is not asked again');
+  }
+
+  {
+    const els = {};
+    function el(tag) {
+      const node = {
+        tagName: String(tag).toUpperCase(), id: '', className: '', innerHTML: '', textContent: '', style: {},
+        children: [], parentNode: null, dataset: {},
+        classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
+        setAttribute(k, v) { if (k === 'id') { this.id = v; els['#' + v] = this; } },
+        getAttribute(k) { return k === 'id' ? this.id : null; },
+        append(...n) { this.children.push(...n); },
+        appendChild(n) { this.children.push(n); if (n && n.id) els['#' + n.id] = n; return n; },
+        insertBefore(n) { this.children.unshift(n); if (n && n.id) els['#' + n.id] = n; return n; },
+        remove() { if (this.id) delete els['#' + this.id]; },
+        querySelector(sel) { return els[sel] || (this._map && this._map[sel]) || null; },
+        querySelectorAll() { return []; },
+        closest() { return null; }
+      };
+      return node;
+    }
+    const body = el('body');
+    const document = {
+      documentElement: { classList: { add() {}, toggle() {} } },
+      body,
+      createElement: el,
+      querySelector(sel) { return els[sel] || null; },
+      querySelectorAll() { return []; },
+      addEventListener() {},
+      getElementById(id) { return els['#' + id] || null; }
+    };
+    const hero = el('section'); hero.id = 'today-hero'; els['#today-hero'] = hero;
+    const kicker = el('div'); kicker.className = 'kicker'; kicker.textContent = 'This evening in Onerahi';
+    const deg = el('div'); deg.className = 'deg'; deg.textContent = '—';
+    const b = el('b'); b.textContent = '⛅ Looking up the weather';
+    const sm = el('small'); sm.textContent = 'Onerahi';
+    hero._map = { '.kicker': kicker, '.deg': deg, '.wxmeta b': b, '.wxmeta small': sm };
+    const tctx = {
+      document, window: {}, console, Date, Math, JSON, Object, Number, String, Array, Intl, setTimeout, clearTimeout,
+      addEventListener() {},
+      localStorage: { getItem() { return null; }, setItem() {} },
+      tab: 'photos',
+      ibWx: { placeName() { return 'Auckland Central'; }, usingHome() { return false; } },
+      wxCurrent() { return { temperature_2m: 21.2, weather_code: 0, wind_speed_10m: 18 }; }
+    };
+    tctx.window = tctx;
+    tctx.globalThis = tctx;
+    vm.createContext(tctx);
+    vm.runInContext(todaySrc, tctx);
+    const T = tctx.ibToday;
+    assert.ok(T.wxLabel(null).name === 'Looking up the weather' && T.wxLabel(3).name === 'Cloudy' && T.wxLabel(0).name === 'Mostly sunny');
+    const ev = T.nzParts(new Date('2026-11-21T04:19:00Z')); // 5:19pm NZDT
+    assert.strictEqual(ev.when, 'evening');
+    assert.strictEqual(ev.kicker, 'This evening in Auckland Central');
+    const html = T.heroHtml();
+    assert.ok(html.includes('This evening in Auckland Central') && html.includes('21°') && html.includes('Mostly sunny') && html.includes('Auckland Central'));
+    assert.ok(!html.includes('Looking up the weather'));
+    T.paintWx();
+    assert.strictEqual(kicker.textContent, 'This evening in Auckland Central');
+    assert.strictEqual(deg.textContent, '21°');
+    assert.ok(b.textContent.includes('Mostly sunny'));
+    assert.ok(sm.textContent.includes('Auckland Central'));
+  }
+
+  console.log('today weather location and loading fix ok');
+}
+
 // 1.9.210 Sugar Rush NZ map main screen
 {
   const SR = load('feed/sugar-rush.js').SugarRush;
