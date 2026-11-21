@@ -4349,6 +4349,123 @@ if (live) {
   console.log('today weather location and loading fix ok');
 }
 
+
+// Notifications tab: replace People in the bar, keep People in the menu, badge and sources.
+{
+  const notifSrc = fs.readFileSync('feed/notif.js', 'utf8');
+  const todaySrc = fs.readFileSync('feed/today.js', 'utf8');
+  const idx = fs.readFileSync('feed/index.html', 'utf8');
+  const sw = fs.readFileSync('feed/sw.js', 'utf8');
+  assert.ok(idx.includes('notif.js?v=1.9.302') && sw.includes("'notif.js?v=' + VERSION"));
+  assert.ok(todaySrc.includes('data-tab="notif"') && todaySrc.includes('ib-nbadge') && todaySrc.includes('data-mftab="people"'));
+  assert.ok(!/data-tab="people"/.test(todaySrc), 'People is no longer in the bottom tab bar');
+  assert.ok(todaySrc.includes('data-mftab="people"') && todaySrc.includes('data-mftab="notif"'), 'People and Notifications both stay in the ☰ menu');
+  assert.ok(todaySrc.includes('ibNotif.drawPage(true)'), 'opening the tab marks the current items seen');
+
+  const ctx = { console, Date, Math, JSON, Object, Number, String, Array, isFinite, encodeURIComponent, Intl, setTimeout, clearTimeout };
+  ctx.window = ctx;
+  ctx.globalThis = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(notifSrc, ctx);
+  const N = ctx.ibNotif;
+  const now = Date.parse('2026-11-21T05:12:00Z'); // 6:12pm NZDT
+
+  assert.strictEqual(N.badgeLabel(0), '');
+  assert.strictEqual(N.badgeLabel(1), '1');
+  assert.strictEqual(N.badgeLabel(9), '9');
+  assert.strictEqual(N.badgeLabel(10), '9+');
+  assert.strictEqual(N.badgeLabel(27), '9+');
+
+  const locHome = { lat: -35.77, lon: 174.37, place: 'Onerahi', fallback: true };
+  const locAkl = { lat: -36.85, lon: 174.76, place: 'Auckland' };
+  assert.ok(N.nearHome(-35.725, 174.32) && !N.nearHome(-36.85, 174.76));
+  assert.ok(N.localWarning({ wg: 1, area: 'Whangārei' }, locHome));
+  assert.ok(!N.localWarning({ wg: 1, area: 'Whangārei' }, locAkl));
+  assert.ok(N.localWarning({ area: 'Auckland and the Hauraki Gulf' }, locAkl));
+  assert.ok(N.localOutage({ kind: 'unplanned', areas: ['Onerahi'] }, locHome));
+  assert.ok(!N.localOutage({ kind: 'unplanned', areas: ['Onerahi'] }, locAkl));
+
+  const quakeNear = { properties: { publicID: '2026p1', time: new Date(now - 3600e3).toISOString(), magnitude: 4.2, mmi: 4, locality: '10 km east of Whangārei' }, geometry: { coordinates: [174.4, -35.75] } };
+  const quakeFar = { properties: { publicID: '2026p2', time: new Date(now - 3600e3).toISOString(), magnitude: 5.4, mmi: 6, locality: "Arthur's Pass" }, geometry: { coordinates: [171.78, -43.02] } };
+  const quakeSmall = { properties: { publicID: '2026p3', time: new Date(now - 3600e3).toISOString(), magnitude: 3.1, mmi: 3, locality: 'near Whangārei' }, geometry: { coordinates: [174.37, -35.77] } };
+  const quakeOld = { properties: { publicID: '2026p4', time: new Date(now - 10 * 864e5).toISOString(), magnitude: 5, mmi: 5, locality: 'near Whangārei' }, geometry: { coordinates: [174.37, -35.77] } };
+  assert.ok(N.keepQuake(quakeNear, locHome, now));
+  assert.ok(!N.keepQuake(quakeFar, locHome, now), 'a South Island quake is outside 300 km');
+  assert.ok(!N.keepQuake(quakeSmall, locHome, now), 'smaller than MMI 4 and magnitude 4 is left out');
+  assert.ok(!N.keepQuake(quakeOld, locHome, now));
+
+  const items = N.collect({
+    now,
+    loc: locHome,
+    cal: [{ id: 'c1', title: 'School pickup', date: '2026-11-21', time: '19:00', at: Date.parse('2026-11-21T06:00:00Z') }],
+    todos: [
+      { id: 't1', title: 'Take out the recycling', done: false, updated: now - 6 * 864e5, created: now - 20 * 864e5 },
+      { id: 't2', title: 'Fresh tick', done: false, updated: now - 2 * 864e5 },
+      { id: 't3', title: 'Already done', done: true, updated: now - 10 * 864e5 }
+    ],
+    shares: [
+      { id: 11, card: 'sh11', name: 'Sarah', at: now - 2 * 3600e3, up: 1 },
+      { id: 12, card: 'sh12', name: 'Shane', at: now - 3600e3, mine: true, text: 1 }
+    ],
+    me: { id: 'm-shane', name: 'Shane' },
+    wx: [{ id: 'w1', wg: 1, colour: 'orange', head: 'Heavy rain - Orange', area: 'Whangārei', onset: now - 1800e3, expires: now + 864e5, web: 'https://www.metservice.com/warnings/home' }],
+    pwr: [{ id: 'p1', kind: 'unplanned', areas: ['Onerahi'], start: now - 900e3, title: 'Onerahi' }],
+    lives: { pending: 1, family: [{ key: 'abc', name: 'Sarah Jenkins', asked: true, sent: false }] },
+    scrabble: { yourTurn: 1, games: [{ id: 'g0123456789abcdef', yourTurn: true, over: false, players: [{ me: true, name: 'Shane' }, { name: 'Sarah Jenkins' }] }] },
+    quakes: { features: [quakeNear, quakeFar, quakeSmall] }
+  }, { read: {}, cleared: {} });
+
+  const kinds = items.map(i => i.kind);
+  assert.ok(kinds.includes('cal') && kinds.includes('todo') && kinds.includes('story') && kinds.includes('wx') && kinds.includes('power') && kinds.includes('lives') && kinds.includes('scrabble') && kinds.includes('quake'));
+  assert.ok(!items.some(i => i.id === 'todo:t2' || i.id === 'todo:t3'), 'fresh or done to-dos do not notify');
+  assert.ok(!items.some(i => i.id === 'sh:12' || (i.kind === 'story' && /Shane/.test(i.title))), 'your own posts are not listed');
+  assert.ok(items.find(i => i.kind === 'story').title.includes('Sarah'));
+  assert.ok(items.find(i => i.kind === 'scrabble').title.includes('Sarah'));
+  assert.ok(items.find(i => i.kind === 'lives' && i.id === 'lv-ask:abc').title.includes('Sarah'));
+  assert.ok(items.find(i => i.id === 'lv-pend'));
+  assert.ok(items.find(i => i.kind === 'todo').title.includes('recycling'));
+  assert.ok(items.find(i => i.kind === 'quake').title.includes('4.2'));
+  assert.ok(!items.some(i => i.id === 'qk:2026p2'));
+  assert.strictEqual(N.unreadOf(items), items.length);
+
+  const afterOpen = N.collect({
+    now, loc: locHome, cal: [{ id: 'c1', title: 'School pickup', date: '2026-11-21', time: '19:00', at: Date.parse('2026-11-21T06:00:00Z') }],
+    todos: [], shares: [], me: { id: 'm-shane', name: 'Shane' }, wx: [], pwr: [], lives: null, scrabble: { yourTurn: 0 }, quakes: { features: [] }
+  }, { read: { 'cal:c1': now }, cleared: {} });
+  assert.strictEqual(afterOpen.length, 1);
+  assert.strictEqual(afterOpen[0].read, true);
+  assert.strictEqual(N.unreadOf(afterOpen), 0);
+  assert.strictEqual(N.badgeLabel(N.unreadOf(afterOpen)), '');
+
+  const afterClear = N.collect({
+    now, loc: locHome, cal: [{ id: 'c1', title: 'School pickup', date: '2026-11-21', time: '19:00', at: Date.parse('2026-11-21T06:00:00Z') }],
+    todos: [], shares: [], wx: [], pwr: [], lives: null, scrabble: { yourTurn: 0 }, quakes: { features: [] }
+  }, { read: {}, cleared: { 'cal:c1': now } });
+  assert.strictEqual(afterClear.length, 0);
+
+  const akl = N.collect({
+    now, loc: locAkl,
+    wx: [{ id: 'w1', wg: 1, colour: 'orange', head: 'Heavy rain', area: 'Whangārei', expires: now + 864e5 }],
+    pwr: [{ id: 'p1', kind: 'unplanned', areas: ['Onerahi'] }],
+    cal: [], todos: [], shares: [], quakes: { features: [quakeNear] }
+  }, { read: {}, cleared: {} });
+  assert.ok(!akl.some(i => i.kind === 'wx' || i.kind === 'power'), 'Whangārei warnings and Northpower cuts stay off for Auckland');
+
+  // urgent things (quake, outage, red warning) sit above a to-do
+  const ranked = N.collect({
+    now, loc: locHome,
+    todos: [{ id: 't1', title: 'Old job', done: false, updated: now - 8 * 864e5 }],
+    pwr: [{ id: 'p1', kind: 'unplanned', areas: ['Onerahi'], start: now - 1000 }],
+    quakes: { features: [quakeNear] },
+    cal: [], shares: [], wx: []
+  }, { read: {}, cleared: {} });
+  assert.ok(ranked.findIndex(i => i.kind === 'quake') < ranked.findIndex(i => i.kind === 'todo'));
+  assert.ok(ranked.findIndex(i => i.kind === 'power') < ranked.findIndex(i => i.kind === 'todo'));
+
+  console.log('notifications tab and sources ok');
+}
+
+
 // 1.9.210 Sugar Rush NZ map main screen
 {
   const SR = load('feed/sugar-rush.js').SugarRush;
