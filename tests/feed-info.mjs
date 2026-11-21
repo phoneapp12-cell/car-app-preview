@@ -4391,6 +4391,11 @@ if (live) {
   assert.ok(!/data-tab="people"/.test(todaySrc), 'People is no longer in the bottom tab bar');
   assert.ok(todaySrc.includes('data-mftab="people"') && todaySrc.includes('data-mftab="notif"'), 'People and Notifications both stay in the ☰ menu');
   assert.ok(todaySrc.includes('ibNotif.drawPage(true)'), 'opening the tab marks the current items seen');
+  const todayCss = fs.readFileSync('feed/today.css', 'utf8');
+  const tabBtn = todaySrc.match(/data-tab="notif"[^>]*>[\s\S]*?<\/button>/);
+  assert.ok(tabBtn && tabBtn[0].includes('<svg') && tabBtn[0].includes('currentColor') && !tabBtn[0].includes('🔔'), 'the tab bar uses a monochrome SVG bell, not a colour emoji');
+  assert.ok(/\.ib-tabs\s+\.ib-nbell\{[^}]*height:\s*1\.2em/.test(todayCss) && !/\.ib-tabs\s+\.ib-nbell\{[^}]*display:\s*inline-block/.test(todayCss), 'the bell stacks in the same icon box as the other tabs');
+  assert.ok(/\.ib-nbadge\{[^}]*position:\s*absolute/.test(todayCss) && /\.ib-tabs\s+\.ib-nbell\{[^}]*position:\s*relative/.test(todayCss), 'the count bubble stays on the bell');
 
   const ctx = { console, Date, Math, JSON, Object, Number, String, Array, isFinite, encodeURIComponent, Intl, setTimeout, clearTimeout };
   ctx.window = ctx;
