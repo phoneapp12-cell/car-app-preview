@@ -79,6 +79,7 @@
     'samoa': [['🏠', 'Open-sided fale homes'], ['🌊', 'To Sua Ocean Trench swimming hole'], ['🌄', 'Among the first places to see each day']],
     'sydney': [['🎭', 'The Opera House has sail-shaped roofs'], ['🌉', 'Harbour Bridge, nicknamed the Coathanger'], ['⛴️', 'Ferries criss-cross the harbour']],
     'sydney lolly shop': [['🍭', 'A side-path sweet shop just after the Sydney stop'], ['🎭', 'The Opera House sails sit across the harbour'], ['🌉', 'The Harbour Bridge is the shop\'s back-window view']],
+    'punanga nui market': [['🏮', 'A sunset side path just after the Rarotonga stop'], ['🛶', 'A vaka of sweets comes ashore at the lagoon'], ['🥁', 'Stallholders call out baskets as the drums pick up']],
     'gold coast': [['🏖️', 'Long golden beaches'], ['🏙️', 'High-rise towers along the beachfront'], ['🌿', 'Rainforest in the hills behind']],
     'perth': [['🦢', 'Black swans on the Swan River'], ['🐾', 'Quokkas live on nearby Rottnest Island'], ['🌳', 'Kings Park, a huge inner-city park']],
     'adelaide': [['🟩', 'A city planned around leafy squares'], ['🐸', 'Home of the frog cake'], ['🍇', 'Barossa Valley vineyards nearby']],

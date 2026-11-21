@@ -1481,6 +1481,47 @@
     const next = Object.assign({}, p, { open: Math.max(p.open | 0, SHOP_REJOIN) });
     return next;
   }
+  // 1.9.313 Island Night Market: a Cook Islands side path after Rarotonga (17) that rejoins at Tonga (18).
+  const MARKET_FROM = 17, MARKET_REJOIN = 18;
+  const MARKET_SECONDS = 150, MARKET_BONUS_SEC = 8, MARKET_COINS = 10, MARKET_TEMPO_MAX = 1.28;
+  const MARKET_FACES = ['🧒', '👧', '👦', '👩', '👨', '🧑', '🌺'];
+  const MARKET_NAMES = ['Tia', 'Mii', 'Tere', 'Ani', 'Kura', 'Tama', 'Aunty Nga', 'Little Teu', 'Moana', 'Rima'];
+  const MARKET_SWEETS = ['cherry gumdrops', 'orange jellies', 'lemon drops', 'pineapple chews', 'lagoon gems', 'grape twists'];
+  const MARKET_STOP = {
+    id: 'island-market',
+    place: 'Punanga Nui Market',
+    name: 'Island Night Market',
+    kind: 'market',
+    label: 'below',
+    // World-map coordinates (same space as live MAP_STOPS / the Sydney shop pin).
+    // Rarotonga sits at about 771,1923 and Tonga at 639,1923; hook south of that
+    // road so the detour is clear of Samoa (668,1842) and of Rarotonga's label.
+    x: 704, y: 2088,
+    via: [{ x: 745, y: 2000 }],
+    lat: -21.205, lon: -159.81, nudged: true
+  };
+  function marketFromStop() { return MAP_STOPS[MARKET_FROM - 1]; }
+  function marketRejoinStop() { return MAP_STOPS[MARKET_REJOIN - 1]; }
+  function marketSideStops() {
+    const from = marketFromStop(), rejoin = marketRejoinStop();
+    if (!from || !rejoin) return [];
+    return [from, Object.assign({}, MARKET_STOP), Object.assign({}, rejoin, { via: [{ x: 655, y: 2000 }] })];
+  }
+  function marketSidePath() { return icingPath(marketSideStops()); }
+  function marketIsOpen(p) {
+    p = p || {};
+    const stars = p.stars || [];
+    return (stars[MARKET_FROM - 1] || 0) > 0 || ((p.open | 0) >= MARKET_REJOIN);
+  }
+  function marketUnlockRejoin(p) {
+    p = p || { open: 1, stars: [], best: [], badges: [], wins: 0 };
+    const next = Object.assign({}, p, { open: Math.max(p.open | 0, MARKET_REJOIN) });
+    return next;
+  }
+  function isSideRush(st) {
+    const lv = st && st.lv;
+    return !!(st && (st.shopRush || st.marketRush || (lv && (lv.shopRush || lv.marketRush))));
+  }
   // 1.9.222 Australia outline (from real coastline points; x = lon, y = lat, scaled into the map).
   const AUS_PATH = 'M 28 1932 L 32 1960 L 33 1976 L 38 2004 L 41 2020 L 47 2040 L 47 2058 L 41 2067 L 54 2075 L 67 2075 L 84 2063 L 114 2063 L 136 2045 L 162 2038 L 179 2036 L 196 2043 L 206 2052 L 218 2073 L 226 2062 L 236 2053 L 237 2071 L 243 2073 L 242 2082 L 252 2097 L 261 2108 L 273 2112 L 286 2117 L 296 2109 L 304 2114 L 311 2120 L 321 2108 L 341 2102 L 344 2082 L 353 2062 L 364 2044 L 370 2026 L 373 2005 L 370 1989 L 368 1970 L 355 1954 L 349 1938 L 335 1921 L 325 1910 L 310 1897 L 307 1877 L 303 1860 L 302 1850 L 291 1846 L 285 1828 L 278 1808 L 273 1822 L 270 1840 L 269 1860 L 263 1882 L 252 1881 L 239 1873 L 226 1864 L 218 1855 L 221 1840 L 229 1824 L 220 1822 L 205 1821 L 193 1815 L 181 1823 L 172 1833 L 167 1854 L 155 1858 L 144 1846 L 132 1850 L 120 1868 L 115 1880 L 103 1887 L 95 1903 L 76 1910 L 58 1917 L 46 1921 L 34 1931 Z';
   const TAS_PATH = 'M 296 2138 L 312 2142 L 328 2140 L 328 2154 L 323 2165 L 315 2170 L 307 2167 L 301 2154 L 297 2143 Z';
@@ -1752,6 +1793,9 @@
       '<path id="sr-shop-path-border" d="" fill="none" stroke="#fff" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 8" opacity=".9"/>' +
       '<path id="sr-shop-path" d="" fill="none" stroke="#7c3aed" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 8" opacity=".95"/>' +
       '<path id="sr-shop-path-icing" d="" fill="none" stroke="url(#sr-icing)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path id="sr-market-path-border" d="" fill="none" stroke="#fff" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 8" opacity=".9"/>' +
+      '<path id="sr-market-path" d="" fill="none" stroke="#0f766e" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 8" opacity=".95"/>' +
+      '<path id="sr-market-path-icing" d="" fill="none" stroke="url(#sr-icing)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>' +
       '<g id="sr-travel-plane" display="none" pointer-events="none" filter="url(#sr-soft)"><g transform="scale(1.7)"><circle r="24" fill="#fff6c8" fill-opacity=".92" stroke="#fff" stroke-width="4"/><circle r="18" fill="none" stroke="#ff6fa8" stroke-width="2.5"/><path d="M0 -14 L3 -4 L14 2 L14 5 L3 2 L2 10 L6 13 L6 15 L0 13 L-6 15 L-6 13 L-2 10 L-3 2 L-14 5 L-14 2 L-3 -4 Z" fill="#fff" stroke="#2878c8" stroke-width="2"/></g></g>' +
       '<g id="sr-travel-car" display="none" pointer-events="none" filter="url(#sr-soft)"><ellipse cx="0" cy="11" rx="27" ry="6" fill="#3e6674" opacity=".28"/><path d="M-25 5 L-23 -4 Q-22 -7 -17 -8 L-10 -10 L-4 -20 Q-2 -22 2 -22 L12 -22 Q16 -21 18 -17 L24 -8 L29 -5 Q31 -3 31 2 L29 7 Q28 10 24 10 L-20 10 Q-25 9 -25 5 Z" fill="#ee4055" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/><path d="M-8 -10 L-3 -18 Q-2 -19 1 -19 L5 -19 L5 -10 Z M8 -19 L12 -19 Q14 -18 16 -15 L19 -10 L8 -10 Z" fill="#bceeff" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/><path d="M-22 -2 L-17 -5 M24 -2 L28 0" fill="none" stroke="#fff6c8" stroke-width="2.3" stroke-linecap="round"/><circle cx="-15" cy="9" r="6" fill="#3e3844" stroke="#fff" stroke-width="1.7"/><circle cx="18" cy="9" r="6" fill="#3e3844" stroke="#fff" stroke-width="1.7"/><circle cx="-15" cy="9" r="2.5" fill="#dcebf0"/><circle cx="18" cy="9" r="2.5" fill="#dcebf0"/><path d="M-9 -21 Q2 -24 12 -21" fill="none" stroke="#ffb0b4" stroke-width="2" stroke-linecap="round"/></g>' +
       '</svg>'
@@ -2337,7 +2381,7 @@
   }
   function goalsMet(st) {
     const lv = st.lv || LEVEL;
-    if (st.shopRush || (lv && lv.shopRush)) return false;
+    if (isSideRush(st) || (lv && (lv.shopRush || lv.marketRush))) return false;
     if (st.challenge) return Array.isArray(st.postcardFound) && st.postcardFound.length >= POSTCARD_COUNT;
     // Score is never the win condition — only objectives are.
     if (lv.jelly && jellyLeft(st) > 0) return false;
@@ -2478,6 +2522,7 @@
     if (st.timerMsLeft <= 0) {
       st.timerLeft = 0;
       if (st.shopRush || (st.lv && st.lv.shopRush)) finishShopShift(st);
+      else if (st.marketRush || (st.lv && st.lv.marketRush)) finishMarketShift(st);
       else {
         st.over = true;
         st.timerExpired = true;
@@ -2571,7 +2616,7 @@
     return out;
   }
   function finishIfDone(st) {
-    if (st.shopRush || (st.lv && st.lv.shopRush)) return;
+    if (isSideRush(st) || (st.lv && (st.lv.shopRush || st.lv.marketRush))) return;
     if (st.fuseBlown) { st.over = true; st.won = false; st.stars = 0; return; }
     const reached = goalsMet(st);
     // Score-only levels (including level 1) play out every move, then award the win.
@@ -2988,7 +3033,9 @@
     // 1.9.227 More room: reverb RT60 ~1.4 s and echoes at 120/260/420 ms, about 34% wet, ~0.9 s tail inside each clip.
     'sugar-rush-say-f.m4a': 'c16ab81b', 'sugar-rush-say-f.mp3': '25067d1f',
     'sugar-rush-say-m.m4a': '9e645d94', 'sugar-rush-say-m.mp3': '8e05c831',
-    'sugar-rush-shop-bell.mp3': '17a691af', 'sugar-rush-shop-chaching.mp3': '65082481', 'sugar-rush-shop-hmph.mp3': '04da5505'
+    'sugar-rush-shop-bell.mp3': '17a691af', 'sugar-rush-shop-chaching.mp3': '65082481', 'sugar-rush-shop-hmph.mp3': '04da5505',
+    'sugar-rush-market-call.mp3': '8f3686d1', 'sugar-rush-market-basket.mp3': '9d329487',
+    'sugar-rush-market.mp3': '1acbd24c'
   };
   // 1.9.225 Spoken sayings as recorded clips, a female voice (Microsoft neural "Molly", en-NZ) and a male one
   // ("Mitchell", en-NZ), so the game mixes the two reliably instead of relying on the phone's voices.
@@ -3057,7 +3104,7 @@
   const SONG_PLAN = { india: [38, 39, 46, 47], aussie: [20, 21, 22, 23, 24, 25, 32, 33], intense: [13, 15, 19, 52, 75], calm: [10, 17, 18], upbeat: [3, 4, 5, 6, 7, 8, 9, 11, 12, 14, 16, 26] };
   // "Sugar Rush travel" (~136 BPM, the loudest and punchiest) drives the designated Hard stages; country tracks remain mapped separately.
   // "Sugar Rush Kiss" (~89 BPM, the softest, "let it linger") floats over the Pacific islands; "Sugar Rush" ("now I can't sit still") for the rest.
-  const SONG_FILES = { india: 'sugar-rush-india.mp3', aussie: 'sugar-rush-aussie.mp3', intense: 'sugar-rush-travel.m4a', calm: 'sugar-rush-kiss.m4a', upbeat: 'sugar-rush-song.m4a' };
+  const SONG_FILES = { india: 'sugar-rush-india.mp3', aussie: 'sugar-rush-aussie.mp3', intense: 'sugar-rush-travel.m4a', calm: 'sugar-rush-kiss.m4a', upbeat: 'sugar-rush-song.m4a', market: 'sugar-rush-market.mp3' };
   const SONG_FROM = 3;
   function songMood(level) {
     if (!(level >= SONG_FROM)) return null;
@@ -5059,6 +5106,141 @@
     st.score = st.shop.coins | 0;
     return st;
   }
+  function marketSweetName(color) { return MARKET_SWEETS[color] || shopShortName(color); }
+  function marketOrderLabel(order) {
+    if (!order) return '';
+    const bits = [];
+    (order.candies || []).forEach(function (item) {
+      bits.push(item.n + ' ' + marketSweetName(item.color));
+    });
+    (order.specials || []).forEach(function (item) {
+      bits.push(item.n + ' ' + (item.kind === 'w' ? 'wrapped sweet' : 'striped sweet') + (item.n > 1 ? 's' : ''));
+    });
+    if (!bits.length) return '';
+    if (bits.length === 1) return bits[0] + '!';
+    return bits.slice(0, -1).join(', ') + ' and ' + bits[bits.length - 1] + '!';
+  }
+  function makeMarketOrder(rand) {
+    const r = typeof rand === 'function' ? rand : rng(rand == null ? 1 : rand);
+    const pick = function (a, b) { return a + Math.floor(r() * (b - a + 1)); };
+    const color = pick(0, KINDS - 1);
+    let candies, specials = [];
+    if (r() < 0.55) {
+      candies = [{ color: color, n: pick(5, 8) }];
+      if (r() < 0.3) specials = [{ kind: 'stripe', n: 1 }];
+    } else {
+      let color2 = pick(0, KINDS - 1);
+      if (color2 === color) color2 = (color + 3) % KINDS;
+      candies = [{ color: color, n: pick(4, 6) }, { color: color2, n: pick(3, 5) }];
+    }
+    const order = {
+      id: pick(1, 1e9),
+      name: MARKET_NAMES[pick(0, MARKET_NAMES.length - 1)],
+      face: MARKET_FACES[pick(0, MARKET_FACES.length - 1)],
+      candies: candies.map(function (c) { return { color: c.color, n: c.n, left: c.n }; }),
+      specials: specials.map(function (s) { return { kind: s.kind, n: s.n, left: s.n }; }),
+      coins: MARKET_COINS
+    };
+    order.call = marketOrderLabel(order);
+    order.label = order.call;
+    return order;
+  }
+  function marketOrderDone(order) { return shopOrderDone(order); }
+  function marketGlowColors(market) {
+    const front = market && market.queue && market.queue[0];
+    if (!front) return [];
+    return (front.candies || []).filter(function (c) { return c.left > 0; }).map(function (c) { return c.color; });
+  }
+  function newMarketState(rand) {
+    const r = typeof rand === 'function' ? rand : rng(rand == null ? Date.now() : rand);
+    return {
+      queue: [makeMarketOrder(r), makeMarketOrder(r), makeMarketOrder(r)],
+      served: 0,
+      coins: 0,
+      nightMs: 0,
+      events: []
+    };
+  }
+  function fillMarketOrder(market, candyDelta, specialDelta) {
+    const front = market && market.queue && market.queue[0];
+    if (!front || market.closed) return { filled: false };
+    candyDelta = candyDelta || [];
+    specialDelta = specialDelta || {};
+    let used = false;
+    (front.candies || []).forEach(function (item) {
+      const got = candyDelta[item.color] || 0;
+      if (got > 0 && item.left > 0) {
+        const n = Math.min(item.left, got);
+        item.left -= n;
+        candyDelta[item.color] -= n;
+        used = true;
+      }
+    });
+    (front.specials || []).forEach(function (item) {
+      let got = 0;
+      if (item.kind === 'stripe') got = (specialDelta.row || 0) + (specialDelta.col || 0);
+      else got = specialDelta[item.kind] || 0;
+      if (got > 0 && item.left > 0) {
+        const n = Math.min(item.left, got);
+        item.left -= n;
+        if (item.kind === 'stripe') { specialDelta.row = 0; specialDelta.col = 0; }
+        else specialDelta[item.kind] -= n;
+        used = true;
+      }
+    });
+    if (marketOrderDone(front)) {
+      market.queue.shift();
+      market.served += 1;
+      market.coins += front.coins;
+      return { filled: true, served: true, order: front, coins: front.coins, bonusSec: MARKET_BONUS_SEC };
+    }
+    return { filled: used, served: false };
+  }
+  function marketAddStall(market, rand) {
+    if (!market || market.closed) return null;
+    const order = makeMarketOrder(rand);
+    market.queue.push(order);
+    while (market.queue.length > 3) market.queue.pop();
+    return order;
+  }
+  function tickMarket(market, dt, rand) {
+    const ev = [];
+    if (!market || market.closed) return ev;
+    market.nightMs = (market.nightMs || 0) + Math.max(0, dt);
+    while (market.queue.length < 3) {
+      const n = marketAddStall(market, rand);
+      if (!n) break;
+      ev.push({ type: 'call', order: n });
+    }
+    return ev;
+  }
+  function marketTempoRate(st) {
+    const night = Math.min(1, ((st && st.market && st.market.nightMs) || 0) / (MARKET_SECONDS * 1000));
+    return 1 + (MARKET_TEMPO_MAX - 1) * night;
+  }
+  function marketLevel() {
+    return {
+      n: 0,
+      id: 'island-market',
+      name: 'Island Night Market · Rarotonga',
+      target: 0,
+      moves: 999,
+      timer: MARKET_SECONDS,
+      stars: [0, 0, 0],
+      kinds: 6,
+      marketRush: true
+    };
+  }
+  function finishMarketShift(st) {
+    if (!st || !st.market) return st;
+    st.market.closed = true;
+    st.over = true;
+    st.timerExpired = true;
+    st.won = (st.market.served | 0) >= 1;
+    st.stars = st.won ? (st.market.served >= 8 ? 3 : st.market.served >= 4 ? 2 : 1) : 0;
+    st.score = st.market.coins | 0;
+    return st;
+  }
   function spinPick(rand) { const r = typeof rand === 'function' ? rand() : Math.random(); return Math.min(SPIN_PRIZES.length - 1, Math.floor(r * SPIN_PRIZES.length)); }
   // Segment i is centred at i * (360 / count) degrees clockwise from the top pointer.
   // Returns the wheel's final rotation (degrees, clockwise) so that segment i lands under the pointer.
@@ -5213,6 +5395,34 @@
   root.SugarRush.tickShop = tickShop;
   root.SugarRush.shopLevel = shopLevel;
   root.SugarRush.finishShopShift = finishShopShift;
+  root.SugarRush.MARKET_FROM = MARKET_FROM;
+  root.SugarRush.MARKET_REJOIN = MARKET_REJOIN;
+  root.SugarRush.MARKET_SECONDS = MARKET_SECONDS;
+  root.SugarRush.MARKET_BONUS_SEC = MARKET_BONUS_SEC;
+  root.SugarRush.MARKET_COINS = MARKET_COINS;
+  root.SugarRush.MARKET_TEMPO_MAX = MARKET_TEMPO_MAX;
+  root.SugarRush.MARKET_STOP = MARKET_STOP;
+  root.SugarRush.MARKET_SWEETS = MARKET_SWEETS;
+  root.SugarRush.marketFromStop = marketFromStop;
+  root.SugarRush.marketRejoinStop = marketRejoinStop;
+  root.SugarRush.marketSideStops = marketSideStops;
+  root.SugarRush.marketSidePath = marketSidePath;
+  root.SugarRush.marketIsOpen = marketIsOpen;
+  root.SugarRush.marketUnlockRejoin = marketUnlockRejoin;
+  root.SugarRush.isSideRush = isSideRush;
+  root.SugarRush.marketSweetName = marketSweetName;
+  root.SugarRush.marketOrderLabel = marketOrderLabel;
+  root.SugarRush.makeMarketOrder = makeMarketOrder;
+  root.SugarRush.marketOrderDone = marketOrderDone;
+  root.SugarRush.marketGlowColors = marketGlowColors;
+  root.SugarRush.newMarketState = newMarketState;
+  root.SugarRush.fillMarketOrder = fillMarketOrder;
+  root.SugarRush.marketAddStall = marketAddStall;
+  root.SugarRush.tickMarket = tickMarket;
+  root.SugarRush.marketTempoRate = marketTempoRate;
+  root.SugarRush.marketLevel = marketLevel;
+  root.SugarRush.finishMarketShift = finishMarketShift;
+
 
   if (!root.document) return;
   const doc = root.document;
@@ -5300,6 +5510,10 @@
     if (!hold) return;
     const on = !!(st && st.shopRush && st.shop);
     hold.hidden = !on;
+    if (on) {
+      if ($('marketqueue')) $('marketqueue').hidden = true;
+      if ($('markettakings')) $('markettakings').hidden = true;
+    }
     if (!on) return;
     const shop = st.shop;
     hold.innerHTML = (shop.queue || []).slice(0, 3).map(function (c, i) {
@@ -5415,7 +5629,7 @@
     if ($('goalban')) $('goalban').hidden = true;
     if ($('goalnext')) $('goalnext').hidden = true;
     hideTutUi(); hideRecap(); hideHardBan();
-    doc.body.classList.remove('onmap', 'onpostcards', 'oncrush', 'sarah', 'hard1', 'hard2', 'postcard-game');
+    doc.body.classList.remove('onmap', 'onpostcards', 'oncrush', 'sarah', 'hard1', 'hard2', 'postcard-game', 'marketrush');
     doc.body.classList.add('ingame', 'shoprush');
     screen = 'game';
     loadSayClips();
@@ -5472,6 +5686,207 @@
       });
     } else go();
   }
+  const MARKET_KEY = 'ib-sugar-island-night-market';
+  let marketBoard = null;
+  function loadMarketBoard() { marketBoard = normalizeShopBoard(ls.get(MARKET_KEY, null), Date.now(), shopWho()); return marketBoard; }
+  function saveMarketBoard() { ls.set(MARKET_KEY, marketBoard); }
+  loadMarketBoard();
+  function marketMemberRow() {
+    const k = shopMemberKey();
+    return marketBoard && marketBoard.members ? marketBoard.members[k] : null;
+  }
+  function playMarketSfx(kind) {
+    runAudio(function () {
+      if (!soundOn) return;
+      const k = kind === 'call' ? 'market_call' : 'market_basket';
+      loadBuf(k).then(function (buf) {
+        if (buf && ac && out) playClip(ac, out, buf, ac.currentTime + 0.01, 1, 0.7);
+      });
+    });
+  }
+  function applyMarketTempo() {
+    if (!musicSrc || !st || !st.marketRush || !ac) return;
+    const rate = marketTempoRate(st);
+    try { musicSrc.playbackRate.setTargetAtTime(rate, ac.currentTime, 0.3); }
+    catch (e) { try { musicSrc.playbackRate.value = rate; } catch (e2) { } }
+  }
+  function paintMarketQueue() {
+    const hold = $('marketqueue');
+    if (!hold) return;
+    const on = !!(st && st.marketRush && st.market);
+    hold.hidden = !on;
+    if ($('shopqueue') && on) $('shopqueue').hidden = true;
+    if (!on) return;
+    const market = st.market;
+    hold.innerHTML = (market.queue || []).slice(0, 3).map(function (c, i) {
+      const cls = 'marketstall' + (i === 0 ? ' front' : '');
+      const left = [];
+      (c.candies || []).forEach(function (item) {
+        if (item.left > 0) left.push('<span class="marketneed">' + item.left + ' ' + marketSweetName(item.color) + '</span>');
+      });
+      (c.specials || []).forEach(function (item) {
+        if (item.left > 0) left.push('<span class="marketneed">' + item.left + ' ' + (item.kind === 'w' ? 'wrapped' : 'striped') + '</span>');
+      });
+      const call = i === 0 ? '<b class="markettag">' + (c.name || 'Stall') + ' calls</b>' : '';
+      return '<div class="' + cls + '" data-front="' + (i === 0 ? '1' : '0') + '"><span class="marketface" aria-hidden="true">' + c.face + '</span><span class="marketwho">' + c.name + (i === 0 ? ' · front basket' : '') + '</span>' + call + '<span class="marketorder">' + (i === 0 ? (c.call || marketOrderLabel(c)) : (left.join(' · ') || 'Done!')) + '</span></div>';
+    }).join('');
+    const take = $('markettakings');
+    if (take) {
+      take.hidden = false;
+      take.innerHTML = '<b>' + (market.coins || 0) + '</b> coins · <span>' + (market.served || 0) + ' baskets</span>';
+    }
+    if ($('shoptakings')) $('shoptakings').hidden = true;
+  }
+  function paintMarketBoard(showOv) {
+    loadMarketBoard();
+    const table = shopScoreRows(marketBoard, Date.now());
+    const html = !table.rows.length
+      ? '<p class="marketempty">Fill a basket to start today’s market takings.</p>'
+      : '<ol>' + table.rows.map(function (r) {
+        return '<li class="' + (r.key === shopMemberKey() ? 'mine' : '') + '">' +
+          '<span class="sb-name">' + (r.crown ? '👑 ' : '') + r.name + '</span>' +
+          '<span class="sb-today">' + r.todayCustomers + ' baskets · ' + r.todayCoins + ' coins today</span>' +
+          '<span class="sb-week">' + r.weekCoins + ' this week</span></li>';
+      }).join('') + '</ol>';
+    const noteTx = table.crown
+      ? (table.crown.name + ' wears the crown this week for last week’s best takings. The week resets on Sunday.')
+      : 'Weekly takings reset on Sunday. The top seller gets a crown next week.';
+    Array.prototype.forEach.call(doc.querySelectorAll('#marketboard .shopboardlist, #marketboardov .shopboardlist, .marketboardlist'), function (body) { body.innerHTML = html; });
+    Array.prototype.forEach.call(doc.querySelectorAll('#marketboard .shopboardnote, #marketboardov .shopboardnote, .marketboardnote'), function (note) { note.textContent = noteTx; });
+    const panel = $('marketboard');
+    if (panel) panel.hidden = false;
+    const ov = $('marketboardov');
+    if (ov && showOv) ov.hidden = false;
+  }
+  function hideMarketBoard() {
+    if ($('marketboardov')) $('marketboardov').hidden = true;
+  }
+  function applyMarketMatches() {
+    if (!st || !st.marketRush || !st.market || st.over) return null;
+    const last = st._marketSnap;
+    if (!last) {
+      st._marketSnap = { collected: (st.collected || []).slice(), specials: Object.assign({}, st.specialsMade || {}) };
+      return null;
+    }
+    const candyDelta = [];
+    for (let i = 0; i < KINDS; i++) candyDelta[i] = Math.max(0, (st.collected[i] || 0) - (last.collected[i] || 0));
+    const specialDelta = {};
+    Object.keys(st.specialsMade || {}).forEach(function (k) {
+      specialDelta[k] = Math.max(0, (st.specialsMade[k] || 0) - (last.specials[k] || 0));
+    });
+    st._marketSnap = { collected: (st.collected || []).slice(), specials: Object.assign({}, st.specialsMade || {}) };
+    const res = fillMarketOrder(st.market, candyDelta, specialDelta);
+    if (res && res.served) {
+      addShopTime(res.bonusSec);
+      playMarketSfx('basket');
+      addText('+' + res.bonusSec + 's  +' + res.coins + ' coins', W / 2, W * .16, 22, '#0f766e');
+      addText(res.order && res.order.call ? res.order.call : 'Basket filled!', W / 2, W * .26, 20, '#c2410c');
+      const next = marketAddStall(st.market, st.rand);
+      if (next) playMarketSfx('call');
+      while (st.market.queue.length < 3) marketAddStall(st.market, st.rand);
+    }
+    paintMarketQueue();
+    hud();
+    return res;
+  }
+  function handleMarketTicks(dt) {
+    if (!st || !st.marketRush || !st.market || st.over || livePaused) return;
+    st.market.nightMs = (st.market.nightMs || 0) + Math.max(0, dt);
+    applyMarketTempo();
+    const ev = tickMarket(st.market, 0, st.rand);
+    ev.forEach(function (e) {
+      if (e.type === 'call') {
+        playMarketSfx('call');
+        addText((e.order.name || 'A stall') + ': ' + (e.order.call || marketOrderLabel(e.order)), W / 2, W * .16, 20, '#0f766e');
+      }
+    });
+    if (ev.length) paintMarketQueue();
+  }
+  function recordMarketShift() {
+    if (!st || !st.market || st.market.recorded) return;
+    st.market.recorded = true;
+    const who = shopWho();
+    marketBoard = recordShopTakings(marketBoard, who.key, {
+      name: who.name,
+      customers: st.market.served | 0,
+      coins: st.market.coins | 0,
+      cleared: st.won
+    }, Date.now(), who);
+    if (st.won) {
+      const next = marketUnlockRejoin(prog);
+      prog.open = next.open;
+      saveProg();
+    }
+    saveMarketBoard();
+  }
+  function bootMarketRush(opt) {
+    opt = opt || {};
+    settleLife();
+    challengeRun = null;
+    $('intro').hidden = true; $('end').hidden = true; $('map').hidden = true;
+    if ($('postcards')) $('postcards').hidden = true;
+    $('game').hidden = false;
+    if ($('goalban')) $('goalban').hidden = true;
+    if ($('goalnext')) $('goalnext').hidden = true;
+    hideTutUi(); hideRecap(); hideHardBan();
+    doc.body.classList.remove('onmap', 'onpostcards', 'oncrush', 'sarah', 'hard1', 'hard2', 'postcard-game', 'shoprush');
+    doc.body.classList.add('ingame', 'marketrush');
+    screen = 'game';
+    loadSayClips();
+    lvNum = 0;
+    const lv = marketLevel();
+    paintScene(MARKET_FROM);
+    enterScreen($('game'));
+    setHammer(false); stopOverlay();
+    paintHearts();
+    $('lvname').textContent = 'Island Night Market · Rarotonga';
+    $('mapbtn').textContent = 'Map';
+    $('endmap').textContent = 'Map';
+    $('restartbtn').textContent = 'New night';
+    if ($('hearts2')) $('hearts2').hidden = true;
+    paintGoalStrip(lv);
+    if (opt.restore) {
+      st = loadLiveState(opt.restore, lv);
+      st.marketRush = true;
+      st.lv = lv;
+    } else {
+      st = newGame({ level: lv });
+      st.marketRush = true;
+      st.lifeDone = true;
+      loadMarketBoard();
+      st.market = newMarketState(st.rand);
+      st._marketSnap = { collected: (st.collected || []).slice(), specials: Object.assign({}, st.specialsMade || {}) };
+    }
+    sel = null; busy = false; lastAct = now();
+    crush = null; warned3 = false; hintOn = false; hintHold = false; hintMove = null; hideHintHand(); hideMovesWarn(); lastSaying = ''; sayUntil = 0; clearSayQueue(); hideSaying();
+    resetStreak(); hideCrushBan();
+    fitCanvas(); syncAll(); hud();
+    paintGoalStrip(lv, st);
+    paintMarketQueue();
+    hintMove = findMove(st.board, st.mask);
+    for (const s of sprites.values()) { s.y = s.r - N - 1 + (N - s.r) * .2; moveTo(s, s.r, s.c, 300 + (N - s.r) * 40, easeOut); }
+    if (musicOn) playKind(wantKind());
+    playMarketSfx('call');
+    const front = st.market && st.market.queue && st.market.queue[0];
+    if (front) addText((front.name || 'A stall') + ': ' + (front.call || marketOrderLabel(front)), W / 2, W * .16, 22, '#0f766e');
+    revealSugarUi();
+    scrollPastGameChrome();
+  }
+  function openMarketRush() {
+    if (!marketIsOpen(prog)) return;
+    pendingLv = 'market';
+    hideIntro();
+    function go() { bootMarketRush(); }
+    if (typeof root.playSugarIntro === 'function' && root.SUGAR_MARKET_INTRO) {
+      root.playSugarIntro({
+        doc: doc,
+        root: root,
+        pick: root.SUGAR_MARKET_INTRO,
+        label: 'Island Night Market intro',
+        onDone: go
+      });
+    } else go();
+  }
   let race = { racers: [], friends: [], friendCount: 0, group: 'family', offline: true, mine: null };
   let raceDemo = false; // test / screenshot only: never POST to the family backend
   let raceLw = 0; // 1.9.222 the level just won, sent once with the next race post
@@ -5514,7 +5929,7 @@
       .then(b => { bufs[kind] = b; return b; }).catch(() => { loading[kind] = null; return null; });
     return loading[kind];
   }
-  const TRACKS = { say_f: SAY_SPRITES.f, say_m: SAY_SPRITES.m, game: 'sugar-rush-music.mp3', game1: 'sugar-rush-l1.mp3', game2: 'sugar-rush-l2.mp3', menu: 'sugar-rush-menu.mp3', win: 'sugar-rush-win.mp3', yum: 'sugar-rush-yum.mp3', yay: VOICE_FILES.yay, great: VOICE_FILES.great, awesome: VOICE_FILES.awesome, sweetas: VOICE_FILES.sweetas, succulent: VOICE_FILES.succulent, swap: 'sugar-rush-swap.mp3', swap_lo: 'sugar-rush-swap-lo.mp3', swap_hi: 'sugar-rush-swap-hi.mp3', swap_bad: 'sugar-rush-swap-bad.mp3', boom: 'sugar-rush-boom.mp3', shop_bell: 'sugar-rush-shop-bell.mp3', shop_chaching: 'sugar-rush-shop-chaching.mp3', shop_hmph: 'sugar-rush-shop-hmph.mp3' };
+  const TRACKS = { say_f: SAY_SPRITES.f, say_m: SAY_SPRITES.m, game: 'sugar-rush-music.mp3', game1: 'sugar-rush-l1.mp3', game2: 'sugar-rush-l2.mp3', menu: 'sugar-rush-menu.mp3', win: 'sugar-rush-win.mp3', yum: 'sugar-rush-yum.mp3', yay: VOICE_FILES.yay, great: VOICE_FILES.great, awesome: VOICE_FILES.awesome, sweetas: VOICE_FILES.sweetas, succulent: VOICE_FILES.succulent, swap: 'sugar-rush-swap.mp3', swap_lo: 'sugar-rush-swap-lo.mp3', swap_hi: 'sugar-rush-swap-hi.mp3', swap_bad: 'sugar-rush-swap-bad.mp3', boom: 'sugar-rush-boom.mp3', shop_bell: 'sugar-rush-shop-bell.mp3', shop_chaching: 'sugar-rush-shop-chaching.mp3', shop_hmph: 'sugar-rush-shop-hmph.mp3', market_call: 'sugar-rush-market-call.mp3', market_basket: 'sugar-rush-market-basket.mp3' };
   function primeSwapSfx() {
     SWAP_VALID.concat(['swap_bad']).forEach(function (k) { loadBuf(k); });
   }
@@ -5549,6 +5964,7 @@
   function volFor(kind) { return kind === 'menu' ? MENU_VOL : BGM_VOL; }
   function gameKind(level) {
     if ((level == null ? lvNum : level) === 0 || (st && st.shopRush)) return 'song_aussie';
+    if (st && st.marketRush) return 'song_market';
     const n = level == null ? lvNum : level;
     const mood = songMood(n);
     if (mood && SONG_FILES[mood]) return 'song_' + mood;
@@ -5608,6 +6024,7 @@
     g.gain.linearRampToValueAtTime(v, t0 + Math.max(0.01, fade || 0));
     try { src.start(0); } catch (e) { return; }
     musicSrc = src; musicSrcGain = g; musicKind = kind;
+    applyMarketTempo();
   }
   function playKind(kind) {
     if (!musicOn || !audio() || endPlaying) return;
@@ -6335,9 +6752,11 @@
       if (!livePaused && tickTimer(st, Date.now())) hud();
       if (st.shopRush && st._shopTickAt) handleShopTicks(Date.now() - st._shopTickAt);
       st._shopTickAt = Date.now();
+      if (st.marketRush && st._marketTickAt) handleMarketTicks(Date.now() - st._marketTickAt);
+      if (st.marketRush) st._marketTickAt = Date.now();
       if (st.timerExpired && !st.timerEndHandled && !busy) {
         st.timerEndHandled = true;
-        if (st.shopRush) showEnd();
+        if (st.shopRush || st.marketRush) showEnd();
         else if (st.won) beginGoalFinish();
         else showEnd();
       }
@@ -6385,6 +6804,20 @@
         if (s.land) { const p = (t - s.land) / 240; if (p >= 1) s.land = 0; else land = 1 + 0.12 * Math.sin(p * Math.PI) * (1 - p) - 0.04 * Math.sin(p * Math.PI * 2) * p; }
         const px = s.x * CS + CS / 2, py = s.y * CS + CS / 2 + bob;
         if (s.t.s && !s.pop && !crushing && (isCandy(s.t) || isBomb(s.t))) drawSpecialGlow(s.t, px, py, R, t, s.al);
+        if (st.marketRush && st.market && !s.pop) {
+          const glow = marketGlowColors(st.market);
+          if (glow.indexOf(s.t.c) >= 0) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            const g = ctx.createRadialGradient(px, py, R * .2, px, py, R * 1.55);
+            const pulse = 0.45 + 0.25 * Math.sin(t / 220);
+            g.addColorStop(0, 'rgba(255, 210, 120,' + (0.55 * pulse * (s.al || 1)) + ')');
+            g.addColorStop(1, 'rgba(255, 150, 40, 0)');
+            ctx.fillStyle = g;
+            ctx.beginPath(); ctx.arc(px, py, R * 1.55, 0, Math.PI * 2); ctx.fill();
+            ctx.restore();
+          }
+        }
         if (st.shopRush && st.shop && !s.pop) {
           const glow = shopGlowColors(st.shop);
           if (glow.indexOf(s.t.c) >= 0) {
@@ -6664,7 +7097,7 @@
   function setLives(n) { if (sessionLevelAccess.hasUnlimitedLives()) return; const cur = livesState(); addLives((n | 0) - cur.n); }
   function nextLife() { return sessionLevelAccess.hasUnlimitedLives() ? 0 : nextLifeMs(ls.get(livesKey(), null)); }
   function settleLife() {
-    if (!st || st.challenge || st.shopRush || st.tutorial || st.won || st.lifeDone) return;
+    if (!st || st.challenge || st.shopRush || st.marketRush || st.tutorial || st.won || st.lifeDone) return;
     if (!(st.played || st.over)) return;
     st.lifeDone = true;
     if (!sessionLevelAccess.hasUnlimitedLives()) addLives(-1);
@@ -6812,7 +7245,7 @@
     return (me && me.id) ? ':' + me.id : '';
   }
   const LIVE_TTL = 36 * 3600 * 1000;
-  const LIVE_ST_KEYS = ['score', 'moves', 'target', 'timerLeft', 'timerMsLeft', 'timerUpdatedAt', 'turns', 'over', 'won', 'stars', 'collected', 'specialsMade', 'combosMade', 'hiddenLeft', 'ingsLeft', 'liqIdle', 'defused', 'fuseBlown', 'moveNo', 'played', 'lifeDone', 'challenge', 'shopRush', 'shop', 'tutorial', 'postcardFound', 'timerExpired', 'timerEndHandled', 'cannonDue', 'cannonShots', 'boss', 'jelly', 'flow', 'kinds'];
+  const LIVE_ST_KEYS = ['score', 'moves', 'target', 'timerLeft', 'timerMsLeft', 'timerUpdatedAt', 'turns', 'over', 'won', 'stars', 'collected', 'specialsMade', 'combosMade', 'hiddenLeft', 'ingsLeft', 'liqIdle', 'defused', 'fuseBlown', 'moveNo', 'played', 'lifeDone', 'challenge', 'shopRush', 'shop', 'marketRush', 'market', 'tutorial', 'postcardFound', 'timerExpired', 'timerEndHandled', 'cannonDue', 'cannonShots', 'boss', 'jelly', 'flow', 'kinds'];
   let liveMem = null, livePaused = false, holdPaused = false, liveSaveTimer = 0;
   function liveKey() { return 'ib-sugar-live' + memberTag(); }
   function snapBoard(b) {
@@ -7028,10 +7461,18 @@
       hold.innerHTML = '<div class="cd-item" data-kind="shop"><span class="cd-icon">🍭</span><span class="cd-num">' + (stt.shop.served || 0) + '</span><span class="cd-lab">served</span></div>' +
         '<div class="cd-item" data-kind="coins"><span class="cd-icon">🪙</span><span class="cd-num">' + (stt.shop.coins || 0) + '</span><span class="cd-lab">coins</span></div>';
     }
+    if (stt && stt.marketRush && stt.market && hold) {
+      hold.innerHTML = '<div class="cd-item" data-kind="market"><span class="cd-icon">🧺</span><span class="cd-num">' + (stt.market.served || 0) + '</span><span class="cd-lab">baskets</span></div>' +
+        '<div class="cd-item" data-kind="coins"><span class="cd-icon">🪙</span><span class="cd-num">' + (stt.market.coins || 0) + '</span><span class="cd-lab">coins</span></div>';
+    }
     if ($('help')) {
       if (stt && stt.shopRush && stt.shop) {
         const front = stt.shop.queue && stt.shop.queue[0];
         $('help').textContent = (front ? ('Front: ' + (front.grandma ? "Grandma's order · " : '') + (front.label || shopOrderLabel(front))) : 'Serve the queue') +
+          ' · ' + Math.floor(stt.timerLeft / 60) + ':' + String(stt.timerLeft % 60).padStart(2, '0') + ' left';
+      } else if (stt && stt.marketRush && stt.market) {
+        const front = stt.market.queue && stt.market.queue[0];
+        $('help').textContent = (front ? ((front.name || 'A stall') + ': ' + (front.call || marketOrderLabel(front))) : 'Fill the baskets') +
           ' · ' + Math.floor(stt.timerLeft / 60) + ':' + String(stt.timerLeft % 60).padStart(2, '0') + ' left';
       } else {
         const bits = counts.map(function (c) { return c.text; });
@@ -7384,6 +7825,7 @@
   function beginLevel(n) {
     hideIntro();
     if (n === 'shop') { openShopRush(); return; }
+    if (n === 'market') { openMarketRush(); return; }
     if (tutorialFor(n) && !tutorialDone(n)) startTutorial({ level: n });
     else startLevel(n);
   }
@@ -8005,6 +8447,15 @@
     if (shopDash) { shopDash.setAttribute('d', shopDone ? '' : side); shopDash.style.strokeDasharray = shopOpen && !shopDone ? '3 8' : ''; }
     if (shopBorder) shopBorder.setAttribute('d', shopDone ? '' : side);
     if (shopIcing) shopIcing.setAttribute('d', shopDone ? side : '');
+    const marketOpen = marketIsOpen(prog) || (prog.open | 0) >= MARKET_FROM;
+    const marketDone = !!(marketBoard && marketBoard.members && Object.keys(marketBoard.members).some(function (k) { return marketBoard.members[k] && marketBoard.members[k].cleared; }));
+    const marketSide = marketOpen ? marketSidePath() : '';
+    const marketDash = stage && stage.querySelector('#sr-market-path');
+    const marketBorder = stage && stage.querySelector('#sr-market-path-border');
+    const marketIcing = stage && stage.querySelector('#sr-market-path-icing');
+    if (marketDash) { marketDash.setAttribute('d', marketDone ? '' : marketSide); marketDash.style.strokeDasharray = marketOpen && !marketDone ? '3 8' : ''; }
+    if (marketBorder) marketBorder.setAttribute('d', marketDone ? '' : marketSide);
+    if (marketIcing) marketIcing.setAttribute('d', marketDone ? marketSide : '');
     path.innerHTML = '';
     const here = Math.min(LV_COUNT, Math.max(1, prog.open));
     LEVELS.forEach((lv, i) => {
@@ -8060,6 +8511,41 @@
             play: open ? play : null,
             playLabel: '▶ Play Sweet Shop Rush',
             lockText: '🔒 Finish Sydney Harbour Lights to open this side path'
+          });
+          return;
+        }
+        if (open) play();
+      });
+      path.appendChild(b);
+    })();
+    (function renderMarketPin() {
+      const stop = MARKET_STOP, open = marketIsOpen(prog);
+      const done = !!(marketBoard && marketMemberRow() && marketMemberRow().cleared);
+      const b = doc.createElement('button');
+      b.type = 'button';
+      b.className = 'lv lab-' + (stop.label || 'below') + ' kind-market market-stop' + (open ? ' open' : '') + (done ? ' done' : '') + (open && !done ? ' here-market' : '');
+      if (!open) { b.classList.add('locked'); b.setAttribute('aria-disabled', 'true'); }
+      b.dataset.n = 'market';
+      b.dataset.country = 'Cook Islands';
+      b.style.left = mapXPct(stop.x);
+      b.style.top = mapYPct(stop.y);
+      b.innerHTML = '<span class="pin"><span class="no" aria-hidden="true">🏮</span></span>' +
+        (done ? '<span class="st"><span class="on">★</span></span>' : '<span class="st"></span>') +
+        '<span class="meta"><b>' + stop.place + '</b><em>' + stop.name + '</em><i class="country">Side path · Rarotonga</i></span>';
+      b.setAttribute('aria-label', (open ? 'Play ' : 'Locked: ') + 'Island Night Market, Punanga Nui Market, a side path after Rarotonga' + (done ? ', completed' : ''));
+      b.addEventListener('click', function () {
+        const play = function () { unlockAudio(); openMarketRush(); };
+        const card = typeof window !== 'undefined' && window.SugarRushMap && window.SugarRushMap.showPlace;
+        if (card) {
+          card({
+            n: 'market',
+            place: stop.place,
+            country: 'Cook Islands',
+            name: stop.name,
+            open: open,
+            play: open ? play : null,
+            playLabel: '▶ Play Island Night Market',
+            lockText: '🔒 Finish Rarotonga Lagoon to open this side path'
           });
           return;
         }
@@ -8155,11 +8641,14 @@
     const fromGame = wasScreen !== 'map' || !$('map').dataset.seen;
     $('game').hidden = true; $('intro').hidden = true; $('end').hidden = true; $('map').hidden = false;
     $('map').dataset.seen = '1';
-    doc.body.classList.remove('sarah', 'ingame', 'hammering', 'hard1', 'hard2', 'postcard-game', 'onpostcards', 'shoprush');
+    doc.body.classList.remove('sarah', 'ingame', 'hammering', 'hard1', 'hard2', 'postcard-game', 'onpostcards', 'shoprush', 'marketrush');
     if ($('shopqueue')) $('shopqueue').hidden = true;
     if ($('shoptakings')) $('shoptakings').hidden = true;
+    if ($('marketqueue')) $('marketqueue').hidden = true;
+    if ($('markettakings')) $('markettakings').hidden = true;
     if ($('hearts2')) $('hearts2').hidden = false;
     hideShopBoard();
+    hideMarketBoard();
     if ($('shopboard')) $('shopboard').hidden = true;
     hideHardBan();
     hammerMode = false;
@@ -8232,6 +8721,7 @@
     for (let i = beltAt; i < res.steps.length; i++) await showStep(res.steps[i], i, { streak: !plain });
     collectPostcardFinds(res.steps);
     if (st.shopRush) applyShopMatches();
+    if (st.marketRush) applyMarketMatches();
     if (plain) addStreak(-1);
     if (res.spread) { const t = st.board[res.spread.r][res.spread.c]; if (t) { const s = sprite(t, res.spread.r, res.spread.c); s.grow = now(); } }
     // 1.9.219 Liquorice creeps after two moves in a row that free none; the move before, it gives a warning.
@@ -9002,7 +9492,7 @@
     me.classList.remove('hopping');
   }
   // 1.9.283 The route strokes are sized in screen px, so they look the same at any zoom of the true-scale map.
-  const ROUTE_STROKES = [['#sr-future-border', 9, [2.2, 6]], ['#sr-future', 5, [2.2, 6]], ['#sr-path-wide', 7], ['#sr-path-dash', 2.2, [5, 7]], ['#sr-path-win', 8], ['#sr-shop-path-border', 8, [2.2, 6]], ['#sr-shop-path', 5, [2.2, 6]], ['#sr-shop-path-icing', 7]];
+  const ROUTE_STROKES = [['#sr-future-border', 9, [2.2, 6]], ['#sr-future', 5, [2.2, 6]], ['#sr-path-wide', 7], ['#sr-path-dash', 2.2, [5, 7]], ['#sr-path-win', 8], ['#sr-shop-path-border', 8, [2.2, 6]], ['#sr-shop-path', 5, [2.2, 6]], ['#sr-shop-path-icing', 7], ['#sr-market-path-border', 8, [2.2, 6]], ['#sr-market-path', 5, [2.2, 6]], ['#sr-market-path-icing', 7]];
   function fitRouteStrokes(pxPerUnit) {
     const u = Math.max(0.01, pxPerUnit || 1);
     ROUTE_STROKES.forEach(function (r) {
@@ -9161,6 +9651,27 @@
     if (!st) return;
     opts = opts || {};
     const won = st.won, n = st.stars || 0, lv = st.lv;
+    if (st.marketRush) {
+      recordMarketShift();
+      const market = st.market || { served: 0, coins: 0 };
+      $('endtitle').textContent = won ? 'The market winds down' : 'The lanterns dim';
+      $('endstars').innerHTML = [0, 1, 2].map(function (i) { return '<span class="' + (i < n ? 'on' : '') + '">★</span>'; }).join('');
+      $('endscore').textContent = market.served + ' baskets · ' + market.coins + ' coins';
+      $('endbadge').hidden = true; if ($('endbadgecap')) $('endbadgecap').hidden = true;
+      if ($('endchest')) $('endchest').hidden = true;
+      if ($('endloot')) $('endloot').hidden = true;
+      if ($('morebtn')) $('morebtn').hidden = true;
+      $('endmsg').textContent = won
+        ? ('You filled ' + market.served + ' basket' + (market.served === 1 ? '' : 's') + ' and took ' + market.coins + ' coins. Tongan Coconut Coast is open on the main road.')
+        : 'Fill at least one basket before closing time to finish the side path and unlock Tongan Coconut Coast. Have another go — this mode does not use lives.';
+      $('againbtn').textContent = won ? 'New night' : 'Try again';
+      $('nextbtn').hidden = !won;
+      $('nextbtn').textContent = 'Go to Tonga';
+      $('endmap').hidden = false; $('endmap').textContent = 'Map';
+      $('end').hidden = false;
+      paintMarketBoard();
+      return;
+    }
     if (st.shopRush) {
       recordShopShift();
       const shop = st.shop || { served: 0, coins: 0 };
@@ -9280,6 +9791,7 @@
   function restart() {
     if (tut && tut.active) return;
     if (st && st.shopRush) { leaveEnd(); bootShopRush(); return; }
+    if (st && st.marketRush) { leaveEnd(); bootMarketRush(); return; }
     if (challengeRun) { const country = challengeRun.country; leaveEnd(); startPostcardChallenge(country); return; }
     leaveEnd();
     startLevel(lvNum);
@@ -9288,13 +9800,14 @@
     leaveEnd();
     if ($('goalnext')) $('goalnext').hidden = true;
     if (st && st.shopRush) { openLevel(SHOP_REJOIN); return; }
+    if (st && st.marketRush) { openLevel(MARKET_REJOIN); return; }
     if (lvNum < LV_COUNT) openLevel(lvNum + 1);
     else showMap();
     if (musicOn && !endPlaying) playKind(wantKind());
   }
   function backToMap() {
     if (challengeRun) { showPostcards(); return; }
-    const shopScroll = st && st.shopRush ? SHOP_REJOIN : null;
+    const shopScroll = st && st.shopRush ? SHOP_REJOIN : (st && st.marketRush ? MARKET_REJOIN : null);
     leaveEnd();
     if ($('goalnext')) $('goalnext').hidden = true;
     if (tut) { tut = null; hideTutUi(); hideRecap(); }
@@ -9341,7 +9854,7 @@
   $('nextbtn').addEventListener('click', goNext);
   $('mapbtn').addEventListener('click', backToMap);
   $('endmap').addEventListener('click', backToMap);
-  $('introbtn').addEventListener('click', () => { unlockAudio(); if (pendingLv === 'shop') openShopRush(); else beginLevel(pendingLv); });
+  $('introbtn').addEventListener('click', () => { unlockAudio(); if (pendingLv === 'shop') openShopRush(); else if (pendingLv === 'market') openMarketRush(); else beginLevel(pendingLv); });
   if ($('introx')) $('introx').addEventListener('click', () => { unlockAudio(); hideIntro(); });
   if ($('intro')) $('intro').addEventListener('click', e => { if (e.target === $('intro')) hideIntro(); });
   if ($('introhow')) $('introhow').addEventListener('click', () => { unlockAudio(); startTutorial({ level: pendingLv }); });
@@ -9363,9 +9876,11 @@
   if ($('raceicon')) $('raceicon').addEventListener('click', () => { unlockAudio(); openIconPicker(); });
   if ($('racefoot')) $('racefoot').addEventListener('click', () => { unlockAudio(); setRaceOpen(true); });
   if ($('shopfoot')) $('shopfoot').addEventListener('click', () => { unlockAudio(); paintShopBoard(true); });
+  if ($('marketfoot')) $('marketfoot').addEventListener('click', () => { unlockAudio(); paintMarketBoard(true); });
   if ($('shopboardov')) $('shopboardov').addEventListener('click', function (e) {
     const t = e.target;
     if (t === $('shopboardov') || (t.closest && t.closest('[data-shop=close]'))) hideShopBoard();
+    if (t === $('marketboardov') || (t.closest && t.closest('[data-market=close]'))) hideMarketBoard();
   });
 
   if ($('boosters')) $('boosters').addEventListener('click', e => {
@@ -9476,7 +9991,7 @@
   })();
 
   root.SugarRush.ui = {
-    state: () => st, attempt, comboTip: maybeComboTip, hud, paintGoalStrip, showEnd, showMap, scrollMapTo, openLevel, startLevel, showIntro, openShopRush, bootShopRush, paintShopQueue, paintShopBoard, hideShopBoard, recordShopShift, startTutorial, skipTutorial, finishTutorial, showTutStep, beginLevel, beginGoalFinish, showGoalBanner, celebrateOnMap, progress: () => prog, tutorial: () => tut, crush: () => crush,
+    state: () => st, attempt, comboTip: maybeComboTip, hud, paintGoalStrip, showEnd, showMap, scrollMapTo, openLevel, startLevel, showIntro, openShopRush, bootShopRush, paintShopQueue, paintShopBoard, hideShopBoard, recordShopShift, openMarketRush, bootMarketRush, paintMarketQueue, paintMarketBoard, hideMarketBoard, recordMarketShift, startTutorial, skipTutorial, finishTutorial, showTutStep, beginLevel, beginGoalFinish, showGoalBanner, celebrateOnMap, progress: () => prog, tutorial: () => tut, crush: () => crush,
     seedLives, showLives, openLivesPanel, lives: () => lives(), settleLife, nextLife: () => nextLife(),
     seedRace, seedRaceEvent, showRaceOn, showRaceResult, racePrize, syncRace, openIconPicker, setRaceOpen, requestCloseSugar, requestMinimiseSugar, scrollPastGameChrome, saveLive: writeLive, readLive, applyLive, clearLive, pauseLive, resumeLiveSession, isResumeOpen, race: () => race,
     say, chime, callout, unlockAudio, audio, showSaying, hideSaying, showMovesWarn, hideMovesWarn, maybeWarn3, showHint, hideHintHand, noteActivity,

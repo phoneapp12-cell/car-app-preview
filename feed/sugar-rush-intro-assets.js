@@ -25,6 +25,16 @@
   };
   root.SUGAR_SHOP_INTRO = SHOP_INTRO;
 
+  const MARKET_INTRO = {
+    poster: 'img/sugar-rush/island-night-market-intro-9a01c1f8-poster.jpg',
+    webm: 'img/sugar-rush/island-night-market-intro-9a01c1f8.webm',
+    mp4: 'img/sugar-rush/island-night-market-intro-9a01c1f8.mp4',
+    song: '',
+    songMp3: '',
+    videoHasAudio: true
+  };
+  root.SUGAR_MARKET_INTRO = MARKET_INTRO;
+
   function pickIntro() {
     return {
       useLong: true,
