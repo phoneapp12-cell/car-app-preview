@@ -399,9 +399,8 @@
       }
       if (extra) {
         let x = extra.innerHTML;
-        // Keep the My App toggle, interests and media filters from the original drawer.
-        extra.innerHTML = `<p class="mfsec">Show me</p>` + (typeof MF_OPTS !== 'undefined' ? MF_OPTS.map(o => `<button type="button" class="mfopt${o[0] === MF ? ' on' : ''}" data-mfset="${o[0]}" role="menuitemradio" aria-checked="${o[0] === MF}"><span class="mfe">${o[1]}</span><span>${o[2]}</span>${o[0] === MF ? '<i>✓</i>' : ''}</button>`).join('') : '')
-          + (typeof intSub === 'function' ? `<p class="mfsec">Interests</p>` + intSub() : '')
+        // Keep the My App toggle and interests from the original drawer.
+        extra.innerHTML = (typeof intSub === 'function' ? `<p class="mfsec">Interests</p>` + intSub() : '')
           + `<p class="mfsec">Settings</p>` +
           (typeof PRIVATE_OK !== 'undefined' && PRIVATE_OK ? `<button type="button" class="mfopt${SHOW_LIFE ? ' on' : ''}" data-showlife="1" role="switch" aria-checked="${!!SHOW_LIFE}"><span class="mfe">📌</span><span>Show My App stuff</span>${SHOW_LIFE ? '<i>✓</i>' : ''}</button>` : '')
           + `<button type="button" class="mfopt" data-ib-open-settings><span class="mfe">⚙︎</span><span>Settings</span></button>`
