@@ -457,6 +457,14 @@ html.nosnap{scroll-snap-type:none}
 /* 1.9.82 stories sit under header (outside #feed so scroll-snap does not skip them) */
 .stories-host:empty{display:none}
 .stories-host .stories{padding-top:2px;padding-bottom:8px}
+/* Hide the old Stories row on the magazine shell from the first paint */
+html.today-look #stories-host{display:none}
+/* Hold the feed until Today has painted the magazine page */
+html.today-look:not(.ib-ready) #feed > :not(.sk){display:none}
+html.today-look:not(.ib-ready) #ib-tabs{visibility:hidden}
+#ib-bootsk{display:none;max-width:640px;margin:0 auto;padding:8px 12px 0}
+html.today-look:not(.ib-ready) #ib-bootsk{display:block}
+html.portal-on #ib-bootsk{display:none}
 /* 1.9.82 no top chip bar — topics live in ☰; --hdr shrinks to the header bar only */
 .chips{display:none!important}
 .backfeed{display:flex;justify-content:center;padding:6px 14px 8px;max-width:640px;margin:0 auto}
@@ -726,6 +734,7 @@ body[data-artopen] .artwin{overscroll-behavior:none}body[data-artopen] .artbar{o
   <nav class="chips" id="chips" aria-label="Interests" hidden></nav>
   <div id="backfeed" class="backfeed" hidden><button type="button" class="backpill" data-backfeed>← Back to feed</button></div>
 </header>
+<div id="ib-bootsk" aria-hidden="true"><div class="sk"></div><div class="sk"></div></div>
 <div id="stories-host" class="stories-host" aria-label="Stories"></div>
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
@@ -734,6 +743,7 @@ body[data-artopen] .artwin{overscroll-behavior:none}body[data-artopen] .artbar{o
 <script src="portal.js?v=1.9.304"></script>
 <script src="family.js?v=1.9.304"></script>
 <script src="app.js?v=1.9.304"></script>
+<script src="today.js?v=1.9.304"></script>
 <script src="extras.js?v=1.9.304"></script>
 <script src="jokes.js?v=1.9.304"></script>
 <script src="learn.js?v=1.9.304"></script>
@@ -753,7 +763,6 @@ body[data-artopen] .artwin{overscroll-behavior:none}body[data-artopen] .artbar{o
 <script src="todos.js?v=1.9.304"></script>
 <script src="notif.js?v=1.9.304"></script>
 <script src="back.js?v=1.9.304"></script>
-<script src="today.js?v=1.9.304"></script>
 <script src="shorts.js?v=1.9.304"></script>
 <script src="reader.js?v=1.9.304"></script>
 <script src="ib-preview.js?v=1.9.304"></script>

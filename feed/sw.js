@@ -16,20 +16,39 @@ self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(k => Pro
 self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
   if (e.request.method !== 'GET' || u.origin !== location.origin || /\.mp3$/i.test(u.pathname) || /\.m4a$/i.test(u.pathname)) return; // music streams with range requests, so leave it to the browser // feed data and pictures go straight to the network
-  // 1.9.166 Always fetch game scripts as this VERSION (and with cache: 'reload') so a cached
+  // 1.9.166 Always fetch game scripts as this VERSION so a cached
   // tetris.html that still says src="tetris.js" cannot keep playing from an old tetris.js.
-  // Game pages (pretty URLs /feed/tetris, /feed/sugar-rush, /feed/scrabble) also reload.
   const gameJs = /\/(tetris|sugar-rush|scrabble|scores)\.js$/i.test(u.pathname);
   const gamePage = /\/(tetris|sugar-rush|scrabble)(\.html)?$/i.test(u.pathname);
   const url = gameJs ? (u.pathname + '?v=' + VERSION) : e.request.url;
-  const bust = e.request.mode === 'navigate' || /\.js$/i.test(u.pathname) || gamePage;
-  const net = bust ? fetch(url, { cache: 'no-store', credentials: 'same-origin', redirect: 'follow' }) : fetch(e.request);
-  e.respondWith(net.then(r => {
-    if (gamePage) return r;
+  const versioned = (new URL(url, location.origin)).searchParams.get('v') === VERSION;
+  const put = (reqUrl, r, alsoPath) => {
+    if (!r || !r.ok) return r;
     const copy = r.clone();
-    caches.open(CACHE + VERSION).then(c => { c.put(url, copy); if (gameJs) c.put(u.pathname, r.clone()); });
+    caches.open(CACHE + VERSION).then(c => { c.put(reqUrl, copy); if (alsoPath) c.put(u.pathname, r.clone()); });
     return r;
-  }).catch(() => gamePage ? fetch(e.request, { cache: 'no-store' }) : caches.match(url).then(r => r || caches.match(e.request, { ignoreSearch: e.request.mode === 'navigate' }).then(r => r || caches.match('index.html')))));
+  };
+  const net = u2 => fetch(u2, { cache: 'no-store', credentials: 'same-origin', redirect: 'follow' });
+  // Game pages (pretty URLs) stay network-first so a pretty URL never serves a stale HTML shell.
+  if (gamePage) {
+    e.respondWith(net(e.request).catch(() => fetch(e.request, { cache: 'no-store' })));
+    return;
+  }
+  // Versioned shell files (?v=VERSION) are cache-first, then revalidated in the background.
+  // The query already busts the cache when VERSION changes.
+  if (versioned) {
+    e.respondWith((async () => {
+      const cached = await caches.match(url) || await caches.match(e.request);
+      const revalidate = net(url).then(r => put(url, r, gameJs)).catch(() => null);
+      if (cached) { e.waitUntil(revalidate); return cached; }
+      return (await revalidate) || caches.match(e.request, { ignoreSearch: true }).then(r => r || caches.match('index.html'));
+    })());
+    return;
+  }
+  // Navigations and other same-origin GETs: network-first, cache as a fallback.
+  const bust = e.request.mode === 'navigate';
+  const req = bust ? net(e.request.url) : fetch(e.request);
+  e.respondWith(req.then(r => put(url, r)).catch(() => caches.match(url).then(r => r || caches.match(e.request, { ignoreSearch: e.request.mode === 'navigate' }).then(r => r || caches.match('index.html')))));
 });
 
 /* 1.9.0 family notifications: the push has no content; ask the family service what's new (with this person's own token,

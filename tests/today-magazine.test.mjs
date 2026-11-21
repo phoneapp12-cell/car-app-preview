@@ -168,3 +168,46 @@ test('swipe hint is dark purple and CTA banners are red, not pink', () => {
   assert.match(css, /\.today-game\.sr\{background:linear-gradient\(135deg,#ff7eb6,#ffa24c\)\}/);
   assert.match(html, /\.sugar-dock\{[^}]*linear-gradient\(135deg,#ff7eb6,#ffa24c\)/);
 });
+
+
+test('head CSS hides the Stories row under today-look and holds the feed until ib-ready', () => {
+  assert.match(html, /html\.today-look #stories-host\{display:none\}/);
+  assert.match(html, /html\.today-look:not\(\.ib-ready\) #feed > :not\(\.sk\)\{display:none\}/);
+  assert.match(html, /html\.today-look:not\(\.ib-ready\) #ib-tabs\{visibility:hidden\}/);
+  assert.match(html, /id="ib-bootsk"/);
+  assert.match(html, /html\.today-look:not\(\.ib-ready\) #ib-bootsk\{display:block\}/);
+  assert.match(css, /html\.today-look #stories-host\{display:none\}/);
+  assert.doesNotMatch(css, /html\.today-look\.ib-tab-all #stories-host/);
+});
+
+test('today.js hooks draw immediately after app.js and is marked ready on first paint', () => {
+  const scripts = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map(m => m[1]);
+  const app = scripts.findIndex(s => s.startsWith('app.js?'));
+  const today = scripts.findIndex(s => s.startsWith('today.js?'));
+  const extras = scripts.findIndex(s => s.startsWith('extras.js?'));
+  const read = scripts.findIndex(s => s.startsWith('read.js?'));
+  const todos = scripts.findIndex(s => s.startsWith('todos.js?'));
+  assert.ok(app >= 0 && today === app + 1, 'today.js must load immediately after app.js, got ' + scripts.slice(Math.max(0, app), app + 3).join(', '));
+  assert.ok(extras === today + 1);
+  assert.ok(read > today && todos > today);
+  assert.match(js, /function ready\(\)/);
+  assert.match(js, /classList\.add\('ib-ready'\)/);
+  assert.match(js, /injectTodoCard, wrapDrawer, hookDraw, ready/);
+  assert.match(js, /if \(mfDrawer\.__ibToday\) return;/);
+});
+
+test('todos.js re-applies the Today to-do card and drawer wrap when it loads', () => {
+  const todos = read('../feed/todos.js');
+  assert.match(todos, /ibToday\.injectTodoCard/);
+  assert.match(todos, /ibToday\.wrapDrawer/);
+});
+
+test('versioned shell files are cache-first and stale-while-revalidate; game pages and navigations stay network-first', () => {
+  assert.match(sw, /searchParams\.get\('v'\) === VERSION/);
+  assert.match(sw, /cache-first, then revalidated in the background/);
+  assert.match(sw, /e\.waitUntil\(revalidate\)/);
+  assert.match(sw, /Game pages \(pretty URLs\) stay network-first/);
+  assert.match(sw, /Navigations and other same-origin GETs: network-first/);
+  // Must not still force every JS file through the network before first paint
+  assert.doesNotMatch(sw, /mode === 'navigate' \|\| \\.js\$/);
+});

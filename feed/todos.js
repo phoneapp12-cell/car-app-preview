@@ -562,4 +562,6 @@
   });
 
   if (root.setTimeout) root.setTimeout(function () { loadAll().catch(function () {}); }, 600);
+  try { if (root.ibToday && typeof ibToday.injectTodoCard === 'function') ibToday.injectTodoCard(); } catch (e) { }
+  try { if (root.ibToday && typeof ibToday.wrapDrawer === 'function') ibToday.wrapDrawer(); } catch (e) { }
 })(typeof window !== 'undefined' ? window : globalThis);
