@@ -224,7 +224,6 @@ const WN = [
   ['⚠️', 'Whangārei weather warnings and power cuts show as a tile up top, only when something is happening.'],
   ['💎', 'New: Crystal of the week, every Monday.'],
   ['🍝', 'New: Easy weeknight meals.'],
-  ['🎨', 'New themes: open ☰, then Appearance, and try Ocean, Spring or Candy Crush.'],
   ['😂', 'More animals, sitcom clips and wow pictures, and less news.'],
 ];
 const ls = { get: (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }, set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } } };

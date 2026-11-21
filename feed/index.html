@@ -1,13 +1,12 @@
 <!doctype html>
-<html lang="en-NZ" class="candy today-look">
+<html lang="en-NZ" class="candy today-look force-light">
 <head>
-<script>try{var M=JSON.parse(localStorage.getItem('mf.member')||'null'),P=M&&M.id&&M.role!=='admin'?'mf.m.'+M.id+'.':'mf.',T=JSON.parse(localStorage.getItem(P+'textSize')||'"l"');if(T!=='n')document.documentElement.classList.add(T==='xl'?'ts-xl':'ts-l')}catch(e){document.documentElement.classList.add('ts-l')}</script>
+<script>try{var M=JSON.parse(localStorage.getItem('mf.member')||'null'),P=M&&M.id&&M.role!=='admin'?'mf.m.'+M.id+'.':'mf.',T=JSON.parse(localStorage.getItem(P+'textSize')||'"l"');if(T!=='n')document.documentElement.classList.add(T==='xl'?'ts-xl':'ts-l')}catch(e){document.documentElement.classList.add('ts-l')}document.documentElement.classList.add('force-light');document.documentElement.classList.remove('force-dark','th-ocean','th-spring','th-candy');document.documentElement.style.colorScheme='light'</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Info Book</title>
 <meta name="description" content="Shane's private photo and video feed. No likes, comments or followers.">
-<meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)">
-<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#ffffff">
 <link rel="stylesheet" href="today.css?v=1.9.300">
 <link rel="stylesheet" href="cal-book.css?v=1.9.300">
 <link rel="stylesheet" href="reader.css?v=1.9.300">
@@ -17,15 +16,14 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Info Book">
 <style>
-:root{--bg:#f4f5f8;--card:#fff;--ink:#14161b;--mute:#6b7280;--line:#e7e8ee;--chip:#eceef3;--acc:#8b5cf6;--acc2:#ec4899;--hr-title:#1e3a8a;--up:#16a34a;--down:#dc2626;--shadow:0 1px 2px rgba(16,24,40,.06),0 6px 18px rgba(16,24,40,.06)}
-@media (prefers-color-scheme:dark){:root{--bg:#0b0d11;--card:#15181e;--ink:#eef0f4;--mute:#9aa1ad;--line:#242833;--chip:#1e222b;--shadow:0 1px 0 rgba(255,255,255,.03)}}
-/* 1.9.79 Appearance: force dark/light regardless of phone setting */
+:root{--bg:#f4f5f8;--card:#fff;--ink:#14161b;--mute:#6b7280;--line:#e7e8ee;--chip:#eceef3;--acc:#8b5cf6;--acc2:#ec4899;--hr-title:#1e3a8a;--up:#16a34a;--down:#dc2626;--shadow:0 1px 2px rgba(16,24,40,.06),0 6px 18px rgba(16,24,40,.06);color-scheme:light}
+/* Standard light theme only. Dark / colour themes are no longer offered. force-dark remains for the Tetris chrome. */
 html.force-dark{--bg:#0b0d11;--card:#15181e;--ink:#eef0f4;--mute:#9aa1ad;--line:#242833;--chip:#1e222b;--shadow:0 1px 0 rgba(255,255,255,.03);color-scheme:dark}
 html.force-light{--bg:#f4f5f8;--card:#fff;--ink:#14161b;--mute:#6b7280;--line:#e7e8ee;--chip:#eceef3;--shadow:0 1px 2px rgba(16,24,40,.06),0 6px 18px rgba(16,24,40,.06);color-scheme:light}
 html.force-dark.candy,html.force-light.candy{/* candy layers keep using var(--bg) etc. */}
 
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html{font-size:100%;-webkit-text-size-adjust:100%;text-size-adjust:100%}html.ts-l{font-size:113%}html.ts-xl{font-size:126%}html.ts-xl .logo{font-size:1.12rem}html.ts-xl .upd{font-size:.6rem}html.ts-xl .greet{max-width:42vw}html.ts-l .logo{font-size:1.25rem}html,body{margin:0;background:var(--bg);color:var(--ink);font:1rem/1.45 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+html{font-size:100%;-webkit-text-size-adjust:100%;text-size-adjust:100%}html.ts-l{font-size:113%}html.ts-xl{font-size:126%}html.ts-xl .logo{font-size:1.12rem}html.ts-xl .upd{font-size:.6rem}html.ts-xl .greet{max-width:42vw}html.ts-l .logo{font-size:1.25rem}html,body{margin:0;background:var(--bg);color:var(--ink);color-scheme:light;font:1rem/1.45 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
 button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 a{color:inherit}
 .top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:saturate(1.6) blur(14px);-webkit-backdrop-filter:saturate(1.6) blur(14px);padding-top:env(safe-area-inset-top);border-bottom:1px solid var(--line)}
@@ -224,7 +222,6 @@ html.mf-only #instb,html.mf-only #feed > :not(.card):not(.load):not(.empty):not(
 .card.words .wdbody{font-size:1.28rem;line-height:1.45;padding:16px 18px 10px;white-space:pre-wrap;overflow-wrap:anywhere;font-weight:650;letter-spacing:-.01em}
 #feed > .card.words{justify-content:center}
 .card.words .shby{font-size:.9rem;padding:14px 16px 0}
-@media (prefers-color-scheme:dark){.card.words{background:linear-gradient(180deg,color-mix(in srgb,var(--c1) 22%,var(--card,#1a1520)),var(--card,#1a1520))}}
 .lkcard{flex-direction:column;gap:0}.lkcard .lkpic{padding:0;gap:0;display:block;position:relative}.lkcard .lkpic img,.lkcard #lkimg{width:100%;height:auto;aspect-ratio:1.91/1;object-fit:cover;display:block;background:var(--line)}
 .lkcard .lkpb{flex-direction:row;gap:6px;padding:6px;flex-wrap:wrap}.lkcard .lkpb .btn{flex:1 1 auto;margin:0;padding:8px 10px;font-size:.85rem}.lkcard>div:last-child{padding:4px 10px 10px}
 .lkdl{display:block;font-size:.82rem;color:var(--mute);margin:8px 2px 4px}#lkdesc{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:12px;padding:10px;font:inherit;background:var(--card,#fff);color:inherit}
@@ -268,16 +265,6 @@ html.candy .mfopt i{color:var(--c-pink)}
 html.candy .mfchip button{background:var(--c-gloss),linear-gradient(135deg,var(--c-sky),var(--c-grape));box-shadow:0 3px 10px rgba(108,199,255,.4)}
 html.candy .media.vid .play{filter:drop-shadow(0 4px 10px rgba(255,126,182,.5))}
 /* dark theme: tints stay jewel-like (no muddy olive/brown from lemon/orange on near-black), gloss toned down */
-@media (prefers-color-scheme:dark){
-html.candy{--c-gloss:linear-gradient(180deg,rgba(255,255,255,.14),rgba(255,255,255,0) 55%)}
-html.candy .top{background:linear-gradient(100deg,color-mix(in srgb,var(--c-pink) 16%,var(--bg)),color-mix(in srgb,var(--c-grape) 16%,var(--bg)) 40%,color-mix(in srgb,var(--c-sky) 14%,var(--bg)) 75%,color-mix(in srgb,var(--c-mint) 12%,var(--bg)))}
-html.candy .chips .chip:not(.on):nth-child(6n+2){background:color-mix(in srgb,var(--c-sky) 22%,var(--card))}
-html.candy .chips .chip:not(.on):nth-child(6n){background:color-mix(in srgb,var(--c-pink) 20%,var(--card))}
-html.candy .chips .chip:not(.on):nth-child(6n+1){background:color-mix(in srgb,var(--c-grape) 24%,var(--card))}
-html.candy .ib{background:var(--c-gloss),color-mix(in srgb,var(--c-grape) 26%,var(--card))}
-html.candy #mfbtn{background:var(--c-gloss),color-mix(in srgb,var(--c-mint) 24%,var(--card))}
-html.candy .card{box-shadow:0 2px 0 color-mix(in srgb,var(--c-grape) 22%,transparent)}
-}
 
 
 /* ---- 1.9.52 ✨ card polish: every card the same shape – same gap, padding, radius and shadow; a big full-width picture or
@@ -299,7 +286,6 @@ html.candy .card{box-shadow:0 2px 0 color-mix(in srgb,var(--c-grape) 22%,transpa
 #feed > .card > .media,#feed > .card > a.media,#feed > .card > .pimg,#feed > .card > .fph{margin:0}
 /* text-only cards get a picture band (emoji on a pastel candy gradient) */
 #feed > .card.xc:not(:has(.media,.pimg,.fph,.bdpic,.hero))::before{content:var(--band-e,'✨');display:flex;align-items:center;justify-content:center;width:100%;aspect-ratio:16/6;font-size:56px;line-height:1;background:linear-gradient(120deg,#ffd1e6,#fff1b8 35%,#c9f5e6 65%,#d9ccff);text-shadow:0 4px 14px rgba(0,0,0,.12)}
-@media (prefers-color-scheme:dark){#feed > .card.xc:not(:has(.media,.pimg,.fph,.bdpic,.hero))::before{background:linear-gradient(120deg,#4a2a40,#3d3a26 35%,#1f3d36 65%,#33295a)}}
 #feed > .card.daily{--band-e:'📸'}#feed > .card.trivia{--band-e:'❓'}#feed > .card.sugg{--band-e:'💡'}#feed > .card.reno{--band-e:'🏠'}#feed > .card.wkr{--band-e:'📅'}#feed > .card.fest.ny{--band-e:'🎆'}#feed > .card.fest.xmas{--band-e:'🎄'}#feed > .card.wx-nz{--band-e:'⛅'}
 
 /* ---- 1.9.56 ↔ swipe rows ---- */
@@ -342,7 +328,6 @@ html.candy .hdots i.on{background:linear-gradient(90deg,var(--c-pink),var(--c-gr
 #feed > .card.fest.xmas{--band-g:linear-gradient(135deg,#ff6b6b,#5fe0b6)}
 #feed > .card.nzsum{--band-g:linear-gradient(135deg,#6cc7ff,#a5f3fc)}
 #feed > .card.streaks{--band-e:'🔥';--band-g:linear-gradient(135deg,#ffa24c,#ff5e7e)}
-@media (prefers-color-scheme:dark){#feed > .card.xc:not(:has(.media,.pimg,.fph,.bdpic,.hero))::before{filter:saturate(.9) brightness(.78)}}
 /* Ask cards: no tall 16/6 rainbow band, so Yes/No stay on a phone screen under the Today hero. */
 #feed > .card.xc.relask::before,#feed > .card.xc.sportask::before{display:none!important;content:none!important;aspect-ratio:auto!important;height:0!important}
 #feed > .card.relask .hd,html.today-look #feed > .card.relask .hd{padding:6px 14px 0}
@@ -366,7 +351,6 @@ html.candy .hdots i.on{background:linear-gradient(90deg,var(--c-pink),var(--c-gr
 .wkl b{font-size:1.05rem;line-height:1.25}
 .wkl em.wkw{align-self:flex-start;margin:5px 0 2px;padding:2px 9px;border-radius:999px;background:var(--wc);color:#fff;font-weight:700;font-size:.8rem;opacity:1;text-shadow:0 1px 1px rgba(0,0,0,.18)}
 .wkl .intbar{margin-left:108px}
-@media (prefers-color-scheme:dark){.wkl li{background:color-mix(in srgb,var(--wc) 16%,var(--card,#1c1c1e))}}
 /* 1.9.77 😂 joke cards + ✨ special effects */
 #feed > .card.joke{--band-g:linear-gradient(135deg,#ffd84d,#ffa24c 55%,#ff7eb6)}
 #feed > .card.joke.cheeky{--band-g:linear-gradient(135deg,#ff7eb6,#ffa24c 55%,#ffd84d)}
@@ -376,7 +360,6 @@ html.candy .hdots i.on{background:linear-gradient(90deg,var(--c-pink),var(--c-gr
 .jkp{font-size:1.12rem;line-height:1.35}
 .jka.jpop{animation:jpop .55s cubic-bezier(.3,1.6,.5,1)}
 @keyframes jpop{0%{transform:scale(.94)}35%{transform:scale(1.05) rotate(-1.5deg)}60%{transform:scale(.98) rotate(1deg)}100%{transform:none}}
-@media (prefers-color-scheme:dark){.jka{background:linear-gradient(135deg,#3b2f12,#3d2418);color:#ffd9a8;box-shadow:inset 0 0 0 2px #a16207}.jka.on{background:linear-gradient(135deg,#3d1830,#3b2f12);color:#ffc2e0;box-shadow:inset 0 0 0 2px #be185d}}
 #fxl{position:fixed;inset:0;pointer-events:none;z-index:80;overflow:hidden}
 #fxl i{position:absolute;font-style:normal;line-height:1;will-change:transform,opacity}
 .fxc{width:9px;height:13px;border-radius:2px;animation:fxc var(--t) cubic-bezier(.2,.7,.4,1) forwards}
@@ -416,7 +399,6 @@ html.candy .hdots i.on{background:linear-gradient(90deg,var(--c-pink),var(--c-gr
 html,body{background:var(--bg)}
 body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(120% 60% at 0% 0%,#e9dcff 0%,transparent 60%),radial-gradient(110% 55% at 100% 35%,#ffdcec 0%,transparent 60%),radial-gradient(120% 60% at 20% 100%,#ffe6cc 0%,transparent 60%),linear-gradient(180deg,#efe6ff,#fde8f2 50%,#fff0df)}
 #feed > .card,#feed .hscroll > .card{box-shadow:0 2px 4px rgba(120,60,160,.08),0 10px 28px rgba(150,70,170,.14)!important;border-color:rgba(255,255,255,.9)!important}
-@media (prefers-color-scheme:dark){:root{--bg:#120e22}body::before{background:radial-gradient(120% 60% at 0% 0%,#2a1a4d 0%,transparent 60%),radial-gradient(110% 55% at 100% 35%,#3a1530 0%,transparent 60%),radial-gradient(120% 60% at 20% 100%,#3a2414 0%,transparent 60%),linear-gradient(180deg,#151029,#1a0f22 50%,#1c140e)}#feed > .card,#feed .hscroll > .card{box-shadow:0 2px 4px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.45)!important;border-color:rgba(255,255,255,.06)!important}}
 html.force-dark{--bg:#120e22}html.force-dark body::before{background:radial-gradient(120% 60% at 0% 0%,#2a1a4d 0%,transparent 60%),radial-gradient(110% 55% at 100% 35%,#3a1530 0%,transparent 60%),radial-gradient(120% 60% at 20% 100%,#3a2414 0%,transparent 60%),linear-gradient(180deg,#151029,#1a0f22 50%,#1c140e)}html.force-dark #feed > .card,html.force-dark #feed .hscroll > .card{box-shadow:0 2px 4px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.45)!important;border-color:rgba(255,255,255,.06)!important}
 html.force-light{--bg:#f1e9ff}html.force-light body::before{background:radial-gradient(120% 60% at 0% 0%,#e9dcff 0%,transparent 60%),radial-gradient(110% 55% at 100% 35%,#ffdcec 0%,transparent 60%),radial-gradient(120% 60% at 20% 100%,#ffe6cc 0%,transparent 60%),linear-gradient(180deg,#efe6ff,#fde8f2 50%,#fff0df)}html.force-light #feed > .card,html.force-light #feed .hscroll > .card{box-shadow:0 2px 4px rgba(120,60,160,.08),0 10px 28px rgba(150,70,170,.14)!important;border-color:rgba(255,255,255,.9)!important}
 
@@ -449,7 +431,6 @@ html.nosnap{scroll-snap-type:none}
 .exa{margin:0;font-size:1.02rem;line-height:1.4;color:inherit}
 .exmore{margin:8px 0 0;font-weight:700}
 .exmore a{color:var(--acc);text-decoration:none}
-@media (prefers-color-scheme:dark){.expill{color:#f5d0fe;background:linear-gradient(135deg,#2a1a4d,#3a1530 55%,#3a2414);box-shadow:inset 0 0 0 1.5px #5b21b6,0 2px 6px rgba(0,0,0,.35)}.exa{color:var(--ink)}}
 /* 1.9.80 📱 each card fills the screen under the header; the picture grows to take up the spare room */
 #feed > .card{min-height:calc(100svh - var(--hdr,120px) - 22px);display:flex;flex-direction:column}
 #feed > .card > .media:not(.vid),#feed > .card > a:has(> .media:not(.vid)){flex:1 1 auto;display:flex;flex-direction:column;min-height:200px}

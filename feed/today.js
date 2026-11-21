@@ -9,14 +9,6 @@
 
   document.documentElement.classList.add('today-look');
 
-  /* ---- default to the light magazine look once (old forced-dark default) ---- */
-  try {
-    if (typeof ls !== 'undefined' && typeof APPEAR !== 'undefined' && !ls.get('ibLook286', 0)) {
-      ls.set('ibLook286', 1);
-      if (APPEAR === 'dark') { APPEAR = 'light'; ls.set('appear', 'light'); if (typeof applyAppear === 'function') applyAppear(); }
-    }
-  } catch (e) { }
-
   /* ---- NZ clock (Pacific/Auckland) ---- */
   function nzParts(d = new Date()) {
     const parts = new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', hour: 'numeric', hourCycle: 'h23', weekday: 'long', day: 'numeric', month: 'long' }).formatToParts(d);
@@ -315,12 +307,8 @@
   function drawYouPage() {
     const m = $('#feed'); if (!m) return;
     const name = (typeof MEMBER !== 'undefined' && MEMBER && MEMBER.name && !MEMBER.pending) ? MEMBER.name : '';
-    const appear = typeof APPEAR !== 'undefined' ? APPEAR : 'light';
-    const opts = [['dark', '🌙', 'Dark'], ['light', '☀️', 'Light'], ['auto', '📱', 'Match phone'], ['ocean', '🌊', 'Ocean'], ['spring', '🌸', 'Spring'], ['candy', '🍬', 'Candy Crush']];
     m.innerHTML = `<div class="today-page"><h1>${esc(name ? 'Hello, ' + name + '.' : 'You.')}</h1>
-      <p class="lede">Appearance, your feed, and settings. Themes include dark, light, and the colour ones.</p>
-      <h2 class="mfsec" style="margin-left:0">Settings &amp; themes</h2>
-      <div class="today-appear">${opts.map(([k, em, l]) => `<button type="button" class="${appear === k ? 'on' : ''}" data-appear="${k}">${em} ${esc(l)}</button>`).join('')}</div>
+      <p class="lede">Your feed and settings.</p>
       ${typeof PRIVATE_OK !== 'undefined' && PRIVATE_OK ? `<button type="button" class="btn" data-tab="life" style="margin-bottom:10px">📌 For You</button>` : ''}
       <button type="button" class="btn pri" data-ib-open-settings>Open settings</button>
       </div>`;
@@ -377,15 +365,11 @@
       }
       if (extra) {
         let x = extra.innerHTML;
-        // Keep appearance, My App toggle, interests and media filters from the original drawer,
-        // but move "Show me" / appearance after our browse block (already in extra from orig).
+        // Keep the My App toggle, interests and media filters from the original drawer.
         extra.innerHTML = `<p class="mfsec">Show me</p>` + (typeof MF_OPTS !== 'undefined' ? MF_OPTS.map(o => `<button type="button" class="mfopt${o[0] === MF ? ' on' : ''}" data-mfset="${o[0]}" role="menuitemradio" aria-checked="${o[0] === MF}"><span class="mfe">${o[1]}</span><span>${o[2]}</span>${o[0] === MF ? '<i>✓</i>' : ''}</button>`).join('') : '')
           + (typeof intSub === 'function' ? `<p class="mfsec">Interests</p>` + intSub() : '')
-          + `<p class="mfsec">Settings &amp; themes</p>` +
-          (typeof PRIVATE_OK !== 'undefined' && PRIVATE_OK ? `<button type="button" class="mfopt${SHOW_LIFE ? ' on' : ''}" data-showlife="1" role="switch" aria-checked="${!!SHOW_LIFE}"><span class="mfe">📌</span><span>Show My App stuff</span>${SHOW_LIFE ? '<i>✓</i>' : ''}</button>` : '') +
-          `<div class="mfappear">` +
-          [['dark', '🌙', 'Dark'], ['light', '☀️', 'Light'], ['auto', '📱', 'Match phone'], ['ocean', '🌊', 'Ocean'], ['spring', '🌸', 'Spring'], ['candy', '🍬', 'Candy Crush']].map(([k, em, l]) =>
-            `<button type="button" class="mfopt${APPEAR === k ? ' on' : ''}" data-appear="${k}" role="menuitemradio" aria-checked="${APPEAR === k}"><span class="mfe">${em}</span><span>${l}</span>${APPEAR === k ? '<i>✓</i>' : ''}</button>`).join('') + `</div>`
+          + `<p class="mfsec">Settings</p>` +
+          (typeof PRIVATE_OK !== 'undefined' && PRIVATE_OK ? `<button type="button" class="mfopt${SHOW_LIFE ? ' on' : ''}" data-showlife="1" role="switch" aria-checked="${!!SHOW_LIFE}"><span class="mfe">📌</span><span>Show My App stuff</span>${SHOW_LIFE ? '<i>✓</i>' : ''}</button>` : '')
           + `<button type="button" class="mfopt" data-ib-open-settings><span class="mfe">⚙︎</span><span>Settings</span></button>`
           + admin;
       }
