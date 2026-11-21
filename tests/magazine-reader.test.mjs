@@ -248,3 +248,22 @@ test('findWiki accepts a strong entity match and still rejects a loose country p
   assert.equal(miss, null);
   assert.ok(!calls.some(u => /page\/summary\/New_Zealand/.test(u)));
 });
+
+test('news and family cards open on tap, so the Open link is omitted; life cards keep theirs', () => {
+  const app = read('../feed/app.js');
+  assert.match(app, /function showOpenLink\(i\)/);
+  assert.match(app, /showOpenLink\(i\)/);
+  assert.match(app, /ibReader\.canOpen\(null, i\)/);
+  assert.match(today, /openReaderOrLink\(card, null\)/);
+  assert.match(today, /ibReader\.canOpen\(card\)/);
+  assert.match(today, /ibReader\.open\(card\)/);
+  const { ibReader } = load();
+  assert.equal(ibReader.canOpen(null, { id: 'n1', t: 'Pōhutukawa starting to bloom along the coast.', s: 'The first red flowers are out.', url: 'https://www.rnz.co.nz/x', sn: 'RNZ', kind: 'news', topic: 'nz' }), true);
+  assert.equal(ibReader.canOpen(null, { id: 'tv1', t: 'Shortland Street', s: 'Tonight on TVNZ 2.', url: 'https://www.tvnz.co.nz/x', kind: 'tv' }), true);
+  assert.equal(ibReader.canOpen(null, { id: 'ev1', t: 'Auckland concert', s: 'Doors at 7.', ev: 1, url: 'https://www.eventfinda.co.nz/x', kind: 'event' }), true);
+  assert.equal(ibReader.canOpen(null, { id: 'ph1', t: 'From the porch', img: 'https://example.invalid/p.jpg', url: 'https://example.invalid/p.jpg', kind: 'photo' }), true);
+  assert.equal(ibReader.canOpen(null, { id: 'lk1', t: 'A link Sarah shared', url: 'https://www.facebook.com/x', kind: 'link', sn: 'Facebook', _share: { name: 'Sarah', link: 1 } }), true);
+  assert.equal(ibReader.canOpen(null, { id: 'fam1', t: 'A pink sky over Whangārei', s: 'Just a hello from the porch.', topic: 'family', _share: { name: 'Shane' } }), true);
+  assert.equal(ibReader.canOpen(null, { id: 'life:1', topic: 'life', t: 'WOF due', url: 'https://shane-my-app.pages.dev/' }), false);
+  assert.equal(ibReader.canOpen(null, { id: 'bare', url: 'https://example.invalid/x' }), false);
+});
