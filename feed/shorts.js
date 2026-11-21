@@ -12,6 +12,7 @@
      "braining" shorts. Boost it to about one in three, without repeating clips. */
   const BOOST_SUBS = { beamazed: 1 };
   const BOOST_EVERY = 3;
+  const BRAYNIX_AUTHOR = 'braynixgames';
   const CMAF_RES = ['CMAF_720', 'CMAF_480', 'DASH_720', 'DASH_480', 'CMAF_360', 'DASH_360'];
   const CMAF_AUDIO = ['CMAF_AUDIO_128', 'CMAF_AUDIO_64', 'DASH_AUDIO_128', 'DASH_audio'];
 
@@ -197,6 +198,83 @@
       url: s.url || ('https://www.youtube.com/watch?v=' + (s.videoId || s.vid))
     }));
   }
+  function braynixVuSet(pack) {
+    const set = {};
+    const clips = (pack && pack.clips) || [];
+    for (const c of clips) if (c && c.vu) set[c.vu] = 1;
+    return set;
+  }
+  function isBraynix(it, pack) {
+    if (!it) return false;
+    if (it.braynix) return true;
+    const author = String(it.author || it.by || it.u || '').replace(/^u\//i, '').toLowerCase();
+    if (author === BRAYNIX_AUTHOR) return true;
+    const url = String(it.url || it.permalink || it.credit || '');
+    if (/\/user\/braynixgames\b/i.test(url) || /\/u\/braynixgames\b/i.test(url)) return true;
+    if (it.vu && pack && braynixVuSet(pack)[it.vu]) return true;
+    return false;
+  }
+  function braynixCredit(it) {
+    const sub = (it && (it.sub || it.credit)) ? String(it.sub || it.credit).replace(/^r\//i, '') : '';
+    const nice = sub && sub.toLowerCase() !== 'u_braynixgames' ? 'r/' + sub : '';
+    return nice ? ('Braynix Games · ' + nice) : 'Braynix Games';
+  }
+  function braynixClips(pack, profile) {
+    const out = [], seen = {};
+    for (const c of (pack && pack.clips) || []) {
+      if (!c || !c.vu || seen[c.vu]) continue;
+      if (c.width && c.height && !isPortrait(c.width, c.height)) continue;
+      if (!durationOk(c.vdur)) continue;
+      const item = {
+        kind: 'reddit',
+        braynix: true,
+        id: 'bn-' + c.vu,
+        vu: c.vu,
+        title: c.title || 'Braynix Games',
+        credit: braynixCredit(c),
+        author: BRAYNIX_AUTHOR,
+        url: c.url,
+        permalink: c.url,
+        topic: c.topic || 'games',
+        src: 'braynix',
+        vdur: c.vdur,
+        width: c.width,
+        height: c.height,
+        sub: c.sub || ''
+      };
+      if (!memberAllows(item, profile)) continue;
+      if (!isAllowedTopic(itemText(item))) continue;
+      seen[c.vu] = 1;
+      out.push(item);
+    }
+    return out;
+  }
+  function mergeBraynix(reddit, pack, profile) {
+    const local = braynixClips(pack, profile);
+    const byVu = {};
+    for (const it of local) byVu[it.vu] = it;
+    const out = [];
+    const seen = {};
+    for (const it of local) {
+      out.push(it);
+      seen[it.vu] = 1;
+    }
+    for (const it of reddit || []) {
+      if (it.vu && seen[it.vu]) continue;
+      if (it.vu && byVu[it.vu] || isBraynix(it, pack)) {
+        out.push(Object.assign({}, it, { braynix: true, author: BRAYNIX_AUTHOR, credit: braynixCredit(Object.assign({ sub: it.credit }, it)) }));
+      } else {
+        out.push(it);
+      }
+      if (it.vu) seen[it.vu] = 1;
+    }
+    return out;
+  }
+  function frontLoad(items, pred) {
+    const head = [], tail = [];
+    for (const it of items || []) (pred(it) ? head : tail).push(it);
+    return head.concat(boostSource(tail));
+  }
   function isBoosted(it) {
     if (!it) return false;
     const credit = String(it.credit || '');
@@ -240,7 +318,7 @@
       return it && isDirectVideo(it.url) && isPortrait(it.width, it.height) && isAllowedTopic((it.title || '') + ' ' + (it.credit || ''));
     });
   }
-  function buildCatalog(feed, top40, profile) {
+  function buildCatalog(feed, top40, profile, braynixPack) {
     const items = (feed && feed.items) || feed || [];
     const reddit = filterReddit(items, profile);
     const edu = filterEduYoutube(items, profile);
@@ -252,8 +330,10 @@
       if (i < music.length) youtube.push(music[i]);
       if (i < edu.length) youtube.push(edu[i]);
     }
-    const mixed = boostSource(mixLane(reddit, youtube, YT_EVERY), BOOST_EVERY);
-    return { reddit, edu, music, youtube, mixed, fallback: filterPortrait(FALLBACK) };
+    const braynix = braynixClips(braynixPack, profile);
+    const merged = mergeBraynix(reddit, braynixPack, profile);
+    const mixed = frontLoad(mixLane(merged, youtube, YT_EVERY), it => isBraynix(it, braynixPack));
+    return { reddit: merged, braynix, edu, music, youtube, mixed, fallback: filterPortrait(FALLBACK) };
   }
 
   function escapeHtml(s) {
@@ -285,6 +365,17 @@
       if (r.ok) return r.json();
     } catch (e) { }
     return { songs: [] };
+  }
+  async function readBraynix() {
+    try {
+      if (typeof BRAYNIX !== 'undefined' && BRAYNIX && Array.isArray(BRAYNIX.clips)) return BRAYNIX;
+    } catch (e) { }
+    const ver = (typeof APP_VERSION !== 'undefined' && APP_VERSION) || (typeof VERSION !== 'undefined' && VERSION) || '1.9.304';
+    try {
+      const r = await fetch('braynix-local.json?v=' + ver, { cache: 'no-store' });
+      if (r.ok) return r.json();
+    } catch (e) { }
+    return { clips: [] };
   }
 
   let on = false, hist = false, muted = true, catalog = [], io = null, reel = null, shell = null, audioEl = null;
@@ -592,9 +683,9 @@
       try { root.history.pushState({ ibShorts: 1 }, ''); hist = true; } catch (e) { hist = false; }
     }
     if (reel) reel.innerHTML = `<p class="sh-empty">Loading shorts…</p>`;
-    Promise.all([readFeed(), readTop40()]).then(([feed, top40]) => {
+    Promise.all([readFeed(), readTop40(), readBraynix()]).then(([feed, top40, braynixPack]) => {
       if (!on) return;
-      const built = buildCatalog(feed, top40);
+      const built = buildCatalog(feed, top40, null, braynixPack);
       const list = built.mixed.length ? built.mixed : built.fallback;
       startWith(list);
     }).catch(() => {
@@ -671,6 +762,7 @@
     durationOk, subredditOf, memberAllows, filterReddit, filterEduYoutube, top40Clips,
     mixLane, filterPortrait, buildCatalog, FALLBACK, ALLOW_SUBS, EDU_SRC, MAX_DUR, YT_EVERY,
     BOOST_SUBS, BOOST_EVERY, isBoosted, boostSource,
+    BRAYNIX_AUTHOR, isBraynix, braynixClips, mergeBraynix, frontLoad,
     SPORT, NSFW, NOT_WANT, open, close
   };
 })();
