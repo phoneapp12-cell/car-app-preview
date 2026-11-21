@@ -195,7 +195,7 @@ html.today-look .today-cal-empty{display:block;margin:6px 0 2px;font-size:.86rem
 .today-celeb p{margin:0 0 14px;color:var(--mute);font-size:.9rem;line-height:1.4}
 .today-celeb-actions{display:flex;gap:8px;flex-wrap:wrap}
 .today-celeb-actions .btn{min-height:44px;padding:10px 16px;border-radius:14px;font:600 .9rem var(--today-sans);cursor:pointer}
-.today-celeb-actions .btn.pri{background:linear-gradient(135deg,#be185d,#f59e0b);color:#fff;border:0}
+.today-celeb-actions .btn.pri{background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:0;font-weight:800}
 .today-celeb-actions .btn:not(.pri){background:var(--card);color:var(--ink);border:1px solid var(--line)}
 
 /* Notifications tab: red count on the bell, and a quiet list */
