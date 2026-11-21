@@ -325,6 +325,40 @@
       : `<span class="today-cal-empty">Nothing coming up — open the calendar</span>`;
     return `<p class="mfsec">Calendar</p><div class="mf-cal"><button type="button" class="today-cal" data-calopen="1"><span class="today-cal-hd"><span class="mfe" aria-hidden="true">📅</span><b>Calendar</b></span>${rows}</button></div>`;
   }
+  function todoPreviewRows() {
+    let list = [];
+    try { if (window.ibTodos && typeof ibTodos.split === 'function') list = ibTodos.split().open; } catch (e) {}
+    if (!list.length) {
+      try { if (window.ibTodos && typeof ibTodos.localLoad === 'function') list = ibTodos.splitItems(ibTodos.localLoad()).open; } catch (e2) {}
+    }
+    const today = (window.ibTodos && ibTodos.nzToday) ? ibTodos.nzToday() : new Date().toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' });
+    const due = window.ibTodos && ibTodos.todayAndOverdue ? ibTodos.todayAndOverdue(list, today) : list.filter(t => t.due && t.due <= today);
+    return due.slice(0, 3).map(t => {
+      const when = window.ibTodos && ibTodos.dueLabel ? ibTodos.dueLabel(t, today) : (t.due || '');
+      return `<span class="today-cal-row"><em>✅</em><span><b>${esc(t.title)}</b><small>${esc(when || 'To-do')}</small></span></span>`;
+    });
+  }
+  function todoMenuBlock() {
+    const rows = todoPreviewRows();
+    const body = rows.length ? rows.join('') : `<span class="today-cal-empty">Today’s and overdue to-dos show here</span>`;
+    return `<p class="mfsec">To-do</p><div class="mf-cal"><button type="button" class="today-cal today-todo" data-todoopen="1"><span class="today-cal-hd"><span class="mfe" aria-hidden="true">✅</span><b>To-do</b></span>${body}</button></div>`;
+  }
+  function todoHomeCardHtml() {
+    const rows = todoPreviewRows();
+    if (!rows.length) return '';
+    return `<button type="button" class="today-todo today-todo-card" data-todoopen="1"><span class="today-cal-hd"><span class="mfe" aria-hidden="true">✅</span><b>To-do today</b></span>${rows.join('')}</button>`;
+  }
+  function injectTodoCard() {
+    const old = document.getElementById('today-todo-wrap'); if (old) old.remove();
+    if (typeof tab !== 'undefined' && tab !== 'all') return;
+    const html = todoHomeCardHtml(); if (!html) return;
+    const wrap = document.createElement('div'); wrap.id = 'today-todo-wrap'; wrap.innerHTML = html;
+    const celeb = document.getElementById('today-celeb');
+    const hero = document.getElementById('today-hero-wrap');
+    if (celeb && celeb.parentNode) celeb.after(wrap);
+    else if (hero && hero.parentNode) hero.after(wrap);
+    else { const feed = document.getElementById('feed'); if (feed) feed.insertBefore(wrap, feed.firstChild); }
+  }
   function wrapDrawer() {
     if (typeof mfDrawer !== 'function') return;
     const orig = mfDrawer;
@@ -361,7 +395,7 @@
       }
 
       if (opts) {
-        opts.innerHTML = gamesMenuBlock() + calMenuBlock() + `<p class="mfsec">Browse</p>` + browse.join('');
+        opts.innerHTML = gamesMenuBlock() + calMenuBlock() + todoMenuBlock() + `<p class="mfsec">Browse</p>` + browse.join('');
       }
       if (extra) {
         let x = extra.innerHTML;
@@ -459,6 +493,7 @@
     if (typeof draw !== 'function') return;
     const orig = draw;
     window.draw = function () {
+      if (window.ibTodoOn || window.ibCalOn) { orig.apply(this, arguments); paintTabs(); return; }
       const t = typeof tab !== 'undefined' ? tab : 'all';
       if (t === 'people' || t === 'games' || t === 'you') {
         try { if (typeof chips === 'function') chips(); } catch (e) { }
@@ -469,7 +504,7 @@
         paintTabs(); return;
       }
       orig.apply(this, arguments);
-      if (typeof tab !== 'undefined' && tab === 'all') injectHero();
+      if (typeof tab !== 'undefined' && tab === 'all') { injectHero(); injectTodoCard(); }
       paintTabs();
     };
   }
@@ -505,7 +540,7 @@
   hookDraw();
   wrapDrawer();
   paintTabs();
-  if (typeof tab !== 'undefined' && tab === 'all' && $('#feed') && !$('#feed .sk')) injectHero();
+  if (typeof tab !== 'undefined' && tab === 'all' && $('#feed') && !$('#feed .sk')) { injectHero(); injectTodoCard(); }
 
   window.ibToday = { nzParts, wxLabel, wxNow, wxView, paintWx, nextBirthday, sugarLevel, loveKeep, TAP_WAIT, IGNORE, heroHtml, celebCardHtml, calPreview, calWhen, fmtTime, daysUntil, isoDate, openReaderOrLink };
 })();

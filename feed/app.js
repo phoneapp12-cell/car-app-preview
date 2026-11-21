@@ -1015,6 +1015,7 @@ function goTab(t) { tab = t || 'all'; ls.set('tab', tab); try { mfDrawer(false);
 
 function draw() {
   chips();
+  if (window.ibTodoOn && typeof window.ibTodoDraw === 'function') { window.ibTodoDraw(); return; }
   if (window.ibCalOn && typeof window.ibCalDraw === 'function') { window.ibCalDraw(); return; }
   const m = $('#feed');
   if (!FEED) { m.innerHTML = '<div class="sk"></div><div class="sk"></div>'; return; }
@@ -1419,7 +1420,7 @@ function mfDrawer(open) {
   // 1.9.123 content topics live only inside the Interests submenu
   const keepNav = new Set(['life', 'family', 'photos', 'liked']);
   const browse = topicList().filter(t => keepNav.has(t[0]));
-  const br = `<p class="mfsec">Browse</p><button type="button" class="mfopt" data-calopen="1"><span class="mfe">📅</span><span>Calendar</span></button>${intSub()}${gameSub()}` + browse.map(t =>
+  const br = `<p class="mfsec">Browse</p><button type="button" class="mfopt" data-calopen="1"><span class="mfe">📅</span><span>Calendar</span></button><button type="button" class="mfopt" data-todoopen="1"><span class="mfe">✅</span><span>To-do</span></button>${intSub()}${gameSub()}` + browse.map(t =>
     `<button type="button" class="mfopt${tab===t[0]?' on':''}" data-mftab="${t[0]}"><span class="mfe">${t[2]}</span><span>${esc(t[1])}${t[0]==='family'&&typeof famNewLikes==='function'&&famNewLikes()?' · new':''}</span>${tab===t[0]?'<i>✓</i>':''}</button>`
   ).join('') + `<button type="button" class="mfopt${tab==='all'?' on':''}" data-mftab="all"><span class="mfe">✨</span><span>All feed</span>${tab==='all'?'<i>✓</i>':''}</button>`;
   extra.innerHTML = br + x;
@@ -1431,6 +1432,7 @@ function mfDrawer(open) {
     const t = e.target; if (!t || !t.closest) return;
     if (t.closest('#mfbtn')) { mfDrawer(true); return; }
     if (t.closest('[data-calopen]')) { e.preventDefault(); mfDrawer(false); if (window.ibCalOpen) window.ibCalOpen(); return; }
+    if (t.closest('[data-todoopen]')) { e.preventDefault(); mfDrawer(false); if (window.ibTodoOpen) window.ibTodoOpen(); return; }
     if (t.closest('[data-gamesmenu]')) { e.preventDefault(); GAMES_OPEN = !GAMES_OPEN; mfDrawer(true); return; }
     if (t.closest('.mfopt[data-art]')) { mfDrawer(false); return; } // play.js opens the game window
     if (t.closest('[data-intmenu]')) { e.preventDefault(); INT_OPEN = !INT_OPEN; mfDrawer(true); return; }
