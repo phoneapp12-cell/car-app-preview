@@ -276,12 +276,10 @@
     const media = href
       ? `<a class="media" href="${esc(href)}" target="_blank" rel="noopener"><img src="${esc(img)}" alt="" loading="lazy" referrerpolicy="no-referrer"></a>`
       : `<div class="media"><img src="${esc(img)}" alt="" loading="lazy"></div>`;
-    const btns = href ? `<div class="xbtns"><a class="btn pri" href="${esc(href)}" target="_blank" rel="noopener">Read the story ↗</a></div>` : '';
     return `<article class="card xc whgdev" data-id="${esc(i.id)}" data-topic="news" style="--c1:#9a3412;--c2:#0f766e">${xh}
       ${media}
       <div class="bd"><h3>${esc(d.title)}</h3>
       <p>${esc(blurb)}</p>
-      ${btns}
       <p class="plsrc">${esc(d.src || 'Local news')}</p></div></article>`;
   }
 
@@ -331,7 +329,7 @@
     list.forEach((d, n) => {
       const card = {
         id: 'whgdev-' + String(d.url || d.title).replace(/\W+/g, '').slice(0, 48) + '-' + day,
-        x: 'whgdev', t: d.title, url: d.url, dev: d, topic: 'news'
+        x: 'whgdev', t: d.title, s: d.desc || '', url: d.url, img: d.img || '', dev: d, topic: 'news'
       };
       out = place(out, nPins, card, now, 21 + n * 4);
     });

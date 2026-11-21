@@ -74,13 +74,10 @@
     const it = i.it || i;
     const when = it.published ? fmtDay(String(it.published).slice(0, 10)) : '';
     const xh = typeof root.xHead === 'function' ? root.xHead('🕯️', 'Religion', [it.sn, when].filter(Boolean).join(' · ') || 'Optional topic', 'Religion') : '';
-    const href = it.url || '';
     const blurb = it.s || '';
-    const btns = href ? `<div class="xbtns"><a class="btn pri" href="${esc(href)}" target="_blank" rel="noopener">Read the story ↗</a></div>` : '';
     return `<article class="card xc religion" data-id="${esc(i.id)}" data-topic="religion" style="--c1:#6d28d9;--c2:#0f766e">${xh}
       <div class="bd"><h3>${esc(it.t)}</h3>
       ${blurb ? `<p>${esc(blurb)}</p>` : ''}
-      ${btns}
       <p class="plsrc">${esc(it.sn || 'Religion')}</p></div></article>`;
   }
 
@@ -359,7 +356,7 @@
       front.push({ id: 'row-top40', x: 'row', k: 'top40', title: 'NZ Top 40 singles', items, topic: 'music' });
     }
     if (religionOn() && REL_ITEMS && REL_ITEMS.length && !out.some(i => i && i.x === 'row' && i.k === 'religion')) {
-      const items = REL_ITEMS.slice(0, 10).map(it => ({ id: it.id, x: 'religion', it, topic: 'religion', t: it.t }));
+      const items = REL_ITEMS.slice(0, 10).map(it => ({ id: it.id, x: 'religion', it, topic: 'religion', t: it.t, s: it.s, url: it.url, sn: it.sn }));
       if (items.length) front.push({ id: 'row-religion', x: 'row', k: 'religion', title: 'Religion', items, topic: 'religion' });
     }
     if (!out.some(i => i && i.x === 'row' && i.k === 'vidrow')) {

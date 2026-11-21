@@ -230,8 +230,7 @@ const ls = { get: (k, d) => { try { const v = localStorage.getItem(k); return v 
 function crystalCard(i) {
   const c = i.c, xh = typeof xHead === 'function' ? xHead('💎', 'Crystal of the week: ' + c.n, 'A new one every Monday', 'Crystals') : '';
   return `<article class="card xc crys" data-id="${esc(i.id)}">${xh}<a class="media" href="${esc(c.wiki)}" target="_blank" rel="noopener"><img src="${esc(c.img)}" alt="${esc(c.n)}" loading="lazy" referrerpolicy="no-referrer"></a>
-    <div class="bd"><p class="xwho"><b>${esc(c.what)}</b></p><p class="xwho">🔮 ${esc(c.say)}</p><p class="xwho">🤓 ${esc(c.fact)}</p>
-    <div class="xbtns"><a class="btn" href="${esc(c.wiki)}" target="_blank" rel="noopener">Read more ↗</a></div></div></article>`;
+    <div class="bd"><p class="xwho"><b>${esc(c.what)}</b></p><p class="xwho">🔮 ${esc(c.say)}</p><p class="xwho">🤓 ${esc(c.fact)}</p></div></article>`;
 }
 function wnCard(i) {
   const xh = typeof xHead === 'function' ? xHead('✨', "What's new in Info Book", 'The latest update', 'New') : '';
@@ -242,7 +241,7 @@ const basePinsW = window.pins;
 window.pins = function () {
   const out = basePinsW ? basePinsW() : [];
   if (!ls.get('wnSeen', {})[WN_ID]) out.unshift({ id: WN_ID, x: 'wnew', topic: 'family', t: "What's new" });
-  const c = crystal(); if (c && !ls.get('crysHide', {})[weekNo()]) out.push({ id: 'crys-' + weekNo(), x: 'crys', c, topic: 'family', t: '💎 Crystal of the week: ' + c.n });
+  const c = crystal(); if (c && !ls.get('crysHide', {})[weekNo()]) out.push({ id: 'crys-' + weekNo(), x: 'crys', c, topic: 'family', t: '💎 Crystal of the week: ' + c.n, s: c.what, url: c.wiki, img: c.img });
   return out;
 };
 const baseCardW = window.card;

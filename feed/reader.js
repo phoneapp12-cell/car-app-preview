@@ -36,18 +36,30 @@
   function doc() { return root.document; }
   function htmlEl() { return doc() && doc().documentElement; }
 
+  function findById(list, id) {
+    if (!list || !Array.isArray(list)) return null;
+    for (let i = 0; i < list.length; i++) {
+      const x = list[i];
+      if (x && x.id === id) return x;
+      if (x && x.x === 'row' && Array.isArray(x.items)) {
+        const hit = x.items.find(it => it && it.id === id);
+        if (hit) return hit;
+      }
+    }
+    return null;
+  }
   function itemOf(cardOrId) {
     const id = typeof cardOrId === 'string' ? cardOrId : (cardOrId && cardOrId.dataset && cardOrId.dataset.id);
     if (!id) return null;
     try {
       if (typeof order !== 'undefined' && Array.isArray(order)) {
-        const hit = order.find(x => x && x.id === id);
+        const hit = findById(order, id);
         if (hit) return hit;
       }
     } catch (e) {}
     try {
       if (typeof FEED !== 'undefined' && FEED && Array.isArray(FEED.items)) {
-        const hit = FEED.items.find(x => x && x.id === id);
+        const hit = findById(FEED.items, id);
         if (hit) return hit;
       }
     } catch (e) {}
@@ -74,6 +86,28 @@
     return !!(root.FAM_ON);
   }
 
+  /* Custom cards often nest the story on .dev / .it / .h / .event / .c instead of the top-level item. */
+  function storyFields(item) {
+    if (!item || typeof item !== 'object') return { t: '', s: '', url: '', img: '' };
+    const nest = item.dev || item.it || item.h || item.event || item.c || {};
+    return {
+      t: item.t || nest.t || nest.title || nest.n || '',
+      s: item.s || nest.s || nest.desc || nest.what || '',
+      url: item.url || nest.url || nest.wiki || '',
+      img: item.img || nest.img || nest.image || ''
+    };
+  }
+  function withStoryFields(item) {
+    if (!item) return item;
+    const f = storyFields(item);
+    const out = Object.assign({}, item);
+    if (!out.t && f.t) out.t = f.t;
+    if (!out.s && f.s) out.s = f.s;
+    if (!out.url && f.url) out.url = f.url;
+    if (!out.img && f.img) out.img = f.img;
+    return out;
+  }
+
   /* News, articles, photos with a story, and family/friend posts. Not games, My App life cards, or bare tool tiles. */
   function canOpen(card, item) {
     if (!card && !item) return false;
@@ -85,8 +119,9 @@
     }
     if (!item) return false;
     if (item.topic === 'life' || item.x === 'gamesoon' || item.x === 'row' || item.x === 'art3d') return false;
-    if (isFamilyPost(item, card)) return !!(item.t || item.s || item.img);
-    return !!(item.t || item.s) && !!(item.url || item.img || item.s);
+    const f = storyFields(item);
+    if (isFamilyPost(item, card)) return !!(f.t || f.s || f.img);
+    return !!(f.t || f.s) && !!(f.url || f.img || f.s);
   }
 
   function norm(s) {
@@ -716,7 +751,7 @@
   }
 
   async function open(card, item) {
-    item = item || itemOf(card);
+    item = withStoryFields(item || itemOf(card));
     if (!canOpen(card, item)) return false;
     const el = ensureShell();
     const page = el.querySelector('.ibr-page');
@@ -777,7 +812,7 @@
   }
 
   root.ibReader = {
-    canOpen, open, close, itemOf, closeMatch, wikiTitleFromUrl, paragraphsFromText,
+    canOpen, open, close, itemOf, storyFields, withStoryFields, closeMatch, wikiTitleFromUrl, paragraphsFromText,
     pullQuotesFrom, viewHtml, findWiki, loadContent, isFamilyPost, byline, postParas,
     extractEntities, scoreCandidate, sectionsFromText, confidenceOk, searchQueries
   };
