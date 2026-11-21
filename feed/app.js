@@ -479,6 +479,7 @@ function visible() {
     if (typeof toneW === 'function' && !toneW(i)) return false;   // 1.9.30 upbeat: no heavy news (deaths, crime, war, court…)
     if (W.drop(i.src)) return false;                               // a source you've voted out
     if (!topicOn(i.topic) || intHidden(i)) return false;
+    if (typeof ibPreview !== 'undefined' && ibPreview.hideFromFeed && ibPreview.hideFromFeed(i)) return false; // cult/religion stories only in the opt-in Religion row
     if (OPTIN.has(i.topic) && !optedIn(i.topic)) return false; // 1.9.0 parenting / drag & LGBTQ+ / social work: only when picked           // interests you've switched off
     if ((i.topic === 'election' || isElSrc(i.src)) && !elLive(i)) return false; // after election night
     if (tab === 'all' && (i.topic === 'election' || isElSrc(i.src))) return false; // 1.9.84 election only via its chip, not All
@@ -1113,6 +1114,7 @@ async function load(force) {
     if (f && Array.isArray(f.items) && f.items.length) {
       const first = !FEED || FEED.updated !== f.updated;
       FEED = f; ls.set('feed', f); noteSources(); noteSrcInts(); if (typeof loadPinRx === 'function') loadPinRx();
+      if (typeof ibPreview !== 'undefined' && typeof ibPreview.onFeed === 'function') ibPreview.onFeed(f);
       if (first || force) draw();
       if (force) toast('Feed is up to date');
     }
@@ -1147,7 +1149,7 @@ function settings() {
     <p>One-off matches, games and races around Whangārei. Recurring fixtures and sport news from the rest of the feed stay out. You can switch this off or back on any time.</p>
     <button class="ich${ibWhg.sportEventsOn() ? ' on' : ''}" id="sportsvt" aria-pressed="${ibWhg.sportEventsOn() ? 'true' : 'false'}">${ibWhg.sportEventsOn() ? '✓ On in your feed' : 'Off'}</button>` : ''}
     ${typeof ibPreview !== 'undefined' && ibPreview.showReligionSettings() ? `<h2 style="margin-top:18px">Religion</h2>
-    <p>Optional, respectful stories about traditional practices and beliefs — including Māori tikanga and wairua, rongoā and other traditional methods — and informational history and news about religions and cults. Hidden until you say yes. You can switch this off or back on any time.</p>
+    <p>Optional, respectful stories about traditional practices and beliefs — including Māori tikanga and wairua, rongoā and other traditional methods — plus news, investigations, documentaries and podcasts about religions, cults and high-control groups. Hidden until you say yes. You can switch this off or back on any time.</p>
     <button class="ich${ibPreview.religionOn() ? ' on' : ''}" id="religt" aria-pressed="${ibPreview.religionOn() ? 'true' : 'false'}">${ibPreview.religionOn() ? '✓ On in your feed' : 'Off'}</button>` : ''}
     <h2 style="margin-top:18px">Time of day</h2>
     <p>Mornings (5–11am) lean to news, what’s on and the election; 11am–7pm is the normal mix; from 7pm it winds down, and 9pm–3am leans hardest to cute animals, calm nature, lofi, cosy cooking, gardening and space, with less hard news and fewer loud trailers. Nothing is hidden, and your votes still count. Uses this phone’s clock.</p>

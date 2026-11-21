@@ -1,6 +1,6 @@
 {
   "updated": "2026-11-21",
-  "note": "Respectful, informational pieces only. Nothing here was invented. Live fetch adds more when a source is reachable.",
+  "note": "Respectful, informational pieces only. Nothing here was invented. Live fetch adds RNZ tikanga, news and The Lodge / CultProof podcasts when a source is reachable. Matching cult stories already in feed.json are tagged in too.",
   "items": [
     {
       "id": "rel-rnz-amoamo-2026-11-20",
@@ -46,6 +46,33 @@
       "sn": "Te Ara — Encyclopedia of New Zealand",
       "published": "",
       "kind": "tikanga"
+    },
+    {
+      "id": "rel-rnz-cultproof-explainer-2026-11-17",
+      "t": "What's the difference between a cult and a high-control group?",
+      "s": "RNZ’s Phil Vine and expert guides from the Cult Chat podcast discuss how to recognise a cult or high-control group, what they do, and what it can take to leave one.",
+      "url": "https://www.rnz.co.nz/podcast/the-lodge/season-2/whats-the-difference-between-a-cult-and-a-high-control-group-cp",
+      "sn": "RNZ The Lodge: CultProof",
+      "published": "2026-11-17",
+      "kind": "podcast"
+    },
+    {
+      "id": "rel-rnz-cultproof-series-2026-11",
+      "t": "The Lodge: CultProof",
+      "s": "An RNZ podcast series in which Phil Vine speaks with people who have left high-control groups, including Gloriavale, Falun Gong and Exclusive Brethren, with context from cult experts.",
+      "url": "https://www.rnz.co.nz/podcast/the-lodge/season-2",
+      "sn": "RNZ The Lodge: CultProof",
+      "published": "2026-11-18",
+      "kind": "podcast"
+    },
+    {
+      "id": "rel-teara-diverse-religions",
+      "t": "Recent and new-age religious movements",
+      "s": "Te Ara’s encyclopedia entry on recent and new-age religious movements in New Zealand, including Scientology, communities such as Centrepoint, and how the word “cult” has been used.",
+      "url": "https://teara.govt.nz/en/diverse-religions/page-9",
+      "sn": "Te Ara — Encyclopedia of New Zealand",
+      "published": "",
+      "kind": "encyclopedia"
     }
   ]
 }
