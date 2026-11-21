@@ -149,14 +149,22 @@ test('theme picker is gone and the feed stays on the standard light theme', () =
   assert.match(html, /color-scheme:light/);
 });
 
-test('swipe-row CTAs and the active pager are red, not pink', () => {
+test('swipe hint is dark purple and CTA banners are red, not pink', () => {
   assert.match(html, /#feed \.hscroll \.btn\.pri/);
   assert.match(html, /html\.candy #feed \.hscroll \.btn\.pri/);
   assert.match(html, /linear-gradient\(135deg,#dc2626,#b91c1c\)/);
   assert.match(html, /#feed \.hdots i\.on/);
   assert.match(html, /html\.candy #feed \.hdots i\.on/);
   assert.match(html, /linear-gradient\(90deg,#dc2626,#b91c1c\)/);
-  assert.match(html, /\.hrhint\{[^}]*color:var\(--acc\)/);
+  assert.match(html, /\.hrhint\{[^}]*font-weight:800;color:#5b21b6/);
+  assert.match(html, /html\.candy \.btn\.pri\{background:linear-gradient\(135deg,#dc2626,#b91c1c\)/);
+  assert.match(html, /\.btn\.pri\{background:linear-gradient\(135deg,#dc2626,#b91c1c\)/);
+  assert.match(html, /\.pinbox \.pbtn,\.pbtn\{[^}]*linear-gradient\(135deg,#dc2626,#b91c1c\)/);
+  assert.match(html, /\.obt small\{[^}]*linear-gradient\(90deg,#dc2626,#b91c1c\)/);
+  assert.match(html, /\.backpill\{[^}]*linear-gradient\(90deg,#dc2626,#b91c1c\)/);
+  assert.match(html, /\.fabpost\{[\s\S]*?linear-gradient\(135deg,#dc2626,#b91c1c\)/);
+  assert.match(css, /\.today-celeb-actions \.btn\.pri\{background:linear-gradient\(135deg,#dc2626,#b91c1c\)/);
   assert.match(html, /--hr-title:#1e3a8a/);
   assert.match(css, /\.today-game\.sr\{background:linear-gradient\(135deg,#ff7eb6,#ffa24c\)\}/);
+  assert.match(html, /\.sugar-dock\{[^}]*linear-gradient\(135deg,#ff7eb6,#ffa24c\)/);
 });
