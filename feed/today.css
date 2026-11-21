@@ -197,3 +197,21 @@ html.today-look .today-cal-empty{display:block;margin:6px 0 2px;font-size:.86rem
 .today-celeb-actions .btn{min-height:44px;padding:10px 16px;border-radius:14px;font:600 .9rem var(--today-sans);cursor:pointer}
 .today-celeb-actions .btn.pri{background:linear-gradient(135deg,#be185d,#f59e0b);color:#fff;border:0}
 .today-celeb-actions .btn:not(.pri){background:var(--card);color:var(--ink);border:1px solid var(--line)}
+
+/* Notifications tab: red count on the bell, and a quiet list */
+.ib-tabs .ib-nbell{position:relative;display:inline-block}
+.ib-nbadge{position:absolute;top:-6px;left:50%;margin-left:4px;min-width:16px;height:16px;padding:0 4px;background:#C4473A;color:#fff;border-radius:99px;font-size:.58rem;font-weight:700;letter-spacing:0;line-height:16px;text-align:center;font-family:var(--today-sans);text-transform:none}
+.ib-nbadge:empty{display:none}
+.ib-tabs [data-tab="notif"]{letter-spacing:.04em}
+#today-notif .today-nacts{display:flex;justify-content:flex-end;padding:0 0 8px}
+#today-notif .today-nall{background:none;border:0;color:var(--sage);font:600 .82rem var(--today-sans);padding:4px 0;cursor:pointer}
+#today-nlist{display:flex;flex-direction:column;gap:8px;padding-bottom:8px}
+.today-nrow{display:flex;align-items:stretch;gap:6px;border:1px solid var(--line);border-radius:16px;background:var(--card);box-shadow:var(--shadow);overflow:hidden}
+.today-nrow.read{opacity:.72}
+.today-nopen{flex:1;display:flex;align-items:flex-start;gap:12px;margin:0;padding:12px 8px 12px 14px;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;min-height:64px}
+.today-nopen .nic{flex:none;width:36px;height:36px;border-radius:12px;display:grid;place-items:center;background:color-mix(in srgb,var(--sky) 16%,var(--chip));font-size:1.15rem}
+.today-nopen .nbody{min-width:0;flex:1}
+.today-nopen .nbody b{display:block;font-size:.92rem;font-weight:650;line-height:1.3}
+.today-nopen .nbody small{display:block;margin-top:3px;color:var(--mute);font-size:.75rem}
+.today-nclear{flex:none;width:44px;border:0;background:none;color:var(--mute);font-size:1rem;cursor:pointer}
+.today-nclear:hover,.today-nclear:focus{color:var(--press)}

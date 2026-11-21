@@ -73,10 +73,12 @@ test('double-tap waits 250–300ms and ignores controls', () => {
   assert.match(css, /@keyframes ibHeart/);
 });
 
-test('tab bar and magazine side menu expose Today, People, Games and You', () => {
+test('tab bar and magazine side menu expose Today, Notifications, Games and You; People stays in the menu', () => {
   assert.match(js, /data-tab="all"/);
   assert.match(js, />Today</);
-  assert.match(js, /data-tab="people"/);
+  assert.match(js, /data-tab="notif"/);
+  assert.doesNotMatch(js, /data-tab="people"/);
+  assert.match(js, /data-mftab="people"/);
   assert.match(js, /data-tab="games"/);
   assert.match(js, /data-tab="you"/);
   assert.match(js, /data-art="sugar"/);

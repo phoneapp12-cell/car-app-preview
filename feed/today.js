@@ -1,4 +1,4 @@
-/* Info Book 1.9.286 — Today magazine chrome: hero, tab bar, People/Games/You,
+/* Info Book 1.9.286 — Today magazine chrome: hero, tab bar, Notifications/Games/You, People in the menu,
    magazine side menu, and TikTok-style double-tap heart on feed cards.
    Keeps existing features and friend/family privacy rules. */
 (() => {
@@ -217,14 +217,23 @@
     }
     const t = typeof tab !== 'undefined' ? tab : 'all';
     const on = k => t === k || (k === 'all' && t === 'all') ? ' on' : '';
+    let badge = '', nLabel = '';
+    try {
+      if (typeof ibNotif !== 'undefined' && ibNotif && typeof ibNotif.unread === 'function') {
+        const n = ibNotif.unread();
+        const lab = typeof ibNotif.badgeLabel === 'function' ? ibNotif.badgeLabel(n) : (n > 9 ? '9+' : (n ? String(n) : ''));
+        if (lab) { badge = `<span class="ib-nbadge">${lab}</span>`; nLabel = `, ${n} new`; }
+      }
+    } catch (e) { }
     nav.innerHTML = `
       <button type="button" class="${on('all')}" data-tab="all"><span class="ic">▦</span>Today</button>
-      <button type="button" class="${on('people')}" data-tab="people"><span class="ic">☺</span>People</button>
+      <button type="button" class="${on('notif')}" data-tab="notif" aria-label="Notifications${nLabel}"><span class="ic ib-nbell">🔔${badge}</span>Notices</button>
       <button type="button" class="${on('games')}" data-tab="games"><span class="ic">✦</span>Games</button>
       <button type="button" class="${on('you')}" data-tab="you"><span class="ic">◉</span>You</button>`;
     document.documentElement.classList.toggle('ib-tab-all', t === 'all');
     document.documentElement.classList.toggle('ib-tab-family', t === 'family');
     document.documentElement.classList.toggle('ib-tab-people', t === 'people');
+    document.documentElement.classList.toggle('ib-tab-notif', t === 'notif');
     document.documentElement.classList.toggle('ib-tab-games', t === 'games');
     document.documentElement.classList.toggle('ib-tab-you', t === 'you');
   }
@@ -372,6 +381,7 @@
       const t = typeof tab !== 'undefined' ? tab : 'all';
       const browse = [];
       browse.push(`<button type="button" class="mfopt${t === 'all' ? ' on' : ''}" data-mftab="all"><span class="mfe">▦</span><span>Today</span>${t === 'all' ? '<i>✓</i>' : ''}</button>`);
+      browse.push(`<button type="button" class="mfopt${t === 'notif' ? ' on' : ''}" data-mftab="notif"><span class="mfe">🔔</span><span>Notifications</span>${t === 'notif' ? '<i>✓</i>' : ''}</button>`);
       browse.push(`<button type="button" class="mfopt${t === 'people' ? ' on' : ''}" data-mftab="people"><span class="mfe">☺</span><span>People</span>${t === 'people' ? '<i>✓</i>' : ''}</button>`);
       browse.push(`<button type="button" class="mfopt${t === 'you' ? ' on' : ''}" data-mftab="you"><span class="mfe">◉</span><span>You</span>${t === 'you' ? '<i>✓</i>' : ''}</button>`);
       if (typeof FAM_ON !== 'undefined' && FAM_ON) {
@@ -492,10 +502,11 @@
     window.draw = function () {
       if (window.ibTodoOn || window.ibCalOn) { orig.apply(this, arguments); paintTabs(); return; }
       const t = typeof tab !== 'undefined' ? tab : 'all';
-      if (t === 'people' || t === 'games' || t === 'you') {
+      if (t === 'people' || t === 'notif' || t === 'games' || t === 'you') {
         try { if (typeof chips === 'function') chips(); } catch (e) { }
         const bf = document.getElementById('backfeed'); if (bf) bf.hidden = true;
         if (t === 'people') drawPeoplePage();
+        else if (t === 'notif') { try { if (window.ibNotif && ibNotif.drawPage) ibNotif.drawPage(true); } catch (e) { } }
         else if (t === 'games') drawGamesPage();
         else drawYouPage();
         paintTabs(); return;
