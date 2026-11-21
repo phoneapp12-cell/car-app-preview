@@ -20,10 +20,10 @@ test('Today magazine assets are wired into the feed shell', () => {
   assert.match(sw, /fonts\/IBMPlexSans\.ttf/);
 });
 
-test('hero greeting follows NZ time of day and uses Onerahi', () => {
+test('hero greeting follows NZ time of day and defaults to Onerahi', () => {
   assert.match(js, /timeZone: 'Pacific\/Auckland'/);
-  assert.match(js, /Tonight in Onerahi/);
-  assert.match(js, /This ' \+ when \+ ' in Onerahi/);
+  assert.match(js, /Tonight in ' \+ place/);
+  assert.match(js, /This ' \+ when \+ ' in ' \+ place/);
   assert.match(js, /morning/);
   assert.match(js, /afternoon/);
   assert.match(js, /evening/);
@@ -82,8 +82,9 @@ test('tab bar and magazine side menu expose Today, People, Games and You', () =>
   assert.match(js, /data-art="sugar"/);
   assert.match(js, /data-art="scrabble"/);
   assert.match(js, /data-art="tetris"/);
-  assert.match(js, /You’re on level/);
-  assert.match(js, /Settings &amp; themes/);
+  assert.match(js, /Sugar Rush/);
+  assert.match(js, /function sugarLevel/);
+  assert.match(js, /<p class="mfsec">Settings<\/p>/);
   assert.match(js, /IS_ADMIN/);
   assert.match(css, /\.mf-games/);
   assert.match(css, /\.mf-cal/);
@@ -129,13 +130,19 @@ test('friends still cannot see family members via the People page filter', () =>
   assert.match(family, /never the family's things/);
 });
 
-test('existing appearance themes are still offered', () => {
-  assert.match(js, /ocean/);
-  assert.match(js, /spring/);
-  assert.match(js, /candy/);
-  assert.match(js, /Match phone/);
-  assert.match(css, /force-dark/);
-  assert.match(css, /th-ocean/);
-  assert.match(css, /th-spring/);
-  assert.match(css, /th-candy/);
+test('theme picker is gone and the feed stays on the standard light theme', () => {
+  const app = read('../feed/app.js');
+  assert.doesNotMatch(js, /data-appear/);
+  assert.doesNotMatch(js, /Match phone/);
+  assert.doesNotMatch(js, /Settings &amp; themes/);
+  assert.doesNotMatch(js, /today-appear/);
+  assert.doesNotMatch(app, /data-appear/);
+  assert.doesNotMatch(app, /ls\.set\('appear'/);
+  assert.match(app, /var APPEAR = 'light'/);
+  assert.match(app, /r\.classList\.add\('force-light'\)/);
+  assert.doesNotMatch(app, /prefers-color-scheme: dark/);
+  assert.doesNotMatch(html, /prefers-color-scheme/);
+  assert.match(html, /class="[^"]*force-light/);
+  assert.match(html, /<meta name="theme-color" content="#ffffff">/);
+  assert.match(html, /color-scheme:light/);
 });

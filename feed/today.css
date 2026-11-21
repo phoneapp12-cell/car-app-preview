@@ -1,5 +1,5 @@
-/* Info Book 1.9.286 — Today magazine look (light default), plus tab bar, side menu and double-tap heart.
-   Builds on existing theme variables so dark, auto, ocean, spring and candy still work. */
+/* Info Book 1.9.286 — Today magazine look (standard light theme), plus tab bar, side menu and double-tap heart.
+   Info Book no longer offers a theme picker; leftover dark/ocean/spring/candy rules are unused. */
 @font-face{font-family:Fraunces;src:url("fonts/Fraunces.ttf") format("truetype");font-weight:100 900;font-style:normal;font-display:swap}
 @font-face{font-family:Fraunces;src:url("fonts/Fraunces-Italic.ttf") format("truetype");font-weight:100 900;font-style:italic;font-display:swap}
 @font-face{font-family:"IBM Plex Sans";src:url("fonts/IBMPlexSans.ttf") format("truetype");font-weight:100 700;font-style:normal;font-display:swap}

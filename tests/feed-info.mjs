@@ -2078,6 +2078,29 @@ if (live) {
   assert.ok(src.includes('function drawFireworksScene') && src.includes('function drawBeachScene'));
 }
 
+// Info Book itself stays on the standard light theme (Tetris / Sugar Rush keep their own look).
+{
+  const app = fs.readFileSync('feed/app.js', 'utf8');
+  const today = fs.readFileSync('feed/today.js', 'utf8');
+  const html = fs.readFileSync('feed/index.html', 'utf8');
+  const weekly = fs.readFileSync('feed/weekly.js', 'utf8');
+  assert.ok(app.includes("var APPEAR = 'light'"));
+  assert.ok(app.includes("r.classList.add('force-light')"));
+  assert.ok(!app.includes('data-appear'));
+  assert.ok(!app.includes("ls.set('appear'"));
+  assert.ok(!app.includes("ls.get('appear'"));
+  assert.ok(!app.includes('prefers-color-scheme: dark'));
+  assert.ok(!today.includes('data-appear'));
+  assert.ok(!today.includes('Match phone'));
+  assert.ok(!today.includes('Settings &amp; themes'));
+  assert.ok(today.includes('<p class="mfsec">Settings</p>'));
+  assert.ok(!html.includes('prefers-color-scheme'));
+  assert.ok(/class="[^"]*force-light/.test(html));
+  assert.ok(html.includes('<meta name="theme-color" content="#ffffff">'));
+  assert.ok(!weekly.includes('New themes: open'));
+  assert.ok(!weekly.includes('Appearance, and try Ocean'));
+}
+
 // 1.9.184 Shane's recorded LEVEL UP cue on every level
 {
   const src = fs.readFileSync('feed/tetris.js', 'utf8');
