@@ -1495,6 +1495,91 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
 }
 
 
+/* INF-26 On demand: official YouTube full episodes + public-domain Archive.org sitcoms */
+assert.ok(fs.existsSync('feed/on-demand.js') && fs.existsSync('feed/on-demand.json'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('on-demand.js?v=1.9.309'));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'on-demand.js?v=' + VERSION"));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'on-demand.json?v=' + VERSION"));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.309'"), 'do not bump version in this preview');
+const odData = JSON.parse(fs.readFileSync('feed/on-demand.json', 'utf8'));
+assert.ok(/^\d{4}-\d{2}-\d{2}$/.test(odData.checked));
+assert.ok(/oembed/i.test(odData.refresh) && /public-domain|public domain/i.test(odData.refresh));
+assert.ok(/Big Bang Theory/.test(odData.refresh));
+const od = load('feed/on-demand.js').ibOnDemand;
+od.setData(odData);
+const odShows = od.visibleShows();
+assert.ok(odShows.length >= 5, 'sitcoms plus a family comedy');
+assert.strictEqual(odShows[0].kind, 'sitcom');
+assert.ok(odShows.some(s => s.id === 'mr-bean' && s.kind === 'comedy'));
+const counts = Object.fromEntries(odShows.map(s => [s.id, s.episodes.length]));
+assert.ok(counts['red-green'] >= 280, JSON.stringify(counts));
+assert.strictEqual(counts['beverly-hillbillies'], 54);
+assert.strictEqual(counts['lucy-show'], 30);
+assert.strictEqual(counts['andy-griffith'], 2);
+assert.strictEqual(counts['mr-bean'], 14);
+assert.ok(!odShows.some(s => /big bang|young sheldon|neon|sport/i.test(s.title + ' ' + (s.episodes || []).map(e => e.t).join(' '))));
+assert.ok(!odShows.some(s => (s.episodes || []).some(e => e.season === 5 && e.ep === 18 && s.id === 'lucy-show')), 'Lucy S5E18 is still copyrighted');
+assert.ok(!counts['beverly-hillbillies'] || !od.showById('beverly-hillbillies').episodes.some(e => e.season === 2 && e.ep > 19));
+for (const s of odShows) {
+  assert.ok(od.allowedShow(s), s.id);
+  if (s.source === 'youtube') {
+    assert.ok(s.official && s.ads && od.OFFICIAL[s.channelId], s.id);
+    assert.ok(/may show ads/i.test(s.label), s.id);
+    for (const e of s.episodes) {
+      const src = od.playerSrc(e);
+      assert.ok(src && src.type === 'youtube' && src.ads, e.id);
+      assert.ok(src.src.startsWith('https://www.youtube-nocookie.com/embed/' + e.vid), e.id);
+    }
+  } else {
+    assert.ok(/public domain/i.test(s.label + ' ' + (s.license || '')), s.id);
+    for (const e of s.episodes) {
+      const src = od.playerSrc(e);
+      assert.ok(src && src.type === 'mp4' && !src.ads, e.id);
+      assert.ok(src.src.startsWith('https://archive.org/download/'), e.id);
+    }
+  }
+}
+const rg0 = od.showById('red-green').episodes[0];
+assert.strictEqual(rg0.vid, 'FUXPuYZ4DEQ');
+const bean = od.showById('mr-bean').episodes;
+assert.strictEqual(bean.length, 14);
+assert.ok(bean.some(e => e.vid === 'YEjMK9DB4no' && /Mr\. Bean$/.test(e.t)));
+const htmlShow = od.showCard({ x: 'odshow', show: od.showById('red-green') });
+assert.ok(htmlShow.includes('The Red Green Show') && htmlShow.includes('may show ads') && htmlShow.includes('data-od-show="red-green"'));
+assert.ok(htmlShow.includes('static.tvmaze.com') && htmlShow.includes('referrerpolicy="no-referrer"'));
+const epsHtml = od.episodesHtml('lucy-show');
+assert.ok(epsHtml.includes('Lucy and George Burns') && epsHtml.includes('data-od-play="lucy-show:lucy-s5e1"') && epsHtml.includes('data-od-eps-close') && epsHtml.includes('×'));
+assert.ok(!epsHtml.includes('Main Street on the Map'));
+const playHtml = od.playerHtml('mr-bean', bean[0], { autoplay: true, mute: false });
+assert.ok(playHtml.includes('youtube-nocookie.com/embed/' + bean[0].vid) && playHtml.includes('data-od-fs-close') && playHtml.includes('×') && /may show ads/i.test(playHtml));
+const hillPlay = od.playerHtml('beverly-hillbillies', od.showById('beverly-hillbillies').episodes[0]);
+assert.ok(hillPlay.includes('<video') && hillPlay.includes('archive.org/download/') && /public domain/i.test(hillPlay));
+const odRow = od.makeRow();
+assert.strictEqual(odRow.k, 'ondemand');
+assert.strictEqual(odRow.title, 'On demand');
+assert.ok(odRow.items.length === odShows.length);
+const fed = od.insertRow([{ id: 'pin', pin: 1, t: 'Pinned' }, { id: 'a', t: 'Card' }]);
+assert.strictEqual(fed[0].id, 'pin');
+assert.ok(fed.some(i => i && i.k === 'ondemand'));
+assert.deepStrictEqual(od.insertRow(fed).filter(i => i && i.k === 'ondemand').length, 1);
+const odKept = nz.presentVideos([{ x: 'row', k: 'ondemand', items: odRow.items }]);
+assert.ok(odKept.length === 1 && odKept[0].k === 'ondemand');
+assert.ok(nz.cineish({ x: 'row', k: 'ondemand' }));
+assert.strictEqual(od.allowedShow({ title: 'The Big Bang Theory', source: 'youtube', official: true, ads: true, channelId: 'UCsfIjK5sy9Upzcf316Xpytw', episodes: [{ id: 'x', t: 'Pilot', vid: 'abcdefghijk' }] }), false);
+assert.strictEqual(od.playerSrc({ id: 'x', t: 'Nope', vid: 'short' }), null);
+const odPage = od.pageHtml();
+assert.ok(odPage.includes('today-od-page') && odPage.includes('today-od-grid') && odPage.includes('The Red Green Show') && odPage.includes('Mr. Bean'));
+const todaySrc = fs.readFileSync('feed/today.js', 'utf8');
+const paintTabs = todaySrc.slice(todaySrc.indexOf('function paintTabs'), todaySrc.indexOf('function avHtml'));
+assert.ok(paintTabs.includes('data-tab="ondemand"') && /On demand/.test(paintTabs));
+assert.ok(!paintTabs.includes('data-tab="you"'), 'You moves out of the bottom nav');
+assert.ok(!/For you/i.test(paintTabs));
+assert.ok(paintTabs.includes('ib-odic') && paintTabs.includes('fill="currentColor"') && paintTabs.includes('<svg'));
+assert.ok(todaySrc.includes("t === 'ondemand'") && todaySrc.includes('ibOnDemand.drawPage'));
+assert.ok(todaySrc.includes('data-mftab="you"') && todaySrc.includes('data-mftab="life"') && todaySrc.includes('For You'), 'You and For You stay in the menu');
+assert.ok(todaySrc.includes('data-mftab="ondemand"'));
+assert.ok(fs.readFileSync('feed/today.css', 'utf8').includes('.ib-tabs .ib-odic svg'));
+
 console.log('feed-info tests ok');
 
 const live = process.env.SKIP_LIVE ? null : await fetch('https://due-dates-calendar-relay.phoneapp12.workers.dev/events', { headers: { Accept: 'application/json', Origin: 'https://shane-my-app.pages.dev' } });
