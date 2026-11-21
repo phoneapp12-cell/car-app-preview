@@ -150,7 +150,7 @@
   function esc(s) { return String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
   // If the saved feed painted before these scripts wrapped card/festive, paint once more
   // before anyone has scrolled. Later updates wait for the next refresh.
-  if (root.document.querySelector('#feed article') && !root.document.querySelector('article.puzzle, article.zoomq') && typeof root.draw === 'function' && (root.scrollY || 0) < 8) {
+  if (root.document.querySelector('#feed article') && !root.document.querySelector('article.puzzle, article.zoomq, article.artq') && typeof root.draw === 'function' && (root.scrollY || 0) < 8) {
     try { root.draw(); } catch (e) {}
   }
   root.document.addEventListener('click', e => {

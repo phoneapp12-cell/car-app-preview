@@ -44,10 +44,11 @@ const feed = Array.from({ length: 40 }, (_, n) => ({ id: 'p' + n, t: 'Post ' + n
 for (const day of [0, 1, 2]) {
   const when = day * 864e5;
   const out = play.insert(feed, 2, when);
-  const specials = out.filter(x => x.x === 'play' || x.x === 'zoomq' || x.x === 'fallq' || x.x === 'tetq');
+  const specials = out.filter(x => x.x === 'play' || x.x === 'zoomq' || x.x === 'fallq' || x.x === 'artq' || x.x === 'tetq');
   assert.ok(specials.some(x => x.kind === 'sitcom' || x.x === 'play' && x.kind === 'sitcom'), 'sitcom puzzle each day');
   assert.strictEqual(specials.filter(x => x.x === 'zoomq').length, 1);
   assert.strictEqual(specials.filter(x => x.x === 'fallq').length, 1);
+  assert.strictEqual(specials.filter(x => x.x === 'artq').length, 2, 'two rotating discovery cards a day');
   assert.strictEqual(specials.filter(x => x.x === 'tetq').length, 0);
   const idx = specials.map(s => out.indexOf(s));
   assert.ok(Math.min(...idx) >= 2);
@@ -70,6 +71,35 @@ assert.ok(/Rafaël Rozendaal/.test(fall));
 assert.ok(!/isn’t part of this artwork/.test(fall));
 assert.ok(fall.includes('img/play/falling.svg'));
 assert.ok(!fall.includes('2011-falling-falling.png'));
+
+assert.strictEqual(play.DISCOVER.length, 12);
+const seenDisco = new Set();
+for (const day of [0, 1, 2, 3, 4, 5]) {
+  const out = play.insert(feed, 2, day * 864e5);
+  const arts = out.filter(x => x.x === 'artq');
+  assert.strictEqual(arts.length, 2, 'day ' + day);
+  for (const a of arts) {
+    assert.ok(a.art && a.t && a.id.startsWith('artq-'));
+    seenDisco.add(a.art);
+    const html = play.render(a);
+    assert.ok(html.includes('data-art="' + a.art + '"'));
+    assert.ok(!/<audio|<iframe|autoplay/i.test(html));
+    const d = play.DISCOVER.find(x => x.key === a.art);
+    assert.ok(d && html.includes(d.url));
+    assert.ok(html.includes(d.img));
+    assert.ok(fs.existsSync('feed/' + d.img), d.img);
+  }
+}
+assert.strictEqual(seenDisco.size, 12, 'all 12 discovery sites appear across 6 days');
+for (const d of play.DISCOVER) {
+  const html = play.render({ id: 'artq-' + d.key + '-0', x: 'artq', art: d.key, topic: d.topic, t: d.title });
+  assert.ok(html.includes('data-art="' + d.key + '"') && html.includes(d.url) && html.includes(d.title));
+  assert.ok(!/<audio|<iframe|autoplay/i.test(html));
+}
+assert.ok(play.render({ id: 'artq-patatap-0', x: 'artq', art: 'patatap' }).toLowerCase().includes('flashing'));
+const playSrc = fs.readFileSync('feed/play.js', 'utf8');
+assert.ok(playSrc.includes('function checkArtEmbed') && playSrc.includes('function openArtInTab'));
+assert.ok(playSrc.includes("href === 'about:blank'"));
 assert.strictEqual(play.render({ id: 'tetq-1', x: 'tetq' }), '');
 assert.ok(!play.insert(feed, 2, 0).some(x => x && x.x === 'tetq'));
 assert.strictEqual(nz.drop({ id: 'tetq-12', x: 'tetq', t: 'Tetris' }), true);
@@ -267,7 +297,7 @@ const cineAt = mixed.findIndex(x => x.x === 'cine');
 assert.ok(cineAt >= 2);
 for (const j of [-1, 1]) {
   const n = mixed[cineAt + j];
-  if (n) assert.ok(!['play', 'zoomq', 'fallq'].includes(n.x));
+  if (n) assert.ok(!['play', 'zoomq', 'fallq', 'artq'].includes(n.x));
 }
 
 // cinema swipe row: two or more current films become one scroll-snap row
@@ -1769,7 +1799,7 @@ if (live) {
   assert.ok(js.includes("d.type !== 'ib-artfull'") && js.includes('function setFull') && js.includes('function layoutBoard'));
   assert.ok(js.includes("from === 'parent'") && js.includes("html.classList.add('fs-overlay')"));
   assert.ok(play.includes("postMessage({ type: 'ib-artfull'") && play.includes('tellFrame'));
-  assert.ok(play.includes('allow="autoplay; fullscreen"') && play.includes("setAttribute('allow', 'autoplay; fullscreen')"));
+  assert.ok(play.includes('allow="autoplay; fullscreen; encrypted-media"') && play.includes("setAttribute('allow', 'autoplay; fullscreen; encrypted-media')"));
   const idx = fs.readFileSync('feed/index.html', 'utf8');
   assert.ok(idx.includes('.artwin.artfull{inset:0;width:100dvw;height:100dvh'));
 }

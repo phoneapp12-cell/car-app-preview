@@ -1220,7 +1220,7 @@ document.addEventListener('load', e => {
   const im = e.target; if (!(im instanceof HTMLImageElement)) return;
   if (im.dataset.yt && im.naturalWidth > 0 && im.naturalWidth <= 120 && !im.dataset.f) { im.dataset.f = 1; im.src = 'https://i.ytimg.com/vi/' + im.dataset.yt + '/hqdefault.jpg'; return; }
   const box = im.closest('.media, .fph'); if (!box || box.classList.contains('vid') || !im.naturalWidth) return;
-  if (im.naturalHeight && box.closest('#feed > .card') && !box.closest('.puzzle,.zoomq,.fallq,.cine')) im.style.setProperty('--frame', stillFrame(im.naturalWidth, im.naturalHeight));
+  if (im.naturalHeight && box.closest('#feed > .card') && !box.closest('.puzzle,.zoomq,.fallq,.artq,.cine')) im.style.setProperty('--frame', stillFrame(im.naturalWidth, im.naturalHeight));
   const dpr = Math.min(window.devicePixelRatio || 1, 3), boxW = box.clientWidth || 400;
   if (im.naturalWidth * 1.6 < boxW * dpr) {
     box.classList.add('lowres'); box.style.setProperty('--lr', `url("${im.currentSrc || im.src}")`);

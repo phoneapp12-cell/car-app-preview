@@ -1,7 +1,9 @@
-/* 1.9.109 In-feed puzzles and two hand-picked discovery cards.
-   Original puzzles only. Zoomquilt and Falling Falling stay still on the card.
-   A tap opens the live site in this app's window. Checked 7 Nov 2026: neither site
-   sends X-Frame-Options or CSP frame-ancestors, and both draw inside a frame.
+/* 1.9.109 In-feed puzzles and hand-picked discovery cards.
+   Original puzzles only. Zoomquilt, Falling Falling and the later discovery sites
+   stay still on the card. A tap opens the live site in this app's window.
+   Checked 7 Nov 2026 for Zoomquilt and Falling Falling, and 21 Nov 2026 for the
+   twelve added sites: none sent X-Frame-Options or CSP frame-ancestors.
+   If a framed site still frame-busts or comes up blank, it opens in a new tab.
    Falling Falling moves at 60fps and starts a looping sound only after that tap.
    Closing the window sets the frame to about:blank so the picture and sound stop. */
 (function (root) {
@@ -124,10 +126,40 @@
       <div class="xbtns"><button type="button" class="btn pri" data-art="fall">Play Falling Falling</button></div>
       <p class="plsrc"><a href="https://fallingfalling.com/" target="_blank" rel="noopener">fallingfalling.com</a> · Reinier Feijen wrote the code · sound by gloumouth1</p></div>`;
   }
+  /* Twelve more discovery sites, added 21 Nov 2026. Cards stay still; the live site
+     opens in the same in-app window as Zoomquilt. Two of these rotate into the feed each day. */
+  const DISCOVER = [
+    { key: 'zq2', title: 'Zoomquilt 2', emoji: '🌀', topic: 'learn', url: 'https://zoomquilt2.com/', host: 'zoomquilt2.com', live: 'Zooms on its own', img: 'img/play/zq2.svg', alt: 'Our sketch of nested frames. Not the Zoomquilt 2 painting.', blurb: 'A second collaborative infinitely zooming painting, 2007, with a new group of illustrators. This card stays still.', btn: 'Play Zoomquilt 2' },
+    { key: 'arkadia', title: 'Arkadia', emoji: '🌿', topic: 'learn', url: 'https://arkadia.xyz/', host: 'arkadia.xyz', live: 'Zooms on its own', img: 'img/play/arkadia.svg', alt: 'Our still sketch of simple leaves. Not the Arkadia painting.', blurb: 'A lush botanical infinite zoom by Sophia Schomberg and Nikolaus Baumgarten, 2015. This card stays still.', btn: 'Play Arkadia' },
+    { key: 'flowers', title: 'Infinite Flowers', emoji: '🌸', topic: 'learn', url: 'https://infiniteflowers.net/', host: 'infiniteflowers.net', live: 'Zooms on its own', img: 'img/play/flowers.svg', alt: 'Our still sketch of simple flowers. Not the Infinite Flowers painting.', blurb: 'Nikolaus Baumgarten’s 2023 infinite-zoom painting of flowers and plants. This card stays still.', btn: 'Play Infinite Flowers' },
+    { key: 'hydromeda', title: 'Hydromeda', emoji: '🌺', topic: 'learn', url: 'https://hydromeda.org/', host: 'hydromeda.org', live: 'Zooms on its own. You can change the speed.', img: 'img/play/hydromeda.svg', alt: 'Our still sketch of simple colour shapes. Not the Hydromeda painting.', blurb: 'Sophia Schomberg’s infinite zoom through vivid botanical forms. You can change the speed once it is open. This card stays still.', btn: 'Play Hydromeda' },
+    { key: 'organic', title: 'Organic City', emoji: '🏙️', topic: 'learn', url: 'https://organiccity.org/', host: 'organiccity.org', live: 'Zooms on its own', img: 'img/play/organic.svg', alt: 'Our still sketch of simple buildings. Not the Organic City painting.', blurb: 'A 2026 infinite zoom through a surreal cityscape, by Sophia Schomberg and Nikolaus Baumgarten. This card stays still.', btn: 'Play Organic City' },
+    { key: 'worldzoom', title: 'World Zoom Quilt', emoji: '🧭', topic: 'learn', url: 'https://worldzoom.nikkki.net/', host: 'worldzoom.nikkki.net', live: 'A zoom you can drag', img: 'img/play/worldzoom.svg', alt: 'Our still sketch of a circle with four arrows. Not the World Zoom Quilt.', blurb: 'A multidirectional infinite zoom you can drag, by Nikolaus Baumgarten, 2019. This card stays still.', btn: 'Play World Zoom Quilt' },
+    { key: 'patatap', title: 'Patatap', emoji: '🎹', topic: 'creative', url: 'https://patatap.com/', host: 'patatap.com', live: 'Tap to make shapes and notes', img: 'img/play/patatap.svg', alt: 'Our still sketch of three coloured circles. Not Patatap.', blurb: 'Tap the screen to make colours, shapes and notes.', warn: 'Warning: contains flashing images. Nothing on this card flashes or makes a sound.', btn: 'Play Patatap' },
+    { key: 'silk', title: 'Silk', emoji: '✨', topic: 'creative', url: 'https://weavesilk.com/', host: 'weavesilk.com', live: 'Draw glowing threads', img: 'img/play/silk.svg', alt: 'Our still sketch of symmetrical curved lines. Not a Silk drawing.', blurb: 'Drag to paint soft, symmetrical glowing threads, by Yuri Vishnevsky. This card stays still.', btn: 'Play Silk' },
+    { key: 'neon', title: 'Neon Flames', emoji: '🔥', topic: 'creative', url: 'https://29a.ch/sandbox/2011/neonflames/', host: '29a.ch', live: 'Draw neon fire trails', img: 'img/play/neon.svg', alt: 'Our still sketch of a neon-coloured curve. Not Neon Flames.', blurb: 'Draw drifting neon fire trails in the browser, by Jonas Wagner. This card stays still.', btn: 'Play Neon Flames' },
+    { key: 'sand', title: 'This Is Sand', emoji: '🏜️', topic: 'creative', url: 'https://thisissand.com/', host: 'thisissand.com', live: 'Pour coloured sand', img: 'img/play/sand.svg', alt: 'Our still sketch of layered sand dunes. Not This Is Sand.', blurb: 'Pour coloured sand into slow, layered pictures. This card stays still.', btn: 'Play This Is Sand' },
+    { key: 'windowswap', title: 'Window-Swap', emoji: '🪟', topic: 'learn', url: 'https://www.window-swap.com/', host: 'window-swap.com', live: 'A real window view, with sound once you open it', img: 'img/play/windowswap.svg', alt: 'Our still sketch of a window frame. Not a Window-Swap view.', blurb: 'Open a real window view somewhere in the world, with the sound of that place. This card stays still and silent.', btn: 'Open Window-Swap' },
+    { key: 'earth', title: 'Earth wind map', emoji: '🌍', topic: 'learn', url: 'https://earth.nullschool.net/', host: 'earth.nullschool.net', live: 'A slowly moving map of wind and weather', img: 'img/play/earth.svg', alt: 'Our still sketch of a globe with wind lines. Not the Earth wind map.', blurb: 'A slowly moving map of wind, weather and ocean currents, by Cameron Beccario. This card stays still.', btn: 'Open Earth wind map' }
+  ];
+  const DISCOVER_BY = Object.fromEntries(DISCOVER.map(d => [d.key, d]));
+  function discoHtml(d) {
+    const warn = d.warn ? `<p class="plwarn">${esc(d.warn)}</p>` : '';
+    return `${head(d.emoji, d.title, 'Still sketch. It opens here when you ask.', 'Discover')}
+      <div class="media"><img src="${esc(d.img)}" alt="${esc(d.alt)}"></div>
+      <div class="bd"><h3>${esc(d.title)}</h3>
+      <p>${esc(d.blurb)}</p>${warn}
+      <div class="xbtns"><button type="button" class="btn pri" data-art="${esc(d.key)}">${esc(d.btn)}</button></div>
+      <p class="plsrc"><a href="${esc(d.url)}" target="_blank" rel="noopener">${esc(d.host)}</a></p></div>`;
+  }
   function render(i) {
     if (!i) return '';
     if (i.x === 'zoomq') return `<article class="card xc zoomq" data-id="${esc(i.id)}" data-topic="learn" style="${styleFor('learn')}">${zoomHtml(i)}</article>`;
     if (i.x === 'fallq') return `<article class="card xc fallq" data-id="${esc(i.id)}" data-topic="creative" style="${styleFor('creative')}">${fallHtml(i)}</article>`;
+    if (i.x === 'artq' && DISCOVER_BY[i.art]) {
+      const d = DISCOVER_BY[i.art];
+      return `<article class="card xc artq" data-id="${esc(i.id)}" data-topic="${esc(d.topic)}" style="${styleFor(d.topic)}">${discoHtml(d)}</article>`;
+    }
     if (i.x !== 'play') return '';
     const st = ensure(i);
     const topic = i.kind === 'sitcom' ? 'sitcoms' : i.kind === 'animal' ? 'nature' : 'kids';
@@ -167,11 +199,20 @@
     add(lo + 8, 'zoom');
     add(lo + 14, 'fall');
     if (n - lo >= 20) add(lo + 19, first === 'sitcom' ? other : 'sitcom');
+    // Two of the twelve discovery sites a day, later in the feed so Zoomquilt and Falling Falling stay put.
+    const da = DISCOVER[(day * 2) % DISCOVER.length].key;
+    const db = DISCOVER[(day * 2 + 1) % DISCOVER.length].key;
+    add(lo + 25, da);
+    add(lo + 31, db);
     return spec;
   }
   function itemFor(kind, day, n) {
     if (kind === 'zoom') return { id: 'zoomq-' + day, x: 'zoomq', topic: 'learn', t: 'Zoomquilt' };
     if (kind === 'fall') return { id: 'fallq-' + day, x: 'fallq', topic: 'creative', t: 'Falling Falling' };
+    if (DISCOVER_BY[kind]) {
+      const d = DISCOVER_BY[kind];
+      return { id: 'artq-' + d.key + '-' + day, x: 'artq', art: d.key, topic: d.topic, t: d.title };
+    }
     const topic = kind === 'sitcom' ? 'sitcoms' : kind === 'animal' ? 'nature' : 'kids';
     const title = kind === 'sitcom' ? 'Sitcom question' : kind === 'animal' ? 'Animal question' : 'Picture match';
     return { id: 'play-' + kind + '-' + day + '-' + n, x: 'play', kind, topic, t: title };
@@ -184,25 +225,39 @@
     plan.forEach((p, n) => out.splice(Math.min(p.at, out.length), 0, itemFor(p.kind, day, n)));
     return out;
   }
-  root.ibPlay = { SITCOM, ANIMAL, TILES, hash, insert, render, slots, quizState, matchState, grade(bank, qi, choice) { const list = bank === 'animal' ? ANIMAL : SITCOM; const q = list[qi]; return !!q && choice === q.a; } };
+  root.ibPlay = { SITCOM, ANIMAL, TILES, DISCOVER, hash, insert, render, slots, quizState, matchState, grade(bank, qi, choice) { const list = bank === 'animal' ? ANIMAL : SITCOM; const q = list[qi]; return !!q && choice === q.a; } };
   if (!root.document) return;
   const prevCard = root.card;
   root.card = function (i) {
-    if (i && (i.x === 'play' || i.x === 'zoomq' || i.x === 'fallq')) return render(i);
+    if (i && (i.x === 'play' || i.x === 'zoomq' || i.x === 'fallq' || i.x === 'artq')) return render(i);
     return prevCard ? prevCard(i) : '';
   };
   const prevFest = root.festive;
   root.festive = function (order, nPins) { order = prevFest ? prevFest(order, nPins) : order; return insert(order, nPins); };
   // Live sites that publish no X-Frame-Options and no CSP frame-ancestors.
   // Checked 2026-11-07: fallingfalling.com and zoomquilt.org both HTTP 200 with neither header.
+  // Checked 2026-11-21: the twelve added discovery sites also had neither header.
   // The frame is created only after a tap. Closing or hiding the page sets the frame to about:blank
   // so their canvas and looping sound unload. No top-navigation, so the framed page cannot take over Info Book.
+  // If a site still frame-busts or the frame comes up blank, open it in a new tab instead.
   // 1.9.164 Version the iframe URL from this script's own ?v= so a cached /feed/tetris page is not reused.
   const VER = ((root.document && root.document.currentScript && /[?&]v=([^&]+)/.exec(root.document.currentScript.src)) || [])[1] || '';
   const gameUrl = name => name + (VER ? '?v=' + VER : '');
   const ART = {
     fall: { url: 'https://fallingfalling.com/', title: 'Falling Falling', host: 'fallingfalling.com', live: 'Moves, and plays a looping sound' },
     zoom: { url: 'https://zoomquilt.org/', title: 'Zoomquilt', host: 'zoomquilt.org', live: 'Zooms on its own' },
+    zq2: { url: 'https://zoomquilt2.com/', title: 'Zoomquilt 2', host: 'zoomquilt2.com', live: 'Zooms on its own' },
+    arkadia: { url: 'https://arkadia.xyz/', title: 'Arkadia', host: 'arkadia.xyz', live: 'Zooms on its own' },
+    flowers: { url: 'https://infiniteflowers.net/', title: 'Infinite Flowers', host: 'infiniteflowers.net', live: 'Zooms on its own' },
+    hydromeda: { url: 'https://hydromeda.org/', title: 'Hydromeda', host: 'hydromeda.org', live: 'Zooms on its own. You can change the speed.' },
+    organic: { url: 'https://organiccity.org/', title: 'Organic City', host: 'organiccity.org', live: 'Zooms on its own' },
+    worldzoom: { url: 'https://worldzoom.nikkki.net/', title: 'World Zoom Quilt', host: 'worldzoom.nikkki.net', live: 'A zoom you can drag' },
+    patatap: { url: 'https://patatap.com/', title: 'Patatap', host: 'patatap.com', live: 'Tap to make shapes and notes' },
+    silk: { url: 'https://weavesilk.com/', title: 'Silk', host: 'weavesilk.com', live: 'Draw glowing threads' },
+    neon: { url: 'https://29a.ch/sandbox/2011/neonflames/', title: 'Neon Flames', host: '29a.ch', live: 'Draw neon fire trails' },
+    sand: { url: 'https://thisissand.com/', title: 'This Is Sand', host: 'thisissand.com', live: 'Pour coloured sand' },
+    windowswap: { url: 'https://www.window-swap.com/', title: 'Window-Swap', host: 'window-swap.com', live: 'A real window view, with sound once you open it' },
+    earth: { url: 'https://earth.nullschool.net/', title: 'Earth wind map', host: 'earth.nullschool.net', live: 'A slowly moving map of wind and weather' },
     // Relative tetris.html is /feed/tetris.html. ship-pages.sh already sends SAMEORIGIN for /feed/tetris.html and /feed/tetris.
     tetris: { url: gameUrl('tetris'), title: 'Tetris', host: 'Info Book', live: 'Sound starts when you tap', local: true },
     // 1.9.147 Scrabble, our own page like Tetris. ship-pages.sh sends SAMEORIGIN for /feed/scrabble too.
@@ -223,11 +278,11 @@
     artWin.setAttribute('role', 'dialog');
     artWin.setAttribute('aria-modal', 'true');
     artWin.setAttribute('aria-labelledby', 'arttitle');
-    artWin.innerHTML = '<div class="artbar"><button type="button" class="artx" data-artclose>Close</button><div class="artmeta"><strong id="arttitle"></strong><a class="artsite" target="_blank" rel="noopener"></a><span class="artlive"></span></div><button type="button" class="artfs" data-artfs hidden>Full screen</button></div><button type="button" class="artfsx" data-artfsx>Exit full screen</button><iframe class="artframe" title="" sandbox="allow-scripts allow-same-origin" allow="autoplay; fullscreen" referrerpolicy="strict-origin-when-cross-origin"></iframe>';
+    artWin.innerHTML = '<div class="artbar"><button type="button" class="artx" data-artclose>Close</button><div class="artmeta"><strong id="arttitle"></strong><a class="artsite" target="_blank" rel="noopener"></a><span class="artlive"></span></div><button type="button" class="artfs" data-artfs hidden>Full screen</button></div><button type="button" class="artfsx" data-artfsx>Exit full screen</button><iframe class="artframe" title="" sandbox="allow-scripts allow-same-origin" allow="autoplay; fullscreen; encrypted-media" referrerpolicy="strict-origin-when-cross-origin"></iframe>';
     root.document.body.appendChild(artWin);
     artFrame = artWin.querySelector('iframe');
-    artFrame.setAttribute('allow', 'autoplay; fullscreen');
-    artFrame.addEventListener('load', () => { if (artWin && artWin.classList.contains('artfull')) tellFrame(true); });
+    artFrame.setAttribute('allow', 'autoplay; fullscreen; encrypted-media');
+    artFrame.addEventListener('load', onArtFrameLoad);
     artWin.addEventListener('click', e => {
       if (e.target.closest('[data-artclose]')) closeArt(false);
       else if (e.target.closest('[data-artfs]')) setFull(true);
@@ -421,11 +476,38 @@
     const next = root.document.createElement('iframe');
     next.className = 'artframe';
     next.setAttribute('sandbox', 'allow-scripts allow-same-origin');
-    next.setAttribute('allow', 'autoplay; fullscreen');
+    next.setAttribute('allow', 'autoplay; fullscreen; encrypted-media');
     next.referrerPolicy = 'strict-origin-when-cross-origin';
-    next.addEventListener('load', () => { if (artWin && artWin.classList.contains('artfull')) tellFrame(true); });
+    next.addEventListener('load', onArtFrameLoad);
     artFrame.replaceWith(next);
     artFrame = next;
+  }
+  function onArtFrameLoad() {
+    if (artWin && artWin.classList.contains('artfull')) tellFrame(true);
+    checkArtEmbed();
+  }
+  // Cross-origin success throws when reading location. A blocked or busted frame often stays on about:blank.
+  function checkArtEmbed() {
+    const spec = artKind && ART[artKind];
+    if (!spec || spec.local || !artFrame) return;
+    const src = artFrame.getAttribute('src') || artFrame.src || '';
+    if (!src || src === 'about:blank') return;
+    let blocked = false;
+    try {
+      const w = artFrame.contentWindow;
+      if (!w) blocked = true;
+      else {
+        const href = String(w.location.href || '');
+        if (!href || href === 'about:blank' || href === 'about:srcdoc') blocked = true;
+      }
+    } catch (e) { blocked = false; }
+    if (blocked) openArtInTab(spec);
+  }
+  function openArtInTab(spec) {
+    if (!spec || !spec.url) return;
+    try { if (typeof closeArt === 'function') closeArt(false); } catch (e) { }
+    try { root.open(spec.url, '_blank', 'noopener,noreferrer'); } catch (e) { }
+    try { if (typeof root.toast === 'function') root.toast(spec.title + ' opened in a new tab'); } catch (e) { }
   }
   function openArt(kind, btn, opts) {
     const spec = ART[kind]; if (!spec) return;
