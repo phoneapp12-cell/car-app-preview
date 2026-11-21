@@ -72,6 +72,27 @@ test('canOpen allows news and family posts, not games or My App life cards', () 
   assert.equal(ibReader.canOpen(fam, { id: 'sh1', t: 'A pink sky over Whangārei', s: 'Just a hello from the porch.', topic: 'family', _share: { name: 'Shane' } }), true);
 });
 
+test('canOpen works for custom story cards, including swipe-row items with nested urls', () => {
+  const rel = { id: 'rel-1', x: 'religion', topic: 'religion', t: 'A local karakia', it: { t: 'A local karakia', s: 'A short blurb.', url: 'https://example.invalid/story' } };
+  const dev = { id: 'd1', x: 'whgdev', topic: 'news', t: 'Housing project', url: 'https://www.nzherald.co.nz/x', dev: { title: 'Housing project', url: 'https://www.nzherald.co.nz/x', desc: 'Habitat for Humanity' } };
+  const tip = { id: 'ht-1', x: 'hometip', topic: 'hometips', t: 'A lunchbox tip', h: { id: 'ht-1', t: 'A lunchbox tip', s: 'Pack snacks first.', url: 'https://kiwifamilies.co.nz/x', img: 'https://example.invalid/t.jpg' } };
+  const crys = { id: 'crys-1', x: 'crys', topic: 'family', t: '💎 Crystal of the week: Rose quartz', c: { n: 'Rose quartz', what: 'Soft pink quartz', wiki: 'https://en.wikipedia.org/wiki/Rose_quartz', img: 'https://example.invalid/c.jpg' } };
+  const card = { classList: { contains: () => false }, querySelector() { return null; }, dataset: { id: rel.id } };
+  const { ibReader } = load({
+    order: [{ id: 'row-religion', x: 'row', k: 'religion', items: [rel] }, dev, tip, crys]
+  });
+  assert.equal(ibReader.itemOf(card).id, 'rel-1');
+  assert.equal(ibReader.canOpen(card), true);
+  assert.equal(ibReader.canOpen(null, dev), true);
+  assert.equal(ibReader.canOpen(null, tip), true);
+  assert.equal(ibReader.canOpen(null, crys), true);
+  const filled = ibReader.withStoryFields(rel);
+  assert.equal(filled.url, 'https://example.invalid/story');
+  const html = ibReader.viewHtml(filled, { wiki: null, paras: [], quotes: [] });
+  assert.match(html, /Read the original/);
+  assert.match(html, /example\.invalid\/story/);
+});
+
 test('viewHtml attributes Wikipedia and always offers Read the original, without inventing text', () => {
   const { ibReader } = load();
   const item = { id: 'n1', t: 'Pōhutukawa starting to bloom along the coast.', s: 'The first red flowers are out on Northland’s shores this week.', url: 'https://www.rnz.co.nz/pohutukawa', sn: 'RNZ', kind: 'news', img: 'https://example.invalid/poh.jpg' };

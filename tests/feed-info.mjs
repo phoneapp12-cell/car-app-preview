@@ -383,7 +383,36 @@ assert.ok(evHtml.includes('Gypsy Fair'));
 assert.ok(evHtml.includes('eventfinda.co.nz'));
 const devHtml = whg.devCard({ id: 'd1', dev: whg.developmentItems(devFix, WHG_NOW)[0] });
 assert.ok(devHtml.includes('wastewater') || devHtml.includes('Construction'));
-assert.ok(devHtml.includes('wdc.govt.nz') || devHtml.includes('Read the story'));
+assert.ok(devHtml.includes('wdc.govt.nz'), 'story URL stays on the card so a tap can open it');
+assert.ok(devHtml.includes('class="media"'));
+assert.ok(!devHtml.includes('Read the story'), 'developments no longer have a Read the story button');
+assert.ok(!devHtml.includes('xbtns'));
+assert.ok(evHtml.includes('Event details'), 'event cards keep Event details ↗ — that goes to the listing, not a duplicate story tap');
+
+const noStoryBtn = p => !/Read the story|Read the tip|Read more ↗/.test(fs.readFileSync(p, 'utf8'));
+assert.ok(noStoryBtn('feed/whg.js'));
+assert.ok(noStoryBtn('feed/ib-preview.js'));
+assert.ok(noStoryBtn('feed/weekly.js'));
+assert.ok(noStoryBtn('feed/extras.js'));
+const ibp = fs.readFileSync('feed/ib-preview.js', 'utf8');
+const extraSrc = fs.readFileSync('feed/extras.js', 'utf8');
+const nzSrc = fs.readFileSync('feed/nz.js', 'utf8');
+const appJs = fs.readFileSync('feed/app.js', 'utf8');
+const expSrc = fs.readFileSync('feed/explain.js', 'utf8');
+assert.ok(fs.readFileSync('feed/whg.js', 'utf8').includes('Event details ↗'));
+assert.ok(ibp.includes('Tickets & info ↗'));
+assert.ok(nzSrc.includes('Whangārei sessions ↗'));
+assert.ok(nzSrc.includes('Film page ↗'));
+assert.ok(extraSrc.includes('Details & tickets ↗'));
+assert.ok(extraSrc.includes('🎟️ Details ↗'));
+assert.ok(extraSrc.includes('Watch on YouTube ↗'));
+assert.ok(extraSrc.includes('Watch on ${esc(w.plat)}'));
+assert.ok(extraSrc.includes('MetService warnings ↗'));
+assert.ok(extraSrc.includes('Northpower outages ↗'));
+assert.ok(extraSrc.includes('More about Slytherin ↗'));
+assert.ok(appJs.includes('Open in My App'));
+assert.ok(appJs.includes('See event &amp; tickets'));
+assert.ok(expSrc.includes('Read more on Wikipedia ↗'), 'explain-sheet Wikipedia link is not a card CTA');
 
 if (fs.existsSync('feed/whg-local.json')) {
   const snap = JSON.parse(fs.readFileSync('feed/whg-local.json', 'utf8'));

@@ -146,3 +146,15 @@ test('theme picker is gone and the feed stays on the standard light theme', () =
   assert.match(html, /<meta name="theme-color" content="#ffffff">/);
   assert.match(html, /color-scheme:light/);
 });
+
+test('swipe-row CTAs and the active pager are red, not pink', () => {
+  assert.match(html, /#feed \.hscroll \.btn\.pri/);
+  assert.match(html, /html\.candy #feed \.hscroll \.btn\.pri/);
+  assert.match(html, /linear-gradient\(135deg,#dc2626,#b91c1c\)/);
+  assert.match(html, /#feed \.hdots i\.on/);
+  assert.match(html, /html\.candy #feed \.hdots i\.on/);
+  assert.match(html, /linear-gradient\(90deg,#dc2626,#b91c1c\)/);
+  assert.match(html, /\.hrhint\{[^}]*color:var\(--acc\)/);
+  assert.match(html, /--hr-title:#1e3a8a/);
+  assert.match(css, /\.today-game\.sr\{background:linear-gradient\(135deg,#ff7eb6,#ffa24c\)\}/);
+});

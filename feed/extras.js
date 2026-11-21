@@ -1223,8 +1223,7 @@ function homeTipCard(i) {
   const t = i.h, host = (() => { try { return new URL(t.url).hostname.replace(/^www\./, ''); } catch (e) { return ''; } })();
   return `<article class="card xc promo hometip" data-id="${esc(t.id)}">${xHead('🏡', 'Home & time-saving tip', t.sn || host, t.nz ? 'NZ tip' : 'Tip')}
     <a class="pimg" href="${esc(t.url)}" target="_blank" rel="noopener"><img src="${esc(t.img)}" alt="" loading="lazy" referrerpolicy="no-referrer"></a>
-    <div class="bd"><h3>${esc(t.t)}</h3>${t.s ? sumHtml(t.s) : ''}
-    <div class="xbtns"><a class="btn pri" href="${esc(t.url)}" target="_blank" rel="noopener">✨ Read the tip ↗</a></div></div></article>`;
+    <div class="bd"><h3>${esc(t.t)}</h3>${t.s ? sumHtml(t.s) : ''}</div></article>`;
 }
 let HT_FOR = null, HT = null;
 const htFestive = window.festive;
@@ -1234,7 +1233,7 @@ window.festive = function (order, nPins) {
   const k = (FEED.updated || 0) + '|' + seenDayN(); if (HT_FOR !== k) { HT_FOR = k; HT = htPick(); }
   if (!HT || order.some(x => x.id === HT.id)) return order;
   const out = order.slice(), at = Math.min(Math.max(2, nPins) + 15 + Math.floor(Math.random() * 5), out.length);
-  out.splice(at, 0, { id: HT.id, x: 'hometip', h: HT, topic: 'hometips', t: HT.t }); return out;
+  out.splice(at, 0, { id: HT.id, x: 'hometip', h: HT, topic: 'hometips', t: HT.t, s: HT.s, url: HT.url, img: HT.img }); return out;
 };
 const cardHt = window.card;
 window.card = function (i) { if (i && i.x === 'hometip') return homeTipCard(i); return cardHt(i); };
