@@ -23,7 +23,7 @@ test('the eight new campaign levels are mapped and carry the intended order reci
   assert.ok(game.LEVELS[57].recipe.candies.length >= 2, 'first recipe requests several candy colours');
   assert.ok(game.LEVELS[57].recipe.specials.some(item => item.kind === 'w'), 'first recipe requires making a wrapped sweet');
   assert.ok(game.LEVELS[59].recipe.combos.some(item => item.kind === 'crisscross'), 'double-stripe order requires a real special swap');
-  assert.ok(game.LEVELS[60].hard && game.LEVELS[60].timer === 90, 'the scarce countdown is marked Hard and lasts 90 seconds');
+  assert.ok(game.LEVELS[60].hard && game.LEVELS[60].timer === 135, 'the scarce countdown is marked Hard and lasts 135 seconds');
   assert.match(game.levelIntro(63).tip, /Popper.*3×3 blast/i);
   assert.match(html, /sugar-rush\.js\?v=1\.9\.290/);
 });
@@ -99,21 +99,21 @@ test('hidden sprites count only when their frosting is fully cracked', () => {
   assert.equal(game.goalsMet(state), true);
 });
 
-test('the 90-second lantern clock can end in either a win or a timeout loss', () => {
+test('the 135-second lantern clock can end in either a win or a timeout loss', () => {
   const level = game.LEVELS[60];
   const won = game.newGame({ level, seed: 506 });
   won.collected[level.collect.color] = level.collect.n;
   won.jelly = won.jelly.map(row => row.map(() => 0));
   const start = won.timerUpdatedAt;
   game.tickTimer(won, start + 18000);
-  assert.equal(won.timerLeft, 72);
-  game.tickTimer(won, start + 90000);
+  assert.equal(won.timerLeft, 117);
+  game.tickTimer(won, start + 135000);
   assert.equal(won.over, true);
   assert.equal(won.timerExpired, true);
   assert.equal(won.won, true);
 
   const lost = game.newGame({ level, seed: 507 });
-  game.tickTimer(lost, lost.timerUpdatedAt + 90000);
+  game.tickTimer(lost, lost.timerUpdatedAt + 135000);
   assert.equal(lost.over, true);
   assert.equal(lost.won, false);
 });
