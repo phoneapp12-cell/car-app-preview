@@ -40,7 +40,12 @@ test('Info Book icons are the light-blue set with cache-busting filenames', () =
   assert.match(idx, /icons\/favicon-32-lb\.png/);
   assert.match(idx, /icons\/apple-touch-icon-lb\.png/);
   assert.ok(man.icons.every(i => /-lb\.png$/.test(i.src)));
+  assert.equal(man.background_color.toLowerCase(), '#c9e4f6');
+  assert.equal(man.theme_color.toLowerCase(), '#c9e4f6');
+  assert.ok(man.icons.filter(i => i.purpose === 'any').every(i => /splash-\d+-lb\.png$/.test(i.src)));
+  assert.ok(man.icons.filter(i => i.purpose === 'maskable').every(i => /maskable-\d+-lb\.png$/.test(i.src)));
   assert.match(sw, /icons\/icon-192-lb\.png/);
+  assert.match(sw, /icons\/splash-512-lb\.png/);
   assert.match(sw, /icons\/logo-lb\.svg/);
   assert.match(app, /feed\/icons\/logo-lb\.svg/);
   assert.match(app, /\['#7EC8F0', '#A8DCF7'\]/);
