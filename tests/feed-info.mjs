@@ -5831,5 +5831,7 @@ console.log('1.9.227 echo and 3 s pace ok');
   assert.ok(typeof S.boostSource === 'function' && typeof S.isBoosted === 'function');
   assert.ok(S.BRAYNIX_AUTHOR === 'braynixgames' && typeof S.isBraynix === 'function');
   assert.ok(fs.existsSync('feed/braynix-local.json'));
+  assert.ok(S.loveRank && S.setLoved && S.isLoved);
+  assert.ok(fs.readFileSync('worker/src/sources.js','utf8').includes('fun-braynix-user'));
 console.log('INF-20 Shorts Reddit + YouTube lane ok');
 }

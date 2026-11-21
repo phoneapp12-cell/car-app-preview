@@ -211,3 +211,62 @@ test('Braynix Games clips from the local catalog get the early slots and stay fa
   assert.ok(after.length && S.isBoosted(after[0]), 'BeAmazed still gets the first leftover slot');
   assert.ok(built.mixed.every(x => !/trump|putin|modi/i.test((x.title || '') + ' ' + (x.credit || ''))));
 });
+
+test('a loved Short boosts similar clips without dropping the Braynix seed or BeAmazed', () => {
+  const S = loadShorts();
+  const pack = { clips: [
+    { vu: '4t9c7bghhy1i1', title: 'Right or Left Rotation? Comment plz', sub: 'opticalillusions', url: 'https://www.reddit.com/r/opticalillusions/comments/1xxmo3p/right_or_left_rotation_comment_plz/', vdur: 41, width: 1080, height: 1920 }
+  ] };
+  const items = [
+    { vk: 'reddit', vu: '4t9c7bghhy1i1', t: 'Right or Left Rotation? Comment plz', url: 'https://www.reddit.com/r/opticalillusions/comments/1xxmo3p/right_or_left_rotation_comment_plz/', topic: 'games', vdur: 41 },
+    { vk: 'reddit', vu: 'pupaaaaaaa', t: 'A sleepy puppy', url: 'https://www.reddit.com/r/aww/comments/x/sleepy/', topic: 'nature', vdur: 12 },
+    { vk: 'reddit', vu: 'pupbbbbbbb', t: 'A golden puppy runs', url: 'https://www.reddit.com/r/aww/comments/x/golden/', topic: 'nature', vdur: 11 },
+    { vk: 'reddit', vu: 'pupccccccc', t: 'Dog treats at home', url: 'https://www.reddit.com/r/rarepuppers/comments/x/treats/', topic: 'dogs', vdur: 13 },
+    { vk: 'reddit', vu: 'amazzzzzzz', t: 'A surprising clip', url: 'https://www.reddit.com/r/BeAmazed/comments/x/s/', topic: 'learn', vdur: 20 },
+    { vk: 'reddit', vu: 'craft11111', t: 'A tidy shelf', url: 'https://www.reddit.com/r/Antiques/comments/x/shelf/', topic: 'collect', vdur: 15 },
+    { vk: 'reddit', vu: 'craft22222', t: 'An old clock', url: 'https://www.reddit.com/r/Antiques/comments/x/clock/', topic: 'collect', vdur: 16 },
+    { vk: 'reddit', vu: 'scuba11111', t: 'A calm reef', url: 'https://www.reddit.com/r/scuba/comments/x/reef/', topic: 'outdoors', vdur: 18 }
+  ];
+  const loves = { pupaaaaaaa: { vu: 'pupaaaaaaa', sub: 'aww', author: '', src: '', topic: 'nature', title: 'A sleepy puppy' } };
+  const built = S.buildCatalog({ items }, { songs: [] }, { pick: ['games', 'nature', 'dogs', 'learn', 'collect', 'outdoors'], optIn: [] }, pack, loves);
+  assert.ok(S.isBraynix(built.mixed[0], pack), 'Braynix still opens the reel');
+  const tail = built.mixed.slice(1);
+  assert.ok(tail.some(S.isBoosted), 'BeAmazed is still in the mix');
+  const awwish = tail.filter(x => /aww|rarepuppers|puppy|Dog /i.test((x.credit || '') + ' ' + (x.title || ''))).length;
+  assert.ok(awwish >= 2, 'loved-alike clips are kept and boosted, got ' + awwish);
+  assert.ok(tail.some(x => /Antiques|scuba/i.test(x.credit || '')), 'other sources still appear');
+  const recs = Object.values(loves);
+  assert.ok(S.loveScore({ vu: 'pupbbbbbbb', sub: 'aww', title: 'A golden puppy runs', topic: 'nature', credit: 'r/aww' }, recs) > 0);
+  const it = { id: 'pupaaaaaaa', vu: 'pupaaaaaaa', title: 'A sleepy puppy', credit: 'r/aww' };
+  const map = S.setLoved(it, true, {});
+  assert.equal(S.isLoved(it, map), true);
+  const off = S.setLoved(it, false, map);
+  assert.equal(S.isLoved(it, off), false);
+});
+
+test('double-tap loves a Short and a single tap still goes to pause', () => {
+  const S = loadShorts();
+  const js = fs.readFileSync(path.join(root, 'feed/shorts.js'), 'utf8');
+  const css = fs.readFileSync(path.join(root, 'feed/shorts.css'), 'utf8');
+  assert.match(js, /data-sh-love/);
+  assert.match(js, /lastTapAt/);
+  assert.match(js, /showHeartBurst/);
+  assert.match(js, /loveVisible\(true/);
+  assert.match(js, /togglePause\(slide\)/);
+  assert.match(css, /\.sh-love/);
+  assert.match(css, /@keyframes sh-burst/);
+  const fam = fs.readFileSync(path.join(root, 'feed/family.js'), 'utf8');
+  assert.match(fam, /shortsLoves/);
+  const sources = fs.readFileSync(path.join(root, 'worker/src/sources.js'), 'utf8');
+  assert.match(sources, /fun-braynix-oi/);
+  assert.match(sources, /fun-braynix-puzzle/);
+  assert.match(sources, /fun-braynix-user/);
+  assert.match(sources, /author: 'braynixgames'/);
+  const worker = fs.readFileSync(path.join(root, 'worker/src/worker.js'), 'utf8');
+  assert.match(worker, /src\.author/);
+  assert.match(worker, /portraitOnly/);
+  assert.match(sources, /modi\|putin\|raga/);
+  const puzzle = S.filterReddit([{ vk: 'reddit', vu: 'pz11111111', t: 'Which cup hides the ball?', url: 'https://www.reddit.com/r/puzzle/comments/x/cup/', topic: 'games', vdur: 20, by: 'braynixgames' }], { pick: ['games'], optIn: [] });
+  assert.equal(puzzle.length, 1, 'Braynix r/puzzle clips are kept even though the sub is not allowlisted');
+  assert.match(puzzle[0].credit, /Braynix Games/);
+});
