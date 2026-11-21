@@ -102,14 +102,20 @@ test('front-basket sweets are the ones that glow', () => {
   assert.deepEqual(colors, [1, 3]);
 });
 
-test('the ukulele and drums speed up as the night goes on', () => {
+test('the music speeds up a gentle two semitones as the night goes on', () => {
   const st0 = { marketRush: true, market: { nightMs: 0 } };
   const stMid = { marketRush: true, market: { nightMs: 75000 } };
   const stEnd = { marketRush: true, market: { nightMs: 150000 } };
+  assert.equal(SR.MARKET_TEMPO_SEMITONES, 2);
   assert.equal(SR.marketTempoRate(st0), 1);
   assert.ok(SR.marketTempoRate(stMid) > SR.marketTempoRate(st0));
   assert.equal(SR.marketTempoRate(stEnd), SR.MARKET_TEMPO_MAX);
-  assert.ok(SR.MARKET_TEMPO_MAX > 1 && SR.MARKET_TEMPO_MAX <= 1.35, 'still mellow at the end of the night');
+  const twoSemis = Math.pow(2, 2 / 12);
+  assert.ok(Math.abs(SR.MARKET_TEMPO_MAX - twoSemis) < 1e-12);
+  // Mid-night is halfway in cents, not halfway in raw rate, so it stays musical.
+  const midWant = Math.pow(2, 1 / 12);
+  assert.ok(Math.abs(SR.marketTempoRate(stMid) - midWant) < 1e-10);
+  assert.ok(SR.MARKET_TEMPO_MAX > 1 && SR.MARKET_TEMPO_MAX < 1.13, 'two semitones keeps vocals musical');
 });
 
 test('weekly takings reset on Sunday and the top seller gets a crown the following week', () => {
@@ -144,10 +150,13 @@ test('finishing a night does not spend a life and uses local takings storage', (
 test('market sound files are hashed and mellow, and the intro film is present', () => {
   assert.equal(SR.MEDIA_HASH['sugar-rush-market-call.mp3'], '8f3686d1');
   assert.equal(SR.MEDIA_HASH['sugar-rush-market-basket.mp3'], '9d329487');
-  assert.equal(SR.MEDIA_HASH['sugar-rush-market.mp3'], '1acbd24c');
+  assert.equal(SR.MEDIA_HASH['sugar-rush-market.m4a'], '1277099c');
+  assert.equal(SR.MEDIA_HASH['sugar-rush-market.mp3'], 'b0e77ad5');
   assert.ok(fs.existsSync('feed/sugar-rush-market-call-8f3686d1.mp3'));
   assert.ok(fs.existsSync('feed/sugar-rush-market-basket-9d329487.mp3'));
-  assert.ok(fs.existsSync('feed/sugar-rush-market-1acbd24c.mp3'));
+  assert.ok(fs.existsSync('feed/sugar-rush-market-1277099c.m4a'));
+  assert.ok(fs.existsSync('feed/sugar-rush-market-b0e77ad5.mp3'));
+  assert.equal(fs.existsSync('feed/sugar-rush-market-1acbd24c.mp3'), false);
   assert.ok(fs.existsSync('feed/img/sugar-rush/island-night-market-intro-9a01c1f8.mp4'));
   assert.ok(fs.existsSync('feed/img/sugar-rush/island-night-market-intro-9a01c1f8.webm'));
   assert.ok(fs.existsSync('feed/img/sugar-rush/island-night-market-intro-9a01c1f8-poster.jpg'));
