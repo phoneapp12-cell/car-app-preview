@@ -13,3 +13,8 @@ html.ib-shorts-on #ib-tabs,html.ib-shorts-on #ibportal,html.ib-shorts-on #ibrise
 .sh-close{top:calc(10px + env(safe-area-inset-top,0px));right:12px}
 .sh-mute{top:calc(10px + env(safe-area-inset-top,0px));left:12px;font-size:1.15rem}
 .sh-empty{margin:auto;padding:24px;color:#ddd;text-align:center;font:600 .95rem system-ui,sans-serif}
+
+.sh-slide iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}
+.sh-ytlab{position:absolute;left:12px;top:calc(62px + env(safe-area-inset-top,0px));z-index:3;padding:4px 8px;border-radius:999px;background:rgba(0,0,0,.55);color:#fff;font:600 .68rem/1.2 system-ui,sans-serif;letter-spacing:.01em;pointer-events:none}
+.sh-cap a.sh-credit{color:#fff;text-decoration:underline;text-underline-offset:2px;pointer-events:auto}
+.sh-cap{pointer-events:none}

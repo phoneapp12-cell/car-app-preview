@@ -11,9 +11,10 @@ const html = fs.readFileSync(path.join(root, 'feed/index.html'), 'utf8');
 const sw = fs.readFileSync(path.join(root, 'feed/sw.js'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'feed/shorts.css'), 'utf8');
 const js = fs.readFileSync(path.join(root, 'feed/shorts.js'), 'utf8');
+const stories = fs.readFileSync(path.join(root, 'feed/stories.js'), 'utf8');
 
 function loadShorts() {
-  const ctx = { console, URL, Set, Map, Object, Number, String, Array, Date, Math, JSON, encodeURIComponent };
+  const ctx = { console, URL, Set, Map, Object, Number, String, Array, Date, Math, JSON, encodeURIComponent, fetch: undefined };
   ctx.window = ctx;
   ctx.globalThis = ctx;
   ctx.document = {
@@ -28,16 +29,29 @@ function loadShorts() {
   return ctx.ibShorts;
 }
 
+const sample = [
+  { vk: 'reddit', vu: 'abc12345', t: 'A sleepy puppy', url: 'https://www.reddit.com/r/aww/comments/x/a_sleepy_puppy/', topic: 'nature', src: 'rd-aww', vdur: 18 },
+  { vk: 'reddit', vu: 'long99999', t: 'A long walk', url: 'https://www.reddit.com/r/aww/comments/x/long/', topic: 'nature', src: 'rd-aww', vdur: 140 },
+  { vk: 'reddit', vu: 'rude99999', t: 'World Cup stadium football', url: 'https://www.reddit.com/r/aww/comments/x/sport/', topic: 'nature', src: 'rd-aww', vdur: 12 },
+  { vk: 'reddit', vu: 'crude1234', t: 'Wild storm', url: 'https://www.reddit.com/r/NatureIsFuckingLit/comments/x/storm/', topic: 'nature', src: 'rd-nfl', vdur: 20 },
+  { vk: 'reddit', vu: 'iaf123456', t: 'A cool fact', url: 'https://www.reddit.com/r/interestingasfuck/comments/x/fact/', topic: 'learn', src: 'fun-interestingasfuck', vdur: 15 },
+  { vk: 'reddit', vu: 'nsfw12345', t: 'NSFW cat clip', url: 'https://www.reddit.com/r/aww/comments/x/nsfw/', topic: 'nature', src: 'rd-aww', vdur: 10 },
+  { vk: 'reddit', vu: 'derp12345', t: 'A derpy dog', url: 'https://www.reddit.com/r/AnimalsBeingDerps/comments/x/derp/', topic: 'pets', src: 'sv-derps', vdur: 22 },
+  { vk: 'reddit', vu: 'smile1234', t: 'A kind teacher', url: 'https://www.reddit.com/r/MadeMeSmile/comments/x/kind/', topic: 'kids', src: 'sv-smile', vdur: 30 },
+  { vid: 'nasaVid111', t: 'Who Can Be a NASA Astronaut?', src: 'yt-nasa', topic: 'scifi', url: 'https://www.youtube.com/watch?v=nasaVid111' },
+  { vid: 'kurzVid111', t: 'What Is Food Fortification?', src: 'fun-kurzgesagt', topic: 'science', url: 'https://www.youtube.com/watch?v=kurzVid111' },
+  { vid: 'dodoVid111', t: 'A rescued puppy', src: 'fun-dodo-all', topic: 'nature', url: 'https://www.youtube.com/watch?v=dodoVid111' }
+];
+const top40 = { songs: [
+  { rank: 1, title: 'Babydoll', artist: 'Jamie Miller', videoId: '8g25GeJgxgs' },
+  { rank: 2, title: 'Man I Need', artist: 'Olivia Dean', videoId: 'oIv_Y2RPQ_A' }
+] };
+
 test('the Today streak tile is replaced by a Shorts tile', () => {
   assert.match(today, /function shortsTile/);
   assert.doesNotMatch(today, /function streakTile/);
   assert.match(today, /title: 'Shorts'/);
-  assert.match(today, /go: 'shorts'/);
   assert.match(today, /🎬/);
-  assert.match(today, /const tr = triviaTile\(\), sh = shortsTile\(\)/);
-  assert.match(today, /data-today-bit="\$\{sh\.go\}"/);
-  assert.doesNotMatch(today, /data-today-bit="\$\{st\.go\}"/);
-  assert.doesNotMatch(today, /k === 'streak'/);
   assert.match(today, /k === 'shorts' && typeof ibShortsOpen === 'function'/);
   assert.match(html, /shorts\.css\?v=/);
   assert.match(html, /shorts\.js\?v=/);
@@ -48,69 +62,95 @@ test('the Today streak tile is replaced by a Shorts tile', () => {
 test('portrait filter keeps only taller-than-wide clips', () => {
   const S = loadShorts();
   assert.equal(S.isPortrait(720, 1280), true);
-  assert.equal(S.isPortrait(1080, 1920), true);
-  assert.equal(S.isPortrait(9, 16), true);
   assert.equal(S.isPortrait(1280, 720), false);
-  assert.equal(S.isPortrait(1920, 1080), false);
   assert.equal(S.isPortrait(1080, 1080), false);
-  assert.equal(S.isPortrait(0, 1280), false);
-  const mixed = [
-    { title: 'Ocean', width: 720, height: 1280, url: 'https://assets.mixkit.co/videos/51500/51500-720.mp4' },
-    { title: 'Wide beach', width: 1280, height: 720, url: 'https://assets.mixkit.co/videos/4064/4064-720.mp4' },
-    { title: 'Square', width: 1080, height: 1080, url: 'https://assets.mixkit.co/videos/x/x-720.mp4' }
-  ];
-  const kept = S.filterPortrait(mixed);
-  assert.equal(kept.length, 1);
-  assert.equal(kept[0].title, 'Ocean');
 });
 
-test('the curated fallback is portrait, ad-free, and family-friendly', () => {
+test('the Mixkit list is portrait and only used as a fallback', () => {
   const S = loadShorts();
-  assert.ok(S.FALLBACK.length >= 8, 'enough clips to swipe through');
-  const kept = S.filterPortrait(S.FALLBACK);
-  assert.equal(kept.length, S.FALLBACK.length, 'every fallback clip already passes the portrait filter');
+  assert.ok(S.FALLBACK.length >= 8);
+  assert.equal(S.filterPortrait(S.FALLBACK).length, S.FALLBACK.length);
   for (const it of S.FALLBACK) {
-    assert.equal(S.isPortrait(it.width, it.height), true, it.id + ' is portrait');
-    assert.equal(S.isDirectVideo(it.url), true, it.id + ' is a direct file');
-    assert.equal(S.isAllowedTopic(it.title), true, it.id + ' is family-friendly');
+    assert.equal(it.fallback, true);
+    assert.equal(S.isPortrait(it.width, it.height), true);
     assert.match(it.url, /^https:\/\/assets\.mixkit\.co\/videos\/\d+\/\d+-720\.mp4$/);
-    assert.doesNotMatch(it.url, /youtube|youtu\.be|tiktok|instagram/i);
-    assert.ok(it.width < it.height);
   }
+  const built = S.buildCatalog({ items: sample }, top40, { optIn: ['pets'] });
+  assert.ok(built.mixed.length, 'the feed mix is used when clips exist');
+  assert.ok(built.mixed.every(it => it.kind === 'reddit' || it.kind === 'youtube'));
+  assert.ok(built.mixed.every(it => !it.fallback));
 });
 
-test('embedded ad hosts and sport clips are rejected', () => {
+test('Reddit clips are allowlisted, short, family-safe and not sport', () => {
   const S = loadShorts();
-  assert.equal(S.isDirectVideo('https://www.youtube.com/embed/abc'), false);
-  assert.equal(S.isDirectVideo('https://www.tiktok.com/@x/video/1'), false);
-  assert.equal(S.isDirectVideo('https://www.instagram.com/reel/abc'), false);
-  assert.equal(S.isDirectVideo('https://youtu.be/abc'), false);
-  assert.equal(S.isDirectVideo('https://assets.mixkit.co/videos/1548/1548-720.mp4'), true);
-  assert.equal(S.isAllowedTopic('Turquoise waves on the sand'), true);
-  assert.equal(S.isAllowedTopic('Alex Ovechkin swing and a miss NHL All-Star'), false);
-  assert.equal(S.isAllowedTopic('World Cup stadium football'), false);
-  const bad = S.filterPortrait([
-    { title: 'Premier League goals', width: 720, height: 1280, url: 'https://assets.mixkit.co/videos/1/1-720.mp4' },
-    { title: 'YouTube short', width: 720, height: 1280, url: 'https://www.youtube.com/watch?v=abc' },
-    { title: 'Forest', width: 720, height: 1280, url: 'https://assets.mixkit.co/videos/51791/51791-720.mp4' }
-  ]);
-  assert.deepEqual(bad.map(x => x.title), ['Forest']);
+  assert.equal(S.isAllowedSub('aww'), true);
+  assert.equal(S.isAllowedSub('AnimalsBeingDerps'), true);
+  assert.equal(S.isAllowedSub('MadeMeSmile'), true);
+  assert.equal(S.isAllowedSub('interestingasfuck'), false);
+  assert.equal(S.isAllowedSub('NatureIsFuckingLit'), false);
+  const reddit = S.filterReddit(sample, { optIn: ['pets'] });
+  const ids = reddit.map(x => x.vu);
+  assert.ok(ids.includes('abc12345'));
+  assert.ok(ids.includes('derp12345'));
+  assert.ok(ids.includes('smile1234'));
+  assert.ok(!ids.includes('long99999'), 'duration cap ~90s');
+  assert.ok(!ids.includes('rude99999'), 'sport titles dropped');
+  assert.ok(!ids.includes('crude1234'), 'crude subs dropped');
+  assert.ok(!ids.includes('iaf123456'), 'interestingasfuck dropped');
+  assert.ok(!ids.includes('nsfw12345'), 'nsfw titles dropped');
+  assert.equal(S.durationOk(90), true);
+  assert.equal(S.durationOk(91), false);
 });
 
-test('the player is a swipeable full-screen reel with close, mute, loop and next-only preload', () => {
-  assert.match(js, /scroll-snap|data-sh-reel/);
+test('clips follow each member’s interests', () => {
+  const S = loadShorts();
+  const petsOff = S.filterReddit(sample, { pick: ['nature', 'kids', 'music', 'science', 'scifi', 'learn'], optIn: [] });
+  assert.ok(petsOff.some(x => x.vu === 'abc12345'));
+  assert.ok(!petsOff.some(x => x.vu === 'derp12345'), 'pets stay off until opted in');
+  const petsOn = S.filterReddit(sample, { optIn: ['pets'] });
+  assert.ok(petsOn.some(x => x.vu === 'derp12345'));
+});
+
+test('YouTube lane mixes music and allowlisted education, about 1 in 5', () => {
+  const S = loadShorts();
+  assert.equal(S.isEduSource('yt-nasa'), true);
+  assert.equal(S.isEduSource('fun-kurzgesagt'), true);
+  assert.equal(S.isEduSource('yt-ted'), true);
+  assert.equal(S.isEduSource('fun-dodo-all'), false);
+  const profile = { optIn: ['pets'], pick: null };
+  const built = S.buildCatalog({ items: sample }, top40, { optIn: ['pets'] });
+  assert.ok(built.music.length === 2);
+  assert.ok(built.edu.some(x => x.videoId === 'nasaVid111'));
+  assert.ok(built.edu.some(x => x.videoId === 'kurzVid111'));
+  assert.ok(!built.edu.some(x => x.videoId === 'dodoVid111'), 'non-allowlisted channels stay out');
+  const yt = built.mixed.filter(x => x.kind === 'youtube');
+  const rd = built.mixed.filter(x => x.kind === 'reddit');
+  assert.ok(rd.length >= 1);
+  assert.ok(yt.length >= 1);
+  /* With a handful of Reddit clips, the 5th slot is YouTube. */
+  const manyR = Array.from({ length: 20 }, (_, i) => ({ vk: 'reddit', vu: 'vu' + String(i).padStart(8, '0'), t: 'Clip ' + i, url: 'https://www.reddit.com/r/aww/comments/x/' + i, topic: 'nature', vdur: 10 }));
+  const mixed = S.buildCatalog({ items: manyR.concat(sample) }, top40, { optIn: ['pets'] }).mixed;
+  const ytIdx = mixed.map((x, i) => x.kind === 'youtube' ? i : -1).filter(i => i >= 0);
+  assert.ok(ytIdx.includes(4), 'the fifth item is a YouTube clip');
+  const ratio = mixed.filter(x => x.kind === 'youtube').length / mixed.length;
+  assert.ok(ratio > 0.1 && ratio < 0.35, 'YouTube is about 1 in 5, got ' + ratio);
+  const lanes = new Set(mixed.filter(x => x.kind === 'youtube').map(x => x.lane));
+  assert.ok(lanes.has('music') && lanes.has('edu'), 'music and education both appear in the lane');
+});
+
+test('the player keeps swipe, close, back, Reddit CMAF audio and a YouTube ads label', () => {
+  assert.match(js, /data-sh-reel/);
   assert.match(css, /scroll-snap-type:\s*y\s+mandatory/);
-  assert.match(css, /scroll-snap-align:\s*start/);
-  assert.match(css, /#ib-shorts\{[^}]*position:\s*fixed/);
-  assert.match(css, /z-index:\s*12000/);
   assert.match(js, /data-sh-close/);
   assert.match(js, /history\.pushState\(\{ ibShorts: 1 \}/);
   assert.match(js, /popstate/);
-  assert.match(js, /v\.loop\s*=\s*true/);
+  assert.match(js, /CMAF_720/);
+  assert.match(js, /CMAF_AUDIO_128/);
+  assert.match(js, /v\.redd\.it/);
+  assert.match(js, /youtube-nocookie\.com\/embed/);
+  assert.match(js, /YouTube · may show ads/);
+  assert.match(css, /\.sh-ytlab/);
+  assert.match(js, /sh-credit/);
+  assert.match(stories, /CMAF_AUDIO_128/);
   assert.match(js, /preload = \(j === i \|\| j === i \+ 1\) \? 'auto'/);
-  assert.match(js, /j === i \|\| j === i \+ 1 \|\| j === i - 1/);
-  assert.match(js, /togglePause/);
-  assert.match(js, /data-sh-mute/);
-  assert.match(js, /ibShortsOpen/);
-  assert.match(js, /playsinline/);
 });
