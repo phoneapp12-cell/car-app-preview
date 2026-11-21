@@ -227,7 +227,7 @@
     } catch (e) { }
     nav.innerHTML = `
       <button type="button" class="${on('all')}" data-tab="all"><span class="ic">▦</span>Today</button>
-      <button type="button" class="${on('notif')}" data-tab="notif" aria-label="Notifications${nLabel}"><span class="ic ib-nbell">🔔${badge}</span>Notices</button>
+      <button type="button" class="${on('notif')}" data-tab="notif" aria-label="Notifications${nLabel}"><span class="ic ib-nbell"><svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 3.2a6.2 6.2 0 0 1 6.2 6.2v3.05l1.5 2.85a.95.95 0 0 1-.85 1.4H5.15a.95.95 0 0 1-.85-1.4l1.5-2.85V9.4A6.2 6.2 0 0 1 12 3.2Zm0 16.3a2.35 2.35 0 0 0 2.2-1.45H9.8A2.35 2.35 0 0 0 12 19.5Z"/></svg>${badge}</span>Notices</button>
       <button type="button" class="${on('games')}" data-tab="games"><span class="ic">✦</span>Games</button>
       <button type="button" class="${on('you')}" data-tab="you"><span class="ic">◉</span>You</button>`;
     document.documentElement.classList.toggle('ib-tab-all', t === 'all');
