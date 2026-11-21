@@ -1882,12 +1882,27 @@ if (live) {
   assert.ok(wrk.includes("p === '/shares/text'") && wrk.includes('priv,at,vis,aud,circ) VALUES (?,?,?,?,4,?,?,?,?)'), 'Worker accepts kind text via POST /shares/text (priv 4)');
   assert.ok(wrk.includes('text: r.priv === 4') && wrk.includes('isUnsafe({ t: text })') && wrk.includes('MAX_TEXT'), 'Worker GET flags text posts and runs the unsafe filter');
   assert.ok(wrk.includes('blockedWhy(text)'), 'Worker also blocks sport and money wording on words posts');
-  // Pictures only may drop text cards; the normal All feed and Family tab must still show them
-  const mediaFn = app.slice(app.indexOf('function mediaFilter'), app.indexOf('function mfChip'));
-  assert.ok(mediaFn.includes("MF === 'all'") && mediaFn.includes('return order'), 'normal All view does not filter out family words posts');
+  // The pictures/videos-only filter is gone; the All feed and Family tab always show the full mix, including words posts
+  const mediaFn = app.slice(app.indexOf('function mediaFilter'), app.indexOf('function sugarOk'));
+  assert.ok(mediaFn.includes('return order') && !mediaFn.includes('mfVideos') && !mediaFn.includes("MF === 'vid'"), 'All view keeps the full mix, including family words posts');
   assert.ok(app.includes("tab === 'family'") && app.includes('drawFamily()') && app.includes('moodLabel(); return;'), 'Family tab draws shares before mediaFilter runs');
   const sharesFor = fam.slice(fam.indexOf('function sharesFor'), fam.indexOf('function weaveShares'));
   assert.ok(sharesFor.includes('unsafe(i)') && !sharesFor.includes("kind === 'text'") && !sharesFor.includes("kind !== 'text'"), 'sharesFor keeps words posts in Family and All (only unsafe / down-voted are dropped)');
+}
+
+// Pictures-only / videos-only view filter removed: the feed always shows the full mix.
+{
+  const app = fs.readFileSync('feed/app.js', 'utf8');
+  const today = fs.readFileSync('feed/today.js', 'utf8');
+  assert.ok(app.includes("var MF = 'all'"));
+  assert.ok(app.includes("ls.set('mediaFilter', 'all')"), 'a saved vid/pic filter is reset to all');
+  assert.ok(!app.includes('data-mfset') && !today.includes('data-mfset'));
+  assert.ok(!app.includes('Videos only') && !app.includes('Pictures only'));
+  assert.ok(!today.includes('Show me') && !today.includes('MF_OPTS'));
+  assert.ok(!app.includes('function mfSet') && !app.includes('function mfChip') && !app.includes('function mfVideos'));
+  const mediaFn = app.slice(app.indexOf('function mediaFilter'), app.indexOf('function sugarOk'));
+  assert.ok(mediaFn.includes('return order'));
+  assert.ok(mediaFn.includes("classList.remove('mf-only')"));
 }
 
 // 1.9.177 Farmyard: the painted animals themselves move (cut-outs), 3D light, and a sunrise from darkness

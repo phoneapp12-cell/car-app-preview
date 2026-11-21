@@ -1030,7 +1030,7 @@ function draw() {
   if (tab === 'all' && FAM_ON) order = weaveShares(order); // 1.7.0: family reposts for everyone
   if (tab !== 'liked') order = order.filter(i => { const hasVid = !!(i && (i.vid || (i.h && i.h.vid) || (i.it && (i.it.vid || (i.it.h && i.it.h.vid))) || (typeof ibPreview !== 'undefined' && ibPreview.playableVid && (ibPreview.playableVid(i) || ibPreview.playableVid(i.it || {}))))); return !(i && !i.pin && !hasVid && (/^r\//i.test(String(i.sn || (i.it && i.it.sn) || '')) || /(reddit\.com|redd\.it)\//i.test(String(i.url || (i.it && i.it.url) || '')))); }); // 1.9.99 also family shares of Reddit posts, except a clip that already has a playable id
   if (tab === 'all') { const P = pins(); order = P.concat(order); if (typeof window.festive === 'function') order = window.festive(order, P.length); } // 1.8.6 pinned specials first; 1.9.1 festive countdowns dropped in at random
-  if (typeof mediaFilter === 'function') order = mediaFilter(order); // 1.9.42 ☰ Videos & pictures / Videos only / Pictures only
+  if (typeof mediaFilter === 'function') order = mediaFilter(order); // pictures/videos-only filter removed: always the full mix
   if (typeof carouselize === 'function') { try { order = carouselize(order); } catch (e) { } } // 1.9.56 ↔ swipe rows
   m.innerHTML = (order.length ? '' : `<div class="empty">${tab === 'liked' ? 'Nothing here yet. Tap 👍 on posts you like and they’ll be kept here.' : 'You’re all caught up ✨ New posts arrive through the day – check back soon.'}</div>`);
   more();
@@ -1067,7 +1067,7 @@ function more() {
   const m = $('#feed'), next = order.slice(shown, shown + PAGE);
   if (!next.length) return;
   shown += next.length;
-  m.insertAdjacentHTML('beforeend', next.map(i => i.topic === 'life' ? lifeCard(i) : card(i)).join('') + (shown < order.length ? '<div class="load" id="sentinel">Loading more…</div>' : `<div class="load">${typeof MF !== 'undefined' && MF === 'vid' ? 'You’re all caught up on videos 🎬' : typeof MF !== 'undefined' && MF === 'pic' ? 'You’re all caught up on pictures 🖼️' : 'You’re all caught up ✨'}</div>`));
+  m.insertAdjacentHTML('beforeend', next.map(i => i.topic === 'life' ? lifeCard(i) : card(i)).join('') + (shown < order.length ? '<div class="load" id="sentinel">Loading more…</div>' : '<div class="load">You’re all caught up ✨</div>'));
   const old = m.querySelectorAll('#sentinel'); old.forEach((s, n) => { if (n < old.length - 1) s.remove(); });
   const flat = next.flatMap(i => i.x === 'row' ? i.items : [i]); // 1.9.56 swipe rows: their cards count like any other
   for (const i of flat) { SEEN[i.id] = (SEEN[i.id] || 0) + 1; if (i.src) IMP[i.src] = (IMP[i.src] || 0) + 1; }
@@ -1300,11 +1300,11 @@ function otherPlayer(el, rec) {
     playVideo() { if (state !== 1) { ifr(fbSrc(muted)); setTimeout(() => mark(true), 900); } }, pauseVideo() { slot.innerHTML = ''; f = null; mark(false); }, getPlayerState: () => state, getDuration: () => 0, seekTo() { }, destroy() { slot.innerHTML = ''; } };
 }
 
-/* ---- 1.9.42 ☰ side menu: swipe in from the left edge (or tap ☰) – Videos & pictures (all), Videos only, Pictures only.
-   Remembered on this phone; a chip under the topics shows it's on, with ✕ to go back to everything. Alerts, pinned
-   specials (weather, power, birthdays, countdowns) and your own My App cards always show. ---- */
-var MF_OPTS = [['all', '🎬🖼️', 'Videos & pictures'], ['vid', '🎬', 'Videos only'], ['pic', '🖼️', 'Pictures only']]; // 1.9.51 var, not const: draw() can run before this line (cached feed) – a const here crashed it
-var MF = ls.get('mediaFilter', 'all'); if (!MF_OPTS.some(o => o[0] === MF)) MF = 'all';
+/* ---- 1.9.42 ☰ side menu: swipe in from the left edge (or tap ☰).
+   The pictures-only / videos-only view filter is gone; the feed always shows the full mix.
+   A saved mediaFilter other than 'all' is cleared so nobody stays stuck in a removed mode. ---- */
+var MF = 'all';
+try { if (ls.get('mediaFilter', 'all') !== 'all') ls.set('mediaFilter', 'all'); } catch (e) { }
 /* 1.9.79 Show My App stuff (Shane's phone only). Themes removed: always the standard light theme. */
 var SHOW_LIFE = ls.get('showLife', 1) !== 0; // default ON
 var APPEAR = 'light'; // ignore any saved appear value and the phone colour scheme
@@ -1350,40 +1350,14 @@ applyAppear();
 /* 1.9.82: new version applied on this open (SW waited) — tiny toast, no reload */
 try { const _lv = ls.get('ibLastVer', ''); if (_lv && _lv !== APP_VERSION) { setTimeout(() => { try { toast('✨ Updated to ' + APP_VERSION); } catch (e) { } }, 1200); try { load(true); } catch (e) { } } ls.set('ibLastVer', APP_VERSION); } catch (e) { }
 
-const mfAlways = i => !!(i.pin || (i.x && !['hometip', 'vlog', 'watch', 'concert'].includes(i.x)) || /^(life|app|ph|you|date|cd|alert)[:-]/.test(String(i.id || '')) || i.topic === 'alerts');
-function mfIsVid(i) { try { return !!(i.vid || (i.x === 'vlog' && i.h && i.h.vid) || (i.h && i.h.vid) || (i.img && vidOf(i)) || (i._share && (i._share.snap || {}).vid)); } catch (e) { return false; } }
-/* 1.9.43 strict: Videos only = only video cards (from every video source: the feed's clips and trailers, vlogs, Reddit/Vimeo,
-   family shares – unseen first, then ones you've already seen so it's never empty); Pictures only = only picture cards
-   (no videos, no alerts, My App, birthdays, countdowns or text-only cards). Videos & pictures = the normal feed.
-   1.9.176 family words posts (kind text) are excluded from Pictures only, which is fine; they still appear in the
-   normal All feed (MF === 'all' returns the order unchanged) and in the Family tab (drawFamily does not run this filter). */
-const mfContent = i => !!i && !i.pin && i.topic !== 'life' && !/^(life|app|ph|you|date|cd|alert|bd)[:-]/.test(String(i.id || '')) && (!i.x || ['hometip', 'vlog', 'watch', 'concert'].includes(i.x)) && i.kind !== 'alert' && i.topic !== 'alerts';
-const mfPic = i => !!(i.img || (i.photos && i.photos.length) || (i.h && i.h.img) || (i._share && ((i._share.snap || {}).img || (i._share.photos || []).length)));
-function mfOk(i) { if (!i) return false; if (VOTES[i.id] && VOTES[i.id].v < 0) return false; const t = (i.t || '') + ' ' + (i.s || ''); if (SPORT.test(t) || unsafe(i)) return false; if (typeof toneW === 'function' && !toneW(i)) return false; if (i.src && weights().drop(i.src)) return false; if (OPTIN.has(i.topic) && !optedIn(i.topic)) return false; return true; }
-function mfVideos(order) {
-  const out = [], ids = new Set(), add = i => { if (!i || ids.has(i.id) || !mfContent(i) || !mfIsVid(i)) return; ids.add(i.id); out.push(i); };
-  order.forEach(add); // what the feed already picked for them, in its order
-  const seen = i => SEEN_BASE.has(i.id) || (SEEN[i.id] || 0) > 0;
-  const vl = ((FEED && FEED.vlogs) || []).filter(v => v.vid && v.img && mfOk(v)).map(v => ({ id: v.id, x: 'vlog', h: v, topic: 'vlogs', t: v.t, at: v.at }));
-  const fv = ((FEED && FEED.items) || []).filter(i => mfIsVid(i) && mfOk(i));
-  const mine = fv.filter(i => topicOn(i.topic) && !intHidden(i)), other = fv.filter(i => !(topicOn(i.topic) && !intHidden(i)));
-  const rest = (typeof rank === 'function' ? rank(mine) : mine).concat(typeof vlScore === 'function' ? vl.sort((a, b) => vlScore(b.h) - vlScore(a.h)) : vl, other.sort((a, b) => (b.at || 0) - (a.at || 0)));
-  rest.filter(i => !seen(i) && !(typeof wasSeen === 'function' && wasSeen(i))).forEach(add); // unseen only; a seen clip is not shown again
-  return out;
-}
 function mediaFilter(order) {
-  if (!MF_OPTS || !MF) return order; // 1.9.51 still starting up
-  mfChip(); if (MF === 'all') return order;
-  if (MF === 'vid') return mfVideos(order);
-  return order.filter(i => mfContent(i) && !mfIsVid(i) && mfPic(i));
+  // Always the full mix. Clear any leftover filter chip from an older version.
+  MF = 'all';
+  const c = document.getElementById('mfchip');
+  if (c) { c.hidden = true; c.innerHTML = ''; }
+  document.documentElement.classList.remove('mf-only');
+  return order;
 }
-function mfChip() {
-  let c = document.getElementById('mfchip');
-  if (!c) { c = document.createElement('div'); c.id = 'mfchip'; c.className = 'mfchip'; const n = document.getElementById('chips'); n && n.after(c); }
-  const o = MF_OPTS.find(x => x[0] === MF); c.hidden = MF === 'all'; document.documentElement.classList.toggle('mf-only', MF !== 'all'); // 1.9.43 strict: no install/extra banners either
-  c.innerHTML = MF === 'all' ? '' : `<button type="button" data-mfset="all" aria-label="Show videos and pictures">${o[1]} ${o[2]} <b>✕</b></button>`;
-}
-function mfSet(v) { MF = v; ls.set('mediaFilter', v); mfDrawer(false); try { draw(); scrollTo(0, 0); } catch (e) { } toast(MF_OPTS.find(x => x[0] === v)[2]); }
 // 1.9.228 Sugar Rush is open to every family member (it was Shane-only from 1.9.166 to 1.9.227).
 function sugarOk() { return true; }
 function sugarOpt() { return '<button type="button" class="mfopt" data-art="sugar"><span class="mfe">🍬</span><span>Play Sugar Rush</span></button>'; }
@@ -1407,10 +1381,10 @@ function mfDrawer(open) {
   let d = document.getElementById('mfdrawer');
   if (!d) {
     d = document.createElement('div'); d.id = 'mfdrawer'; d.className = 'mfdrawer';
-    d.innerHTML = `<div class="mfscrim" data-mfclose></div><nav class="mfpanel" aria-label="Menu"><div class="mfhd"><b>Menu</b><button type="button" class="ib" data-mfclose aria-label="Close menu">✕</button></div><div class="mfopts"></div><div class="mfextra"></div><p class="mfnote">Interests are in their own list. Videos only / Pictures only filter the All feed. Alerts still notify.</p></nav>`;
+    d.innerHTML = `<div class="mfscrim" data-mfclose></div><nav class="mfpanel" aria-label="Menu"><div class="mfhd"><b>Menu</b><button type="button" class="ib" data-mfclose aria-label="Close menu">✕</button></div><div class="mfopts"></div><div class="mfextra"></div><p class="mfnote">Interests are in their own list. Alerts still notify.</p></nav>`;
     document.body.append(d);
   }
-  d.querySelector('.mfopts').innerHTML = `<p class="mfsec">Show me</p>` + MF_OPTS.map(o => `<button type="button" class="mfopt${o[0] === MF ? ' on' : ''}" data-mfset="${o[0]}" role="menuitemradio" aria-checked="${o[0] === MF}"><span class="mfe">${o[1]}</span><span>${o[2]}</span>${o[0] === MF ? '<i>✓</i>' : ''}</button>`).join('');
+  d.querySelector('.mfopts').innerHTML = '';
   const extra = d.querySelector('.mfextra');
   const kept = d.querySelector('.mfpanel').scrollTop;
   let x = '';
@@ -1438,7 +1412,6 @@ function mfDrawer(open) {
     if (t.closest('[data-intmenu]')) { e.preventDefault(); INT_OPEN = !INT_OPEN; mfDrawer(true); return; }
     const io = t.closest('[data-intoff]'); if (io) { e.preventDefault(); e.stopPropagation(); const n = io.dataset.intoff; if (!INT_BY_NAME.has(n)) return; if (INT_OFF[n]) delete INT_OFF[n]; else INT_OFF[n] = 1; ls.set('intOff', INT_OFF); for (const i of (FEED && FEED.items) || []) delete i._ints; INT_OPEN = true; mfDrawer(true); try { const sheet = document.getElementById('sheet'); if (sheet && sheet.classList.contains('on')) { const y = sheet.scrollTop; settings(); sheet.scrollTop = y; } } catch (err) { } try { draw(); } catch (err) { } toast((INT_OFF[n] ? 'Off: ' : 'On: ') + n); return; }
     if (t.closest('[data-soon]')) { e.preventDefault(); mfDrawer(false); if (window.ibSoon) window.ibSoon(); return; }
-    const sb = t.closest('[data-mfset]'); if (sb) { e.preventDefault(); mfSet(sb.dataset.mfset); return; }
     const lb = t.closest('[data-showlife]'); if (lb) { e.preventDefault(); SHOW_LIFE = !SHOW_LIFE; ls.set('showLife', SHOW_LIFE ? 1 : 0); mfDrawer(true); try { draw(); } catch (err) { } toast(SHOW_LIFE ? 'My App stuff: on' : 'My App stuff: off'); return; }
     if (t.closest('[data-mfclose]')) mfDrawer(false);
   });
