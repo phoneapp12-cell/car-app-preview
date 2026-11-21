@@ -1508,8 +1508,9 @@ assert.ok(/Big Bang Theory/.test(odData.refresh));
 const od = load('feed/on-demand.js').ibOnDemand;
 od.setData(odData);
 const odShows = od.visibleShows();
-assert.ok(odShows.length >= 5, 'sitcoms plus a family comedy');
+assert.ok(odShows.length >= 7, 'existing shows plus family-friendly official additions');
 assert.strictEqual(odShows[0].kind, 'sitcom');
+assert.deepStrictEqual(odShows.map(s => s.id), ['red-green', 'beverly-hillbillies', 'lucy-show', 'andy-griffith', 'mr-bean', 'junior-taskmaster', 'studio-c']);
 assert.ok(odShows.some(s => s.id === 'mr-bean' && s.kind === 'comedy'));
 const counts = Object.fromEntries(odShows.map(s => [s.id, s.episodes.length]));
 assert.ok(counts['red-green'] >= 280, JSON.stringify(counts));
@@ -1517,6 +1518,10 @@ assert.strictEqual(counts['beverly-hillbillies'], 54);
 assert.strictEqual(counts['lucy-show'], 30);
 assert.strictEqual(counts['andy-griffith'], 2);
 assert.strictEqual(counts['mr-bean'], 14);
+assert.strictEqual(counts['junior-taskmaster'], 8);
+assert.strictEqual(counts['studio-c'], 21);
+assert.ok(!odShows.some(s => /katering|the guild|whose line|taskmaster uk|taskmaster nz/i.test(s.id + ' ' + s.title)));
+assert.ok(!/adult humour/i.test(JSON.stringify(odData)));
 assert.ok(!odShows.some(s => /big bang|young sheldon|neon|sport/i.test(s.title + ' ' + (s.episodes || []).map(e => e.t).join(' '))));
 assert.ok(!odShows.some(s => (s.episodes || []).some(e => e.season === 5 && e.ep === 18 && s.id === 'lucy-show')), 'Lucy S5E18 is still copyrighted');
 assert.ok(!counts['beverly-hillbillies'] || !od.showById('beverly-hillbillies').episodes.some(e => e.season === 2 && e.ep > 19));
@@ -1539,6 +1544,13 @@ for (const s of odShows) {
     }
   }
 }
+assert.strictEqual(od.OFFICIAL['UCT5C7yaO3RVuOgwP8JVAujQ'], 'Taskmaster');
+assert.strictEqual(od.OFFICIAL['UCsZXuHKonP9utl5q2hFCkgA'], 'StudioCtv');
+const jtm0 = od.showById('junior-taskmaster').episodes[0];
+assert.strictEqual(jtm0.vid, '0PZLw6-CvvI');
+assert.ok(od.playerSrc(jtm0).src.startsWith('https://www.youtube-nocookie.com/embed/0PZLw6-CvvI'));
+const scShow = od.showById('studio-c');
+assert.ok(scShow.episodes.every(e => e.vid && od.playerSrc(e).type === 'youtube'));
 const rg0 = od.showById('red-green').episodes[0];
 assert.strictEqual(rg0.vid, 'FUXPuYZ4DEQ');
 const bean = od.showById('mr-bean').episodes;
@@ -1568,7 +1580,7 @@ assert.ok(nz.cineish({ x: 'row', k: 'ondemand' }));
 assert.strictEqual(od.allowedShow({ title: 'The Big Bang Theory', source: 'youtube', official: true, ads: true, channelId: 'UCsfIjK5sy9Upzcf316Xpytw', episodes: [{ id: 'x', t: 'Pilot', vid: 'abcdefghijk' }] }), false);
 assert.strictEqual(od.playerSrc({ id: 'x', t: 'Nope', vid: 'short' }), null);
 const odPage = od.pageHtml();
-assert.ok(odPage.includes('today-od-page') && odPage.includes('today-od-grid') && odPage.includes('The Red Green Show') && odPage.includes('Mr. Bean'));
+assert.ok(odPage.includes('today-od-page') && odPage.includes('today-od-grid') && odPage.includes('The Red Green Show') && odPage.includes('Mr. Bean') && odPage.includes('Junior Taskmaster') && odPage.includes('Studio C'));
 const todaySrc = fs.readFileSync('feed/today.js', 'utf8');
 const paintTabs = todaySrc.slice(todaySrc.indexOf('function paintTabs'), todaySrc.indexOf('function avHtml'));
 assert.ok(paintTabs.includes('data-tab="ondemand"') && /On demand/.test(paintTabs));

@@ -1,6 +1,6 @@
 {
   "checked": "2026-11-21",
-  "refresh": "Re-list official YouTube season playlists on @RedGreenTV (channel UCsfIjK5sy9Upzcf316Xpytw) and the 14 official live-action full episodes on @MrBean (UCkAGrHCLFmlK3H2kd6isipg). Keep only videos still on those channels, about 20–40 minutes long, and embeddable (HTTP 200 from https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v=VIDEO_ID). For Archive.org, keep only episodes on the documented public-domain lists: The Beverly Hillbillies season 1 and the first 19 season-2 episodes (Orion/Filmways did not renew); the 30 Lucy Show episodes that lapsed (two from season 1, 21 from season 5 not including “Lucy Puts Main Street on the Map”, and seven from season 6); and the 16 season-3 Andy Griffith episodes that lapsed — this file only includes the two of those with a clear public-domain licence and a working mp4. Confirm each mp4 still returns video/mp4 at its /download/ URL. Do not add The Big Bang Theory or any show that is not legally free. No Neon, no sport, no unofficial YouTube uploads.",
+  "refresh": "Re-list official YouTube season playlists on @RedGreenTV (channel UCsfIjK5sy9Upzcf316Xpytw) and the 14 official live-action full episodes on @MrBean (UCkAGrHCLFmlK3H2kd6isipg). For Junior Taskmaster, keep only official full episodes from the Taskmaster channel (UCT5C7yaO3RVuOgwP8JVAujQ) “Junior Taskmaster - Season 1 | Full Episodes” playlist. For Studio C, keep only official videos titled Full Episode on @StudioCtv (UCsZXuHKonP9utl5q2hFCkgA). Keep only videos still on those official channels and embeddable (HTTP 200 from https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v=VIDEO_ID, with a youtube.com/embed player, and a youtube-nocookie embed page that loads without an unavailability message). Where a country list is available, drop any episode that is not playable in New Zealand. For Archive.org, keep only episodes on the documented public-domain lists: The Beverly Hillbillies season 1 and the first 19 season-2 episodes (Orion/Filmways did not renew); the 30 Lucy Show episodes that lapsed (two from season 1, 21 from season 5 not including “Lucy Puts Main Street on the Map”, and seven from season 6); and the 16 season-3 Andy Griffith episodes that lapsed — this file only includes the two of those with a clear public-domain licence and a working mp4. Confirm each mp4 still returns video/mp4 at its /download/ URL. Do not add The Big Bang Theory or any show that is not legally free. No Neon, no sport, no unofficial YouTube uploads. No adult shows: do not add The Katering Show, The Guild (TV-14, strong language from episode 1), Taskmaster UK, Taskmaster NZ, or Whose Line Is It Anyway? (Taskmaster UK/NZ have strong language in essentially every episode; the official YouTube full episodes are not the Bleeped family edits, which live on Channel 4 and SuperMax+. Whose Line’s innuendo is central and cannot be certified family-friendly episode by episode without watching).",
   "shows": [
     {
       "id": "red-green",
@@ -2697,7 +2697,8 @@
           "vid": "8q5dfFMre40",
           "no": 300
         }
-      ]
+      ],
+      "order": 10
     },
     {
       "id": "beverly-hillbillies",
@@ -3251,7 +3252,8 @@
           "mp4": "https://archive.org/download/bevhill-s01e01-36/s02e19_The_Race_For_Queen.mp4",
           "item": "bevhill-s01e01-36"
         }
-      ]
+      ],
+      "order": 20
     },
     {
       "id": "lucy-show",
@@ -3565,7 +3567,8 @@
           "mp4": "https://archive.org/download/the-lucy-show/S6E8%20LUCY%20AND%20ROBERT%20GOULET.mp4",
           "item": "the-lucy-show"
         }
-      ]
+      ],
+      "order": 30
     },
     {
       "id": "andy-griffith",
@@ -3599,7 +3602,8 @@
           "mp4": "https://archive.org/download/Andy_Griffith_The_Bighouse/Bighouse_512kb.mp4",
           "item": "Andy_Griffith_The_Bighouse"
         }
-      ]
+      ],
+      "order": 40
     },
     {
       "id": "mr-bean",
@@ -3740,6 +3744,279 @@
           "mins": 26,
           "dur": 1566,
           "vid": "hz_e7SRecWw"
+        }
+      ],
+      "order": 50
+    },
+    {
+      "id": "junior-taskmaster",
+      "title": "Junior Taskmaster",
+      "kind": "family",
+      "topic": "sitcoms",
+      "source": "youtube",
+      "channel": "Taskmaster",
+      "channelId": "UCT5C7yaO3RVuOgwP8JVAujQ",
+      "official": true,
+      "ads": true,
+      "order": 60,
+      "label": "YouTube · may show ads",
+      "poster": "https://static.tvmaze.com/uploads/images/medium_portrait/553/1382754.jpg",
+      "about": "Official full episodes of the family spin-off, posted by the Taskmaster channel.",
+      "episodes": [
+        {
+          "id": "jtm-s01e01",
+          "t": "Happy birthday bandana",
+          "season": 1,
+          "ep": 1,
+          "mins": 46,
+          "dur": 2748,
+          "vid": "0PZLw6-CvvI"
+        },
+        {
+          "id": "jtm-s01e02",
+          "t": "Would a bird fly?",
+          "season": 1,
+          "ep": 2,
+          "mins": 46,
+          "dur": 2755,
+          "vid": "vVCH1nuATcE"
+        },
+        {
+          "id": "jtm-s01e03",
+          "t": "Rustic shin pad",
+          "season": 1,
+          "ep": 3,
+          "mins": 46,
+          "dur": 2758,
+          "vid": "q-Di6C3RQ9I"
+        },
+        {
+          "id": "jtm-s01e04",
+          "t": "Overthinking overthinking",
+          "season": 1,
+          "ep": 4,
+          "mins": 46,
+          "dur": 2751,
+          "vid": "1u5d_KgdR7c"
+        },
+        {
+          "id": "jtm-s01e05",
+          "t": "Nice shiny buttons",
+          "season": 1,
+          "ep": 5,
+          "mins": 46,
+          "dur": 2742,
+          "vid": "j8Hxx53GH7E"
+        },
+        {
+          "id": "jtm-s01e06",
+          "t": "You can’t milk a pigeon",
+          "season": 1,
+          "ep": 6,
+          "mins": 46,
+          "dur": 2745,
+          "vid": "Jts2nhjEKgI"
+        },
+        {
+          "id": "jtm-s01e07",
+          "t": "Shout-out to slow maths",
+          "season": 1,
+          "ep": 7,
+          "mins": 46,
+          "dur": 2746,
+          "vid": "jZv0SQj9Z8k"
+        },
+        {
+          "id": "jtm-s01e08",
+          "t": "Balloon carcasses",
+          "season": 1,
+          "ep": 8,
+          "mins": 46,
+          "dur": 2754,
+          "vid": "Dkdcggh1SbU"
+        }
+      ]
+    },
+    {
+      "id": "studio-c",
+      "title": "Studio C",
+      "kind": "family",
+      "topic": "sitcoms",
+      "source": "youtube",
+      "channel": "StudioCtv",
+      "channelId": "UCsZXuHKonP9utl5q2hFCkgA",
+      "official": true,
+      "ads": true,
+      "order": 70,
+      "label": "YouTube · may show ads",
+      "poster": "https://static.tvmaze.com/uploads/images/medium_portrait/538/1346512.jpg",
+      "about": "Official full episodes of this clean, family sketch-comedy show from BYUtv.",
+      "episodes": [
+        {
+          "id": "sc-s05e01",
+          "t": "Season 5 Episode 1",
+          "mins": 26,
+          "dur": 1537,
+          "vid": "rFAPxrbYyBM",
+          "season": 5,
+          "ep": 1
+        },
+        {
+          "id": "sc-s05e02",
+          "t": "Season 5 Episode 2",
+          "mins": 25,
+          "dur": 1517,
+          "vid": "_WM-qDOZW9M",
+          "season": 5,
+          "ep": 2
+        },
+        {
+          "id": "sc-s05e03",
+          "t": "Season 5 Episode 3",
+          "mins": 25,
+          "dur": 1498,
+          "vid": "qArn40TbxQs",
+          "season": 5,
+          "ep": 3
+        },
+        {
+          "id": "sc-s05e04",
+          "t": "Season 5 Episode 4",
+          "mins": 27,
+          "dur": 1596,
+          "vid": "mxGTAqW312A",
+          "season": 5,
+          "ep": 4
+        },
+        {
+          "id": "sc-s05e05",
+          "t": "Season 5 Episode 5",
+          "mins": 25,
+          "dur": 1497,
+          "vid": "6seUwQ3O8NM",
+          "season": 5,
+          "ep": 5
+        },
+        {
+          "id": "sc-s05e06",
+          "t": "Season 5 Episode 6",
+          "mins": 25,
+          "dur": 1508,
+          "vid": "eL5kOSh-riM",
+          "season": 5,
+          "ep": 6
+        },
+        {
+          "id": "sc-s05e07",
+          "t": "Season 5 Episode 7",
+          "mins": 26,
+          "dur": 1569,
+          "vid": "YLSnTDYAeX4",
+          "season": 5,
+          "ep": 7
+        },
+        {
+          "id": "sc-s05e08",
+          "t": "Season 5 Episode 8",
+          "mins": 26,
+          "dur": 1537,
+          "vid": "1MTXG0enwTk",
+          "season": 5,
+          "ep": 8
+        },
+        {
+          "id": "sc-christmas-special-season-12",
+          "t": "Christmas Special Season 12",
+          "mins": 45,
+          "dur": 2686,
+          "vid": "GA3uy7yUiyE",
+          "season": 12
+        },
+        {
+          "id": "sc-halloween-special-season-12",
+          "t": "Halloween Special Season 12",
+          "mins": 26,
+          "dur": 1560,
+          "vid": "osoO4ClBb9s",
+          "season": 12
+        },
+        {
+          "id": "sc-christmas-special-season-14",
+          "t": "Christmas Special Season 14",
+          "mins": 26,
+          "dur": 1576,
+          "vid": "qZY6yQzDH4U",
+          "season": 14
+        },
+        {
+          "id": "sc-100th-special",
+          "t": "100th Special",
+          "mins": 22,
+          "dur": 1340,
+          "vid": "NUbVeDDKa0Y"
+        },
+        {
+          "id": "sc-200th-special",
+          "t": "200th Special",
+          "mins": 57,
+          "dur": 3426,
+          "vid": "W6sAOuVSwto"
+        },
+        {
+          "id": "sc-a-musical-wedding",
+          "t": "A Musical Wedding",
+          "mins": 27,
+          "dur": 1631,
+          "vid": "Q8Rs3BMVx7k"
+        },
+        {
+          "id": "sc-i-m-dead-part-435-with-rainn-wilson",
+          "t": "I'm Dead Part 435 with Rainn Wilson",
+          "mins": 23,
+          "dur": 1389,
+          "vid": "6eaJNYYdP34"
+        },
+        {
+          "id": "sc-jack-mcbrayer-knows-you-re-not-real",
+          "t": "Jack McBrayer Knows You're Not Real",
+          "mins": 21,
+          "dur": 1257,
+          "vid": "XTOVqfXekUI"
+        },
+        {
+          "id": "sc-josh-peck-is-pretty-pretty-dope",
+          "t": "Josh Peck is Pretty Pretty Dope",
+          "mins": 22,
+          "dur": 1324,
+          "vid": "HJu4aS9fic0"
+        },
+        {
+          "id": "sc-pierson-manifests-you-zip-your-lips",
+          "t": "Pierson Manifests You Zip Your Lips",
+          "mins": 23,
+          "dur": 1376,
+          "vid": "Ng0eojnflu0"
+        },
+        {
+          "id": "sc-steven-he-s-emotional-damage",
+          "t": "Steven He's Emotional Damage",
+          "mins": 22,
+          "dur": 1304,
+          "vid": "HrChiFj4jmQ"
+        },
+        {
+          "id": "sc-terry-crews-is-sorry-it-didn-t-work-out",
+          "t": "Terry Crews is Sorry It Didn't Work Out",
+          "mins": 24,
+          "dur": 1431,
+          "vid": "yGhjAfGoZMM"
+        },
+        {
+          "id": "sc-will-forte-is-missing",
+          "t": "Will Forte is Missing",
+          "mins": 29,
+          "dur": 1734,
+          "vid": "Ex65LT9_-Lc"
         }
       ]
     }

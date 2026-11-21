@@ -6,7 +6,9 @@
   const JSON_URL = 'on-demand.json?v=1.9.310';
   const OFFICIAL = {
     UCsfIjK5sy9Upzcf316Xpytw: 'RedGreenTV',
-    UCkAGrHCLFmlK3H2kd6isipg: 'MrBean'
+    UCkAGrHCLFmlK3H2kd6isipg: 'MrBean',
+    UCT5C7yaO3RVuOgwP8JVAujQ: 'Taskmaster',
+    UCsZXuHKonP9utl5q2hFCkgA: 'StudioCtv'
   };
   const SPORT = /\b(sport|rugby|nrl|afl|nfl|nba|nhl|cricket|netball|football|soccer|wwe|wrestling|boxing)\b/i;
   const BLOCKED = /\b(neon|neontv|the big bang theory|young sheldon)\b/i;
@@ -34,7 +36,7 @@
   }
   function allowedEpisode(e) {
     if (!e || !e.t || !e.id) return false;
-    if (SPORT.test(e.t) || BLOCKED.test(e.t)) return false;
+    if (BLOCKED.test(e.t)) return false;
     if (e.vid) return /^[\w-]{11}$/.test(e.vid);
     if (e.mp4) return /^https:\/\/archive\.org\/download\/[^\s]+$/i.test(e.mp4);
     return false;
@@ -47,6 +49,9 @@
       return Object.assign({}, s, { episodes });
     }).filter(s => s.episodes.length);
     list.sort((a, b) => {
+      const ao = Number.isFinite(a.order) ? a.order : 1000;
+      const bo = Number.isFinite(b.order) ? b.order : 1000;
+      if (ao !== bo) return ao - bo;
       const ak = a.kind === 'sitcom' ? 0 : 1, bk = b.kind === 'sitcom' ? 0 : 1;
       if (ak !== bk) return ak - bk;
       return 0;
