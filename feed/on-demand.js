@@ -8,7 +8,9 @@
     UCsfIjK5sy9Upzcf316Xpytw: 'RedGreenTV',
     UCkAGrHCLFmlK3H2kd6isipg: 'MrBean',
     UCT5C7yaO3RVuOgwP8JVAujQ: 'Taskmaster',
-    UCsZXuHKonP9utl5q2hFCkgA: 'StudioCtv'
+    UCx9l0FfNQ3G79_9SBxkhR9g: 'TaskmasterInternational',
+    UCsZXuHKonP9utl5q2hFCkgA: 'StudioCtv',
+    UCKg_ZFByYTINckLG76cjUEg: 'WhoseLineIsItAnyway'
   };
   const SPORT = /\b(sport|rugby|nrl|afl|nfl|nba|nhl|cricket|netball|football|soccer|wwe|wrestling|boxing)\b/i;
   const BLOCKED = /\b(neon|neontv|the big bang theory|young sheldon)\b/i;
