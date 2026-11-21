@@ -337,6 +337,7 @@
       browse.push(`<button type="button" class="mfopt${t === 'all' ? ' on' : ''}" data-mftab="all"><span class="mfe">▦</span><span>Today</span>${t === 'all' ? '<i>✓</i>' : ''}</button>`);
       browse.push(`<button type="button" class="mfopt${t === 'people' ? ' on' : ''}" data-mftab="people"><span class="mfe">☺</span><span>People</span>${t === 'people' ? '<i>✓</i>' : ''}</button>`);
       browse.push(`<button type="button" class="mfopt${t === 'you' ? ' on' : ''}" data-mftab="you"><span class="mfe">◉</span><span>You</span>${t === 'you' ? '<i>✓</i>' : ''}</button>`);
+      browse.push(`<button type="button" class="mfopt" data-todo-open><span class="mfe">✓</span><span>To-do list</span></button>`);
       if (typeof FAM_ON !== 'undefined' && FAM_ON) {
         const label = friend ? 'Friends feed' : 'Family feed';
         browse.push(`<button type="button" class="mfopt${t === 'family' ? ' on' : ''}" data-mftab="family"><span class="mfe">${friend ? '🤝' : '👨‍👩‍👧'}</span><span>${label}</span>${t === 'family' ? '<i>✓</i>' : ''}</button>`);

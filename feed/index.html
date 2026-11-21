@@ -8,12 +8,12 @@
 <meta name="description" content="Shane's private photo and video feed. No likes, comments or followers.">
 <meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-<link rel="stylesheet" href="today.css?v=1.9.300">
-<link rel="stylesheet" href="cal-book.css?v=1.9.300">
-<link rel="stylesheet" href="reader.css?v=1.9.300">
+<link rel="stylesheet" href="today.css?v=1.9.301">
+<link rel="stylesheet" href="cal-book.css?v=1.9.301">
+<link rel="stylesheet" href="reader.css?v=1.9.301">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icons/favicon-32-lb.png?v=1.9.300" sizes="32x32"><link rel="icon" href="icons/logo-lb.svg?v=1.9.300" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon-lb.png?v=1.9.300">
+<link rel="icon" href="icons/favicon-32-lb.png?v=1.9.301" sizes="32x32"><link rel="icon" href="icons/logo-lb.svg?v=1.9.301" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon-lb.png?v=1.9.301">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Info Book">
 <style>
@@ -719,12 +719,36 @@ body[data-artopen] .artwin{overscroll-behavior:none}body[data-artopen] .artbar{o
 #scrayourhost{max-width:640px;margin:0 auto;padding:12px 10px 0}#scrayourhost:empty{display:none;padding:0}
 .scrayour{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left;padding:14px 16px;border-radius:16px;background:var(--card);color:var(--ink);border:2px solid var(--acc);box-shadow:var(--shadow);font-weight:800;font-size:1.15rem;cursor:pointer}
 .scrayour small{display:block;font-weight:600;color:var(--mute);font-size:.85rem}#scrayourhost .scraycancel{display:block;width:100%;margin-top:8px;padding:10px 16px;border-radius:14px;background:transparent;color:var(--ink);border:1px solid var(--line,rgba(127,127,127,.35));font-weight:700}
+.ib-todo{--todo-accent:var(--acc,#8b5cf6)}
+.ib-todo-heading{display:flex;align-items:center;gap:12px;margin:0 0 8px}
+.ib-todo-icon{display:grid;place-items:center;width:42px;height:42px;flex:none;border-radius:14px;background:color-mix(in srgb,var(--todo-accent) 16%,transparent);color:var(--todo-accent);font-size:1.4rem;font-weight:900}
+.ib-todo-heading h2{margin:0!important}.ib-todo-heading p{margin:1px 0 0!important;font-size:.84rem!important}
+.ib-todo-close{margin-left:auto;width:38px;height:38px;border-radius:50%;background:var(--chip);color:var(--mute);font-size:1.15rem}
+.ib-todo-private{border:1px solid color-mix(in srgb,var(--todo-accent) 20%,var(--line));border-radius:12px;padding:9px 11px;margin:10px 0 16px!important;font-size:.82rem!important}
+.ib-todo-form{border-radius:16px;padding:14px;background:color-mix(in srgb,var(--todo-accent) 7%,var(--card));border:1px solid color-mix(in srgb,var(--todo-accent) 18%,var(--line))}
+.ib-todo-form label{display:block;font-size:.88rem;font-weight:800;margin:0 0 6px}.ib-todo-entry{display:flex;gap:8px;align-items:stretch}
+.ib-todo-entry input{flex:1;min-width:0;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font:inherit;color:var(--ink);background:var(--bg)}
+.ib-todo-entry .btn{width:auto;margin:0;padding:8px 16px;white-space:nowrap}
+.ib-todo-form .ib-todo-date-label{margin:12px 0 5px;color:var(--mute);font-weight:700}.ib-todo-date-label span{font-weight:500}
+.ib-todo-form input[type=date]{width:100%;max-width:220px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font:inherit;color:var(--ink);background:var(--bg)}
+.ib-todo-list-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:18px 0 8px}.ib-todo-list-head h3{margin:0;font-size:1rem}
+.ib-todo-clear{border:1px solid var(--line);border-radius:999px;padding:6px 10px;color:var(--mute);font-size:.8rem;font-weight:700}
+.ib-todo-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.ib-todo-item{display:grid;grid-template-columns:minmax(0,1fr) 38px;grid-template-areas:"task del" "due del";align-items:center;column-gap:8px;row-gap:3px;padding:10px 8px 10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--card)}
+.ib-todo-check{grid-area:task;display:flex;align-items:flex-start;gap:10px;min-width:0;font-weight:650;line-height:1.35;overflow-wrap:anywhere}
+.ib-todo-check input{width:20px;height:20px;flex:none;margin:1px 0 0;accent-color:var(--todo-accent)}
+.ib-todo-item.is-done .ib-todo-check span{text-decoration:line-through;color:var(--mute)}
+.ib-todo-due{grid-area:due;margin-left:30px;color:var(--mute);font-size:.78rem}.ib-todo-due.overdue{color:#dc2626;font-weight:800}
+.ib-todo-delete{grid-area:del;width:36px;height:36px;border-radius:10px;color:var(--mute);font-size:1.35rem}.ib-todo-delete:active{background:color-mix(in srgb,#dc2626 12%,transparent);color:#dc2626}
+.ib-todo-empty{display:flex;flex-direction:column;align-items:center;gap:3px;margin:22px 0 8px;padding:18px;border:1px dashed var(--line);border-radius:16px;color:var(--mute);text-align:center}.ib-todo-empty span{font-size:1.8rem}.ib-todo-empty b{color:var(--ink)}.ib-todo-empty small{font-size:.85rem}
+.ib-todo-done{margin-top:16px}
+@media (max-width:360px){.ib-todo-form{padding:11px}.ib-todo-entry .btn{padding-inline:12px}}
 </style>
 </head>
 <body>
 <header class="top">
   <div class="bar">
-    <div class="logo"><img src="icons/logo-lb.svg?v=1.9.300" width="30" height="30" alt=""><div class="lt"><span class="ttl">Info Book<small id="stchip" class="stchip" hidden></small></span><small class="greet" id="greet"></small></div></div>
+    <div class="logo"><img src="icons/logo-lb.svg?v=1.9.301" width="30" height="30" alt=""><div class="lt"><span class="ttl">Info Book<small id="stchip" class="stchip" hidden></small></span><small class="greet" id="greet"></small></div></div>
     <div class="mood" id="mood"></div>
     <div class="upd" id="upd"></div>
     <button class="ib" id="rf" aria-label="Refresh">↻</button>
@@ -738,30 +762,31 @@ body[data-artopen] .artwin{overscroll-behavior:none}body[data-artopen] .artbar{o
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="scores.js?v=1.9.300"></script>
-<script src="portal.js?v=1.9.300"></script>
-<script src="family.js?v=1.9.300"></script>
-<script src="app.js?v=1.9.300"></script>
-<script src="extras.js?v=1.9.300"></script>
-<script src="jokes.js?v=1.9.300"></script>
-<script src="learn.js?v=1.9.300"></script>
-<script src="common-en.js?v=1.9.300"></script>
-<script src="explain.js?v=1.9.300"></script>
-<script src="effects.js?v=1.9.300"></script>
-<script src="stories.js?v=1.9.300"></script>
-<script src="weekly.js?v=1.9.300"></script>
-<script src="sugar-rush-intro-assets.js?v=1.9.300"></script>
-<script src="play.js?v=1.9.300"></script>
-<script src="nz.js?v=1.9.300"></script>
-<script src="whg.js?v=1.9.300"></script>
-<script src="sights.js?v=1.9.300"></script>
-<script src="art3d.js?v=1.9.300"></script>
-<script src="read.js?v=1.9.300"></script>
-<script src="cal.js?v=1.9.300"></script>
-<script src="back.js?v=1.9.300"></script>
-<script src="today.js?v=1.9.300"></script>
-<script src="reader.js?v=1.9.300"></script>
-<script src="ib-preview.js?v=1.9.300"></script>
+<script src="scores.js?v=1.9.301"></script>
+<script src="portal.js?v=1.9.301"></script>
+<script src="family.js?v=1.9.301"></script>
+<script src="app.js?v=1.9.301"></script>
+<script src="extras.js?v=1.9.301"></script>
+<script src="jokes.js?v=1.9.301"></script>
+<script src="learn.js?v=1.9.301"></script>
+<script src="common-en.js?v=1.9.301"></script>
+<script src="explain.js?v=1.9.301"></script>
+<script src="effects.js?v=1.9.301"></script>
+<script src="stories.js?v=1.9.301"></script>
+<script src="weekly.js?v=1.9.301"></script>
+<script src="sugar-rush-intro-assets.js?v=1.9.301"></script>
+<script src="play.js?v=1.9.301"></script>
+<script src="nz.js?v=1.9.301"></script>
+<script src="whg.js?v=1.9.301"></script>
+<script src="sights.js?v=1.9.301"></script>
+<script src="art3d.js?v=1.9.301"></script>
+<script src="read.js?v=1.9.301"></script>
+<script src="cal.js?v=1.9.301"></script>
+<script src="back.js?v=1.9.301"></script>
+<script src="today.js?v=1.9.301"></script>
+<script src="reader.js?v=1.9.301"></script>
+<script src="ib-preview.js?v=1.9.301"></script>
+<script src="todo.js?v=1.9.301"></script>
 <script>
 /* 1.9.82 self-heal: if the feed is still skeletons after 9s (crash/stale cache), offer a manual reload.
    Auto-reload only on a real JS error, at most once per 10 minutes (localStorage). No controllerchange reload —
