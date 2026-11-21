@@ -5802,7 +5802,7 @@ console.log('1.9.227 echo and 3 s pace ok');
 }
 
 
-// INF-20 Shorts: Reddit clips plus a YouTube music/education lane (preview).
+// INF-20 Shorts: Reddit clips only; YouTube is kept out of the reel.
 {
   const today = fs.readFileSync('feed/today.js', 'utf8');
   const html = fs.readFileSync('feed/index.html', 'utf8');
@@ -5819,8 +5819,8 @@ console.log('1.9.227 echo and 3 s pace ok');
   assert.ok(S.isAllowedSub('aww') && !S.isAllowedSub('NatureIsFuckingLit'));
   assert.strictEqual(S.durationOk(91), false);
   assert.ok(S.isEduSource('yt-nasa') && S.isEduSource('fun-kurzgesagt'));
-  assert.ok(js.includes('CMAF_720') && js.includes('CMAF_AUDIO_128') && js.includes('youtube-nocookie.com/embed'));
-  assert.ok(js.includes('YouTube · may show ads') && css.includes('sh-ytlab'));
+  assert.ok(js.includes('CMAF_720') && js.includes('CMAF_AUDIO_128'));
+  assert.ok(typeof S.withoutYoutube === 'function' && typeof S.isYoutubeClip === 'function');
   const reddit = S.filterReddit([
     { vk: 'reddit', vu: 'ok1234567', t: 'A kitten', url: 'https://www.reddit.com/r/aww/comments/x/k/', topic: 'nature', vdur: 12 },
     { vk: 'reddit', vu: 'sport1234', t: 'Premier League goals', url: 'https://www.reddit.com/r/aww/comments/x/s/', topic: 'nature', vdur: 12 }
@@ -5833,5 +5833,5 @@ console.log('1.9.227 echo and 3 s pace ok');
   assert.ok(fs.existsSync('feed/braynix-local.json'));
   assert.ok(S.loveRank && S.setLoved && S.isLoved);
   assert.ok(fs.readFileSync('worker/src/sources.js','utf8').includes('fun-braynix-user'));
-console.log('INF-20 Shorts Reddit + YouTube lane ok');
+console.log('INF-20 Shorts Reddit only, no YouTube in the reel ok');
 }
