@@ -376,6 +376,8 @@ assert.ok(fam.includes("this.rt.note(mid, 'sugar', text, card)"), 'race pushes g
   assert.deepEqual(r.body.family.map(f => f.name), ['Aranea', 'Shane Jenkins'], 'family list: not me, not removed members');
   assert.ok(!JSON.stringify(r.body).includes('m1') && !JSON.stringify(r.body).includes('Gone'), 'no member ids');
   assert.equal(r.body.pending, 0); assert.equal(r.body.asked, false);
+  assert.deepEqual(r.body.asks, []);
+  assert.ok(r.body.family.every(f => f.asked === false));
   const shaneKey = r.body.family.find(f => f.name === 'Shane Jenkins').key;
   assert.equal(shaneKey, lifeKey('m1'));
   // sending
@@ -412,6 +414,25 @@ assert.ok(fam.includes("this.rt.note(mid, 'sugar', text, card)"), 'race pushes g
   assert.equal((await post(S, { act: 'ask' }, NEXT + 6000)).status, 429, 'one ask a day');
   assert.equal((await get(S, NEXT + 7000)).body.asked, true);
   assert.equal((await scoresRoute(q, S, '/sugar-lives', 'PUT', new URL('https://x/'), async () => ({}), NEXT, hooks)).status, 405);
+  // other members see Shane's ask (Notifications: asks / family[].asked). ids stay off the wire.
+  r = await get(A, NEXT + 8000);
+  assert.equal(r.body.asked, false, 'Aranea has not asked');
+  const shaneOnA = r.body.family.find(f => f.name === 'Shane Jenkins');
+  assert.equal(shaneOnA.asked, true);
+  assert.equal(shaneOnA.sent, false);
+  assert.equal(r.body.asks.length, 1);
+  assert.equal(r.body.asks[0].name, 'Shane Jenkins');
+  assert.equal(r.body.asks[0].key, lifeKey('m1'));
+  assert.equal(r.body.asks[0].at, NEXT + 5000);
+  assert.ok(!JSON.stringify(r.body).includes('m1') && !JSON.stringify(r.body).includes('m2') && !JSON.stringify(r.body).includes('m3'), 'no member ids in asks');
+  r = await get(H, NEXT + 8000);
+  assert.equal(r.body.family.find(f => f.name === 'Shane Jenkins').asked, true);
+  assert.equal(r.body.family.find(f => f.name === 'Shane Jenkins').sent, true, 'Sarah already sent Shane a life today');
+  assert.deepEqual(r.body.asks, [], 'asks omits people I already sent a life to today');
+  const DAY2 = Date.parse('2026-11-15T11:05:00Z'); // 12:05am Monday 16 Nov in Auckland
+  r = await get(A, DAY2);
+  assert.equal(r.body.family.find(f => f.name === 'Shane Jenkins').asked, false);
+  assert.deepEqual(r.body.asks, []);
 }
 
 console.log('scores tests ok');
