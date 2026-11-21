@@ -1,12 +1,110 @@
-/* Preview: religion opt-in, Auckland concerts carousel, NZ Top 40 + in-app videos,
-   and bringing playable videos back to the feed. Do not production-deploy from this branch. */
+/* Preview: religion opt-in (including cults and high-control groups), Auckland concerts
+   carousel, NZ Top 40 + in-app videos, and bringing playable videos back to the feed.
+   Do not production-deploy from this branch. */
 (function (root) {
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const REL_KEY = 'religion';
   const VENUE_OK = /spark arena|eden park|go media|town hall|the civic|western springs|auckland live/i;
   const NOT_CONCERT = /e-waste|recycl|comedy|stand-?up|bluey|paul smith|wwe|breakers|wrestling|basketball|rugby|netball|football|cricket/i;
-  const REL_KEEP = /tikanga|wairua|rongo[aā]|karakia|tohunga|whakapapa|atua|poukai|kiingitanga|kīngitanga|matakite|faith|church|religio|spiritual|cult\b|islam|christian|catholic|hindu|buddhist|jewish|synagogue|mosque|temple|bible|gospel|ministry|rongoa/i;
+  const REL_KEEP = /tikanga|wairua|rongo[aā]|karakia|tohunga|whakapapa|atua|poukai|kiingitanga|kīngitanga|matakite|faith|church|religio|spiritual|cults?\b|islam|christian|catholic|hindu|buddhist|jewish|synagogue|mosque|temple|bible|gospel|ministry|rongoa/i;
   const REL_DROP = /\brugby|league|nrl|afl|cricket|netball|football|sport\b|election|parliament|politic/i;
+  const REL_SPORT = /\brugby|league|nrl|afl|cricket|netball|football|sport\b/i;
+  // Word-bounded so "culture", "cultivate" and "section" are not tagged as cults.
+  const CULT_KEEP = /\b(?:cults?|cultish|cultic|cultists?|cult[\s-]?survivors?|cult[\s-]?leaders?|ex[\s-]?cult|high[\s-]?control\s+groups?|doomsday\s+cults?|gloriavale|scientology|scientologists?|l\.?\s*ron\s+hubbard|david\s+miscavige|jonestown|peoples?\s+temple|jim\s+jones|nxivm|keith\s+raniere|heaven['’]?s?\s+gate|branch\s+davidians?|children\s+of\s+god|the\s+family\s+international|aum\s+shinrikyo|solar\s+temple|rajneesh(?:puram)?|wild\s+wild\s+country|flds\b|warren\s+jeffs|synanon|centrepoint(?:\s+community)?|cultproof|sects?|sectarian)\b/i;
+  const CULT_DROP = /\b(you won'?t believe|shocking video|horrifying footage|gruesome|gore\b|nsfw)\b/i;
+  const REL_FEEDS = [
+    { url: 'https://www.rnz.co.nz/rss/te-manu-korihi.xml', sn: 'RNZ Te Manu Korihi', mode: 'religion' },
+    { url: 'https://www.rnz.co.nz/rss/national.xml', sn: 'RNZ', mode: 'cult' },
+    { url: 'https://www.rnz.co.nz/rss/world.xml', sn: 'RNZ World', mode: 'cult' },
+    { url: 'https://www.rnz.co.nz/podcasts/the-lodge.rss', sn: 'RNZ The Lodge', mode: 'lodge', kind: 'podcast' }
+  ];
+
+  function religionBlob(i) {
+    if (i == null) return '';
+    if (typeof i === 'string') return i;
+    const nest = i.it || i.h || i;
+    return [i.t, i.s, i.sn, i.src, i.url, i.tag, i.sub, nest && nest.t, nest && nest.s, nest && nest.sn, nest && nest.url].map(x => x || '').join(' ');
+  }
+  function isCultText(text) {
+    const blob = String(text || '');
+    if (!blob || CULT_DROP.test(blob) || REL_SPORT.test(blob)) return false;
+    return CULT_KEEP.test(blob);
+  }
+  function isCultItem(i) { return isCultText(religionBlob(i)); }
+  function hideFromFeed(i) { return isCultItem(i); }
+  function rssKeep(blob, mode) {
+    if (!blob || CULT_DROP.test(blob) || REL_SPORT.test(blob)) return false;
+    if (mode === 'religion') return REL_KEEP.test(blob) && !REL_DROP.test(blob);
+    if (mode === 'cult') return CULT_KEEP.test(blob);
+    if (mode === 'lodge') return CULT_KEEP.test(blob) || /cultproof|the lodge|takaro lodge|aiping wang|high[\s-]?control/i.test(blob);
+    return false;
+  }
+  function religionDedupe(items) {
+    const seen = new Set();
+    return (items || []).filter(it => {
+      if (!it || !it.t) return false;
+      const keys = [
+        String(it.url || '').toLowerCase().replace(/\/+$/, ''),
+        String(it.t || '').toLowerCase().replace(/\s+/g, ' ').trim()
+      ].filter(Boolean);
+      if (keys.some(k => seen.has(k))) return false;
+      keys.forEach(k => seen.add(k));
+      return true;
+    });
+  }
+  function religionSort(items) {
+    return (items || []).slice().sort((a, b) => {
+      const da = String(a.published || ''), db = String(b.published || '');
+      if (da && db) return db.localeCompare(da);
+      if (da && !db) return -1;
+      if (!da && db) return 1;
+      return 0;
+    });
+  }
+  function collectFromFeed(feed) {
+    const f = feed || feedObj() || {};
+    const out = [];
+    for (const list of [f.items, f.vlogs]) {
+      for (const i of list || []) {
+        if (!isCultItem(i) || !i.t) continue;
+        const at = i.at || i.first;
+        let published = '';
+        try { if (at) published = new Date(at).toISOString().slice(0, 10); } catch (e) { }
+        out.push({
+          id: i.id || ('rel-feed-' + String(i.url || i.t).replace(/\W+/g, '').slice(-16)),
+          t: i.t,
+          s: i.s || '',
+          url: i.url || '',
+          img: i.img || '',
+          vid: i.vid || '',
+          sn: i.sn || i.src || 'Feed',
+          published,
+          kind: i.vid ? 'documentary' : (i.kind || 'news'),
+          fromFeed: true
+        });
+      }
+    }
+    return out;
+  }
+  async function fetchReligionRss(src) {
+    const items = [];
+    try {
+      const r = await fetch(src.url, { cache: 'no-store' });
+      if (!r.ok || typeof DOMParser === 'undefined') return items;
+      const doc = new DOMParser().parseFromString(await r.text(), 'text/xml');
+      for (const it of [...doc.querySelectorAll('item')]) {
+        const t = (it.querySelector('title') || {}).textContent || '';
+        const url = (it.querySelector('link') || {}).textContent || '';
+        const s = ((it.querySelector('description') || {}).textContent || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        const pub = (it.querySelector('pubDate') || {}).textContent || '';
+        if (!url || !rssKeep(t + ' ' + s, src.mode)) continue;
+        let published = '';
+        try { if (pub) published = new Date(pub).toISOString().slice(0, 10); } catch (e) { }
+        items.push({ id: 'rel-live-' + url.replace(/\W+/g, '').slice(-16), t, s, url, sn: src.sn, published, kind: src.kind || 'news' });
+      }
+    } catch (e) { }
+    return items;
+  }
 
   function memberTag() {
     try {
@@ -67,7 +165,7 @@
     return `<article class="card xc relask" data-id="${esc((i && i.id) || 'ib-rel-ask')}" data-topic="religion" style="--c1:#6d28d9;--c2:#0f766e">${xh}
       <div class="bd"><h3>Want Religion in your feed?</h3>
       <div class="xbtns"><button type="button" class="btn pri" data-ib-religion="yes">Yes</button><button type="button" class="btn" data-ib-religion="no">No</button></div>
-      <p>Optional stories about traditional practices and beliefs — including Māori tikanga and wairua, rongoā and other traditional methods — and informational history and news about religions and cults. It stays respectful and is hidden until you say yes. You can change this later in Settings → Interests.</p>
+      <p>Optional stories about traditional practices and beliefs — including Māori tikanga and wairua, rongoā and other traditional methods — plus respectful news, investigations, documentaries and podcasts about religions, cults and high-control groups. It stays factual and is hidden until you say yes. You can change this later in Settings → Interests.</p>
       </div></article>`;
   }
   function religionCard(i) {
@@ -82,43 +180,28 @@
   }
 
   let REL_ITEMS = null, REL_FOR = '';
+  function applyFeedCults(feed) {
+    REL_ITEMS = religionSort(religionDedupe((REL_ITEMS || []).concat(collectFromFeed(feed))));
+    return REL_ITEMS;
+  }
+  function onFeed(feed) { applyFeedCults(feed || feedObj()); }
   async function loadReligion() {
     const k = nzToday();
-    if (REL_FOR === k && REL_ITEMS) return REL_ITEMS;
+    if (REL_FOR === k && REL_ITEMS) {
+      applyFeedCults(feedObj());
+      return REL_ITEMS;
+    }
     let items = [];
     try {
       const r = await fetch('religion-local.json?v=1.9.302', { cache: 'no-store' });
-      if (r.ok) {
-        const j = await r.json();
-        items = (j.items || []).slice();
-      }
+      if (r.ok) items = ((await r.json()).items || []).slice();
     } catch (e) { }
-    try {
-      const r = await fetch('https://www.rnz.co.nz/rss/te-manu-korihi.xml', { cache: 'no-store' });
-      if (r.ok) {
-        const txt = await r.text();
-        const doc = new DOMParser().parseFromString(txt, 'text/xml');
-        for (const it of [...doc.querySelectorAll('item')]) {
-          const t = (it.querySelector('title') || {}).textContent || '';
-          const url = (it.querySelector('link') || {}).textContent || '';
-          const s = ((it.querySelector('description') || {}).textContent || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-          const pub = (it.querySelector('pubDate') || {}).textContent || '';
-          const blob = t + ' ' + s;
-          if (!REL_KEEP.test(blob) || REL_DROP.test(blob) || !url) continue;
-          items.push({ id: 'rel-live-' + url.replace(/\W+/g, '').slice(-16), t, s, url, sn: 'RNZ Te Manu Korihi', published: pub ? new Date(pub).toISOString().slice(0, 10) : '', kind: 'news' });
-        }
-      }
-    } catch (e) { }
-    const seen = new Set();
-    items = items.filter(it => {
-      const key = (it.url || it.t || '').toLowerCase();
-      if (!it.t || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-    REL_ITEMS = items;
+    const rss = await Promise.all(REL_FEEDS.map(fetchReligionRss));
+    rss.forEach(list => { items = items.concat(list); });
+    items = items.concat(collectFromFeed(feedObj()));
+    REL_ITEMS = religionSort(religionDedupe(items));
     REL_FOR = k;
-    return items;
+    return REL_ITEMS;
   }
 
   /* ---- Auckland concerts carousel ---- */
@@ -355,6 +438,7 @@
       const items = TOP40.songs.map(s => ({ id: 't40-' + (s.videoId || s.rank), x: 'top40', song: s, topic: 'music', t: s.title, vid: s.videoId }));
       front.push({ id: 'row-top40', x: 'row', k: 'top40', title: 'NZ Top 40 singles', items, topic: 'music' });
     }
+    applyFeedCults(feedObj());
     if (religionOn() && REL_ITEMS && REL_ITEMS.length && !out.some(i => i && i.x === 'row' && i.k === 'religion')) {
       const items = REL_ITEMS.slice(0, 10).map(it => ({ id: it.id, x: 'religion', it, topic: 'religion', t: it.t, s: it.s, url: it.url, sn: it.sn }));
       if (items.length) front.push({ id: 'row-religion', x: 'row', k: 'religion', title: 'Religion', items, topic: 'religion' });
@@ -367,6 +451,7 @@
       for (const i of pool) {
         const id = playableVid(i);
         if (!id || seen.has(id) || seen.has(i.id)) continue;
+        if (hideFromFeed(i)) continue;
         if (typeof root.ibNz !== 'undefined' && root.ibNz.usNetworkPromo && root.ibNz.usNetworkPromo(i)) continue;
         seen.add(id); seen.add(i.id);
         vids.push(Object.assign({}, i, { vid: id }));
@@ -402,6 +487,7 @@
 
   root.ibPreview = {
     religionOn, shouldAskReligion, setReligion, showReligionSettings, relPref,
+    isCultText, isCultItem, hideFromFeed, collectFromFeed, onFeed, rssKeep,
     playableVid, openVidFs, closeVidFs, openTop40Video, soundAll, setSoundAll
   };
   root.setReligion = setReligion;
