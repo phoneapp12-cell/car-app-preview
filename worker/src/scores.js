@@ -368,10 +368,17 @@ function lifeFamily(sql, me) { // 1.9.230 people this member can see (family: th
 export function livesView(sql, me, now = Date.now()) {
   const day = nzDay(now);
   const sent = new Set(rows(sql, `SELECT too FROM sugar_life_gift WHERE frm=? AND day=?`, me.id, day).map(r => r.too));
-  const family = lifeFamily(sql, me).map(r => ({ key: lifeKey(r.id), name: r.name, icon: r.icon || null, sent: sent.has(r.id) }));
+  const askRows = rows(sql, `SELECT mid, at FROM sugar_life_ask WHERE day=?`, day);
+  const askedIds = new Set(askRows.map(r => r.mid));
+  const askAt = new Map(askRows.map(r => [r.mid, r.at]));
+  const people = lifeFamily(sql, me);
+  // asked on each family row: that person asked today. asks[]: other members who asked today that I have not already sent a life to (the Notifications hook).
+  const family = people.map(r => ({ key: lifeKey(r.id), name: r.name, icon: r.icon || null, sent: sent.has(r.id), asked: askedIds.has(r.id) }));
   const pending = rows(sql, `SELECT COUNT(*) n FROM sugar_life_gift WHERE too=? AND claimed=0`, me.id)[0].n || 0;
-  const asked = !!rows(sql, `SELECT 1 FROM sugar_life_ask WHERE mid=? AND day=?`, me.id, day)[0];
-  return { day, family, pending, asked };
+  const asked = askedIds.has(me.id);
+  const asks = people.filter(r => askedIds.has(r.id) && !sent.has(r.id))
+    .map(r => ({ key: lifeKey(r.id), name: r.name, icon: r.icon || null, at: askAt.get(r.id) || now }));
+  return { day, family, pending, asked, asks };
 }
 export function livesPost(sql, me, b, now = Date.now()) {
   const day = nzDay(now), notes = [];
