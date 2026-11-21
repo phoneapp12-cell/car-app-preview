@@ -78,6 +78,7 @@
     'tonga': [['👑', 'The Pacific\'s only kingdom'], ['🐋', 'Humpback whales visit July to October'], ['💨', 'Blowholes spout along Tongatapu']],
     'samoa': [['🏠', 'Open-sided fale homes'], ['🌊', 'To Sua Ocean Trench swimming hole'], ['🌄', 'Among the first places to see each day']],
     'sydney': [['🎭', 'The Opera House has sail-shaped roofs'], ['🌉', 'Harbour Bridge, nicknamed the Coathanger'], ['⛴️', 'Ferries criss-cross the harbour']],
+    'sydney lolly shop': [['🍭', 'A side-path sweet shop just after the Sydney stop'], ['🎭', 'The Opera House sails sit across the harbour'], ['🌉', 'The Harbour Bridge is the shop\'s back-window view']],
     'gold coast': [['🏖️', 'Long golden beaches'], ['🏙️', 'High-rise towers along the beachfront'], ['🌿', 'Rainforest in the hills behind']],
     'perth': [['🦢', 'Black swans on the Swan River'], ['🐾', 'Quokkas live on nearby Rottnest Island'], ['🌳', 'Kings Park, a huge inner-city park']],
     'adelaide': [['🟩', 'A city planned around leafy squares'], ['🐸', 'Home of the frog cake'], ['🍇', 'Barossa Valley vineyards nearby']],
@@ -194,8 +195,8 @@
         return '<li><i aria-hidden="true" style="background:' + CHIPS[(i + (opts.n || 0)) % CHIPS.length] + '">' + f[0] + '</i><span>' + esc(f[1]) + '</span></li>';
       }).join('') + '</ul>' +
       (opts.open
-        ? '<button type="button" class="sr-pc-play" data-sr-place="play"' + (opts.name ? ' title="' + esc(opts.name) + '"' : '') + '>▶ Play level ' + esc(opts.n) + '</button>'
-        : '<p class="sr-pc-lock">🔒 Finish level ' + esc((opts.n || 2) - 1) + ' to unlock</p>');
+        ? '<button type="button" class="sr-pc-play" data-sr-place="play"' + (opts.name ? ' title="' + esc(opts.name) + '"' : '') + '>' + esc(opts.playLabel || ('▶ Play level ' + opts.n)) + '</button>'
+        : '<p class="sr-pc-lock">' + esc(opts.lockText || ('🔒 Finish level ' + ((opts.n || 2) - 1) + ' to unlock')) + '</p>');
     placeOpen = opts;
     var cc = document.getElementById('sr-country-card');
     var ctop = cc && !cc.hidden && cc.offsetHeight ? cc.getBoundingClientRect().bottom + 8 : 64;
