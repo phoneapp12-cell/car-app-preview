@@ -1321,6 +1321,11 @@
     ['Palau', 'Federated States of Micronesia', 'Marshall Islands', 'Nauru', 'Kiribati']
   );
   function countryForLevel(n) { return MAP_COUNTRIES[(n | 0) - 1] || ''; }
+
+  // First overseas stop after Bluff, the last New Zealand level. A leaving-NZ
+  // film plays once per player when they first start this stage.
+  const LEAVE_NZ_LEVEL = 17;
+  const LEAVE_NZ_INTRO_KEY = 'ib-sugar-leave-nz-intro';
   // 1.9.283 Every stop at its real place on the one world projection (the three Whangārei close-up stops stay
   // in their panel). Cities closer than a pin's width are eased apart inside their own country only.
   function placeWorldStops(stops) {
@@ -5365,6 +5370,8 @@
   root.SugarRush.normalizePostcardProgress = normalizePostcardProgress;
   root.SugarRush.addPostcardPiece = addPostcardPiece;
   root.SugarRush.countryForLevel = countryForLevel;
+  root.SugarRush.LEAVE_NZ_LEVEL = LEAVE_NZ_LEVEL;
+  root.SugarRush.LEAVE_NZ_INTRO_KEY = LEAVE_NZ_INTRO_KEY;
   root.SugarRush.journeyPath = journeyPath;
   root.SugarRush.createSessionLevelAccess = createSessionLevelAccess;
   root.SugarRush.SHOP_FROM = SHOP_FROM;
@@ -7828,12 +7835,37 @@
     revealSugarUi();
     scrollPastGameChrome();
   }
+  function leaveNzIntroKey() { return LEAVE_NZ_INTRO_KEY + memberTag(); }
+  function leaveNzIntroSeen() { return !!ls.get(leaveNzIntroKey(), false); }
+  function markLeaveNzIntroSeen() { ls.set(leaveNzIntroKey(), true); }
+  function shouldPlayLeaveNzIntro(n) {
+    if (n !== LEAVE_NZ_LEVEL) return false;
+    if (leaveNzIntroSeen()) return false;
+    if (!(typeof root.playSugarIntro === 'function' && root.SUGAR_LEAVE_NZ_INTRO)) return false;
+    // Don't spend the once-per-player flag if they cannot actually start.
+    if (!(tutorialFor(n) && !tutorialDone(n)) && lives() <= 0) return false;
+    return true;
+  }
   function beginLevel(n) {
     hideIntro();
     if (n === 'shop') { openShopRush(); return; }
     if (n === 'market') { openMarketRush(); return; }
-    if (tutorialFor(n) && !tutorialDone(n)) startTutorial({ level: n });
-    else startLevel(n);
+    function go() {
+      if (tutorialFor(n) && !tutorialDone(n)) startTutorial({ level: n });
+      else startLevel(n);
+    }
+    if (shouldPlayLeaveNzIntro(n)) {
+      markLeaveNzIntroSeen();
+      root.playSugarIntro({
+        doc: doc,
+        root: root,
+        pick: root.SUGAR_LEAVE_NZ_INTRO,
+        label: 'Leaving New Zealand intro',
+        onDone: go
+      });
+      return;
+    }
+    go();
   }
 
   function revealSugarUi() {

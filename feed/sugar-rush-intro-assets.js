@@ -35,6 +35,17 @@
   };
   root.SUGAR_MARKET_INTRO = MARKET_INTRO;
 
+  const LEAVE_NZ_INTRO = {
+    poster: 'img/sugar-rush/leaving-nz-intro-8b496564-poster.jpg',
+    webm: 'img/sugar-rush/leaving-nz-intro-8b496564.webm',
+    mp4: 'img/sugar-rush/leaving-nz-intro-8b496564.mp4',
+    song: '',
+    songMp3: '',
+    videoHasAudio: true
+  };
+  root.SUGAR_LEAVE_NZ_INTRO = LEAVE_NZ_INTRO;
+
+
   function pickIntro() {
     return {
       useLong: true,
