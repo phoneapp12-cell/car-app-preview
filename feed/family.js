@@ -56,7 +56,7 @@ async function setCelebNews(on) {
   CELEB.ask = false;
   syncCelebPick();
   try {
-    const r = await fam('/prefs', { method: 'PUT', body: JSON.stringify({ pick: PICK, given: ls.get('defaultsGiven', []), adds: ls.get('addsGot', []), intOff: typeof INT_OFF !== 'undefined' ? INT_OFF : {}, moodOff: typeof MOOD_OFF !== 'undefined' ? MOOD_OFF : false, celebNews: !!on }) });
+    const r = await fam('/prefs', { method: 'PUT', body: JSON.stringify({ pick: PICK, given: ls.get('defaultsGiven', []), adds: ls.get('addsGot', []), intOff: typeof INT_OFF !== 'undefined' ? INT_OFF : {}, moodOff: typeof MOOD_OFF !== 'undefined' ? MOOD_OFF : false, celebNews: !!on, shortsLoves: ls.get('shortsLoves', {}) }) });
     if (r && 'celebNews' in r) applyCelebFlags(r);
   } catch (e) { }
   try { if (typeof draw === 'function') draw(); } catch (e) { }
@@ -121,12 +121,13 @@ function giveDefaults() { // a new default chip is switched on once for people w
 function applyPrefs(p) {
   PICK = p.pick; if (Array.isArray(p.given)) ls.set('defaultsGiven', p.given); giveDefaults(); syncCelebPick(); ls.set('pick', PICK);
   if (p.intOff) { INT_OFF = p.intOff; ls.set('intOff', INT_OFF); }
+  if (p.shortsLoves && typeof p.shortsLoves === 'object') ls.set('shortsLoves', p.shortsLoves);
   if (Array.isArray(p.vlTags)) ls.set('vlTags', p.vlTags); // 1.9.40 vlog likes Shane set for them
   if (typeof p.moodOff === 'boolean') { MOOD_OFF = p.moodOff; ls.set('moodOff', MOOD_OFF); }
   draw();
 }
 let prefsT = 0;
-function famPrefsChanged() { if (!FAM_ON) return; clearTimeout(prefsT); prefsT = setTimeout(() => fam('/prefs', { method: 'PUT', body: JSON.stringify({ pick: PICK, given: ls.get('defaultsGiven', []), adds: ls.get('addsGot', []), intOff: INT_OFF, moodOff: MOOD_OFF, celebNews: (CELEB.can && CELEB.news !== null) ? CELEB.news : undefined }) }).catch(() => { }), 1500); }
+function famPrefsChanged() { if (!FAM_ON) return; clearTimeout(prefsT); prefsT = setTimeout(() => fam('/prefs', { method: 'PUT', body: JSON.stringify({ pick: PICK, given: ls.get('defaultsGiven', []), adds: ls.get('addsGot', []), intOff: INT_OFF, moodOff: MOOD_OFF, celebNews: (CELEB.can && CELEB.news !== null) ? CELEB.news : undefined, shortsLoves: ls.get('shortsLoves', {}) }) }).catch(() => { }), 1500); }
 
 /* ---- welcome: pick interests ---- */
 function onboarding() {

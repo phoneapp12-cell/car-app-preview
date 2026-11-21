@@ -18,3 +18,13 @@ html.ib-shorts-on #ib-tabs,html.ib-shorts-on #ibportal,html.ib-shorts-on #ibrise
 .sh-ytlab{position:absolute;left:12px;top:calc(62px + env(safe-area-inset-top,0px));z-index:3;padding:4px 8px;border-radius:999px;background:rgba(0,0,0,.55);color:#fff;font:600 .68rem/1.2 system-ui,sans-serif;letter-spacing:.01em;pointer-events:none}
 .sh-cap a.sh-credit{color:#fff;text-decoration:underline;text-underline-offset:2px;pointer-events:auto}
 .sh-cap{pointer-events:none}
+
+.sh-love{position:fixed;z-index:12001;right:12px;bottom:calc(88px + env(safe-area-inset-bottom,0px));width:44px;height:44px;border:0;border-radius:50%;background:rgba(0,0,0,.45);color:#ff4b6b;font:700 1.25rem/1 system-ui,sans-serif;cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);-webkit-tap-highlight-color:transparent}
+.sh-love[hidden]{display:none!important}
+.sh-love.on{color:#ff4b6b}
+.sh-burst{position:absolute;z-index:5;font-size:64px;color:#ff4b6b;pointer-events:none;transform:translate(-50%,-50%) scale(.4);animation:sh-burst .65s ease-out forwards;text-shadow:0 2px 8px rgba(0,0,0,.35);line-height:1}
+@keyframes sh-burst{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(.3)}
+  25%{opacity:1;transform:translate(-50%,-50%) scale(1.15)}
+  100%{opacity:0;transform:translate(-50%,-62%) scale(1.35)}
+}

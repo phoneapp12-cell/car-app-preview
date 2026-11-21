@@ -12,6 +12,7 @@
      "braining" shorts. Boost it to about one in three, without repeating clips. */
   const BOOST_SUBS = { beamazed: 1 };
   const BOOST_EVERY = 3;
+  const BRAYNIX_AUTHOR = 'braynixgames';
   const CMAF_RES = ['CMAF_720', 'CMAF_480', 'DASH_720', 'DASH_480', 'CMAF_360', 'DASH_360'];
   const CMAF_AUDIO = ['CMAF_AUDIO_128', 'CMAF_AUDIO_64', 'DASH_AUDIO_128', 'DASH_audio'];
 
@@ -141,7 +142,9 @@
       if (!isRedditClip(it)) continue;
       if (!durationOk(it.vdur)) continue;
       const sub = subredditOf(it);
-      if (!isAllowedSub(sub)) continue;
+      const author = String(it.by || it.author || '').replace(/^u\//i, '').toLowerCase();
+      const bray = author === BRAYNIX_AUTHOR || isBraynix(it, null);
+      if (!isAllowedSub(sub) && !bray) continue;
       if (!memberAllows(it, profile)) continue;
       if (seen[it.vu]) continue;
       seen[it.vu] = 1;
@@ -150,12 +153,15 @@
         id: 'rd-' + it.vu,
         vu: it.vu,
         title: it.t || it.title || 'Reddit clip',
-        credit: 'r/' + sub,
+        credit: bray ? braynixCredit({ sub, credit: 'r/' + sub }) : ('r/' + sub),
         url: it.url || ('https://www.reddit.com/r/' + sub),
         topic: it.topic || '',
         src: it.src || '',
         vdur: it.vdur,
-        permalink: it.url
+        permalink: it.url,
+        author: author || undefined,
+        by: author || undefined,
+        braynix: bray || undefined
       });
     }
     return out;
@@ -197,6 +203,169 @@
       url: s.url || ('https://www.youtube.com/watch?v=' + (s.videoId || s.vid))
     }));
   }
+  function braynixVuSet(pack) {
+    const set = {};
+    const clips = (pack && pack.clips) || [];
+    for (const c of clips) if (c && c.vu) set[c.vu] = 1;
+    return set;
+  }
+  function isBraynix(it, pack) {
+    if (!it) return false;
+    if (it.braynix) return true;
+    const author = String(it.author || it.by || it.u || '').replace(/^u\//i, '').toLowerCase();
+    if (author === BRAYNIX_AUTHOR) return true;
+    const url = String(it.url || it.permalink || it.credit || '');
+    if (/\/user\/braynixgames\b/i.test(url) || /\/u\/braynixgames\b/i.test(url)) return true;
+    if (it.vu && pack && braynixVuSet(pack)[it.vu]) return true;
+    return false;
+  }
+  function braynixCredit(it) {
+    const sub = (it && (it.sub || it.credit)) ? String(it.sub || it.credit).replace(/^r\//i, '') : '';
+    const nice = sub && sub.toLowerCase() !== 'u_braynixgames' ? 'r/' + sub : '';
+    return nice ? ('Braynix Games · ' + nice) : 'Braynix Games';
+  }
+  function braynixClips(pack, profile) {
+    const out = [], seen = {};
+    for (const c of (pack && pack.clips) || []) {
+      if (!c || !c.vu || seen[c.vu]) continue;
+      if (c.width && c.height && !isPortrait(c.width, c.height)) continue;
+      if (!durationOk(c.vdur)) continue;
+      const item = {
+        kind: 'reddit',
+        braynix: true,
+        id: 'bn-' + c.vu,
+        vu: c.vu,
+        title: c.title || 'Braynix Games',
+        credit: braynixCredit(c),
+        author: BRAYNIX_AUTHOR,
+        url: c.url,
+        permalink: c.url,
+        topic: c.topic || 'games',
+        src: 'braynix',
+        vdur: c.vdur,
+        width: c.width,
+        height: c.height,
+        sub: c.sub || ''
+      };
+      if (!memberAllows(item, profile)) continue;
+      if (!isAllowedTopic(itemText(item))) continue;
+      seen[c.vu] = 1;
+      out.push(item);
+    }
+    return out;
+  }
+  function mergeBraynix(reddit, pack, profile) {
+    const local = braynixClips(pack, profile);
+    const byVu = {};
+    for (const it of local) byVu[it.vu] = it;
+    const out = [];
+    const seen = {};
+    for (const it of local) {
+      out.push(it);
+      seen[it.vu] = 1;
+    }
+    for (const it of reddit || []) {
+      if (it.vu && seen[it.vu]) continue;
+      if (it.vu && byVu[it.vu] || isBraynix(it, pack)) {
+        out.push(Object.assign({}, it, { braynix: true, author: BRAYNIX_AUTHOR, credit: braynixCredit(Object.assign({ sub: it.credit }, it)) }));
+      } else {
+        out.push(it);
+      }
+      if (it.vu) seen[it.vu] = 1;
+    }
+    return out;
+  }
+  function frontLoad(items, pred) {
+    const head = [], tail = [];
+    for (const it of items || []) (pred(it) ? head : tail).push(it);
+    return head.concat(boostSource(tail));
+  }
+
+  const LOVE_STOP = { the:1, and:1, for:1, with:1, this:1, that:1, from:1, your:1, you:1, comment:1, plz:1, please:1, what:1, left:1, right:1, or:1 };
+  function loveKey(it) { return (it && (it.id || it.vu || it.videoId)) ? String(it.id || it.vu || it.videoId) : ''; }
+  function readLoves() {
+    try { if (typeof ls !== 'undefined' && ls.get) return ls.get('shortsLoves', {}) || {}; } catch (e) { }
+    return {};
+  }
+  function writeLoves(map) {
+    try { if (typeof ls !== 'undefined' && ls.set) { ls.set('shortsLoves', map); if (typeof famPrefsChanged === 'function') famPrefsChanged(); } } catch (e) { }
+  }
+  function isLoved(it, loves) {
+    const map = loves || readLoves();
+    const k = loveKey(it);
+    return !!(k && map[k]);
+  }
+  function loveRecord(it) {
+    const sub = (it.sub || ((it.credit || '').replace(/^.*\br\//i, '').split(/\s/)[0]) || '').replace(/^r\//i, '');
+    const author = String(it.author || it.by || (isBraynix(it) ? BRAYNIX_AUTHOR : '')).replace(/^u\//i, '').toLowerCase();
+    return {
+      at: Date.now(),
+      vu: it.vu || '',
+      videoId: it.videoId || '',
+      id: it.id || '',
+      sub: sub,
+      author: author,
+      src: it.src || '',
+      topic: it.topic || '',
+      title: it.title || '',
+      kind: it.kind || ''
+    };
+  }
+  function setLoved(it, on, loves) {
+    const map = Object.assign({}, loves || readLoves());
+    const k = loveKey(it);
+    if (!k) return map;
+    if (on) map[k] = loveRecord(it);
+    else delete map[k];
+    writeLoves(map);
+    return map;
+  }
+  function loveWords(title) {
+    return String(title || '').toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 4 && !LOVE_STOP[w]);
+  }
+  function loveScore(it, recs) {
+    if (!it || !recs || !recs.length) return 0;
+    let s = 0;
+    const sub = String(it.sub || (it.credit || '').replace(/^.*\br\//i, '').split(/[^A-Za-z0-9_]/)[0] || '').replace(/^r\//i, '').toLowerCase();
+    const author = String(it.author || it.by || '').replace(/^u\//i, '').toLowerCase();
+    const words = new Set(loveWords(it.title));
+    for (const r of recs) {
+      if (r.vu && it.vu && r.vu === it.vu) s += 6;
+      if (r.videoId && it.videoId && r.videoId === it.videoId) s += 6;
+      if (r.author && author && r.author === author) s += 3;
+      if (r.sub && sub && r.sub.toLowerCase() === sub) s += 2;
+      if (r.src && it.src && r.src === it.src) s += 2;
+      if (r.topic && it.topic && r.topic === it.topic) s += 1;
+      for (const w of loveWords(r.title)) if (words.has(w)) s += 1;
+    }
+    return s;
+  }
+  function interleavePreferred(preferred, rest, every) {
+    const step = every || 3;
+    const a = (preferred || []).slice(), b = (rest || []).slice();
+    if (!a.length) return b;
+    const out = [];
+    let ai = 0, bi = 0;
+    while (ai < a.length || bi < b.length) {
+      if ((out.length % step) === 0 && ai < a.length) out.push(a[ai++]);
+      else if (bi < b.length) out.push(b[bi++]);
+      else out.push(a[ai++]);
+    }
+    return out;
+  }
+  function loveRank(items, loves, pack) {
+    const recs = Object.values(loves || {});
+    const list = (items || []).slice();
+    if (!recs.length) return list;
+    const head = [], tail = [];
+    for (const it of list) (isBraynix(it, pack) ? head : tail).push(it);
+    const amaz = tail.filter(isBoosted);
+    const sim = tail.filter(it => !isBoosted(it) && loveScore(it, recs) > 0);
+    const other = tail.filter(it => !isBoosted(it) && loveScore(it, recs) <= 0);
+    if (!sim.length) return list;
+    return head.concat(boostSource(interleavePreferred(sim, other, 3).concat(amaz)));
+  }
+
   function isBoosted(it) {
     if (!it) return false;
     const credit = String(it.credit || '');
@@ -240,7 +409,7 @@
       return it && isDirectVideo(it.url) && isPortrait(it.width, it.height) && isAllowedTopic((it.title || '') + ' ' + (it.credit || ''));
     });
   }
-  function buildCatalog(feed, top40, profile) {
+  function buildCatalog(feed, top40, profile, braynixPack, loves) {
     const items = (feed && feed.items) || feed || [];
     const reddit = filterReddit(items, profile);
     const edu = filterEduYoutube(items, profile);
@@ -252,8 +421,10 @@
       if (i < music.length) youtube.push(music[i]);
       if (i < edu.length) youtube.push(edu[i]);
     }
-    const mixed = boostSource(mixLane(reddit, youtube, YT_EVERY), BOOST_EVERY);
-    return { reddit, edu, music, youtube, mixed, fallback: filterPortrait(FALLBACK) };
+    const braynix = braynixClips(braynixPack, profile);
+    const merged = mergeBraynix(reddit, braynixPack, profile);
+    const mixed = loveRank(frontLoad(mixLane(merged, youtube, YT_EVERY), it => isBraynix(it, braynixPack)), loves || readLoves(), braynixPack);
+    return { reddit: merged, braynix, edu, music, youtube, mixed, fallback: filterPortrait(FALLBACK) };
   }
 
   function escapeHtml(s) {
@@ -286,8 +457,19 @@
     } catch (e) { }
     return { songs: [] };
   }
+  async function readBraynix() {
+    try {
+      if (typeof BRAYNIX !== 'undefined' && BRAYNIX && Array.isArray(BRAYNIX.clips)) return BRAYNIX;
+    } catch (e) { }
+    const ver = (typeof APP_VERSION !== 'undefined' && APP_VERSION) || (typeof VERSION !== 'undefined' && VERSION) || '1.9.304';
+    try {
+      const r = await fetch('braynix-local.json?v=' + ver, { cache: 'no-store' });
+      if (r.ok) return r.json();
+    } catch (e) { }
+    return { clips: [] };
+  }
 
-  let on = false, hist = false, muted = true, catalog = [], io = null, reel = null, shell = null, audioEl = null;
+  let on = false, hist = false, muted = true, catalog = [], io = null, reel = null, shell = null, audioEl = null, lastTapAt = 0, lastTapSlide = null, singleTapT = 0;
 
   function stopAudio() {
     if (!audioEl) return;
@@ -366,6 +548,7 @@
     el.setAttribute('aria-label', 'Shorts');
     el.innerHTML = `<button type="button" class="sh-close" data-sh-close aria-label="Close">×</button>
       <button type="button" class="sh-mute" data-sh-mute aria-label="Sound"></button>
+      <button type="button" class="sh-love" data-sh-love aria-label="Loved" hidden>♥</button>
       <div class="sh-reel" data-sh-reel></div>`;
     document.body.appendChild(el);
     return el;
@@ -386,6 +569,38 @@
     if (!btn) return;
     btn.textContent = muted ? '🔇' : '🔊';
     btn.setAttribute('aria-label', muted ? 'Unmute' : 'Mute');
+  }
+  function paintLove() {
+    const btn = shell && shell.querySelector('[data-sh-love]');
+    if (!btn) return;
+    const it = catalog[visibleIndex()];
+    const onLove = !!(it && isLoved(it));
+    btn.hidden = !onLove;
+    btn.classList.toggle('on', onLove);
+    btn.setAttribute('aria-pressed', onLove ? 'true' : 'false');
+    btn.setAttribute('aria-label', onLove ? 'Unlove' : 'Loved');
+  }
+  function showHeartBurst(slide, ev) {
+    if (!slide) return;
+    const burst = document.createElement('div');
+    burst.className = 'sh-burst';
+    burst.textContent = '♥';
+    const r = slide.getBoundingClientRect();
+    const x = ev && ev.clientX ? ev.clientX - r.left : r.width / 2;
+    const y = ev && ev.clientY ? ev.clientY - r.top : r.height / 2;
+    burst.style.left = x + 'px';
+    burst.style.top = y + 'px';
+    slide.appendChild(burst);
+    setTimeout(() => { try { burst.remove(); } catch (e) { } }, 700);
+  }
+  function loveVisible(on, ev) {
+    const i = visibleIndex();
+    const it = catalog[i];
+    const slide = slides()[i];
+    if (!it) return;
+    setLoved(it, on);
+    paintLove();
+    if (on && ev) showHeartBurst(slide, ev);
   }
 
   function skipSlide(slide, reason) {
@@ -475,6 +690,7 @@
 
   function playAt(i) {
     if (i < 0 || i >= catalog.length) return;
+    paintLove();
     slides().forEach((s, j) => {
       const it = catalog[j];
       s.classList.toggle('on', j === i);
@@ -592,9 +808,9 @@
       try { root.history.pushState({ ibShorts: 1 }, ''); hist = true; } catch (e) { hist = false; }
     }
     if (reel) reel.innerHTML = `<p class="sh-empty">Loading shorts…</p>`;
-    Promise.all([readFeed(), readTop40()]).then(([feed, top40]) => {
+    Promise.all([readFeed(), readTop40(), readBraynix()]).then(([feed, top40, braynixPack]) => {
       if (!on) return;
-      const built = buildCatalog(feed, top40);
+      const built = buildCatalog(feed, top40, null, braynixPack);
       const list = built.mixed.length ? built.mixed : built.fallback;
       startWith(list);
     }).catch(() => {
@@ -654,8 +870,26 @@
       return;
     }
     if (t.closest && t.closest('a.sh-credit')) return;
+    if (t.closest && t.closest('[data-sh-love]')) {
+      e.preventDefault();
+      loveVisible(false);
+      return;
+    }
     const slide = t.closest && t.closest('.sh-slide');
-    if (slide) { e.preventDefault(); togglePause(slide); }
+    if (!slide) return;
+    e.preventDefault();
+    const now = Date.now();
+    if (lastTapSlide === slide && now - lastTapAt < 320) {
+      if (singleTapT) { clearTimeout(singleTapT); singleTapT = 0; }
+      lastTapAt = 0;
+      lastTapSlide = null;
+      loveVisible(true, e);
+      return;
+    }
+    lastTapAt = now;
+    lastTapSlide = slide;
+    if (singleTapT) clearTimeout(singleTapT);
+    singleTapT = setTimeout(() => { singleTapT = 0; if (on) togglePause(slide); }, 280);
   }
 
   if (root.addEventListener) {
@@ -671,6 +905,8 @@
     durationOk, subredditOf, memberAllows, filterReddit, filterEduYoutube, top40Clips,
     mixLane, filterPortrait, buildCatalog, FALLBACK, ALLOW_SUBS, EDU_SRC, MAX_DUR, YT_EVERY,
     BOOST_SUBS, BOOST_EVERY, isBoosted, boostSource,
+    BRAYNIX_AUTHOR, isBraynix, braynixClips, mergeBraynix, frontLoad,
+    loveKey, isLoved, setLoved, loveScore, loveRank, loveWords, readLoves,
     SPORT, NSFW, NOT_WANT, open, close
   };
 })();

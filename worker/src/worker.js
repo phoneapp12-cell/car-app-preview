@@ -127,10 +127,12 @@ function parseReddit(xml, src) {
     if (yv) img = `https://i.ytimg.com/vi/${yv}/hqdefault.jpg`;
     if (src.want && !src.want.test(title)) continue;
     if (isPaywalled({ url: linkOut })) continue; // 1.9.24 a Reddit post linking to a paywalled paper
+    const by = strip((e.match(/<author>[\s\S]*?<name>([^<]+)<\/name>/i) || [])[1] || '').replace(/^\/?u\//i, '');
+    if (src.author && by.toLowerCase() !== String(src.author).toLowerCase()) continue;
     const body = clip(strip(html.replace(/submitted by[\s\S]*$/i, '')), 200);
     if (src.imagesOnly && !img) continue;
     if (/\b(nsfw|nsfl|gore|rip|passed away|euthan|cancer)\b/i.test(title)) continue; // keep it a happy feed
-    out.push({ id: hash(link), t: clip(title, 160), s: body === title ? '' : body, url: link, ext: linkOut || undefined, img, at: Date.parse(strip(tag(e, 'updated') || tag(e, 'published'))) || Date.now(), kind: yv || rv ? 'video' : img ? 'photo' : 'news', vid: yv || undefined, vk: rv ? 'reddit' : undefined, vu: rv || undefined });
+    out.push({ id: hash(link), t: clip(title, 160), s: body === title ? '' : body, url: link, ext: linkOut || undefined, img, at: Date.parse(strip(tag(e, 'updated') || tag(e, 'published'))) || Date.now(), kind: yv || rv ? 'video' : img ? 'photo' : 'news', vid: yv || undefined, vk: rv ? 'reddit' : undefined, vu: rv || undefined, by: by || undefined });
   }
   return out;
 }
@@ -314,8 +316,15 @@ async function runSource(src, old = new Map()) {
     items = src.kind === 'reddit' ? parseReddit(xml, src) : parseRss(xml, src);
     if (src.kind === 'reddit') { // 1.9.93 how long each Reddit clip is (short ones fill the stories row: no ads, under 30s)
       for (const i of items) { const o = old.get(i.id); if (o && o.vdur) i.vdur = o.vdur; }
-      await Promise.all(items.filter(i => i.vk === 'reddit' && i.vu && !i.vdur).slice(0, 6).map(async i => { try { const t = await (await get(`https://v.redd.it/${i.vu}/DASHPlaylist.mpd`, { tries: 1, ms: 5000 })).text();
-        const m = t.match(/mediaPresentationDuration="PT(?:(\d+)H)?(?:(\d+)M)?(?:([\d.]+)S)?"/); if (m) i.vdur = Math.round((+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0)); } catch (e) { } }));
+      const lim = src.author || src.portraitOnly || src.maxSec ? 16 : 6;
+      await Promise.all(items.filter(i => i.vk === 'reddit' && i.vu && !i.vdur).slice(0, lim).map(async i => { try { const t = await (await get(`https://v.redd.it/${i.vu}/DASHPlaylist.mpd`, { tries: 1, ms: 5000 })).text();
+        const m = t.match(/mediaPresentationDuration="PT(?:(\d+)H)?(?:(\d+)M)?(?:([\d.]+)S)?"/); if (m) i.vdur = Math.round((+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0));
+        let bestW = 0, bestH = 0;
+        const re = /(?:width="(\d+)"[^>]*height="(\d+)"|height="(\d+)"[^>]*width="(\d+)")/gi;
+        let mm; while ((mm = re.exec(t))) { const w = +(mm[1] || mm[4] || 0), h = +(mm[2] || mm[3] || 0); if (h > bestH) { bestW = w; bestH = h; } }
+        if (bestW && bestH) { i.vw = bestW; i.vh = bestH; } } catch (e) { } }));
+      if (src.maxSec) items = items.filter(i => !i.vu || !i.vdur || i.vdur <= src.maxSec);
+      if (src.portraitOnly) items = items.filter(i => !i.vu || !i.vw || !i.vh || i.vh > i.vw);
     }
     if (src.og) { // 1.6.0: fetch a picture straight away for a couple of new posts (the rest are filled over later runs)
       let n = 0; const lim = src.prio ? 4 : 2;
