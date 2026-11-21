@@ -23,8 +23,9 @@
     const get = t => (parts.find(p => p.type === t) || {}).value || '';
     const h = +get('hour');
     const when = h >= 5 && h < 12 ? 'morning' : h >= 12 && h < 17 ? 'afternoon' : h >= 17 && h < 21 ? 'evening' : 'night';
-    const kicker = when === 'night' ? 'Tonight in Onerahi' : 'This ' + when + ' in Onerahi';
-    return { h, when, kicker, weekday: get('weekday'), date: get('day') + ' ' + get('month') };
+    const place = (typeof ibWx !== 'undefined' && ibWx.placeName) ? ibWx.placeName() : 'Onerahi';
+    const kicker = when === 'night' ? 'Tonight in ' + place : 'This ' + when + ' in ' + place;
+    return { h, when, kicker, place, weekday: get('weekday'), date: get('day') + ' ' + get('month') };
   }
   function wxLabel(code) {
     if (code == null || code === '') return { em: '⛅', name: 'Looking up the weather' };
@@ -42,8 +43,30 @@
   }
   function wxNow() {
     try { if (typeof wxCurrent === 'function') { const c = wxCurrent(); if (c) return c; } } catch (e) { }
-    try { const o = JSON.parse(localStorage.getItem('fxWx') || 'null'); if (o && o.w && Date.now() - o.t < 3 * 36e5) return o.w; } catch (e) { }
+    // fxWx is a short-lived copy of the same forecast; skip it when this person is away from Onerahi
+    try {
+      const away = typeof ibWx !== 'undefined' && typeof ibWx.usingHome === 'function' && !ibWx.usingHome();
+      if (!away) { const o = JSON.parse(localStorage.getItem('fxWx') || 'null'); if (o && o.w && Date.now() - o.t < 3 * 36e5) return o.w; }
+    } catch (e) { }
     return null;
+  }
+  function wxView() {
+    const nz = nzParts();
+    const w = wxNow();
+    const lab = wxLabel(w && (w.weather_code != null ? w.weather_code : w.weathercode));
+    const temp = w && w.temperature_2m != null ? Math.round(w.temperature_2m) : null;
+    const wind = w && w.wind_speed_10m != null ? Math.round(w.wind_speed_10m) : null;
+    const windTxt = wind == null ? '' : wind < 15 ? 'light breeze' : wind + ' km/h wind';
+    const wxSub = temp != null ? [windTxt, nz.place].filter(Boolean).join(' · ') : nz.place;
+    return { nz, lab, temp, wxSub };
+  }
+  function paintWx() {
+    const hero = $('#today-hero'); if (!hero) return;
+    const v = wxView();
+    const kick = hero.querySelector('.kicker'); if (kick) kick.textContent = v.nz.kicker;
+    const deg = hero.querySelector('.deg'); if (deg) deg.textContent = v.temp != null ? v.temp + '°' : '—';
+    const b = hero.querySelector('.wxmeta b'); if (b) b.textContent = v.lab.em + ' ' + v.lab.name;
+    const sm = hero.querySelector('.wxmeta small'); if (sm) sm.textContent = v.wxSub;
   }
 
   /* ---- tiles: birthday (family only), trivia, streak ---- */
@@ -138,13 +161,7 @@
 
   /* ---- Hero + composer on Today ---- */
   function heroHtml() {
-    const nz = nzParts();
-    const w = wxNow();
-    const lab = wxLabel(w && (w.weather_code != null ? w.weather_code : w.weathercode));
-    const temp = w && w.temperature_2m != null ? Math.round(w.temperature_2m) : null;
-    const wind = w && w.wind_speed_10m != null ? Math.round(w.wind_speed_10m) : null;
-    const windTxt = wind == null ? '' : wind < 15 ? 'light breeze' : wind + ' km/h wind';
-    const wxSub = [windTxt, 'Onerahi'].filter(Boolean).join(' · ');
+    const v = wxView(), nz = v.nz, lab = v.lab, temp = v.temp, wxSub = v.wxSub;
     const bd = nextBirthday();
     const bdTitle = bd ? (bd.title || 'Birthday').replace(/^🎂\s*/, '') : (typeof IS_FRIEND !== 'undefined' && IS_FRIEND ? 'Friends' : 'Birthdays');
     const bdSub = bd ? (typeof inDays === 'function' ? inDays(bd.days) : (bd.days === 0 ? 'today' : 'in ' + bd.days + ' days')) : (typeof IS_FRIEND !== 'undefined' && IS_FRIEND ? 'Your circle' : 'None coming up');
@@ -153,7 +170,7 @@
       <div class="kicker">${esc(nz.kicker)}</div>
       <h1>${esc(nz.weekday)}<small>${esc(nz.date)}</small></h1>
       <div class="today-wx"><div class="deg">${temp != null ? temp + '°' : '—'}</div>
-        <div class="wxmeta"><b>${lab.em} ${esc(lab.name)}</b><small>${temp != null ? esc(wxSub) : 'Onerahi · Whangārei'}</small></div></div>
+        <div class="wxmeta"><b>${lab.em} ${esc(lab.name)}</b><small>${esc(wxSub)}</small></div></div>
       <div class="today-bits">
         <button type="button" class="today-bit" data-today-bit="${bd ? 'bday' : 'people'}"><em>🎂</em><b>${esc(bdTitle)}</b><small>${esc(bdSub)}</small></button>
         <button type="button" class="today-bit" data-today-bit="${tr.go}"><em>${tr.em}</em><b>${esc(tr.title)}</b><small>${esc(tr.sub)}</small></button>
@@ -506,5 +523,5 @@
   paintTabs();
   if (typeof tab !== 'undefined' && tab === 'all' && $('#feed') && !$('#feed .sk')) injectHero();
 
-  window.ibToday = { nzParts, wxLabel, nextBirthday, sugarLevel, loveKeep, TAP_WAIT, IGNORE, heroHtml, celebCardHtml, calPreview, calWhen, fmtTime, daysUntil, isoDate, openReaderOrLink };
+  window.ibToday = { nzParts, wxLabel, wxNow, wxView, paintWx, nextBirthday, sugarLevel, loveKeep, TAP_WAIT, IGNORE, heroHtml, celebCardHtml, calPreview, calWhen, fmtTime, daysUntil, isoDate, openReaderOrLink };
 })();
