@@ -87,7 +87,7 @@
     if (REL_FOR === k && REL_ITEMS) return REL_ITEMS;
     let items = [];
     try {
-      const r = await fetch('religion-local.json?v=1.9.301', { cache: 'no-store' });
+      const r = await fetch('religion-local.json?v=1.9.302', { cache: 'no-store' });
       if (r.ok) {
         const j = await r.json();
         items = (j.items || []).slice();
@@ -134,7 +134,7 @@
   async function loadConcerts() {
     if (!CON_FALLBACK) {
       try {
-        const r = await fetch('akl-concerts.json?v=1.9.301', { cache: 'no-store' });
+        const r = await fetch('akl-concerts.json?v=1.9.302', { cache: 'no-store' });
         if (r.ok) CON_FALLBACK = (await r.json()).events || [];
       } catch (e) { CON_FALLBACK = []; }
     }
@@ -182,7 +182,7 @@
   async function loadTop40() {
     if (TOP40 && TOP40.songs && TOP40.songs.length) return TOP40;
     try {
-      const r = await fetch('top40-local.json?v=1.9.301', { cache: 'no-store' });
+      const r = await fetch('top40-local.json?v=1.9.302', { cache: 'no-store' });
       if (r.ok) TOP40 = await r.json();
     } catch (e) { }
     try {
