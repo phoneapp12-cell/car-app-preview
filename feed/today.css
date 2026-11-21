@@ -39,11 +39,8 @@ html.today-look.force-dark .ib,html.today-look.force-dark #mfbtn{background:var(
 html.today-look #mfbtn{order:-1}
 html.today-look .logo img{border-radius:10px}
 
-/* Hide stories on the magazine Today feed; back-to-feed pill stays when needed */
-html.today-look.ib-tab-all #stories-host,
-html.today-look.ib-tab-people #stories-host,
-html.today-look.ib-tab-games #stories-host,
-html.today-look.ib-tab-you #stories-host{display:none}
+/* Hide stories on the magazine shell from the first paint (also inlined in index.html) */
+html.today-look #stories-host{display:none}
 
 /* Hero */
 .today-hero{margin:8px 12px 14px;background:linear-gradient(165deg,color-mix(in srgb,var(--card) 92%,#fff) 0%,color-mix(in srgb,var(--sky) 14%,var(--card)) 60%,color-mix(in srgb,var(--paper) 80%,var(--card)) 100%);

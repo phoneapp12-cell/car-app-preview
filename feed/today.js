@@ -368,6 +368,7 @@
   }
   function wrapDrawer() {
     if (typeof mfDrawer !== 'function') return;
+    if (mfDrawer.__ibToday) return;
     const orig = mfDrawer;
     window.mfDrawer = function (open) {
       orig(open);
@@ -415,6 +416,8 @@
           + admin;
       }
     };
+  
+    window.mfDrawer.__ibToday = true;
   }
 
   /* ---- Double-tap heart (TikTok-style) ---- */
@@ -500,7 +503,7 @@
     if (typeof draw !== 'function') return;
     const orig = draw;
     window.draw = function () {
-      if (window.ibTodoOn || window.ibCalOn) { orig.apply(this, arguments); paintTabs(); return; }
+      if (window.ibTodoOn || window.ibCalOn) { orig.apply(this, arguments); paintTabs(); ready(); return; }
       const t = typeof tab !== 'undefined' ? tab : 'all';
       if (t === 'people' || t === 'notif' || t === 'games' || t === 'you') {
         try { if (typeof chips === 'function') chips(); } catch (e) { }
@@ -509,11 +512,12 @@
         else if (t === 'notif') { try { if (window.ibNotif && ibNotif.drawPage) ibNotif.drawPage(true); } catch (e) { } }
         else if (t === 'games') drawGamesPage();
         else drawYouPage();
-        paintTabs(); return;
+        paintTabs(); ready(); return;
       }
       orig.apply(this, arguments);
       if (typeof tab !== 'undefined' && tab === 'all') { injectHero(); injectTodoCard(); }
       paintTabs();
+      ready();
     };
   }
 
@@ -545,10 +549,15 @@
     }
   });
 
+  function ready() {
+    document.documentElement.classList.add('ib-ready');
+  }
+
   hookDraw();
   wrapDrawer();
   paintTabs();
   if (typeof tab !== 'undefined' && tab === 'all' && $('#feed') && !$('#feed .sk')) { injectHero(); injectTodoCard(); }
+  ready();
 
-  window.ibToday = { nzParts, wxLabel, wxNow, wxView, paintWx, nextBirthday, sugarLevel, shortsTile, loveKeep, TAP_WAIT, IGNORE, heroHtml, celebCardHtml, calPreview, calWhen, fmtTime, daysUntil, isoDate, openReaderOrLink };
+  window.ibToday = { nzParts, wxLabel, wxNow, wxView, paintWx, nextBirthday, sugarLevel, shortsTile, loveKeep, TAP_WAIT, IGNORE, heroHtml, celebCardHtml, calPreview, calWhen, fmtTime, daysUntil, isoDate, openReaderOrLink, injectTodoCard, wrapDrawer, hookDraw, ready };
 })();
