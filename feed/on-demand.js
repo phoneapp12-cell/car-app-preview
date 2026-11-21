@@ -38,12 +38,54 @@
     } else return false;
     return s.episodes.some(allowedEpisode);
   }
+  const HIDE_KEY = 'ib-od-hide-nz';
+  let memHidden = null;
+  function hiddenSet() {
+    if (memHidden) return memHidden;
+    try {
+      const raw = root.localStorage && root.localStorage.getItem(HIDE_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      memHidden = new Set(Array.isArray(arr) ? arr : []);
+    } catch (e) { memHidden = new Set(); }
+    return memHidden;
+  }
+  function persistHidden() {
+    try {
+      if (root.localStorage) root.localStorage.setItem(HIDE_KEY, JSON.stringify(Array.from(hiddenSet())));
+    } catch (err) { }
+  }
+  function hideOnDevice(e) {
+    const id = (e && (e.vid || e.id)) || '';
+    if (!id) return;
+    hiddenSet().add(id);
+    persistHidden();
+  }
+  function unhideOnDevice(e) {
+    const id = (e && (e.vid || e.id)) || '';
+    if (!id) return;
+    hiddenSet().delete(id);
+    persistHidden();
+  }
+  function isHiddenOnDevice(e) {
+    const id = (e && (e.vid || e.id)) || '';
+    return !!(id && hiddenSet().has(id));
+  }
   function allowedEpisode(e) {
     if (!e || !e.t || !e.id) return false;
     if (BLOCKED.test(e.t)) return false;
+    if (isHiddenOnDevice(e)) return false;
     if (e.vid) return /^[\w-]{11}$/.test(e.vid);
     if (e.mp4) return /^https:\/\/archive\.org\/download\/[^\s]+$/i.test(e.mp4);
     return false;
+  }
+  function nextPlayable(show, ep) {
+    const s = typeof show === 'string' ? showById(show) : show;
+    const all = (s && s.episodes) || [];
+    const idx = all.findIndex(x => x && ep && x.id === ep.id);
+    for (let i = idx + 1; i < all.length; i++) {
+      if (allowedEpisode(all[i])) return all[i];
+    }
+    return null;
   }
   function visibleShows(opts) {
     opts = opts || {};
@@ -69,7 +111,13 @@
     if (!/^[\w-]{11}$/.test(vid || '')) return '';
     const auto = opts.autoplay === false ? '0' : '1';
     const mute = opts.mute ? '1' : '0';
-    return 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(vid) + '?rel=0&modestbranding=1&playsinline=1&autoplay=' + auto + '&mute=' + mute;
+    let url = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(vid) + '?rel=0&modestbranding=1&playsinline=1&autoplay=' + auto + '&mute=' + mute + '&enablejsapi=1';
+    try {
+      if (root.location && root.location.origin && root.location.origin !== 'null') {
+        url += '&origin=' + encodeURIComponent(root.location.origin);
+      }
+    } catch (e) { }
+    return url;
   }
   function playerSrc(ep, opts) {
     if (!allowedEpisode(ep)) return null;
@@ -158,7 +206,7 @@
     if (!s || !src) return '';
     const ads = src.ads ? '<p class="ib-od-ads">YouTube · may show ads</p>' : '<p class="ib-od-ads">Public domain</p>';
     const stage = src.type === 'youtube'
-      ? `<iframe title="${esc(ep.t)}" src="${esc(src.src)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen></iframe>`
+      ? `<iframe id="ib-od-yt" title="${esc(ep.t)}" src="${esc(src.src)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen></iframe>`
       : `<video title="${esc(ep.t)}" src="${esc(src.src)}" controls playsinline autoplay></video>`;
     return `<div class="ib-od-fs" id="ib-od-fs" role="dialog" aria-label="${esc(ep.t)}">
       <button type="button" class="ib-od-x" data-od-fs-close aria-label="Close">×</button>
@@ -172,6 +220,9 @@
     if (root.document) root.document.documentElement.classList.remove('ib-od-eps-on');
   }
   function closePlayer() {
+    clearSkipTimer();
+    try { if (ytPlayer && ytPlayer.destroy) ytPlayer.destroy(); } catch (e) { }
+    ytPlayer = null;
     const el = root.document && root.document.getElementById('ib-od-fs');
     if (el) {
       const v = el.querySelector('video');
@@ -189,6 +240,63 @@
     doc.body.insertAdjacentHTML('beforeend', episodesHtml(s));
     doc.documentElement.classList.add('ib-od-eps-on');
   }
+  let ytPlayer = null;
+  let skipTimer = 0;
+  function clearSkipTimer() {
+    if (skipTimer) { try { clearTimeout(skipTimer); } catch (e) { } skipTimer = 0; }
+  }
+  function ensureYtApi(cb) {
+    if (root.YT && root.YT.Player) { cb(); return; }
+    const prev = root.onYouTubeIframeAPIReady;
+    root.onYouTubeIframeAPIReady = function () {
+      if (typeof prev === 'function') prev();
+      cb();
+    };
+    const doc = root.document;
+    if (doc && !doc.querySelector('script[src*="youtube.com/iframe_api"]')) {
+      const s = doc.createElement('script');
+      s.src = 'https://www.youtube.com/iframe_api';
+      (doc.head || doc.documentElement).appendChild(s);
+    }
+  }
+  function bindYtPlayer(showId, ep) {
+    if (!root.YT || !root.YT.Player || !root.document.getElementById('ib-od-yt')) return;
+    try { if (ytPlayer && ytPlayer.destroy) ytPlayer.destroy(); } catch (e) { }
+    ytPlayer = null;
+    try {
+      ytPlayer = new root.YT.Player('ib-od-yt', {
+        events: {
+          onError: function (ev) {
+            const code = ev && ev.data;
+            if (code === 101 || code === 150 || code === 100) onUnavailable(showId, ep, code);
+          }
+        }
+      });
+    } catch (e) { }
+  }
+  function onUnavailable(showId, ep, code) {
+    hideOnDevice(ep);
+    const doc = root.document;
+    const stage = doc && doc.querySelector('#ib-od-fs .ib-od-stage');
+    if (!stage) return;
+    const nxt = nextPlayable(showId, ep);
+    const nextBtn = nxt ? '<button type="button" class="btn pri" data-od-play="' + esc(showId) + ':' + esc(nxt.id) + '">Play next episode</button>' : '';
+    stage.innerHTML = '<div class="ib-od-unavail"><p>Not available in NZ</p>'
+      + (nxt ? '<p class="ib-od-unavail-next">Playing the next episode…</p>' : '')
+      + nextBtn + '</div>';
+    const cap = doc.querySelector('#ib-od-fs .ib-od-cap p');
+    if (cap) cap.textContent = (ep && ep.t ? ep.t + ' · ' : '') + 'Not available in NZ';
+    // Refresh the episode list if it is still open, and drop empty shows from the page.
+    const epsEl = doc.getElementById('ib-od-eps');
+    if (epsEl) {
+      const s = showById(showId);
+      if (s && (s.episodes || []).some(allowedEpisode)) epsEl.outerHTML = episodesHtml(s);
+      else closeEpisodes();
+    }
+    try { if (typeof drawPage === 'function') drawPage(); } catch (e) { }
+    clearSkipTimer();
+    if (nxt) skipTimer = setTimeout(function () { openPlayer(showId, nxt.id); }, 2200);
+  }
   function openPlayer(showId, epId) {
     const s = showById(showId);
     const e = episodeOf(s, epId);
@@ -198,6 +306,7 @@
     closePlayer();
     doc.body.insertAdjacentHTML('beforeend', playerHtml(s, e, { autoplay: true, mute: false }));
     doc.documentElement.classList.add('ib-od-fs-on');
+    if (src.type === 'youtube') ensureYtApi(function () { bindYtPlayer(showId, e); });
   }
 
   function onClick(ev) {
@@ -232,6 +341,10 @@
     + '#ib-od-fs .ib-od-cap{padding:12px 16px calc(16px + env(safe-area-inset-bottom))}'
     + '#ib-od-fs .ib-od-cap p{margin:0 0 4px;font-weight:800}'
     + '#ib-od-fs .ib-od-ads{margin:0;font-weight:700;opacity:.8}'
+    + '#ib-od-fs .ib-od-unavail{color:#fff;text-align:center;padding:24px;max-width:22rem}'
+    + '#ib-od-fs .ib-od-unavail p{margin:0 0 12px;font-weight:800;font-size:1.15rem}'
+    + '#ib-od-fs .ib-od-unavail .ib-od-unavail-next{font-weight:650;font-size:.95rem;opacity:.85}'
+    + '#ib-od-fs .ib-od-unavail .btn{margin-top:8px}'
     + '.ib-od-x{position:absolute;top:max(10px,env(safe-area-inset-top));right:max(10px,env(safe-area-inset-right));z-index:2;width:44px;height:44px;border:0;border-radius:22px;background:rgba(255,255,255,.92);color:#111;font-size:28px;font-weight:800;line-height:1;cursor:pointer}'
     + '#ib-od-eps .ib-od-x{position:relative;top:0;right:0;flex:none}'
     + '.today-od-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}'
@@ -267,7 +380,8 @@
     JSON_URL, OFFICIAL, setData, catalog, shows, showById, episodeOf,
     allowedShow, allowedEpisode, visibleShows, youtubeEmbedUrl, playerSrc,
     epLabel, showCard, rowItems, makeRow, insertRow, episodesHtml, playerHtml,
-    openEpisodes, openPlayer, closeEpisodes, closePlayer, loadJson, pageHtml, drawPage
+    openEpisodes, openPlayer, closeEpisodes, closePlayer, loadJson, pageHtml, drawPage,
+    hideOnDevice, unhideOnDevice, isHiddenOnDevice, nextPlayable, HIDE_KEY
   };
 
   if (!root.document) return;
