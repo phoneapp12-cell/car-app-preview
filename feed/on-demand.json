@@ -1,6 +1,6 @@
 {
   "checked": "2026-11-21",
-  "refresh": "Re-list official YouTube season playlists on @RedGreenTV (channel UCsfIjK5sy9Upzcf316Xpytw) and the 14 official live-action full episodes on @MrBean (UCkAGrHCLFmlK3H2kd6isipg). For Junior Taskmaster, keep only official full episodes from the Taskmaster channel (UCT5C7yaO3RVuOgwP8JVAujQ) “Junior Taskmaster - Season 1 | Full Episodes” playlist. For Studio C, keep only official videos titled Full Episode on @StudioCtv (UCsZXuHKonP9utl5q2hFCkgA). For Taskmaster UK, keep official full episodes from the Taskmaster channel “Season N - Full Episodes” playlists (series 1–22), plus full-episode Champion of Champions and New Year Treat specials from those official playlists (not outtakes, trailers, or Full Task clips). For Taskmaster NZ, keep official full episodes from Taskmaster International (UCx9l0FfNQ3G79_9SBxkhR9g) season playlists and official Taskmaster International or Taskmaster-channel full episodes for seasons without a working International playlist (season 4 individual official uploads; season 5 “Taskmaster NZ - Season 5 | Full Episodes” on the Taskmaster channel). For Whose Line Is It Anyway?, keep only official full episodes from the @WhoseLineIsItAnyway (UCKg_ZFByYTINckLG76cjUEg) “Original UK Series” playlist; do not add compilations, clips, or Best Of videos from that channel or from The CW. Keep only videos still on those official channels and embeddable (HTTP 200 from https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v=VIDEO_ID, with a youtube.com/embed player, and a youtube-nocookie embed page that loads without an unavailability message). Where a country list is available, drop any episode that is not playable in New Zealand. For Archive.org, keep only episodes on the documented public-domain lists: The Beverly Hillbillies season 1 and the first 19 season-2 episodes (Orion/Filmways did not renew); the 30 Lucy Show episodes that lapsed (two from season 1, 21 from season 5 not including “Lucy Puts Main Street on the Map”, and seven from season 6); and the 16 season-3 Andy Griffith episodes that lapsed — this file only includes the two of those with a clear public-domain licence and a working mp4. Confirm each mp4 still returns video/mp4 at its /download/ URL. Do not add The Big Bang Theory or any show that is not legally free. No Neon, no sport, no unofficial YouTube uploads. No adult-show additions beyond those Shane has approved: do not add The Katering Show or The Guild (TV-14, strong language from episode 1). Taskmaster UK, Taskmaster NZ, and Whose Line Is It Anyway? are included at Shane’s request.",
+  "refresh": "Re-list official YouTube season playlists on @RedGreenTV (channel UCsfIjK5sy9Upzcf316Xpytw) and the 14 official live-action full episodes on @MrBean (UCkAGrHCLFmlK3H2kd6isipg). For Junior Taskmaster, keep only official full episodes from the Taskmaster channel (UCT5C7yaO3RVuOgwP8JVAujQ) “Junior Taskmaster - Season 1 | Full Episodes” playlist. For Studio C, keep only official videos titled Full Episode on @StudioCtv (UCsZXuHKonP9utl5q2hFCkgA). For Taskmaster UK, keep official full episodes from the Taskmaster channel “Season N - Full Episodes” playlists (series 1–22), plus full-episode Champion of Champions and New Year Treat specials from those official playlists (not outtakes, trailers, or Full Task clips). For Taskmaster NZ, keep official full episodes from Taskmaster International (UCx9l0FfNQ3G79_9SBxkhR9g) season playlists and official Taskmaster International or Taskmaster-channel full episodes for seasons without a working International playlist (season 4 individual official uploads; season 5 “Taskmaster NZ - Season 5 | Full Episodes” on the Taskmaster channel). For Whose Line Is It Anyway?, keep only official full episodes from the @WhoseLineIsItAnyway (UCKg_ZFByYTINckLG76cjUEg) “Original UK Series” playlist; do not add compilations, clips, or Best Of videos from that channel or from The CW. Keep only videos still on those official channels and embeddable (HTTP 200 from https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v=VIDEO_ID, with a youtube.com/embed player, and a youtube-nocookie embed page that loads without an unavailability message). Where a country list is available, drop any episode that is not playable in New Zealand. For Archive.org, keep only episodes on the documented public-domain lists: The Beverly Hillbillies season 1 and the first 19 season-2 episodes (Orion/Filmways did not renew); the 30 Lucy Show episodes that lapsed (two from season 1, 21 from season 5 not including “Lucy Puts Main Street on the Map”, and seven from season 6); and the 16 season-3 Andy Griffith episodes that lapsed — this file only includes the two of those with a clear public-domain licence and a working mp4. Confirm each mp4 still returns video/mp4 at its /download/ URL. Do not add The Big Bang Theory or any show that is not legally free. No Neon, no sport, no unofficial YouTube uploads. No adult-show additions beyond those Shane has approved: do not add The Katering Show or The Guild (TV-14, strong language from episode 1). Taskmaster UK, Taskmaster NZ, and Whose Line Is It Anyway? are included at Shane’s request. For The Drew Carey Show, keep only official full episodes from the @TheDrewCareyShow channel (UCahQQyMAU3ft_tBZxhFyPGA) full-episodes playlist; drop duplicate listings of the same video, and when an official title matches a different series episode, use that numbering (the upload labelled S6 E2 as What’s Wrong With This Episode IV is season 6 episode 21). For Joey, keep only official full episodes from the official Friends channel @Friends (UCijVIIfFzspulKc7yWA2Qhg) full-episode playlist. For Taskmaster Australia, keep official full episodes from the Taskmaster International (UCx9l0FfNQ3G79_9SBxkhR9g) season playlists (seasons 1–5). For Taskmaster World Cup, keep the four official English full specials from the Taskmaster International “Taskmaster World Cup” playlist. Do not add non-English Taskmaster editions. Joey is included at Shane’s request.",
   "shows": [
     {
       "id": "red-green",
@@ -2701,6 +2701,2497 @@
       "order": 10
     },
     {
+      "id": "drew-carey",
+      "title": "The Drew Carey Show",
+      "kind": "sitcom",
+      "topic": "sitcoms",
+      "source": "youtube",
+      "channel": "TheDrewCareyShow",
+      "channelId": "UCahQQyMAU3ft_tBZxhFyPGA",
+      "official": true,
+      "ads": true,
+      "order": 20,
+      "label": "YouTube · may show ads",
+      "poster": "https://static.tvmaze.com/uploads/images/medium_portrait/8/21085.jpg",
+      "about": "Official full episodes posted by the show’s own Warner Bros. Discovery YouTube channel.",
+      "episodes": [
+        {
+          "id": "drew-s01e01",
+          "t": "Pilot",
+          "season": 1,
+          "ep": 1,
+          "mins": 22,
+          "dur": 1327,
+          "vid": "H_rlThh2ze8"
+        },
+        {
+          "id": "drew-s01e02",
+          "t": "Miss Right",
+          "season": 1,
+          "ep": 2,
+          "mins": 23,
+          "dur": 1370,
+          "vid": "HURVox6rE6g"
+        },
+        {
+          "id": "drew-s01e03",
+          "t": "The Joining Of Two Unlikely Elements Is A Mixture",
+          "season": 1,
+          "ep": 3,
+          "mins": 22,
+          "dur": 1349,
+          "vid": "8ob1Q7xJSYc"
+        },
+        {
+          "id": "drew-s01e04",
+          "t": "Nature Abhors a Vacuum",
+          "season": 1,
+          "ep": 4,
+          "mins": 21,
+          "dur": 1277,
+          "vid": "2QrIr6hAfIs"
+        },
+        {
+          "id": "drew-s01e05",
+          "t": "No Two Things In Nature Are Exactly Alike",
+          "season": 1,
+          "ep": 5,
+          "mins": 23,
+          "dur": 1361,
+          "vid": "3sKExrv3FS0"
+        },
+        {
+          "id": "drew-s01e06",
+          "t": "Drew Needs Lawyers",
+          "season": 1,
+          "ep": 6,
+          "mins": 22,
+          "dur": 1328,
+          "vid": "AVYH7fovpo4"
+        },
+        {
+          "id": "drew-s01e07",
+          "t": "Drew in Court",
+          "season": 1,
+          "ep": 7,
+          "mins": 23,
+          "dur": 1363,
+          "vid": "U0kQwiLu4no"
+        },
+        {
+          "id": "drew-s01e08",
+          "t": "Lewis' Sister",
+          "season": 1,
+          "ep": 8,
+          "mins": 23,
+          "dur": 1359,
+          "vid": "7RvabDN_cVY"
+        },
+        {
+          "id": "drew-s01e09",
+          "t": "Drew and Mrs. Louder",
+          "season": 1,
+          "ep": 9,
+          "mins": 23,
+          "dur": 1358,
+          "vid": "rl0Qhwx4X9g"
+        },
+        {
+          "id": "drew-s01e10",
+          "t": "Science Names Suck",
+          "season": 1,
+          "ep": 10,
+          "mins": 22,
+          "dur": 1350,
+          "vid": "tqnJG9x9RlY"
+        },
+        {
+          "id": "drew-s01e11",
+          "t": "The Electron Doesn't Fall Far from the Tree",
+          "season": 1,
+          "ep": 11,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "ZCIqi2NA5-w"
+        },
+        {
+          "id": "drew-s01e12",
+          "t": "Isomers Have Distinct Characteristics",
+          "season": 1,
+          "ep": 12,
+          "mins": 22,
+          "dur": 1317,
+          "vid": "CBLFLmkx04s"
+        },
+        {
+          "id": "drew-s01e13",
+          "t": "Drew and the Unstable Element",
+          "season": 1,
+          "ep": 13,
+          "mins": 23,
+          "dur": 1357,
+          "vid": "Ofqu-Wd2TRo"
+        },
+        {
+          "id": "drew-s01e14",
+          "t": "Drew and Mr. Bell’s Nephew",
+          "season": 1,
+          "ep": 14,
+          "mins": 21,
+          "dur": 1255,
+          "vid": "pWDk4ZQJivc"
+        },
+        {
+          "id": "drew-s01e15",
+          "t": "There Is No Scientific Name For A Show About God",
+          "season": 1,
+          "ep": 15,
+          "mins": 22,
+          "dur": 1305,
+          "vid": "JO2YfwKM104"
+        },
+        {
+          "id": "drew-s01e16",
+          "t": "Drew's New Assistant",
+          "season": 1,
+          "ep": 16,
+          "mins": 23,
+          "dur": 1360,
+          "vid": "Kn-spgk1vI0"
+        },
+        {
+          "id": "drew-s01e17",
+          "t": "The Front",
+          "season": 1,
+          "ep": 17,
+          "mins": 22,
+          "dur": 1347,
+          "vid": "Q__ZnRkBGzI"
+        },
+        {
+          "id": "drew-s01e18",
+          "t": "Playing a Unified Field",
+          "season": 1,
+          "ep": 18,
+          "mins": 23,
+          "dur": 1373,
+          "vid": "FVAOUK4XkrM"
+        },
+        {
+          "id": "drew-s01e19",
+          "t": "An Atomic Cat Fight",
+          "season": 1,
+          "ep": 19,
+          "mins": 22,
+          "dur": 1330,
+          "vid": "rH0PpiAQSow"
+        },
+        {
+          "id": "drew-s01e20",
+          "t": "Drew and Kate and Kate’s Mom",
+          "season": 1,
+          "ep": 20,
+          "mins": 23,
+          "dur": 1357,
+          "vid": "kvlBiYI2Q6k"
+        },
+        {
+          "id": "drew-s01e21",
+          "t": "Drew Gets Motivated",
+          "season": 1,
+          "ep": 21,
+          "mins": 22,
+          "dur": 1291,
+          "vid": "2fPGnxDGFCc"
+        },
+        {
+          "id": "drew-s01e22",
+          "t": "Buzz Beer",
+          "season": 1,
+          "ep": 22,
+          "mins": 23,
+          "dur": 1360,
+          "vid": "OJMyEJmsN10"
+        },
+        {
+          "id": "drew-s02e01",
+          "t": "We'll Remember Always, Evaluation Day",
+          "season": 2,
+          "ep": 1,
+          "mins": 22,
+          "dur": 1350,
+          "vid": "RbJQLRvGvoA"
+        },
+        {
+          "id": "drew-s02e02",
+          "t": "Something Wick This Way Comes",
+          "season": 2,
+          "ep": 2,
+          "mins": 21,
+          "dur": 1282,
+          "vid": "aLYsmOzz_p8"
+        },
+        {
+          "id": "drew-s02e03",
+          "t": "Break It Up, Break It Up",
+          "season": 2,
+          "ep": 3,
+          "mins": 21,
+          "dur": 1265,
+          "vid": "8R_goEFQpxM"
+        },
+        {
+          "id": "drew-s02e04",
+          "t": "The Bully You Know",
+          "season": 2,
+          "ep": 4,
+          "mins": 22,
+          "dur": 1341,
+          "vid": "QyT5bJ3INa4"
+        },
+        {
+          "id": "drew-s02e05",
+          "t": "The Devil, You Say",
+          "season": 2,
+          "ep": 5,
+          "mins": 22,
+          "dur": 1300,
+          "vid": "4uIUGMFqbz0"
+        },
+        {
+          "id": "drew-s02e06",
+          "t": "The Day the Music Died",
+          "season": 2,
+          "ep": 6,
+          "mins": 22,
+          "dur": 1341,
+          "vid": "5ZFJQnkquxY"
+        },
+        {
+          "id": "drew-s02e07",
+          "t": "What the Zoning Inspector Saw",
+          "season": 2,
+          "ep": 7,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "cNriwGhDeck"
+        },
+        {
+          "id": "drew-s02e08",
+          "t": "Drew’s the Other Man",
+          "season": 2,
+          "ep": 8,
+          "mins": 21,
+          "dur": 1279,
+          "vid": "Sf9MENiSuVk"
+        },
+        {
+          "id": "drew-s02e09",
+          "t": "Mimi's Day Parade",
+          "season": 2,
+          "ep": 9,
+          "mins": 22,
+          "dur": 1333,
+          "vid": "R-mgfBY8go8"
+        },
+        {
+          "id": "drew-s02e10",
+          "t": "It's Your Party and I'll Crash If I Want To",
+          "season": 2,
+          "ep": 10,
+          "mins": 21,
+          "dur": 1272,
+          "vid": "32h-VLcq2rQ"
+        },
+        {
+          "id": "drew-s02e11",
+          "t": "Lisa Gets Married",
+          "season": 2,
+          "ep": 11,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "WjrbHq16vBM"
+        },
+        {
+          "id": "drew-s02e12",
+          "t": "They're Back!",
+          "season": 2,
+          "ep": 12,
+          "mins": 22,
+          "dur": 1325,
+          "vid": "tsP8lVB_oBk"
+        },
+        {
+          "id": "drew-s02e13",
+          "t": "Hello, Goodbye",
+          "season": 2,
+          "ep": 13,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "X58vKuShJNQ"
+        },
+        {
+          "id": "drew-s02e14",
+          "t": "Drewstock",
+          "season": 2,
+          "ep": 14,
+          "mins": 20,
+          "dur": 1191,
+          "vid": "1USmim-e_e0"
+        },
+        {
+          "id": "drew-s02e15",
+          "t": "Drew Blows His Promotion",
+          "season": 2,
+          "ep": 15,
+          "mins": 22,
+          "dur": 1341,
+          "vid": "dzTGsmylbgM"
+        },
+        {
+          "id": "drew-s02e16",
+          "t": "Check Out Drew's Old Flame",
+          "season": 2,
+          "ep": 16,
+          "mins": 22,
+          "dur": 1304,
+          "vid": "tFrpbm2R1Hk"
+        },
+        {
+          "id": "drew-s02e17",
+          "t": "See Drew Run",
+          "season": 2,
+          "ep": 17,
+          "mins": 22,
+          "dur": 1301,
+          "vid": "o5RE9UCXl4I"
+        },
+        {
+          "id": "drew-s02e18",
+          "t": "Drew Gets Married",
+          "season": 2,
+          "ep": 18,
+          "mins": 23,
+          "dur": 1353,
+          "vid": "0AJz5S-M7jE"
+        },
+        {
+          "id": "drew-s02e19",
+          "t": "Man's Best Same-Sex Companion",
+          "season": 2,
+          "ep": 19,
+          "mins": 22,
+          "dur": 1309,
+          "vid": "dAeImzsnFB0"
+        },
+        {
+          "id": "drew-s02e20",
+          "t": "Two Drews and the Queen of Poland Walk Into a Bar",
+          "season": 2,
+          "ep": 20,
+          "mins": 22,
+          "dur": 1345,
+          "vid": "dsi1ulFkjE8"
+        },
+        {
+          "id": "drew-s02e21",
+          "t": "Cap-Beer-Cino",
+          "season": 2,
+          "ep": 21,
+          "mins": 21,
+          "dur": 1288,
+          "vid": "X6zh5cqOVkw"
+        },
+        {
+          "id": "drew-s02e22",
+          "t": "Drew vs. Mimi: Part 2",
+          "season": 2,
+          "ep": 22,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "IApEaN79M0Q"
+        },
+        {
+          "id": "drew-s02e23",
+          "t": "Win a Date with Kate",
+          "season": 2,
+          "ep": 23,
+          "mins": 22,
+          "dur": 1303,
+          "vid": "IjMXNhj5pXc"
+        },
+        {
+          "id": "drew-s02e24",
+          "t": "New York and Queens",
+          "season": 2,
+          "ep": 24,
+          "mins": 22,
+          "dur": 1306,
+          "vid": "VM1yRlgAl0g"
+        },
+        {
+          "id": "drew-s03e01",
+          "t": "Drew vs. Billboard",
+          "season": 3,
+          "ep": 1,
+          "mins": 22,
+          "dur": 1326,
+          "vid": "DiF92vXSkk8"
+        },
+        {
+          "id": "drew-s03e02",
+          "t": "Drew and the Singles Union",
+          "season": 3,
+          "ep": 2,
+          "mins": 22,
+          "dur": 1329,
+          "vid": "DPkwAgijihM"
+        },
+        {
+          "id": "drew-s03e03",
+          "t": "Strange Bedfellows",
+          "season": 3,
+          "ep": 3,
+          "mins": 22,
+          "dur": 1318,
+          "vid": "DN-RbQcONX4"
+        },
+        {
+          "id": "drew-s03e04",
+          "t": "Misery Loves Mimi",
+          "season": 3,
+          "ep": 4,
+          "mins": 21,
+          "dur": 1268,
+          "vid": "O1ZrwK0HrZk"
+        },
+        {
+          "id": "drew-s03e05",
+          "t": "A Very, Very, Very Fine House",
+          "season": 3,
+          "ep": 5,
+          "mins": 22,
+          "dur": 1307,
+          "vid": "vZylKGWtPCE"
+        },
+        {
+          "id": "drew-s03e06",
+          "t": "Drew vs. the Pig",
+          "season": 3,
+          "ep": 6,
+          "mins": 22,
+          "dur": 1325,
+          "vid": "eezsf2d37Yw"
+        },
+        {
+          "id": "drew-s03e07",
+          "t": "Batmobile",
+          "season": 3,
+          "ep": 7,
+          "mins": 22,
+          "dur": 1325,
+          "vid": "2lvJ7Lw2GJ0"
+        },
+        {
+          "id": "drew-s03e08",
+          "t": "Dog and Pony Show",
+          "season": 3,
+          "ep": 8,
+          "mins": 22,
+          "dur": 1311,
+          "vid": "FLm8cUnRNEw"
+        },
+        {
+          "id": "drew-s03e09",
+          "t": "Drew's Brother",
+          "season": 3,
+          "ep": 9,
+          "mins": 22,
+          "dur": 1326,
+          "vid": "0hfgjN_gQos"
+        },
+        {
+          "id": "drew-s03e10",
+          "t": "That Thing You Don't",
+          "season": 3,
+          "ep": 10,
+          "mins": 21,
+          "dur": 1267,
+          "vid": "vXic3crjSec"
+        },
+        {
+          "id": "drew-s03e11",
+          "t": "Volunteer",
+          "season": 3,
+          "ep": 11,
+          "mins": 22,
+          "dur": 1328,
+          "vid": "_He0EGP3dmE"
+        },
+        {
+          "id": "drew-s03e12",
+          "t": "The Vacation",
+          "season": 3,
+          "ep": 12,
+          "mins": 22,
+          "dur": 1326,
+          "vid": "F4r_EN-jEmA"
+        },
+        {
+          "id": "drew-s03e13",
+          "t": "Howdy, Neighbor!",
+          "season": 3,
+          "ep": 13,
+          "mins": 22,
+          "dur": 1327,
+          "vid": "nOvoQSnEUCo"
+        },
+        {
+          "id": "drew-s03e14",
+          "t": "He Harassed Me, He Harassed Me Not",
+          "season": 3,
+          "ep": 14,
+          "mins": 22,
+          "dur": 1308,
+          "vid": "xPSyKG3f-q8"
+        },
+        {
+          "id": "drew-s03e15",
+          "t": "Mr. Louder's Birthday Party",
+          "season": 3,
+          "ep": 15,
+          "mins": 22,
+          "dur": 1326,
+          "vid": "9ZilcatiMmU"
+        },
+        {
+          "id": "drew-s03e16",
+          "t": "The Salon",
+          "season": 3,
+          "ep": 16,
+          "mins": 22,
+          "dur": 1325,
+          "vid": "41ViGARAp1Y"
+        },
+        {
+          "id": "drew-s03e17",
+          "t": "The Engagement",
+          "season": 3,
+          "ep": 17,
+          "mins": 22,
+          "dur": 1316,
+          "vid": "Kdu_oeiuXRM"
+        },
+        {
+          "id": "drew-s03e18",
+          "t": "Nicki's Parents",
+          "season": 3,
+          "ep": 18,
+          "mins": 21,
+          "dur": 1255,
+          "vid": "RPj6Nuo5Wmo"
+        },
+        {
+          "id": "drew-s03e19",
+          "t": "Two Weddings and a Funeral for a Refrigerator",
+          "season": 3,
+          "ep": 19,
+          "mins": 21,
+          "dur": 1282,
+          "vid": "IZr1aAudXuc"
+        },
+        {
+          "id": "drew-s03e20",
+          "t": "The Bachelor Party",
+          "season": 3,
+          "ep": 20,
+          "mins": 22,
+          "dur": 1329,
+          "vid": "wVHRPcZ3NQs"
+        },
+        {
+          "id": "drew-s03e21",
+          "t": "The Sex Drug",
+          "season": 3,
+          "ep": 21,
+          "mins": 21,
+          "dur": 1240,
+          "vid": "gZ_7hxoZJqw"
+        },
+        {
+          "id": "drew-s03e22",
+          "t": "What's Wrong with This Episode?",
+          "season": 3,
+          "ep": 22,
+          "mins": 22,
+          "dur": 1301,
+          "vid": "2HJOqJDn538"
+        },
+        {
+          "id": "drew-s03e23",
+          "t": "The Rebound",
+          "season": 3,
+          "ep": 23,
+          "mins": 22,
+          "dur": 1299,
+          "vid": "Vadhl3g8X6I"
+        },
+        {
+          "id": "drew-s03e24",
+          "t": "The Dating Consultant",
+          "season": 3,
+          "ep": 24,
+          "mins": 22,
+          "dur": 1295,
+          "vid": "HXGpwCZwRxo"
+        },
+        {
+          "id": "drew-s03e25",
+          "t": "Drew's Cousin",
+          "season": 3,
+          "ep": 25,
+          "mins": 22,
+          "dur": 1296,
+          "vid": "AzsH6EbkHew"
+        },
+        {
+          "id": "drew-s03e27",
+          "t": "The Wedding Dress",
+          "season": 3,
+          "ep": 27,
+          "mins": 20,
+          "dur": 1221,
+          "vid": "1tHR8EM28Zw"
+        },
+        {
+          "id": "drew-s03e28",
+          "t": "My Best Friend's Wedding",
+          "season": 3,
+          "ep": 28,
+          "mins": 22,
+          "dur": 1324,
+          "vid": "Zoly-KVRDQI"
+        },
+        {
+          "id": "drew-s04e01",
+          "t": "Drew and the Conspiracy",
+          "season": 4,
+          "ep": 1,
+          "mins": 22,
+          "dur": 1325,
+          "vid": "71c37XJUJCE"
+        },
+        {
+          "id": "drew-s04e02",
+          "t": "In Ramada Da Vida",
+          "season": 4,
+          "ep": 2,
+          "mins": 21,
+          "dur": 1257,
+          "vid": "JpwyUoVYmOo"
+        },
+        {
+          "id": "drew-s04e03",
+          "t": "Golden Boy",
+          "season": 4,
+          "ep": 3,
+          "mins": 21,
+          "dur": 1256,
+          "vid": "JZDIflpDJco"
+        },
+        {
+          "id": "drew-s04e04",
+          "t": "Drew Between The Rock And A Hard Place",
+          "season": 4,
+          "ep": 4,
+          "mins": 18,
+          "dur": 1051,
+          "vid": "2sVB3by8FEA"
+        },
+        {
+          "id": "drew-s04e05",
+          "t": "Sexual Perversity in Cleveland",
+          "season": 4,
+          "ep": 5,
+          "mins": 22,
+          "dur": 1324,
+          "vid": "Wr0JnfH3Y9Y"
+        },
+        {
+          "id": "drew-s04e06",
+          "t": "Cain and Mabel",
+          "season": 4,
+          "ep": 6,
+          "mins": 22,
+          "dur": 1319,
+          "vid": "3kUosr-AP_I"
+        },
+        {
+          "id": "drew-s04e07",
+          "t": "Nicki's Wedding",
+          "season": 4,
+          "ep": 7,
+          "mins": 21,
+          "dur": 1246,
+          "vid": "KlkVulQ9Q3w"
+        },
+        {
+          "id": "drew-s04e08",
+          "t": "Drew's New Car",
+          "season": 4,
+          "ep": 8,
+          "mins": 22,
+          "dur": 1312,
+          "vid": "AayqHHlA4UI"
+        },
+        {
+          "id": "drew-s04e09",
+          "t": "High Road to China",
+          "season": 4,
+          "ep": 9,
+          "mins": 22,
+          "dur": 1326,
+          "vid": "VS2sH-pjVy0"
+        },
+        {
+          "id": "drew-s04e11",
+          "t": "Kate's Family",
+          "season": 4,
+          "ep": 11,
+          "mins": 21,
+          "dur": 1289,
+          "vid": "iDhtxfLr_TY"
+        },
+        {
+          "id": "drew-s04e12",
+          "t": "Drew’s Date’s a Senior",
+          "season": 4,
+          "ep": 12,
+          "mins": 22,
+          "dur": 1303,
+          "vid": "Ydym_7zC434"
+        },
+        {
+          "id": "drew-s04e13",
+          "t": "Drew's Holiday Punch",
+          "season": 4,
+          "ep": 13,
+          "mins": 22,
+          "dur": 1299,
+          "vid": "wc4NyJkH548"
+        },
+        {
+          "id": "drew-s04e14",
+          "t": "A House Divided",
+          "season": 4,
+          "ep": 14,
+          "mins": 22,
+          "dur": 1301,
+          "vid": "in1jfBHI-zA"
+        },
+        {
+          "id": "drew-s04e15",
+          "t": "A House Reunited",
+          "season": 4,
+          "ep": 15,
+          "mins": 20,
+          "dur": 1208,
+          "vid": "9hXOhrAoLD0"
+        },
+        {
+          "id": "drew-s04e16",
+          "t": "Rats, Kate’s Dating a Wrestler",
+          "season": 4,
+          "ep": 16,
+          "mins": 21,
+          "dur": 1261,
+          "vid": "DKoN_XeDWyc"
+        },
+        {
+          "id": "drew-s04e17",
+          "t": "Three Guys, A Girl And A B-Story",
+          "season": 4,
+          "ep": 17,
+          "mins": 21,
+          "dur": 1239,
+          "vid": "Zn_jKD-TpF8"
+        },
+        {
+          "id": "drew-s04e18",
+          "t": "Boy Party/Girl Party",
+          "season": 4,
+          "ep": 18,
+          "mins": 22,
+          "dur": 1297,
+          "vid": "Cuv244LKIJY"
+        },
+        {
+          "id": "drew-s04e19",
+          "t": "Tracy Bowl",
+          "season": 4,
+          "ep": 19,
+          "mins": 21,
+          "dur": 1233,
+          "vid": "vmszR3k3CSQ"
+        },
+        {
+          "id": "drew-s04e20",
+          "t": "DrugCo",
+          "season": 4,
+          "ep": 20,
+          "mins": 22,
+          "dur": 1322,
+          "vid": "duyJtuopLUU"
+        },
+        {
+          "id": "drew-s04e21",
+          "t": "Steve and Mimi",
+          "season": 4,
+          "ep": 21,
+          "mins": 22,
+          "dur": 1324,
+          "vid": "KdJEqnZbe78"
+        },
+        {
+          "id": "drew-s04e22",
+          "t": "What's Wrong With This Episode II",
+          "season": 4,
+          "ep": 22,
+          "mins": 22,
+          "dur": 1326,
+          "vid": "ohwC6U837T0"
+        },
+        {
+          "id": "drew-s04e23",
+          "t": "She's Gotta Have It",
+          "season": 4,
+          "ep": 23,
+          "mins": 21,
+          "dur": 1283,
+          "vid": "Z6vjdAwSz48"
+        },
+        {
+          "id": "drew-s04e24",
+          "t": "Good Vibrations",
+          "season": 4,
+          "ep": 24,
+          "mins": 22,
+          "dur": 1320,
+          "vid": "pXkZBOCoCxI"
+        },
+        {
+          "id": "drew-s04e25",
+          "t": "Do the Hustle",
+          "season": 4,
+          "ep": 25,
+          "mins": 21,
+          "dur": 1267,
+          "vid": "vWkJhCJFosY"
+        },
+        {
+          "id": "drew-s04e26",
+          "t": "Up on the Roof",
+          "season": 4,
+          "ep": 26,
+          "mins": 22,
+          "dur": 1323,
+          "vid": "-CnOBfLv5PY"
+        },
+        {
+          "id": "drew-s04e27",
+          "t": "Brotherhood of Man",
+          "season": 4,
+          "ep": 27,
+          "mins": 22,
+          "dur": 1312,
+          "vid": "9kiGo6qYPnw"
+        },
+        {
+          "id": "drew-s05e01",
+          "t": "Y2K, You're Okay",
+          "season": 5,
+          "ep": 1,
+          "mins": 22,
+          "dur": 1294,
+          "vid": "GhQwbQOu7YI"
+        },
+        {
+          "id": "drew-s05e02",
+          "t": "Drew Goes to the Browns’ Game",
+          "season": 5,
+          "ep": 2,
+          "mins": 20,
+          "dur": 1217,
+          "vid": "dyjmcDbBd3E"
+        },
+        {
+          "id": "drew-s05e03",
+          "t": "Drew and the Gang Law",
+          "season": 5,
+          "ep": 3,
+          "mins": 22,
+          "dur": 1296,
+          "vid": "ywEh7Tz2LRE"
+        },
+        {
+          "id": "drew-s05e04",
+          "t": "Drew's Reunion",
+          "season": 5,
+          "ep": 4,
+          "mins": 21,
+          "dur": 1264,
+          "vid": "F4q-GnlCARg"
+        },
+        {
+          "id": "drew-s05e05",
+          "t": "Drew's Physical",
+          "season": 5,
+          "ep": 5,
+          "mins": 20,
+          "dur": 1198,
+          "vid": "lxdNM8iK5y8"
+        },
+        {
+          "id": "drew-s05e06",
+          "t": "Drew Tries to Kill Mimi",
+          "season": 5,
+          "ep": 6,
+          "mins": 22,
+          "dur": 1296,
+          "vid": "roRZa5J-izU"
+        },
+        {
+          "id": "drew-s05e07",
+          "t": "Red, White, and Drew",
+          "season": 5,
+          "ep": 7,
+          "mins": 20,
+          "dur": 1230,
+          "vid": "gseCcCwtCnM"
+        },
+        {
+          "id": "drew-s05e08",
+          "t": "Drew Live",
+          "season": 5,
+          "ep": 8,
+          "mins": 21,
+          "dur": 1288,
+          "vid": "fk4O7gvUafA"
+        },
+        {
+          "id": "drew-s05e09",
+          "t": "Drew Cam",
+          "season": 5,
+          "ep": 9,
+          "mins": 20,
+          "dur": 1227,
+          "vid": "hMl_Gkdhjh0"
+        },
+        {
+          "id": "drew-s05e10",
+          "t": "Drew's Stomachache",
+          "season": 5,
+          "ep": 10,
+          "mins": 22,
+          "dur": 1298,
+          "vid": "SjlFi23C4f4"
+        },
+        {
+          "id": "drew-s05e11",
+          "t": "Steve and Mimi Get Married",
+          "season": 5,
+          "ep": 11,
+          "mins": 21,
+          "dur": 1256,
+          "vid": "trQXjrAYRFQ"
+        },
+        {
+          "id": "drew-s05e12",
+          "t": "Drew and Kate’s First Date",
+          "season": 5,
+          "ep": 12,
+          "mins": 21,
+          "dur": 1268,
+          "vid": "RjmCPXgscLU"
+        },
+        {
+          "id": "drew-s05e13",
+          "t": "Drew And The Racial Tension Play",
+          "season": 5,
+          "ep": 13,
+          "mins": 20,
+          "dur": 1184,
+          "vid": "ISYco3hPv6U"
+        },
+        {
+          "id": "drew-s05e14",
+          "t": "Kate Works for Drew",
+          "season": 5,
+          "ep": 14,
+          "mins": 21,
+          "dur": 1278,
+          "vid": "Ig4ikz8KgXM"
+        },
+        {
+          "id": "drew-s05e15",
+          "t": "Mimi Moves In",
+          "season": 5,
+          "ep": 15,
+          "mins": 20,
+          "dur": 1222,
+          "vid": "zIE-c2bxwsE"
+        },
+        {
+          "id": "drew-s05e16",
+          "t": "Do Drew and Kate Have Sex?",
+          "season": 5,
+          "ep": 16,
+          "mins": 21,
+          "dur": 1251,
+          "vid": "xZnQbWZFaG4"
+        },
+        {
+          "id": "drew-s05e17",
+          "t": "I Dishonestly Love You",
+          "season": 5,
+          "ep": 17,
+          "mins": 20,
+          "dur": 1190,
+          "vid": "9x_7jOoIUSg"
+        },
+        {
+          "id": "drew-s05e18",
+          "t": "Drew Goes to Hell",
+          "season": 5,
+          "ep": 18,
+          "mins": 22,
+          "dur": 1296,
+          "vid": "IGdwb3DP6KM"
+        },
+        {
+          "id": "drew-s05e19",
+          "t": "What's Wrong With This Episode III?",
+          "season": 5,
+          "ep": 19,
+          "mins": 20,
+          "dur": 1230,
+          "vid": "xaQ_ROzRCN0"
+        },
+        {
+          "id": "drew-s05e20",
+          "t": "The Gang Stops Drinking",
+          "season": 5,
+          "ep": 20,
+          "mins": 21,
+          "dur": 1246,
+          "vid": "0exrDgoqEqk"
+        },
+        {
+          "id": "drew-s05e21",
+          "t": "Oswald's Son",
+          "season": 5,
+          "ep": 21,
+          "mins": 20,
+          "dur": 1226,
+          "vid": "vhpu_nQWInU"
+        },
+        {
+          "id": "drew-s05e22",
+          "t": "Mr. Wick Returns",
+          "season": 5,
+          "ep": 22,
+          "mins": 21,
+          "dur": 1241,
+          "vid": "WhZCj_HFd70"
+        },
+        {
+          "id": "drew-s05e23",
+          "t": "Kate vs. Speedy",
+          "season": 5,
+          "ep": 23,
+          "mins": 21,
+          "dur": 1245,
+          "vid": "QPfdZbgs6Kw"
+        },
+        {
+          "id": "drew-s05e24",
+          "t": "Beer Ball",
+          "season": 5,
+          "ep": 24,
+          "mins": 20,
+          "dur": 1190,
+          "vid": "bg5apjIH6Uw"
+        },
+        {
+          "id": "drew-s05e25",
+          "t": "Drew and Kate Boink",
+          "season": 5,
+          "ep": 25,
+          "mins": 21,
+          "dur": 1271,
+          "vid": "6thEUIdHy9c"
+        },
+        {
+          "id": "drew-s05e26",
+          "t": "A Very Special Drew",
+          "season": 5,
+          "ep": 26,
+          "mins": 21,
+          "dur": 1286,
+          "vid": "K8LJcMmdReU"
+        },
+        {
+          "id": "drew-s06e01",
+          "t": "Drew Pops Something on Kate",
+          "season": 6,
+          "ep": 1,
+          "mins": 21,
+          "dur": 1265,
+          "vid": "sE0-QKWSlwc"
+        },
+        {
+          "id": "drew-s06e02",
+          "t": "Be Drew to Your School",
+          "season": 6,
+          "ep": 2,
+          "mins": 22,
+          "dur": 1293,
+          "vid": "lN1kKTGBWeY"
+        },
+        {
+          "id": "drew-s06e03",
+          "t": "Drew's Inheritance",
+          "season": 6,
+          "ep": 3,
+          "mins": 21,
+          "dur": 1286,
+          "vid": "BvwFKDM1gBg"
+        },
+        {
+          "id": "drew-s06e04",
+          "t": "Mimi’s a Partner",
+          "season": 6,
+          "ep": 4,
+          "mins": 21,
+          "dur": 1286,
+          "vid": "EU4nFkbRBxk"
+        },
+        {
+          "id": "drew-s06e05",
+          "t": "Drew Live II",
+          "season": 6,
+          "ep": 5,
+          "mins": 22,
+          "dur": 1296,
+          "vid": "z8s5OfkkX2A"
+        },
+        {
+          "id": "drew-s06e06",
+          "t": "The Pregnancy Scare",
+          "season": 6,
+          "ep": 6,
+          "mins": 21,
+          "dur": 1246,
+          "vid": "JDG_Wzm63Bs"
+        },
+        {
+          "id": "drew-s06e07",
+          "t": "Drew and the Trail Scouts",
+          "season": 6,
+          "ep": 7,
+          "mins": 21,
+          "dur": 1246,
+          "vid": "lFVhLcDfzSE"
+        },
+        {
+          "id": "drew-s06e08",
+          "t": "Drew and Kate Become Friends",
+          "season": 6,
+          "ep": 8,
+          "mins": 20,
+          "dur": 1178,
+          "vid": "xTUETFiDkxc"
+        },
+        {
+          "id": "drew-s06e09",
+          "t": "Drew Can't Carey a Tune",
+          "season": 6,
+          "ep": 9,
+          "mins": 19,
+          "dur": 1148,
+          "vid": "5_fEnlYZHxU"
+        },
+        {
+          "id": "drew-s06e10",
+          "t": "Buzzie Wuzzie Liked His Beer",
+          "season": 6,
+          "ep": 10,
+          "mins": 20,
+          "dur": 1200,
+          "vid": "u3TYd57EMRI"
+        },
+        {
+          "id": "drew-s06e11",
+          "t": "Fetal Attraction",
+          "season": 6,
+          "ep": 11,
+          "mins": 22,
+          "dur": 1294,
+          "vid": "o9lmKnsNc_k"
+        },
+        {
+          "id": "drew-s06e12",
+          "t": "The Warsaw Closes",
+          "season": 6,
+          "ep": 12,
+          "mins": 20,
+          "dur": 1200,
+          "vid": "snIZCogsF8A"
+        },
+        {
+          "id": "drew-s06e13",
+          "t": "Oswald's Dad Returns",
+          "season": 6,
+          "ep": 13,
+          "mins": 20,
+          "dur": 1207,
+          "vid": "l3vHiXkS4Vc"
+        },
+        {
+          "id": "drew-s06e14",
+          "t": "All Work and No Play",
+          "season": 6,
+          "ep": 14,
+          "mins": 22,
+          "dur": 1302,
+          "vid": "a-XMAF7mUV4"
+        },
+        {
+          "id": "drew-s06e15",
+          "t": "Drew’s in a Coma",
+          "season": 6,
+          "ep": 15,
+          "mins": 20,
+          "dur": 1185,
+          "vid": "VrbYLazoCYE"
+        },
+        {
+          "id": "drew-s06e16",
+          "t": "Drew and the Baby",
+          "season": 6,
+          "ep": 16,
+          "mins": 20,
+          "dur": 1197,
+          "vid": "rcmZUuo9bQc"
+        },
+        {
+          "id": "drew-s06e17",
+          "t": "Hush Little Baby",
+          "season": 6,
+          "ep": 17,
+          "mins": 20,
+          "dur": 1207,
+          "vid": "fjVGBq8z02Y"
+        },
+        {
+          "id": "drew-s06e18",
+          "t": "Drew's Life After Death",
+          "season": 6,
+          "ep": 18,
+          "mins": 21,
+          "dur": 1289,
+          "vid": "Mg60n7rf284"
+        },
+        {
+          "id": "drew-s06e19",
+          "t": "Drew and Motorcycle",
+          "season": 6,
+          "ep": 19,
+          "mins": 21,
+          "dur": 1264,
+          "vid": "_umNHdJ1glw"
+        },
+        {
+          "id": "drew-s06e20",
+          "t": "Kate and Her New Boyfriend",
+          "season": 6,
+          "ep": 20,
+          "mins": 22,
+          "dur": 1303,
+          "vid": "G5r_cTn6Auw"
+        },
+        {
+          "id": "drew-s06e21",
+          "t": "What's Wrong With This Episode IV",
+          "season": 6,
+          "ep": 21,
+          "mins": 21,
+          "dur": 1287,
+          "vid": "umUJGb-A29o"
+        },
+        {
+          "id": "drew-s06e22",
+          "t": "The Easter Show",
+          "season": 6,
+          "ep": 22,
+          "mins": 21,
+          "dur": 1250,
+          "vid": "RX5Vfe1BefA"
+        },
+        {
+          "id": "drew-s06e23",
+          "t": "Christening",
+          "season": 6,
+          "ep": 23,
+          "mins": 22,
+          "dur": 1303,
+          "vid": "MpFF4uYWoVU"
+        },
+        {
+          "id": "drew-s06e24",
+          "t": "Drew and the Activist: Part 1",
+          "season": 6,
+          "ep": 24,
+          "mins": 22,
+          "dur": 1294,
+          "vid": "aklP1ylQD-Q"
+        },
+        {
+          "id": "drew-s06e25",
+          "t": "Drew and the Activist: Part 2",
+          "season": 6,
+          "ep": 25,
+          "mins": 20,
+          "dur": 1213,
+          "vid": "sXHSv5S6s4A"
+        },
+        {
+          "id": "drew-s06e26",
+          "t": "Bananas: Part 1",
+          "season": 6,
+          "ep": 26,
+          "mins": 21,
+          "dur": 1275,
+          "vid": "dTbL5_gUqII"
+        },
+        {
+          "id": "drew-s06e27",
+          "t": "Bananas: Part 2",
+          "season": 6,
+          "ep": 27,
+          "mins": 21,
+          "dur": 1268,
+          "vid": "JEyNqfCNLpQ"
+        },
+        {
+          "id": "drew-s07e03",
+          "t": "Drew Gets Out of the Nuthouse",
+          "season": 7,
+          "ep": 3,
+          "mins": 20,
+          "dur": 1212,
+          "vid": "TCFok0fGSAQ"
+        },
+        {
+          "id": "drew-s07e04",
+          "t": "Married to a Mob",
+          "season": 7,
+          "ep": 4,
+          "mins": 22,
+          "dur": 1304,
+          "vid": "0aiBxUV1WUM"
+        },
+        {
+          "id": "drew-s07e05",
+          "t": "When Wives Collide",
+          "season": 7,
+          "ep": 5,
+          "mins": 21,
+          "dur": 1276,
+          "vid": "PopLnQ5rgvw"
+        },
+        {
+          "id": "drew-s07e07",
+          "t": "It's Halloween, Dummy",
+          "season": 7,
+          "ep": 7,
+          "mins": 22,
+          "dur": 1300,
+          "vid": "V3ALQShvauQ"
+        },
+        {
+          "id": "drew-s07e08",
+          "t": "Beulah Gets Her Groove Back",
+          "season": 7,
+          "ep": 8,
+          "mins": 22,
+          "dur": 1297,
+          "vid": "2TR4MD2Nb4I"
+        },
+        {
+          "id": "drew-s07e09",
+          "t": "Drew Live III",
+          "season": 7,
+          "ep": 9,
+          "mins": 22,
+          "dur": 1304,
+          "vid": "0UoQHcgIl54"
+        },
+        {
+          "id": "drew-s07e10",
+          "t": "Eat Drink Drew Woman",
+          "season": 7,
+          "ep": 10,
+          "mins": 22,
+          "dur": 1305,
+          "vid": "hImJhN1QRMA"
+        },
+        {
+          "id": "drew-s07e11",
+          "t": "Mr. Laffoon's Wild Ride",
+          "season": 7,
+          "ep": 11,
+          "mins": 20,
+          "dur": 1190,
+          "vid": "t9IeWQNcA88"
+        },
+        {
+          "id": "drew-s07e12",
+          "t": "Hotel Drew",
+          "season": 7,
+          "ep": 12,
+          "mins": 21,
+          "dur": 1254,
+          "vid": "nNg986TbBhs"
+        },
+        {
+          "id": "drew-s07e13",
+          "t": "Drew and the King",
+          "season": 7,
+          "ep": 13,
+          "mins": 21,
+          "dur": 1288,
+          "vid": "doNxRIZj2rs"
+        },
+        {
+          "id": "drew-s07e14",
+          "t": "Curse of the Mummy",
+          "season": 7,
+          "ep": 14,
+          "mins": 22,
+          "dur": 1303,
+          "vid": "WJP94-Xti8Y"
+        },
+        {
+          "id": "drew-s07e15",
+          "t": "The Enabler",
+          "season": 7,
+          "ep": 15,
+          "mins": 22,
+          "dur": 1305,
+          "vid": "g-2PLoiwz3A"
+        },
+        {
+          "id": "drew-s07e16",
+          "t": "Pretty Baby",
+          "season": 7,
+          "ep": 16,
+          "mins": 20,
+          "dur": 1221,
+          "vid": "ut85_3BaQHw"
+        },
+        {
+          "id": "drew-s07e17",
+          "t": "A Shot in the Dark",
+          "season": 7,
+          "ep": 17,
+          "mins": 22,
+          "dur": 1294,
+          "vid": "Hzu3ZGSHCds"
+        },
+        {
+          "id": "drew-s07e18",
+          "t": "It's A Dog Eat Drew World",
+          "season": 7,
+          "ep": 18,
+          "mins": 21,
+          "dur": 1240,
+          "vid": "vVyDLIn0Eec"
+        },
+        {
+          "id": "drew-s07e19",
+          "t": "Bringing up Boss",
+          "season": 7,
+          "ep": 19,
+          "mins": 22,
+          "dur": 1304,
+          "vid": "E-PcMPkXKxo"
+        },
+        {
+          "id": "drew-s07e20",
+          "t": "Daddy Dearest",
+          "season": 7,
+          "ep": 20,
+          "mins": 22,
+          "dur": 1305,
+          "vid": "yTfjef2TKgo"
+        },
+        {
+          "id": "drew-s07e21",
+          "t": "Never Been to Spain",
+          "season": 7,
+          "ep": 21,
+          "mins": 21,
+          "dur": 1242,
+          "vid": "FZ-qRWs6Yks"
+        },
+        {
+          "id": "drew-s07e22",
+          "t": "Oh Brother, Who Art Thou?",
+          "season": 7,
+          "ep": 22,
+          "mins": 21,
+          "dur": 1289,
+          "vid": "yW6jAkzAW0g"
+        },
+        {
+          "id": "drew-s07e23",
+          "t": "Rich Woman, Poor Man",
+          "season": 7,
+          "ep": 23,
+          "mins": 22,
+          "dur": 1303,
+          "vid": "0Jk7Vc2fZjA"
+        },
+        {
+          "id": "drew-s07e24",
+          "t": "What Women Don't Want",
+          "season": 7,
+          "ep": 24,
+          "mins": 21,
+          "dur": 1266,
+          "vid": "bGvdhnss9SU"
+        },
+        {
+          "id": "drew-s07e25",
+          "t": "Look Mom, One Hand!",
+          "season": 7,
+          "ep": 25,
+          "mins": 22,
+          "dur": 1300,
+          "vid": "pT1u3wJRZgg"
+        },
+        {
+          "id": "drew-s07e26",
+          "t": "The Eagle Has Landed",
+          "season": 7,
+          "ep": 26,
+          "mins": 21,
+          "dur": 1289,
+          "vid": "Vb22TSORkyw"
+        },
+        {
+          "id": "drew-s07e27",
+          "t": "The Underpants Guy",
+          "season": 7,
+          "ep": 27,
+          "mins": 21,
+          "dur": 1271,
+          "vid": "_8PZa-Of70w"
+        },
+        {
+          "id": "drew-s08e01",
+          "t": "Revenge of the Doormat",
+          "season": 8,
+          "ep": 1,
+          "mins": 21,
+          "dur": 1264,
+          "vid": "88d-BNMWHo0"
+        },
+        {
+          "id": "drew-s08e02",
+          "t": "Kate's Wedding",
+          "season": 8,
+          "ep": 2,
+          "mins": 21,
+          "dur": 1267,
+          "vid": "dXSKMGP0B3k"
+        },
+        {
+          "id": "drew-s08e03",
+          "t": "Eyes Wide Open",
+          "season": 8,
+          "ep": 3,
+          "mins": 21,
+          "dur": 1288,
+          "vid": "7YCeHf6RIy8"
+        },
+        {
+          "id": "drew-s08e04",
+          "t": "Drew & the Life-Size Jim Thome Cut-Out",
+          "season": 8,
+          "ep": 4,
+          "mins": 22,
+          "dur": 1305,
+          "vid": "vHQq8xzCS2Y"
+        },
+        {
+          "id": "drew-s08e05",
+          "t": "Hickory Dickory... Double Date",
+          "season": 8,
+          "ep": 5,
+          "mins": 21,
+          "dur": 1286,
+          "vid": "9-4TsdxzkIE"
+        },
+        {
+          "id": "drew-s08e06",
+          "t": "Mother Told Me I Should Come",
+          "season": 8,
+          "ep": 6,
+          "mins": 22,
+          "dur": 1303,
+          "vid": "611mGuuKJsc"
+        },
+        {
+          "id": "drew-s08e07",
+          "t": "Family Affair",
+          "season": 8,
+          "ep": 7,
+          "mins": 22,
+          "dur": 1298,
+          "vid": "2kn7Cba1oog"
+        },
+        {
+          "id": "drew-s08e08",
+          "t": "Chemistry Schmemistry",
+          "season": 8,
+          "ep": 8,
+          "mins": 21,
+          "dur": 1249,
+          "vid": "P8CvezO3K-I"
+        },
+        {
+          "id": "drew-s08e09",
+          "t": "The Dawn Patrol",
+          "season": 8,
+          "ep": 9,
+          "mins": 22,
+          "dur": 1303,
+          "vid": "IbXMaJEj6VY"
+        },
+        {
+          "id": "drew-s08e10",
+          "t": "Drew's Girl Friday",
+          "season": 8,
+          "ep": 10,
+          "mins": 22,
+          "dur": 1297,
+          "vid": "rUJ9LTUBMYo"
+        },
+        {
+          "id": "drew-s08e11",
+          "t": "Drew Tries Hot Salsa",
+          "season": 8,
+          "ep": 11,
+          "mins": 22,
+          "dur": 1298,
+          "vid": "sfGqU7nHkkc"
+        },
+        {
+          "id": "drew-s08e12",
+          "t": "The Man in the Iron Chair",
+          "season": 8,
+          "ep": 12,
+          "mins": 22,
+          "dur": 1304,
+          "vid": "BgzKYVCii9U"
+        },
+        {
+          "id": "drew-s08e13",
+          "t": "Drew Takes a Guilt Trip",
+          "season": 8,
+          "ep": 13,
+          "mins": 22,
+          "dur": 1297,
+          "vid": "OsJusZQpVBg"
+        },
+        {
+          "id": "drew-s08e14",
+          "t": "Blecch Sunday",
+          "season": 8,
+          "ep": 14,
+          "mins": 21,
+          "dur": 1268,
+          "vid": "3_7nj8d1WcE"
+        },
+        {
+          "id": "drew-s08e15",
+          "t": "Turkeyspotting",
+          "season": 8,
+          "ep": 15,
+          "mins": 22,
+          "dur": 1304,
+          "vid": "seHQ5922-24"
+        },
+        {
+          "id": "drew-s08e16",
+          "t": "Suddenly, No Summer",
+          "season": 8,
+          "ep": 16,
+          "mins": 21,
+          "dur": 1273,
+          "vid": "Sk9DhTUGaks"
+        },
+        {
+          "id": "drew-s08e18",
+          "t": "Two Girls for Every Boy",
+          "season": 8,
+          "ep": 18,
+          "mins": 21,
+          "dur": 1280,
+          "vid": "DRhbiJanjPA"
+        },
+        {
+          "id": "drew-s08e19",
+          "t": "Two Days of the Condo",
+          "season": 8,
+          "ep": 19,
+          "mins": 22,
+          "dur": 1292,
+          "vid": "NC2Mk80By8g"
+        },
+        {
+          "id": "drew-s08e20",
+          "t": "Lewis You Can Drive My Car",
+          "season": 8,
+          "ep": 20,
+          "mins": 22,
+          "dur": 1297,
+          "vid": "6wblemSQatU"
+        },
+        {
+          "id": "drew-s08e21",
+          "t": "A Speedy Recovery",
+          "season": 8,
+          "ep": 21,
+          "mins": 21,
+          "dur": 1248,
+          "vid": "UXuf-Z6zwQA"
+        },
+        {
+          "id": "drew-s08e22",
+          "t": "A Means to an End",
+          "season": 8,
+          "ep": 22,
+          "mins": 22,
+          "dur": 1304,
+          "vid": "Z4b9LUT_6c4"
+        },
+        {
+          "id": "drew-s08e23",
+          "t": "Drew Answers the Belle",
+          "season": 8,
+          "ep": 23,
+          "mins": 22,
+          "dur": 1300,
+          "vid": "QOvCRxvY4CI"
+        },
+        {
+          "id": "drew-s08e24",
+          "t": "What Screams May Come",
+          "season": 8,
+          "ep": 24,
+          "mins": 21,
+          "dur": 1267,
+          "vid": "bcl1tjM7sXI"
+        },
+        {
+          "id": "drew-s08e25",
+          "t": "Love Is in the Air",
+          "season": 8,
+          "ep": 25,
+          "mins": 20,
+          "dur": 1197,
+          "vid": "d6V8JXMEqa8"
+        },
+        {
+          "id": "drew-s08e26",
+          "t": "The Bataan Wedding March",
+          "season": 8,
+          "ep": 26,
+          "mins": 21,
+          "dur": 1256,
+          "vid": "E-geuOxi-pw"
+        },
+        {
+          "id": "drew-s09e01",
+          "t": "Drew Hunts Silver Fox",
+          "season": 9,
+          "ep": 1,
+          "mins": 22,
+          "dur": 1291,
+          "vid": "IQOCEVHGCco"
+        },
+        {
+          "id": "drew-s09e02",
+          "t": "Eye of the Leopard",
+          "season": 9,
+          "ep": 2,
+          "mins": 21,
+          "dur": 1286,
+          "vid": "fYepATNNlyY"
+        },
+        {
+          "id": "drew-s09e03",
+          "t": "Foos Rush In",
+          "season": 9,
+          "ep": 3,
+          "mins": 22,
+          "dur": 1290,
+          "vid": "aKJ-kfF8kPQ"
+        },
+        {
+          "id": "drew-s09e04",
+          "t": "Drew Thinks Inside the Box",
+          "season": 9,
+          "ep": 4,
+          "mins": 21,
+          "dur": 1269,
+          "vid": "ZACFe_XN3Cw"
+        },
+        {
+          "id": "drew-s09e05",
+          "t": "At Your Cervix",
+          "season": 9,
+          "ep": 5,
+          "mins": 21,
+          "dur": 1271,
+          "vid": "X__zdtp2Plw"
+        },
+        {
+          "id": "drew-s09e06",
+          "t": "Sealed in a Kiss",
+          "season": 9,
+          "ep": 6,
+          "mins": 22,
+          "dur": 1298,
+          "vid": "wUh4OuJDea4"
+        },
+        {
+          "id": "drew-s09e07",
+          "t": "Baby Makes Stress",
+          "season": 9,
+          "ep": 7,
+          "mins": 22,
+          "dur": 1294,
+          "vid": "gi-2IXjyk_0"
+        },
+        {
+          "id": "drew-s09e08",
+          "t": "Michigan J. Gus",
+          "season": 9,
+          "ep": 8,
+          "mins": 21,
+          "dur": 1286,
+          "vid": "0vmzVOLuBPE"
+        },
+        {
+          "id": "drew-s09e09",
+          "t": "No Booze for Drew",
+          "season": 9,
+          "ep": 9,
+          "mins": 22,
+          "dur": 1296,
+          "vid": "gU_vgV12ZRQ"
+        },
+        {
+          "id": "drew-s09e10",
+          "t": "Drew's Best Friend",
+          "season": 9,
+          "ep": 10,
+          "mins": 21,
+          "dur": 1250,
+          "vid": "_C-7sxntdU8"
+        },
+        {
+          "id": "drew-s09e11",
+          "t": "Arrividerci, Italy",
+          "season": 9,
+          "ep": 11,
+          "mins": 22,
+          "dur": 1299,
+          "vid": "dwG-W9Q-vdY"
+        },
+        {
+          "id": "drew-s09e12",
+          "t": "House of the Rising Son-In-Law",
+          "season": 9,
+          "ep": 12,
+          "mins": 22,
+          "dur": 1302,
+          "vid": "8Nzd2Nb-MCs"
+        },
+        {
+          "id": "drew-s09e13",
+          "t": "Dog Soup",
+          "season": 9,
+          "ep": 13,
+          "mins": 21,
+          "dur": 1233,
+          "vid": "j0_VOHSdGok"
+        },
+        {
+          "id": "drew-s09e14",
+          "t": "Asleep at the Wheel",
+          "season": 9,
+          "ep": 14,
+          "mins": 22,
+          "dur": 1292,
+          "vid": "PYs44MhR7WU"
+        },
+        {
+          "id": "drew-s09e15",
+          "t": "Baby Face",
+          "season": 9,
+          "ep": 15,
+          "mins": 22,
+          "dur": 1302,
+          "vid": "8IbRE7fZ4LY"
+        },
+        {
+          "id": "drew-s09e16",
+          "t": "Girlfriend, Interrupted",
+          "season": 9,
+          "ep": 16,
+          "mins": 22,
+          "dur": 1292,
+          "vid": "bHTI7p2inD0"
+        },
+        {
+          "id": "drew-s09e17",
+          "t": "Straight Eye for the Queer Guy",
+          "season": 9,
+          "ep": 17,
+          "mins": 21,
+          "dur": 1270,
+          "vid": "qsi61HUe4Yk"
+        },
+        {
+          "id": "drew-s09e18",
+          "t": "Still Life with Freeloader",
+          "season": 9,
+          "ep": 18,
+          "mins": 22,
+          "dur": 1297,
+          "vid": "ytKQ-b6JoGI"
+        },
+        {
+          "id": "drew-s09e19",
+          "t": "Burning Down the House",
+          "season": 9,
+          "ep": 19,
+          "mins": 21,
+          "dur": 1266,
+          "vid": "MaTeHdZ01jU"
+        },
+        {
+          "id": "drew-s09e20",
+          "t": "Liar, Liar, House on Fire",
+          "season": 9,
+          "ep": 20,
+          "mins": 21,
+          "dur": 1271,
+          "vid": "CtNUsDRblGc"
+        },
+        {
+          "id": "drew-s09e21",
+          "t": "Sleeping with the Enemy",
+          "season": 9,
+          "ep": 21,
+          "mins": 21,
+          "dur": 1275,
+          "vid": "gwi3wn8OgWo"
+        },
+        {
+          "id": "drew-s09e22",
+          "t": "Assault with a Lovely Weapon",
+          "season": 9,
+          "ep": 22,
+          "mins": 21,
+          "dur": 1273,
+          "vid": "kTyGfNY58IE"
+        },
+        {
+          "id": "drew-s09e23",
+          "t": "Love, Sri Lankan Style",
+          "season": 9,
+          "ep": 23,
+          "mins": 22,
+          "dur": 1301,
+          "vid": "UKt9x4SveIU"
+        },
+        {
+          "id": "drew-s09e24",
+          "t": "Knot in the Mood",
+          "season": 9,
+          "ep": 24,
+          "mins": 21,
+          "dur": 1285,
+          "vid": "X9r0l3iaqaQ"
+        },
+        {
+          "id": "drew-s09e25",
+          "t": "The Passion of the Wick",
+          "season": 9,
+          "ep": 25,
+          "mins": 22,
+          "dur": 1305,
+          "vid": "e64-GS8aGsY"
+        },
+        {
+          "id": "drew-s09e26",
+          "t": "Finale",
+          "season": 9,
+          "ep": 26,
+          "mins": 21,
+          "dur": 1246,
+          "vid": "0tWd7NpuL30"
+        }
+      ]
+    },
+    {
+      "id": "joey",
+      "title": "Joey",
+      "kind": "sitcom",
+      "topic": "sitcoms",
+      "source": "youtube",
+      "channel": "Friends",
+      "channelId": "UCijVIIfFzspulKc7yWA2Qhg",
+      "official": true,
+      "ads": true,
+      "order": 30,
+      "label": "YouTube · may show ads",
+      "poster": "https://static.tvmaze.com/uploads/images/medium_portrait/5/13685.jpg",
+      "about": "Official full episodes of the Friends spin-off, posted by the official Friends YouTube channel.",
+      "episodes": [
+        {
+          "id": "joey-s01e01",
+          "t": "Pilot",
+          "season": 1,
+          "ep": 1,
+          "mins": 27,
+          "dur": 1615,
+          "vid": "ST2y17euBlc"
+        },
+        {
+          "id": "joey-s01e02",
+          "t": "Joey and the Student",
+          "season": 1,
+          "ep": 2,
+          "mins": 24,
+          "dur": 1416,
+          "vid": "X5oCPvGe-4M"
+        },
+        {
+          "id": "joey-s01e03",
+          "t": "Joey and the Party",
+          "season": 1,
+          "ep": 3,
+          "mins": 22,
+          "dur": 1295,
+          "vid": "g7iAe94z438"
+        },
+        {
+          "id": "joey-s01e04",
+          "t": "Joey and the Book Club",
+          "season": 1,
+          "ep": 4,
+          "mins": 22,
+          "dur": 1299,
+          "vid": "xUFB_Znb4yU"
+        },
+        {
+          "id": "joey-s01e05",
+          "t": "Joey and the Perfect Storm",
+          "season": 1,
+          "ep": 5,
+          "mins": 22,
+          "dur": 1299,
+          "vid": "OQVO_0HIZAA"
+        },
+        {
+          "id": "joey-s01e06",
+          "t": "Joey and the Nemesis",
+          "season": 1,
+          "ep": 6,
+          "mins": 22,
+          "dur": 1299,
+          "vid": "WY4ciWj_XJg"
+        },
+        {
+          "id": "joey-s01e07",
+          "t": "Joey and the Husband",
+          "season": 1,
+          "ep": 7,
+          "mins": 22,
+          "dur": 1298,
+          "vid": "eBx0odbFlno"
+        },
+        {
+          "id": "joey-s01e08",
+          "t": "Joey and the Dream Girl: Part 1",
+          "season": 1,
+          "ep": 8,
+          "mins": 21,
+          "dur": 1269,
+          "vid": "Z5SHAoXyD5A"
+        },
+        {
+          "id": "joey-s01e09",
+          "t": "Joey and the Dream Girl: Part 2",
+          "season": 1,
+          "ep": 9,
+          "mins": 21,
+          "dur": 1245,
+          "vid": "WKuGlNUZYv8"
+        },
+        {
+          "id": "joey-s01e10",
+          "t": "Joey and the Big Audition",
+          "season": 1,
+          "ep": 10,
+          "mins": 22,
+          "dur": 1300,
+          "vid": "hm8EX_PpQN0"
+        },
+        {
+          "id": "joey-s01e11",
+          "t": "Joey and the Roadtrip",
+          "season": 1,
+          "ep": 11,
+          "mins": 21,
+          "dur": 1274,
+          "vid": "uZlFSz7Zq8U"
+        },
+        {
+          "id": "joey-s01e12",
+          "t": "Joey and the Plot Twist",
+          "season": 1,
+          "ep": 12,
+          "mins": 21,
+          "dur": 1279,
+          "vid": "bJ2iWghap4c"
+        },
+        {
+          "id": "joey-s01e13",
+          "t": "Joey and the Taste Test",
+          "season": 1,
+          "ep": 13,
+          "mins": 22,
+          "dur": 1300,
+          "vid": "Pt6yDA6LX0Q"
+        },
+        {
+          "id": "joey-s01e14",
+          "t": "Joey and the Premiere",
+          "season": 1,
+          "ep": 14,
+          "mins": 22,
+          "dur": 1299,
+          "vid": "IcqHLJjBKi8"
+        },
+        {
+          "id": "joey-s01e15",
+          "t": "Joey and the Assistant",
+          "season": 1,
+          "ep": 15,
+          "mins": 22,
+          "dur": 1299,
+          "vid": "OXp8CXnhMDs"
+        },
+        {
+          "id": "joey-s01e16",
+          "t": "Joey and the Tonight Show",
+          "season": 1,
+          "ep": 16,
+          "mins": 21,
+          "dur": 1253,
+          "vid": "13noTscNwuo"
+        },
+        {
+          "id": "joey-s01e17",
+          "t": "Joey and the Valentine's Date",
+          "season": 1,
+          "ep": 17,
+          "mins": 22,
+          "dur": 1300,
+          "vid": "Q1DuzapMyMU"
+        },
+        {
+          "id": "joey-s01e18",
+          "t": "Joey and the Wrong Name",
+          "season": 1,
+          "ep": 18,
+          "mins": 22,
+          "dur": 1297,
+          "vid": "rNnYfrXiIt0"
+        },
+        {
+          "id": "joey-s01e19",
+          "t": "Joey and the Fancy Sister",
+          "season": 1,
+          "ep": 19,
+          "mins": 22,
+          "dur": 1290,
+          "vid": "o_X4ZXONheI"
+        },
+        {
+          "id": "joey-s01e20",
+          "t": "Joey and the Neighbor",
+          "season": 1,
+          "ep": 20,
+          "mins": 21,
+          "dur": 1270,
+          "vid": "dUU8ssLGR1Q"
+        },
+        {
+          "id": "joey-s01e21",
+          "t": "Joey and the Spying",
+          "season": 1,
+          "ep": 21,
+          "mins": 21,
+          "dur": 1274,
+          "vid": "oaFn_XhfL9U"
+        },
+        {
+          "id": "joey-s01e22",
+          "t": "Joey and the Temptation",
+          "season": 1,
+          "ep": 22,
+          "mins": 22,
+          "dur": 1299,
+          "vid": "K1OtYjVybPI"
+        },
+        {
+          "id": "joey-s01e23",
+          "t": "Joey and the Breakup",
+          "season": 1,
+          "ep": 23,
+          "mins": 22,
+          "dur": 1300,
+          "vid": "j5T20Ua3CWA"
+        },
+        {
+          "id": "joey-s01e24",
+          "t": "Joey and the Moving In",
+          "season": 1,
+          "ep": 24,
+          "mins": 22,
+          "dur": 1299,
+          "vid": "VyAnxx20XcI"
+        },
+        {
+          "id": "joey-s02e01",
+          "t": "Joey and the Big Break: Part 1",
+          "season": 2,
+          "ep": 1,
+          "mins": 20,
+          "dur": 1218,
+          "vid": "gbmmV-oYqKE"
+        },
+        {
+          "id": "joey-s02e02",
+          "t": "Joey and the Big Break: Part 2",
+          "season": 2,
+          "ep": 2,
+          "mins": 22,
+          "dur": 1300,
+          "vid": "G3MBD0KTQjI"
+        },
+        {
+          "id": "joey-s02e03",
+          "t": "Joey and the Spanking",
+          "season": 2,
+          "ep": 3,
+          "mins": 22,
+          "dur": 1301,
+          "vid": "0chZKc37BAg"
+        },
+        {
+          "id": "joey-s02e04",
+          "t": "Joey and the Stuntman",
+          "season": 2,
+          "ep": 4,
+          "mins": 22,
+          "dur": 1301,
+          "vid": "DDOX8Y-NhAM"
+        },
+        {
+          "id": "joey-s02e05",
+          "t": "Joey and the House",
+          "season": 2,
+          "ep": 5,
+          "mins": 22,
+          "dur": 1299,
+          "vid": "Du7Rd_FfOMw"
+        },
+        {
+          "id": "joey-s02e06",
+          "t": "Joey and the ESL",
+          "season": 2,
+          "ep": 6,
+          "mins": 21,
+          "dur": 1264,
+          "vid": "uLFTvixnPNg"
+        },
+        {
+          "id": "joey-s02e07",
+          "t": "Joey and the Poker",
+          "season": 2,
+          "ep": 7,
+          "mins": 22,
+          "dur": 1301,
+          "vid": "ikvHqt-LeYQ"
+        },
+        {
+          "id": "joey-s02e08",
+          "t": "Joey and the Sex Tape",
+          "season": 2,
+          "ep": 8,
+          "mins": 22,
+          "dur": 1300,
+          "vid": "wQmfvI5_tAA"
+        },
+        {
+          "id": "joey-s02e09",
+          "t": "Joey and the Musical",
+          "season": 2,
+          "ep": 9,
+          "mins": 21,
+          "dur": 1280,
+          "vid": "CGpoTA-mvSQ"
+        },
+        {
+          "id": "joey-s02e10",
+          "t": "Joey and the Bachelor Thanksgiving",
+          "season": 2,
+          "ep": 10,
+          "mins": 22,
+          "dur": 1301,
+          "vid": "l_F47ALPNAc"
+        },
+        {
+          "id": "joey-s02e11",
+          "t": "Joey and the High School Friend",
+          "season": 2,
+          "ep": 11,
+          "mins": 22,
+          "dur": 1301,
+          "vid": "qWIaCV4Af2A"
+        },
+        {
+          "id": "joey-s02e12",
+          "t": "Joey and the Tijuana Trip",
+          "season": 2,
+          "ep": 12,
+          "mins": 22,
+          "dur": 1312,
+          "vid": "PNduKs4vidQ"
+        },
+        {
+          "id": "joey-s02e13",
+          "t": "Joey and the Christmas Party",
+          "season": 2,
+          "ep": 13,
+          "mins": 22,
+          "dur": 1290,
+          "vid": "_0BizvTD1wE"
+        },
+        {
+          "id": "joey-s02e14",
+          "t": "Joey and the Snowball Fight",
+          "season": 2,
+          "ep": 14,
+          "mins": 22,
+          "dur": 1313,
+          "vid": "yHhSzdOlZ3Y"
+        },
+        {
+          "id": "joey-s02e15",
+          "t": "Joey and the Dad",
+          "season": 2,
+          "ep": 15,
+          "mins": 22,
+          "dur": 1291,
+          "vid": "Sfem4w7UxPY"
+        },
+        {
+          "id": "joey-s02e16",
+          "t": "Joey and the Party for Alex",
+          "season": 2,
+          "ep": 16,
+          "mins": 22,
+          "dur": 1301,
+          "vid": "-xEFtFiR0bU"
+        },
+        {
+          "id": "joey-s02e17",
+          "t": "Joey and the Big Move",
+          "season": 2,
+          "ep": 17,
+          "mins": 22,
+          "dur": 1300,
+          "vid": "m5IbpwRO5Q8"
+        },
+        {
+          "id": "joey-s02e18",
+          "t": "Joey and the Beard",
+          "season": 2,
+          "ep": 18,
+          "mins": 22,
+          "dur": 1299,
+          "vid": "PByWXUN8QdY"
+        },
+        {
+          "id": "joey-s02e19",
+          "t": "Joey and the Critic",
+          "season": 2,
+          "ep": 19,
+          "mins": 22,
+          "dur": 1300,
+          "vid": "PGYCqIC16eQ"
+        },
+        {
+          "id": "joey-s02e20",
+          "t": "Joey and the Actor's Studio",
+          "season": 2,
+          "ep": 20,
+          "mins": 22,
+          "dur": 1300,
+          "vid": "Sl-83CH4txc"
+        },
+        {
+          "id": "joey-s02e21",
+          "t": "Joey and the Holding Hands",
+          "season": 2,
+          "ep": 21,
+          "mins": 22,
+          "dur": 1300,
+          "vid": "3Y6ukurbpYw"
+        },
+        {
+          "id": "joey-s02e22",
+          "t": "Joey and the Wedding",
+          "season": 2,
+          "ep": 22,
+          "mins": 22,
+          "dur": 1300,
+          "vid": "XpOQqG-XSdQ"
+        }
+      ]
+    },
+    {
       "id": "beverly-hillbillies",
       "title": "The Beverly Hillbillies",
       "kind": "sitcom",
@@ -3253,7 +5744,7 @@
           "item": "bevhill-s01e01-36"
         }
       ],
-      "order": 20
+      "order": 40
     },
     {
       "id": "lucy-show",
@@ -3568,7 +6059,7 @@
           "item": "the-lucy-show"
         }
       ],
-      "order": 30
+      "order": 50
     },
     {
       "id": "andy-griffith",
@@ -3603,7 +6094,7 @@
           "item": "Andy_Griffith_The_Bighouse"
         }
       ],
-      "order": 40
+      "order": 60
     },
     {
       "id": "mr-bean",
@@ -3746,7 +6237,7 @@
           "vid": "hz_e7SRecWw"
         }
       ],
-      "order": 50
+      "order": 70
     },
     {
       "id": "junior-taskmaster",
@@ -3758,7 +6249,7 @@
       "channelId": "UCT5C7yaO3RVuOgwP8JVAujQ",
       "official": true,
       "ads": true,
-      "order": 60,
+      "order": 80,
       "label": "YouTube · may show ads",
       "poster": "https://static.tvmaze.com/uploads/images/medium_portrait/553/1382754.jpg",
       "about": "Official full episodes of the family spin-off, posted by the Taskmaster channel.",
@@ -3847,7 +6338,7 @@
       "channelId": "UCsZXuHKonP9utl5q2hFCkgA",
       "official": true,
       "ads": true,
-      "order": 70,
+      "order": 90,
       "label": "YouTube · may show ads",
       "poster": "https://static.tvmaze.com/uploads/images/medium_portrait/538/1346512.jpg",
       "about": "Official full episodes of this clean, family sketch-comedy show from BYUtv.",
@@ -4030,7 +6521,7 @@
       "channelId": "UCx9l0FfNQ3G79_9SBxkhR9g",
       "official": true,
       "ads": true,
-      "order": 80,
+      "order": 100,
       "label": "YouTube · may show ads",
       "poster": "https://static.tvmaze.com/uploads/images/medium_portrait/583/1458236.jpg",
       "about": "Official full episodes posted by Taskmaster International (season 5 is on the Taskmaster channel). Season 7 is still being uploaded.",
@@ -4605,6 +7096,473 @@
       ]
     },
     {
+      "id": "taskmaster-au",
+      "title": "Taskmaster Australia",
+      "kind": "comedy",
+      "topic": "sitcoms",
+      "source": "youtube",
+      "channel": "Taskmaster International",
+      "channelId": "UCx9l0FfNQ3G79_9SBxkhR9g",
+      "official": true,
+      "ads": true,
+      "order": 110,
+      "label": "YouTube · may show ads",
+      "poster": "https://static.tvmaze.com/uploads/images/medium_portrait/623/1559757.jpg",
+      "about": "Official full episodes of the Australian series, posted by Taskmaster International.",
+      "episodes": [
+        {
+          "id": "tmau-s01e01",
+          "t": "Foot juice",
+          "season": 1,
+          "ep": 1,
+          "mins": 42,
+          "dur": 2535,
+          "vid": "5zpjscgN250"
+        },
+        {
+          "id": "tmau-s01e02",
+          "t": "Keep it clean and flowing",
+          "season": 1,
+          "ep": 2,
+          "mins": 44,
+          "dur": 2639,
+          "vid": "sKyyoiPejoY"
+        },
+        {
+          "id": "tmau-s01e03",
+          "t": "Cricketmaster",
+          "season": 1,
+          "ep": 3,
+          "mins": 43,
+          "dur": 2599,
+          "vid": "EKc5FRbvVUc"
+        },
+        {
+          "id": "tmau-s01e04",
+          "t": "BOOM BOOM BOOM BOOM",
+          "season": 1,
+          "ep": 4,
+          "mins": 44,
+          "dur": 2630,
+          "vid": "5xcqoL4Kb4o"
+        },
+        {
+          "id": "tmau-s01e05",
+          "t": "Are you okay?",
+          "season": 1,
+          "ep": 5,
+          "mins": 44,
+          "dur": 2657,
+          "vid": "2a-YVW_CTuQ"
+        },
+        {
+          "id": "tmau-s01e06",
+          "t": "Lucky with a sausage",
+          "season": 1,
+          "ep": 6,
+          "mins": 44,
+          "dur": 2667,
+          "vid": "s4oQLpxKem4"
+        },
+        {
+          "id": "tmau-s01e07",
+          "t": "The energy of a sickly child",
+          "season": 1,
+          "ep": 7,
+          "mins": 44,
+          "dur": 2663,
+          "vid": "SQVXNUFA5Us"
+        },
+        {
+          "id": "tmau-s01e08",
+          "t": "Dumb in Unison",
+          "season": 1,
+          "ep": 8,
+          "mins": 45,
+          "dur": 2673,
+          "vid": "5CiddaMo8YI"
+        },
+        {
+          "id": "tmau-s01e09",
+          "t": "Sorry for your loss",
+          "season": 1,
+          "ep": 9,
+          "mins": 44,
+          "dur": 2660,
+          "vid": "G3QGBFqYbqw"
+        },
+        {
+          "id": "tmau-s01e10",
+          "t": "Don't ask me what a JC is",
+          "season": 1,
+          "ep": 10,
+          "mins": 45,
+          "dur": 2692,
+          "vid": "7QXZeMCc8ro"
+        },
+        {
+          "id": "tmau-s02e01",
+          "t": "Don't slip on the chips old man",
+          "season": 2,
+          "ep": 1,
+          "mins": 52,
+          "dur": 3105,
+          "vid": "zYZd8wXHqKE"
+        },
+        {
+          "id": "tmau-s02e02",
+          "t": "A hotly contested auction",
+          "season": 2,
+          "ep": 2,
+          "mins": 48,
+          "dur": 2863,
+          "vid": "g-fuSCXrYhE"
+        },
+        {
+          "id": "tmau-s02e03",
+          "t": "Answer the phone Gary",
+          "season": 2,
+          "ep": 3,
+          "mins": 50,
+          "dur": 3021,
+          "vid": "ssZXBdOmX10"
+        },
+        {
+          "id": "tmau-s02e04",
+          "t": "Oink Oink B*****s",
+          "season": 2,
+          "ep": 4,
+          "mins": 48,
+          "dur": 2903,
+          "vid": "zLS2WDjdNO8"
+        },
+        {
+          "id": "tmau-s02e05",
+          "t": "The moment of divorce is recorded",
+          "season": 2,
+          "ep": 5,
+          "mins": 47,
+          "dur": 2835,
+          "vid": "HCJ7UPB5CPE"
+        },
+        {
+          "id": "tmau-s02e06",
+          "t": "Everyone here is a nerd",
+          "season": 2,
+          "ep": 6,
+          "mins": 47,
+          "dur": 2837,
+          "vid": "zGQ_uYN012E"
+        },
+        {
+          "id": "tmau-s02e07",
+          "t": "You've gotta find the slop",
+          "season": 2,
+          "ep": 7,
+          "mins": 47,
+          "dur": 2803,
+          "vid": "Ce3BLm9TEMw"
+        },
+        {
+          "id": "tmau-s02e08",
+          "t": "Dingo Dongo",
+          "season": 2,
+          "ep": 8,
+          "mins": 46,
+          "dur": 2778,
+          "vid": "U-7piu1za-A"
+        },
+        {
+          "id": "tmau-s02e09",
+          "t": "Killed by a nerd",
+          "season": 2,
+          "ep": 9,
+          "mins": 46,
+          "dur": 2781,
+          "vid": "qknXUNMouWo"
+        },
+        {
+          "id": "tmau-s02e10",
+          "t": "Fun sexy wrestle",
+          "season": 2,
+          "ep": 10,
+          "mins": 48,
+          "dur": 2891,
+          "vid": "MzBaY35_Isk"
+        },
+        {
+          "id": "tmau-s03e01",
+          "t": "For your Logie consideration",
+          "season": 3,
+          "ep": 1,
+          "mins": 46,
+          "dur": 2768,
+          "vid": "56PprEBu-_k"
+        },
+        {
+          "id": "tmau-s03e02",
+          "t": "Burying a backpacker",
+          "season": 3,
+          "ep": 2,
+          "mins": 48,
+          "dur": 2866,
+          "vid": "mzQQ8Cbmscc"
+        },
+        {
+          "id": "tmau-s03e03",
+          "t": "Mop and bucket situation",
+          "season": 3,
+          "ep": 3,
+          "mins": 47,
+          "dur": 2819,
+          "vid": "gW6Vjyw-QKU"
+        },
+        {
+          "id": "tmau-s03e04",
+          "t": "Sorry about the fingers",
+          "season": 3,
+          "ep": 4,
+          "mins": 50,
+          "dur": 3001,
+          "vid": "nMzxZOQdXNY"
+        },
+        {
+          "id": "tmau-s03e05",
+          "t": "Inspired by Pol Pot",
+          "season": 3,
+          "ep": 5,
+          "mins": 51,
+          "dur": 3071,
+          "vid": "PfzKnNQU-W8"
+        },
+        {
+          "id": "tmau-s03e06",
+          "t": "Out-alpha'd by a sheep",
+          "season": 3,
+          "ep": 6,
+          "mins": 51,
+          "dur": 3050,
+          "vid": "HhIQe7ho8Jk"
+        },
+        {
+          "id": "tmau-s03e07",
+          "t": "Gimme some item",
+          "season": 3,
+          "ep": 7,
+          "mins": 53,
+          "dur": 3187,
+          "vid": "YgHe_C6Xq9U"
+        },
+        {
+          "id": "tmau-s03e08",
+          "t": "Tickled in two different ways",
+          "season": 3,
+          "ep": 8,
+          "mins": 52,
+          "dur": 3142,
+          "vid": "Ze_r-GrkKOQ"
+        },
+        {
+          "id": "tmau-s03e09",
+          "t": "A bit of a pickle",
+          "season": 3,
+          "ep": 9,
+          "mins": 51,
+          "dur": 3059,
+          "vid": "Or1Q85XepFU"
+        },
+        {
+          "id": "tmau-s03e10",
+          "t": "Wee/wee",
+          "season": 3,
+          "ep": 10,
+          "mins": 53,
+          "dur": 3165,
+          "vid": "FnJ3uxqgZpE"
+        },
+        {
+          "id": "tmau-s04e01",
+          "t": "Wasting a man's time",
+          "season": 4,
+          "ep": 1,
+          "mins": 49,
+          "dur": 2932,
+          "vid": "lQsUxhb96no"
+        },
+        {
+          "id": "tmau-s04e02",
+          "t": "What is life?",
+          "season": 4,
+          "ep": 2,
+          "mins": 50,
+          "dur": 3030,
+          "vid": "gjZdkA_UeUA"
+        },
+        {
+          "id": "tmau-s04e03",
+          "t": "Jock on nerd action",
+          "season": 4,
+          "ep": 3,
+          "mins": 50,
+          "dur": 3005,
+          "vid": "206zoqb8wGM"
+        },
+        {
+          "id": "tmau-s04e04",
+          "t": "You gotta die of something, so let's go",
+          "season": 4,
+          "ep": 4,
+          "mins": 48,
+          "dur": 2900,
+          "vid": "PSCyM0O5l_U"
+        },
+        {
+          "id": "tmau-s04e05",
+          "t": "It's tickle time",
+          "season": 4,
+          "ep": 5,
+          "mins": 50,
+          "dur": 2974,
+          "vid": "XdVvRvo95TM"
+        },
+        {
+          "id": "tmau-s04e06",
+          "t": "Why are you so horny?",
+          "season": 4,
+          "ep": 6,
+          "mins": 49,
+          "dur": 2948,
+          "vid": "B8lkPBqa3qg"
+        },
+        {
+          "id": "tmau-s04e07",
+          "t": "You've unleashed the dragon",
+          "season": 4,
+          "ep": 7,
+          "mins": 48,
+          "dur": 2883,
+          "vid": "Rebvin5tb_U"
+        },
+        {
+          "id": "tmau-s04e08",
+          "t": "You can have tomorrow off school",
+          "season": 4,
+          "ep": 8,
+          "mins": 48,
+          "dur": 2856,
+          "vid": "w46RcPas09c"
+        },
+        {
+          "id": "tmau-s04e09",
+          "t": "The beepie beepies",
+          "season": 4,
+          "ep": 9,
+          "mins": 49,
+          "dur": 2931,
+          "vid": "OIwL3kUuOsI"
+        },
+        {
+          "id": "tmau-s04e10",
+          "t": "Yucky, yucky, yucky, that's you",
+          "season": 4,
+          "ep": 10,
+          "mins": 49,
+          "dur": 2931,
+          "vid": "dg9OcszOEdc"
+        },
+        {
+          "id": "tmau-s05e01",
+          "t": "Where the war happened",
+          "season": 5,
+          "ep": 1,
+          "mins": 49,
+          "dur": 2957,
+          "vid": "IPXmdkEJN3k"
+        },
+        {
+          "id": "tmau-s05e02",
+          "t": "I'm the Girl One",
+          "season": 5,
+          "ep": 2,
+          "mins": 46,
+          "dur": 2749,
+          "vid": "mwVgJtgDOdc"
+        },
+        {
+          "id": "tmau-s05e03",
+          "t": "Very flaccid paintbrush",
+          "season": 5,
+          "ep": 3,
+          "mins": 46,
+          "dur": 2781,
+          "vid": "uiimHdYJ0qc"
+        },
+        {
+          "id": "tmau-s05e04",
+          "t": "Jesus would have nailed this",
+          "season": 5,
+          "ep": 4,
+          "mins": 44,
+          "dur": 2665,
+          "vid": "v0KJ0edruOA"
+        },
+        {
+          "id": "tmau-s05e05",
+          "t": "Your crotch is worth 1 point",
+          "season": 5,
+          "ep": 5,
+          "mins": 47,
+          "dur": 2792,
+          "vid": "qguQegqT100"
+        },
+        {
+          "id": "tmau-s05e06",
+          "t": "Having a Menty B",
+          "season": 5,
+          "ep": 6,
+          "mins": 47,
+          "dur": 2844,
+          "vid": "5V2RtYi0rAw"
+        },
+        {
+          "id": "tmau-s05e07",
+          "t": "A Bogan Toddler",
+          "season": 5,
+          "ep": 7,
+          "mins": 45,
+          "dur": 2693,
+          "vid": "TOsjO9F2lNk"
+        },
+        {
+          "id": "tmau-s05e08",
+          "t": "Australia's Occasional Sweetheart",
+          "season": 5,
+          "ep": 8,
+          "mins": 44,
+          "dur": 2664,
+          "vid": "GxRMTX7DZu0"
+        },
+        {
+          "id": "tmau-s05e09",
+          "t": "Coming out lunging",
+          "season": 5,
+          "ep": 9,
+          "mins": 48,
+          "dur": 2905,
+          "vid": "-5j8Saja8YI"
+        },
+        {
+          "id": "tmau-s05e10",
+          "t": "Give it to daddy to pop",
+          "season": 5,
+          "ep": 10,
+          "mins": 47,
+          "dur": 2806,
+          "vid": "AtyVLIuY61g"
+        }
+      ]
+    },
+    {
       "id": "taskmaster-uk",
       "title": "Taskmaster",
       "kind": "comedy",
@@ -4614,7 +7572,7 @@
       "channelId": "UCT5C7yaO3RVuOgwP8JVAujQ",
       "official": true,
       "ads": true,
-      "order": 90,
+      "order": 120,
       "label": "YouTube · may show ads",
       "poster": "https://static.tvmaze.com/uploads/images/medium_portrait/639/1599040.jpg",
       "about": "Official full episodes of the UK series, plus Champion of Champions and New Year Treat specials, posted by the Taskmaster channel.",
@@ -6517,6 +9475,55 @@
       ]
     },
     {
+      "id": "taskmaster-world-cup",
+      "title": "Taskmaster World Cup",
+      "kind": "comedy",
+      "topic": "sitcoms",
+      "source": "youtube",
+      "channel": "Taskmaster International",
+      "channelId": "UCx9l0FfNQ3G79_9SBxkhR9g",
+      "official": true,
+      "ads": true,
+      "order": 130,
+      "label": "YouTube · may show ads",
+      "poster": "https://i.ytimg.com/vi/5LyK6RrjI8k/maxresdefault.jpg",
+      "about": "The four official English specials, posted by Taskmaster International.",
+      "episodes": [
+        {
+          "id": "tmwc-e01",
+          "t": "Pop 99 Red Balloons",
+          "no": 1,
+          "mins": 32,
+          "dur": 1924,
+          "vid": "5LyK6RrjI8k"
+        },
+        {
+          "id": "tmwc-e02",
+          "t": "Sabotage your team",
+          "no": 2,
+          "mins": 33,
+          "dur": 1964,
+          "vid": "AF4NGM8uGIo"
+        },
+        {
+          "id": "tmwc-e03",
+          "t": "Paint a horse while riding a horse",
+          "no": 3,
+          "mins": 33,
+          "dur": 1988,
+          "vid": "hh0FWxI6G5w"
+        },
+        {
+          "id": "tmwc-e04",
+          "t": "Eat as much watermelon as possible",
+          "no": 4,
+          "mins": 46,
+          "dur": 2780,
+          "vid": "5hQrqHzije4"
+        }
+      ]
+    },
+    {
       "id": "whose-line",
       "title": "Whose Line Is It Anyway?",
       "kind": "comedy",
@@ -6526,7 +9533,7 @@
       "channelId": "UCKg_ZFByYTINckLG76cjUEg",
       "official": true,
       "ads": true,
-      "order": 100,
+      "order": 140,
       "label": "YouTube · may show ads",
       "poster": "https://static.tvmaze.com/uploads/images/medium_portrait/534/1335935.jpg",
       "about": "Official full episodes of the original UK series, posted by the show’s own YouTube channel.",
