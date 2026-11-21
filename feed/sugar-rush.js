@@ -1483,7 +1483,11 @@
   }
   // 1.9.313 Island Night Market: a Cook Islands side path after Rarotonga (17) that rejoins at Tonga (18).
   const MARKET_FROM = 17, MARKET_REJOIN = 18;
-  const MARKET_SECONDS = 150, MARKET_BONUS_SEC = 8, MARKET_COINS = 10, MARKET_TEMPO_MAX = 1.28;
+  const MARKET_SECONDS = 150, MARKET_BONUS_SEC = 8, MARKET_COINS = 10;
+  // Shane's 'Swipe It Right' is 102 BPM in A major, with vocals, so the night-time speedup
+  // is a gentle 2-semitone playbackRate ramp (102 → ~114.5 BPM), linear in cents.
+  const MARKET_TEMPO_SEMITONES = 2;
+  const MARKET_TEMPO_MAX = Math.pow(2, MARKET_TEMPO_SEMITONES / 12);
   const MARKET_FACES = ['🧒', '👧', '👦', '👩', '👨', '🧑', '🌺'];
   const MARKET_NAMES = ['Tia', 'Mii', 'Tere', 'Ani', 'Kura', 'Tama', 'Aunty Nga', 'Little Teu', 'Moana', 'Rima'];
   const MARKET_SWEETS = ['cherry gumdrops', 'orange jellies', 'lemon drops', 'pineapple chews', 'lagoon gems', 'grape twists'];
@@ -3035,7 +3039,8 @@
     'sugar-rush-say-m.m4a': '9e645d94', 'sugar-rush-say-m.mp3': '8e05c831',
     'sugar-rush-shop-bell.mp3': '17a691af', 'sugar-rush-shop-chaching.mp3': '65082481', 'sugar-rush-shop-hmph.mp3': '04da5505',
     'sugar-rush-market-call.mp3': '8f3686d1', 'sugar-rush-market-basket.mp3': '9d329487',
-    'sugar-rush-market.mp3': '1acbd24c'
+    // 1.9.314 Shane's 'Swipe It Right' (Suno, 102 BPM, A major), -17 LUFS, AAC 96k with an mp3 twin. Whole track, like the other songs; it fades in the last 1.3s.
+    'sugar-rush-market.m4a': '1277099c', 'sugar-rush-market.mp3': 'b0e77ad5'
   };
   // 1.9.225 Spoken sayings as recorded clips, a female voice (Microsoft neural "Molly", en-NZ) and a male one
   // ("Mitchell", en-NZ), so the game mixes the two reliably instead of relying on the phone's voices.
@@ -3104,7 +3109,7 @@
   const SONG_PLAN = { india: [38, 39, 46, 47], aussie: [20, 21, 22, 23, 24, 25, 32, 33], intense: [13, 15, 19, 52, 75], calm: [10, 17, 18], upbeat: [3, 4, 5, 6, 7, 8, 9, 11, 12, 14, 16, 26] };
   // "Sugar Rush travel" (~136 BPM, the loudest and punchiest) drives the designated Hard stages; country tracks remain mapped separately.
   // "Sugar Rush Kiss" (~89 BPM, the softest, "let it linger") floats over the Pacific islands; "Sugar Rush" ("now I can't sit still") for the rest.
-  const SONG_FILES = { india: 'sugar-rush-india.mp3', aussie: 'sugar-rush-aussie.mp3', intense: 'sugar-rush-travel.m4a', calm: 'sugar-rush-kiss.m4a', upbeat: 'sugar-rush-song.m4a', market: 'sugar-rush-market.mp3' };
+  const SONG_FILES = { india: 'sugar-rush-india.mp3', aussie: 'sugar-rush-aussie.mp3', intense: 'sugar-rush-travel.m4a', calm: 'sugar-rush-kiss.m4a', upbeat: 'sugar-rush-song.m4a', market: 'sugar-rush-market.m4a' };
   const SONG_FROM = 3;
   function songMood(level) {
     if (!(level >= SONG_FROM)) return null;
@@ -5216,7 +5221,7 @@
   }
   function marketTempoRate(st) {
     const night = Math.min(1, ((st && st.market && st.market.nightMs) || 0) / (MARKET_SECONDS * 1000));
-    return 1 + (MARKET_TEMPO_MAX - 1) * night;
+    return Math.pow(2, (MARKET_TEMPO_SEMITONES * night) / 12);
   }
   function marketLevel() {
     return {
@@ -5400,6 +5405,7 @@
   root.SugarRush.MARKET_SECONDS = MARKET_SECONDS;
   root.SugarRush.MARKET_BONUS_SEC = MARKET_BONUS_SEC;
   root.SugarRush.MARKET_COINS = MARKET_COINS;
+  root.SugarRush.MARKET_TEMPO_SEMITONES = MARKET_TEMPO_SEMITONES;
   root.SugarRush.MARKET_TEMPO_MAX = MARKET_TEMPO_MAX;
   root.SugarRush.MARKET_STOP = MARKET_STOP;
   root.SugarRush.MARKET_SWEETS = MARKET_SWEETS;
