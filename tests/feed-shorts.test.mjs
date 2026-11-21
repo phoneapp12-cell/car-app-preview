@@ -182,3 +182,32 @@ test('r/BeAmazed is boosted to about one in three and stays family-safe', () => 
   assert.ok(ratio > 0.2 && ratio < 0.4, 'boost is about 1 in 3, got ' + ratio);
   assert.ok(flags.filter(Boolean).length === 6, 'every BeAmazed clip is still shown');
 });
+
+test('Braynix Games clips from the local catalog get the early slots and stay family-safe', () => {
+  const S = loadShorts();
+  assert.equal(S.BRAYNIX_AUTHOR, 'braynixgames');
+  const pack = {
+    credit: 'Braynix Games',
+    author: 'braynixgames',
+    clips: [
+      { vu: '4t9c7bghhy1i1', title: 'Right or Left Rotation? Comment plz', sub: 'opticalillusions', url: 'https://www.reddit.com/r/opticalillusions/comments/1xxmo3p/right_or_left_rotation_comment_plz/', vdur: 41, width: 1080, height: 1920 },
+      { vu: 'vtebjwhmhj2i1', title: 'Left or right || Top or Bottom? Comment plz', sub: 'opticalillusions', url: 'https://www.reddit.com/r/opticalillusions/comments/1y05fd4/left_or_right_top_or_bottom_comment_plz/', vdur: 48, width: 1080, height: 1920 },
+      { vu: 'landscap90xx', title: '90 SECS PUZZLE', sub: 'opticalillusions', url: 'https://www.reddit.com/r/opticalillusions/comments/x/landscape/', vdur: 90, width: 1280, height: 720 },
+      { vu: 'toolong99999', title: 'A long puzzle', sub: 'opticalillusions', url: 'https://www.reddit.com/r/opticalillusions/comments/x/long/', vdur: 98, width: 576, height: 1280 }
+    ]
+  };
+  const feedItems = [
+    { vk: 'reddit', vu: '4t9c7bghhy1i1', t: 'Right or Left Rotation? Comment plz', url: 'https://www.reddit.com/r/opticalillusions/comments/1xxmo3p/right_or_left_rotation_comment_plz/', topic: 'games', src: 'fun-illusions', vdur: 41 },
+    { vk: 'reddit', vu: 'aww00000001', t: 'A sleepy puppy', url: 'https://www.reddit.com/r/aww/comments/x/a_sleepy_puppy/', topic: 'nature', vdur: 12 },
+    { vk: 'reddit', vu: 'amaz0000001', t: 'A surprising clip', url: 'https://www.reddit.com/r/BeAmazed/comments/x/surprising/', topic: 'learn', vdur: 20 },
+    { vk: 'reddit', vu: 'aww00000002', t: 'Another puppy', url: 'https://www.reddit.com/r/aww/comments/x/another/', topic: 'nature', vdur: 14 }
+  ];
+  const built = S.buildCatalog({ items: feedItems }, { songs: [] }, { pick: ['games', 'nature', 'learn'], optIn: [] }, pack);
+  assert.equal(built.braynix.length, 2, 'landscape and over-long clips stay out');
+  assert.ok(S.isBraynix(built.mixed[0], pack) && S.isBraynix(built.mixed[1], pack), 'Braynix clips open the reel');
+  assert.ok(built.mixed[0].credit.includes('Braynix Games'));
+  assert.equal(built.mixed.filter(x => x.vu === '4t9c7bghhy1i1').length, 1, 'the feed copy is not duplicated');
+  const after = built.mixed.slice(2);
+  assert.ok(after.length && S.isBoosted(after[0]), 'BeAmazed still gets the first leftover slot');
+  assert.ok(built.mixed.every(x => !/trump|putin|modi/i.test((x.title || '') + ' ' + (x.credit || ''))));
+});
