@@ -201,6 +201,9 @@ html.today-look .today-cal-empty{display:block;margin:6px 0 2px;font-size:.86rem
 .ib-nbadge{position:absolute;top:-6px;left:50%;margin-left:4px;min-width:16px;height:16px;padding:0 4px;background:#C4473A;color:#fff;border-radius:99px;font-size:.58rem;font-weight:700;letter-spacing:0;line-height:16px;text-align:center;font-family:var(--today-sans);text-transform:none;z-index:1}
 .ib-nbadge:empty{display:none}
 .ib-tabs [data-tab="notif"]{letter-spacing:.04em}
+.ib-tabs .ib-odic{position:relative;display:flex;align-items:center;justify-content:center;height:1.2em}
+.ib-tabs .ib-odic svg{display:block;width:1em;height:1em;flex:none}
+.ib-tabs [data-tab="ondemand"]{letter-spacing:.02em}
 #today-notif .today-nacts{display:flex;justify-content:flex-end;padding:0 0 8px}
 #today-notif .today-nall{background:none;border:0;color:var(--sage);font:600 .82rem var(--today-sans);padding:4px 0;cursor:pointer}
 #today-nlist{display:flex;flex-direction:column;gap:8px;padding-bottom:8px}

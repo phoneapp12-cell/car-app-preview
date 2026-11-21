@@ -1,0 +1,3747 @@
+{
+  "checked": "2026-11-21",
+  "refresh": "Re-list official YouTube season playlists on @RedGreenTV (channel UCsfIjK5sy9Upzcf316Xpytw) and the 14 official live-action full episodes on @MrBean (UCkAGrHCLFmlK3H2kd6isipg). Keep only videos still on those channels, about 20–40 minutes long, and embeddable (HTTP 200 from https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v=VIDEO_ID). For Archive.org, keep only episodes on the documented public-domain lists: The Beverly Hillbillies season 1 and the first 19 season-2 episodes (Orion/Filmways did not renew); the 30 Lucy Show episodes that lapsed (two from season 1, 21 from season 5 not including “Lucy Puts Main Street on the Map”, and seven from season 6); and the 16 season-3 Andy Griffith episodes that lapsed — this file only includes the two of those with a clear public-domain licence and a working mp4. Confirm each mp4 still returns video/mp4 at its /download/ URL. Do not add The Big Bang Theory or any show that is not legally free. No Neon, no sport, no unofficial YouTube uploads.",
+  "shows": [
+    {
+      "id": "red-green",
+      "title": "The Red Green Show",
+      "kind": "sitcom",
+      "topic": "sitcoms",
+      "source": "youtube",
+      "channel": "RedGreenTV",
+      "channelId": "UCsfIjK5sy9Upzcf316Xpytw",
+      "official": true,
+      "ads": true,
+      "label": "YouTube · may show ads",
+      "poster": "https://static.tvmaze.com/uploads/images/medium_portrait/23/59775.jpg",
+      "about": "Official full episodes posted by the show’s own YouTube channel.",
+      "episodes": [
+        {
+          "id": "rg-FUXPuYZ4DEQ",
+          "t": "The Big Outboard",
+          "season": 1,
+          "mins": 24,
+          "dur": 1452,
+          "vid": "FUXPuYZ4DEQ",
+          "ep": 1
+        },
+        {
+          "id": "rg-HbOX7yyL8VM",
+          "t": "The Elvis Sighting",
+          "season": 1,
+          "mins": 24,
+          "dur": 1444,
+          "vid": "HbOX7yyL8VM",
+          "ep": 2
+        },
+        {
+          "id": "rg-F7HfMwWIJtE",
+          "t": "The UFO",
+          "season": 1,
+          "mins": 24,
+          "dur": 1446,
+          "vid": "F7HfMwWIJtE",
+          "no": 3
+        },
+        {
+          "id": "rg-IUaYYK2u0g0",
+          "t": "The Treasure Hunt",
+          "season": 1,
+          "mins": 24,
+          "dur": 1446,
+          "vid": "IUaYYK2u0g0",
+          "no": 4
+        },
+        {
+          "id": "rg-fPQsX9LguyY",
+          "t": "Practical Joke Week",
+          "season": 1,
+          "mins": 24,
+          "dur": 1448,
+          "vid": "fPQsX9LguyY",
+          "no": 5
+        },
+        {
+          "id": "rg-dp7Cags27yw",
+          "t": "Home-Barber Kit",
+          "season": 1,
+          "mins": 24,
+          "dur": 1426,
+          "vid": "dp7Cags27yw",
+          "no": 6
+        },
+        {
+          "id": "rg-w2Pv2rItuyU",
+          "t": "He-Man Contest",
+          "season": 1,
+          "mins": 24,
+          "dur": 1445,
+          "vid": "w2Pv2rItuyU",
+          "no": 7
+        },
+        {
+          "id": "rg-noZxccLy5eY",
+          "t": "Guest Elephant",
+          "season": 1,
+          "mins": 24,
+          "dur": 1445,
+          "vid": "noZxccLy5eY",
+          "no": 8
+        },
+        {
+          "id": "rg-9f8b4k96tR4",
+          "t": "Exotic Dancer",
+          "season": 1,
+          "mins": 24,
+          "dur": 1448,
+          "vid": "9f8b4k96tR4",
+          "no": 9
+        },
+        {
+          "id": "rg-OdER_ipjLwM",
+          "t": "Lost Toupee",
+          "season": 1,
+          "mins": 24,
+          "dur": 1449,
+          "vid": "OdER_ipjLwM",
+          "no": 10
+        },
+        {
+          "id": "rg-jyA1GVRAYt8",
+          "t": "Talent Show",
+          "season": 1,
+          "mins": 24,
+          "dur": 1444,
+          "vid": "jyA1GVRAYt8",
+          "no": 11
+        },
+        {
+          "id": "rg-bjljzpPvTW4",
+          "t": "Problem Outhouse",
+          "season": 1,
+          "mins": 24,
+          "dur": 1452,
+          "vid": "bjljzpPvTW4",
+          "no": 12
+        },
+        {
+          "id": "rg-3neYbn4_nzE",
+          "t": "Whittling Contest",
+          "season": 1,
+          "mins": 24,
+          "dur": 1448,
+          "vid": "3neYbn4_nzE",
+          "no": 13
+        },
+        {
+          "id": "rg-0OUmnQd5dcI",
+          "t": "Wind-Powered Boat",
+          "season": 1,
+          "mins": 24,
+          "dur": 1442,
+          "vid": "0OUmnQd5dcI",
+          "no": 14
+        },
+        {
+          "id": "rg-0PmaxiD7S-0",
+          "t": "Hot Water Bottle",
+          "season": 1,
+          "mins": 24,
+          "dur": 1445,
+          "vid": "0PmaxiD7S-0",
+          "no": 15
+        },
+        {
+          "id": "rg-Sx_6ZEEkW9w",
+          "t": "Lodge Visitor",
+          "season": 1,
+          "mins": 24,
+          "dur": 1445,
+          "vid": "Sx_6ZEEkW9w",
+          "no": 16
+        },
+        {
+          "id": "rg-ODTN6CG3Yr8",
+          "t": "Gun Powder Shakes",
+          "season": 1,
+          "mins": 24,
+          "dur": 1445,
+          "vid": "ODTN6CG3Yr8",
+          "no": 17
+        },
+        {
+          "id": "rg-U7Q06csDc7U",
+          "t": "Safety Week",
+          "season": 1,
+          "mins": 24,
+          "dur": 1445,
+          "vid": "U7Q06csDc7U",
+          "no": 18
+        },
+        {
+          "id": "rg-oqAsaWFNLro",
+          "t": "Bad Chili",
+          "season": 1,
+          "mins": 24,
+          "dur": 1445,
+          "vid": "oqAsaWFNLro",
+          "no": 19
+        },
+        {
+          "id": "rg-VRgiCi5S_Eo",
+          "t": "Water Tower",
+          "season": 1,
+          "mins": 24,
+          "dur": 1437,
+          "vid": "VRgiCi5S_Eo",
+          "no": 20
+        },
+        {
+          "id": "rg-TVzCZUojjKw",
+          "t": "Jet-Ski",
+          "season": 1,
+          "mins": 24,
+          "dur": 1444,
+          "vid": "TVzCZUojjKw",
+          "no": 21
+        },
+        {
+          "id": "rg-W2hhbijc7Lk",
+          "t": "New Well",
+          "season": 1,
+          "mins": 24,
+          "dur": 1450,
+          "vid": "W2hhbijc7Lk",
+          "no": 22
+        },
+        {
+          "id": "rg-p8OL3YcZpZk",
+          "t": "Canoe Jousting",
+          "season": 1,
+          "mins": 24,
+          "dur": 1444,
+          "vid": "p8OL3YcZpZk",
+          "no": 23
+        },
+        {
+          "id": "rg-iLJIpZLAouI",
+          "t": "Water Slide",
+          "season": 1,
+          "mins": 24,
+          "dur": 1441,
+          "vid": "iLJIpZLAouI",
+          "no": 24
+        },
+        {
+          "id": "rg-tjTlB5NpNBA",
+          "t": "The Putter Attack",
+          "season": 2,
+          "mins": 24,
+          "dur": 1438,
+          "vid": "tjTlB5NpNBA",
+          "no": 25
+        },
+        {
+          "id": "rg-GEvigNmGko4",
+          "t": "Doc's Loan",
+          "season": 2,
+          "mins": 24,
+          "dur": 1456,
+          "vid": "GEvigNmGko4",
+          "no": 26
+        },
+        {
+          "id": "rg-YkSjqBdtK8g",
+          "t": "Missing",
+          "season": 2,
+          "mins": 24,
+          "dur": 1447,
+          "vid": "YkSjqBdtK8g",
+          "no": 27
+        },
+        {
+          "id": "rg-9QFpXypl6bg",
+          "t": "The Receipt-A-Thon",
+          "season": 2,
+          "mins": 24,
+          "dur": 1466,
+          "vid": "9QFpXypl6bg",
+          "no": 28
+        },
+        {
+          "id": "rg-0Xb_xcJbtzA",
+          "t": "The Sing Along Machine",
+          "season": 2,
+          "mins": 24,
+          "dur": 1451,
+          "vid": "0Xb_xcJbtzA",
+          "no": 29
+        },
+        {
+          "id": "rg-Li02MnwLO2E",
+          "t": "Bear!!!",
+          "season": 2,
+          "mins": 24,
+          "dur": 1446,
+          "vid": "Li02MnwLO2E",
+          "no": 30
+        },
+        {
+          "id": "rg-rCO43p2W1X4",
+          "t": "The Bad Check-Up",
+          "season": 2,
+          "mins": 24,
+          "dur": 1447,
+          "vid": "rCO43p2W1X4",
+          "no": 31
+        },
+        {
+          "id": "rg--AcxT5vKX6c",
+          "t": "The Four-Man Raft",
+          "season": 2,
+          "mins": 24,
+          "dur": 1448,
+          "vid": "-AcxT5vKX6c",
+          "no": 32
+        },
+        {
+          "id": "rg-ytOvjNQcrIg",
+          "t": "Skeet Golf",
+          "season": 2,
+          "mins": 24,
+          "dur": 1448,
+          "vid": "ytOvjNQcrIg",
+          "no": 33
+        },
+        {
+          "id": "rg-yUgKnQ5usoU",
+          "t": "The Broken Water Pump",
+          "season": 2,
+          "mins": 24,
+          "dur": 1442,
+          "vid": "yUgKnQ5usoU",
+          "no": 34
+        },
+        {
+          "id": "rg-5NMbJUo7sKw",
+          "t": "The Illegal Clubs",
+          "season": 2,
+          "mins": 24,
+          "dur": 1439,
+          "vid": "5NMbJUo7sKw",
+          "no": 35
+        },
+        {
+          "id": "rg-BKEziIurooI",
+          "t": "Animals In The Attic",
+          "season": 2,
+          "mins": 24,
+          "dur": 1452,
+          "vid": "BKEziIurooI",
+          "no": 36
+        },
+        {
+          "id": "rg-vxusElbyUjQ",
+          "t": "The Party Boat Sank",
+          "season": 2,
+          "mins": 24,
+          "dur": 1447,
+          "vid": "vxusElbyUjQ",
+          "no": 37
+        },
+        {
+          "id": "rg-0vvpgyMOf30",
+          "t": "The Food Club",
+          "season": 2,
+          "mins": 24,
+          "dur": 1443,
+          "vid": "0vvpgyMOf30",
+          "no": 38
+        },
+        {
+          "id": "rg-DgLR2msD9NI",
+          "t": "The Fish Locater",
+          "season": 2,
+          "mins": 24,
+          "dur": 1446,
+          "vid": "DgLR2msD9NI",
+          "no": 39
+        },
+        {
+          "id": "rg-S_AVsR-AODw",
+          "t": "The Boat Canoe",
+          "season": 2,
+          "mins": 24,
+          "dur": 1445,
+          "vid": "S_AVsR-AODw",
+          "no": 40
+        },
+        {
+          "id": "rg-phoKDi3YIp4",
+          "t": "Job Security",
+          "season": 2,
+          "mins": 24,
+          "dur": 1437,
+          "vid": "phoKDi3YIp4",
+          "no": 41
+        },
+        {
+          "id": "rg-FiiDKZBKWwE",
+          "t": "Noel's Stag",
+          "season": 2,
+          "mins": 24,
+          "dur": 1431,
+          "vid": "FiiDKZBKWwE",
+          "no": 42
+        },
+        {
+          "id": "rg-ldboS9fNRys",
+          "t": "Bob's Birthday",
+          "season": 2,
+          "mins": 24,
+          "dur": 1453,
+          "vid": "ldboS9fNRys",
+          "no": 43
+        },
+        {
+          "id": "rg-PgcrB5chxyg",
+          "t": "The Sudsy Lake",
+          "season": 2,
+          "mins": 24,
+          "dur": 1441,
+          "vid": "PgcrB5chxyg",
+          "no": 44
+        },
+        {
+          "id": "rg-LqDUcdA88M4",
+          "t": "The Gun Mishap",
+          "season": 2,
+          "mins": 24,
+          "dur": 1447,
+          "vid": "LqDUcdA88M4",
+          "no": 45
+        },
+        {
+          "id": "rg-PHknw_z_N1Y",
+          "t": "The Double Date",
+          "season": 2,
+          "mins": 24,
+          "dur": 1441,
+          "vid": "PHknw_z_N1Y",
+          "no": 46
+        },
+        {
+          "id": "rg-gyTrIFdK9PE",
+          "t": "The Florida Trip",
+          "season": 2,
+          "mins": 24,
+          "dur": 1446,
+          "vid": "gyTrIFdK9PE",
+          "no": 47
+        },
+        {
+          "id": "rg-y55Xiy4iqkg",
+          "t": "Not One Fish",
+          "season": 2,
+          "mins": 24,
+          "dur": 1440,
+          "vid": "y55Xiy4iqkg",
+          "no": 48
+        },
+        {
+          "id": "rg-EaWhsBImvdo",
+          "t": "Maple Syrup",
+          "season": 3,
+          "mins": 24,
+          "dur": 1457,
+          "vid": "EaWhsBImvdo",
+          "no": 49
+        },
+        {
+          "id": "rg-OqoIl6cPymM",
+          "t": "Car Pool",
+          "season": 3,
+          "mins": 24,
+          "dur": 1452,
+          "vid": "OqoIl6cPymM",
+          "no": 50
+        },
+        {
+          "id": "rg-_XyysLOIoWY",
+          "t": "The Spawning Grounds",
+          "season": 3,
+          "mins": 24,
+          "dur": 1445,
+          "vid": "_XyysLOIoWY",
+          "no": 51
+        },
+        {
+          "id": "rg-l-AJWHBtV7g",
+          "t": "Magnetic Lake",
+          "season": 3,
+          "mins": 24,
+          "dur": 1454,
+          "vid": "l-AJWHBtV7g",
+          "no": 52
+        },
+        {
+          "id": "rg-_VPq5trBXlI",
+          "t": "Underground Parking",
+          "season": 3,
+          "mins": 24,
+          "dur": 1455,
+          "vid": "_VPq5trBXlI",
+          "no": 53
+        },
+        {
+          "id": "rg-uSP7pkEYcPA",
+          "t": "The Tanks We Get",
+          "season": 3,
+          "mins": 24,
+          "dur": 1449,
+          "vid": "uSP7pkEYcPA",
+          "no": 54
+        },
+        {
+          "id": "rg-gKjsK2o1nsM",
+          "t": "Fire Brigade",
+          "season": 3,
+          "mins": 24,
+          "dur": 1450,
+          "vid": "gKjsK2o1nsM",
+          "no": 55
+        },
+        {
+          "id": "rg-_VSZUA1f5Cc",
+          "t": "The New Shirt/Casino",
+          "season": 3,
+          "mins": 24,
+          "dur": 1451,
+          "vid": "_VSZUA1f5Cc",
+          "no": 56
+        },
+        {
+          "id": "rg-d9KRzAh8XsY",
+          "t": "Green Green",
+          "season": 3,
+          "mins": 24,
+          "dur": 1451,
+          "vid": "d9KRzAh8XsY",
+          "no": 57
+        },
+        {
+          "id": "rg-KOU3d_kJEls",
+          "t": "Fuel Conversion",
+          "season": 3,
+          "mins": 24,
+          "dur": 1461,
+          "vid": "KOU3d_kJEls",
+          "no": 58
+        },
+        {
+          "id": "rg-7ousp38ww5A",
+          "t": "The Hidden Mine",
+          "season": 3,
+          "mins": 24,
+          "dur": 1461,
+          "vid": "7ousp38ww5A",
+          "no": 59
+        },
+        {
+          "id": "rg-_JnzIlqVN6c",
+          "t": "Lake Regulations",
+          "season": 3,
+          "mins": 24,
+          "dur": 1458,
+          "vid": "_JnzIlqVN6c",
+          "no": 60
+        },
+        {
+          "id": "rg-bJQ94Ntd1bE",
+          "t": "Cross The Lake Race",
+          "season": 3,
+          "mins": 24,
+          "dur": 1457,
+          "vid": "bJQ94Ntd1bE",
+          "no": 61
+        },
+        {
+          "id": "rg-4d2OX_0jfiM",
+          "t": "The Salmon Parade",
+          "season": 3,
+          "mins": 24,
+          "dur": 1451,
+          "vid": "4d2OX_0jfiM",
+          "no": 62
+        },
+        {
+          "id": "rg-p2jl85vcI3c",
+          "t": "The Funniest Video",
+          "season": 3,
+          "mins": 24,
+          "dur": 1446,
+          "vid": "p2jl85vcI3c",
+          "no": 63
+        },
+        {
+          "id": "rg-rxLQ0-_lTmA",
+          "t": "Biosphere Three",
+          "season": 3,
+          "mins": 24,
+          "dur": 1451,
+          "vid": "rxLQ0-_lTmA",
+          "no": 64
+        },
+        {
+          "id": "rg-yLGMfLp7KIs",
+          "t": "The Water Park",
+          "season": 3,
+          "mins": 24,
+          "dur": 1446,
+          "vid": "yLGMfLp7KIs",
+          "no": 65
+        },
+        {
+          "id": "rg-XpfyolUTS7s",
+          "t": "The Used Helicopter",
+          "season": 3,
+          "mins": 24,
+          "dur": 1466,
+          "vid": "XpfyolUTS7s",
+          "no": 66
+        },
+        {
+          "id": "rg-4F-3b28_EVs",
+          "t": "Possum Lake Regatta",
+          "season": 3,
+          "mins": 24,
+          "dur": 1449,
+          "vid": "4F-3b28_EVs",
+          "no": 67
+        },
+        {
+          "id": "rg-cn5oxjirWJc",
+          "t": "The Retirement Home",
+          "season": 3,
+          "mins": 24,
+          "dur": 1454,
+          "vid": "cn5oxjirWJc",
+          "no": 68
+        },
+        {
+          "id": "rg-NqJDBpwnyuc",
+          "t": "Slingshot Skiing",
+          "season": 3,
+          "mins": 24,
+          "dur": 1451,
+          "vid": "NqJDBpwnyuc",
+          "no": 69
+        },
+        {
+          "id": "rg--xcRKVY_6dQ",
+          "t": "The Possum Olympics",
+          "season": 3,
+          "mins": 24,
+          "dur": 1450,
+          "vid": "-xcRKVY_6dQ",
+          "no": 70
+        },
+        {
+          "id": "rg-1wi4wTntj_4",
+          "t": "Possum Lake Monster",
+          "season": 3,
+          "mins": 24,
+          "dur": 1452,
+          "vid": "1wi4wTntj_4",
+          "no": 71
+        },
+        {
+          "id": "rg-i6tLGrguXxE",
+          "t": "The Water Show",
+          "season": 3,
+          "mins": 24,
+          "dur": 1458,
+          "vid": "i6tLGrguXxE",
+          "no": 72
+        },
+        {
+          "id": "rg-jYbrQ-0djt0",
+          "t": "The Beef Project",
+          "season": 4,
+          "mins": 24,
+          "dur": 1432,
+          "vid": "jYbrQ-0djt0",
+          "no": 73
+        },
+        {
+          "id": "rg-8BMWIH2_M84",
+          "t": "The Owl Project",
+          "season": 4,
+          "mins": 24,
+          "dur": 1426,
+          "vid": "8BMWIH2_M84",
+          "no": 74
+        },
+        {
+          "id": "rg-lFY8EEv5cD4",
+          "t": "The Beer Project",
+          "season": 4,
+          "mins": 24,
+          "dur": 1450,
+          "vid": "lFY8EEv5cD4",
+          "no": 75
+        },
+        {
+          "id": "rg-zWqvlnU-Kq8",
+          "t": "The Firewood Project",
+          "season": 4,
+          "mins": 24,
+          "dur": 1445,
+          "vid": "zWqvlnU-Kq8",
+          "no": 76
+        },
+        {
+          "id": "rg-_M7eSnvDvx8",
+          "t": "The Hydrogen Project",
+          "season": 4,
+          "mins": 24,
+          "dur": 1427,
+          "vid": "_M7eSnvDvx8",
+          "no": 77
+        },
+        {
+          "id": "rg-7G7CN4ddtRw",
+          "t": "The Schoolhouse Project",
+          "season": 4,
+          "mins": 24,
+          "dur": 1427,
+          "vid": "7G7CN4ddtRw",
+          "no": 78
+        },
+        {
+          "id": "rg-6aGzHr2yxao",
+          "t": "The Firefly Project",
+          "season": 4,
+          "mins": 24,
+          "dur": 1427,
+          "vid": "6aGzHr2yxao",
+          "no": 79
+        },
+        {
+          "id": "rg-UOsEks6oqj8",
+          "t": "The Badger Project",
+          "season": 4,
+          "mins": 24,
+          "dur": 1427,
+          "vid": "UOsEks6oqj8",
+          "no": 80
+        },
+        {
+          "id": "rg-QU0UuHzn9fE",
+          "t": "The Conveyor Project",
+          "season": 4,
+          "mins": 24,
+          "dur": 1427,
+          "vid": "QU0UuHzn9fE",
+          "no": 81
+        },
+        {
+          "id": "rg-B_fOTBCelOQ",
+          "t": "The Electrical Project",
+          "season": 4,
+          "mins": 24,
+          "dur": 1427,
+          "vid": "B_fOTBCelOQ",
+          "no": 82
+        },
+        {
+          "id": "rg-vn6D5w-vCIs",
+          "t": "The Storm Damage Project",
+          "season": 4,
+          "mins": 24,
+          "dur": 1422,
+          "vid": "vn6D5w-vCIs",
+          "no": 83
+        },
+        {
+          "id": "rg-zPv8yFqcuvg",
+          "t": "The Marine Show Project",
+          "season": 4,
+          "mins": 24,
+          "dur": 1426,
+          "vid": "zPv8yFqcuvg",
+          "no": 84
+        },
+        {
+          "id": "rg-1odMXI_mdhY",
+          "t": "The Silver Project",
+          "season": 4,
+          "mins": 24,
+          "dur": 1427,
+          "vid": "1odMXI_mdhY",
+          "no": 85
+        },
+        {
+          "id": "rg-UcXDW0TK7yw",
+          "t": "The Ski & Golf Project",
+          "season": 4,
+          "mins": 24,
+          "dur": 1446,
+          "vid": "UcXDW0TK7yw",
+          "no": 86
+        },
+        {
+          "id": "rg-7rVVjBANDgk",
+          "t": "The Auction Project",
+          "season": 4,
+          "mins": 24,
+          "dur": 1424,
+          "vid": "7rVVjBANDgk",
+          "no": 87
+        },
+        {
+          "id": "rg-OzNGUIzkguw",
+          "t": "The Rustproofing Project",
+          "season": 4,
+          "mins": 24,
+          "dur": 1427,
+          "vid": "OzNGUIzkguw",
+          "no": 88
+        },
+        {
+          "id": "rg-K68j_PbX7y4",
+          "t": "The Movie Project",
+          "season": 4,
+          "mins": 24,
+          "dur": 1440,
+          "vid": "K68j_PbX7y4",
+          "no": 89
+        },
+        {
+          "id": "rg-zjWC9B4jW-s",
+          "t": "The Painted Leaves Project",
+          "season": 4,
+          "mins": 24,
+          "dur": 1423,
+          "vid": "zjWC9B4jW-s",
+          "no": 90
+        },
+        {
+          "id": "rg-bWsyiKueTos",
+          "t": "The Real Estate Project",
+          "season": 4,
+          "mins": 24,
+          "dur": 1426,
+          "vid": "bWsyiKueTos",
+          "no": 91
+        },
+        {
+          "id": "rg-_Nk8X_J1510",
+          "t": "The Stuck Truck Project",
+          "season": 4,
+          "mins": 24,
+          "dur": 1433,
+          "vid": "_Nk8X_J1510",
+          "no": 92
+        },
+        {
+          "id": "rg-7XOpiU_dNe0",
+          "t": "The Group Photo Project",
+          "season": 4,
+          "mins": 24,
+          "dur": 1428,
+          "vid": "7XOpiU_dNe0",
+          "no": 93
+        },
+        {
+          "id": "rg-KiWQIoxuHG8",
+          "t": "The Guard Dog Project",
+          "season": 4,
+          "mins": 24,
+          "dur": 1433,
+          "vid": "KiWQIoxuHG8",
+          "no": 94
+        },
+        {
+          "id": "rg-6rcLR2aM0sU",
+          "t": "The Mt. Rushmore Project",
+          "season": 4,
+          "mins": 24,
+          "dur": 1429,
+          "vid": "6rcLR2aM0sU",
+          "no": 95
+        },
+        {
+          "id": "rg--R5W0gnthzQ",
+          "t": "The Catfish Project",
+          "season": 4,
+          "mins": 24,
+          "dur": 1422,
+          "vid": "-R5W0gnthzQ",
+          "no": 96
+        },
+        {
+          "id": "rg-l33k1N6AJwc",
+          "t": "Men's Night On The Mountain",
+          "season": 5,
+          "mins": 23,
+          "dur": 1405,
+          "vid": "l33k1N6AJwc",
+          "no": 97
+        },
+        {
+          "id": "rg-wKkmZ7QZdrY",
+          "t": "The Driving Test",
+          "season": 5,
+          "mins": 23,
+          "dur": 1405,
+          "vid": "wKkmZ7QZdrY",
+          "no": 98
+        },
+        {
+          "id": "rg-083F2oWtMuQ",
+          "t": "The Satellite Dish",
+          "season": 5,
+          "mins": 24,
+          "dur": 1427,
+          "vid": "083F2oWtMuQ",
+          "no": 99
+        },
+        {
+          "id": "rg-e4LNfJovWBM",
+          "t": "Father and Son Banquet",
+          "season": 5,
+          "mins": 23,
+          "dur": 1401,
+          "vid": "e4LNfJovWBM",
+          "no": 100
+        },
+        {
+          "id": "rg-Z5RXm5q3lcQ",
+          "t": "The New Doctor",
+          "season": 5,
+          "mins": 23,
+          "dur": 1405,
+          "vid": "Z5RXm5q3lcQ",
+          "no": 101
+        },
+        {
+          "id": "rg-qVeQWtVzkAQ",
+          "t": "The Vertical Grandstand",
+          "season": 5,
+          "mins": 23,
+          "dur": 1403,
+          "vid": "qVeQWtVzkAQ",
+          "no": 102
+        },
+        {
+          "id": "rg-KUzn5wJlgiE",
+          "t": "The Network Deal",
+          "season": 5,
+          "mins": 23,
+          "dur": 1404,
+          "vid": "KUzn5wJlgiE",
+          "no": 103
+        },
+        {
+          "id": "rg-dg0sYtVbpx4",
+          "t": "Medieval Times",
+          "season": 5,
+          "mins": 23,
+          "dur": 1405,
+          "vid": "dg0sYtVbpx4",
+          "no": 104
+        },
+        {
+          "id": "rg-SBgdWe96zuQ",
+          "t": "Van Go",
+          "season": 5,
+          "mins": 23,
+          "dur": 1405,
+          "vid": "SBgdWe96zuQ",
+          "no": 105
+        },
+        {
+          "id": "rg-Y07C8p7rZiM",
+          "t": "Possum Lodge Radio",
+          "season": 5,
+          "mins": 23,
+          "dur": 1405,
+          "vid": "Y07C8p7rZiM",
+          "no": 106
+        },
+        {
+          "id": "rg-PmxEzsoc-T0",
+          "t": "X Marks the Spot",
+          "season": 5,
+          "mins": 23,
+          "dur": 1403,
+          "vid": "PmxEzsoc-T0",
+          "no": 107
+        },
+        {
+          "id": "rg-E0vqkH6Immk",
+          "t": "Sedgwick the Thief",
+          "season": 5,
+          "mins": 23,
+          "dur": 1405,
+          "vid": "E0vqkH6Immk",
+          "no": 108
+        },
+        {
+          "id": "rg-Wa8yuwn1cRs",
+          "t": "Ep 109 'The Cement Load\" (1995 Season)",
+          "season": 5,
+          "mins": 23,
+          "dur": 1405,
+          "vid": "Wa8yuwn1cRs",
+          "no": 109
+        },
+        {
+          "id": "rg-B-0hsShQDx4",
+          "t": "The Gas Shortage",
+          "season": 5,
+          "mins": 23,
+          "dur": 1405,
+          "vid": "B-0hsShQDx4",
+          "no": 110
+        },
+        {
+          "id": "rg-Xxl-6HIGCuA",
+          "t": "Trout Season",
+          "season": 5,
+          "mins": 23,
+          "dur": 1405,
+          "vid": "Xxl-6HIGCuA",
+          "no": 111
+        },
+        {
+          "id": "rg-yeGg9_KwBw0",
+          "t": "The Lost Dog",
+          "season": 5,
+          "mins": 23,
+          "dur": 1405,
+          "vid": "yeGg9_KwBw0",
+          "no": 112
+        },
+        {
+          "id": "rg-R7aQyV7-lok",
+          "t": "The New Statue",
+          "season": 5,
+          "mins": 24,
+          "dur": 1414,
+          "vid": "R7aQyV7-lok",
+          "no": 113
+        },
+        {
+          "id": "rg-ynYh_oYgbjM",
+          "t": "One Man's Garbage",
+          "season": 5,
+          "mins": 23,
+          "dur": 1401,
+          "vid": "ynYh_oYgbjM",
+          "no": 114
+        },
+        {
+          "id": "rg-cfoje-Cns2g",
+          "t": "The Big Thing",
+          "season": 5,
+          "mins": 23,
+          "dur": 1402,
+          "vid": "cfoje-Cns2g",
+          "no": 115
+        },
+        {
+          "id": "rg-rcHmq2wGcQ4",
+          "t": "Bottled Water",
+          "season": 5,
+          "mins": 23,
+          "dur": 1399,
+          "vid": "rcHmq2wGcQ4",
+          "no": 116
+        },
+        {
+          "id": "rg-vE0AQqGpl7s",
+          "t": "Floating Church",
+          "season": 5,
+          "mins": 23,
+          "dur": 1405,
+          "vid": "vE0AQqGpl7s",
+          "no": 117
+        },
+        {
+          "id": "rg-mvxwJlSMPP8",
+          "t": "The Not-Chicken Franchise",
+          "season": 5,
+          "mins": 23,
+          "dur": 1403,
+          "vid": "mvxwJlSMPP8",
+          "no": 118
+        },
+        {
+          "id": "rg-FCttYqOIkQY",
+          "t": "The Compost Heap",
+          "season": 5,
+          "mins": 23,
+          "dur": 1403,
+          "vid": "FCttYqOIkQY",
+          "no": 119
+        },
+        {
+          "id": "rg-lzUb3PgviT0",
+          "t": "Homemade Cheese",
+          "season": 5,
+          "mins": 23,
+          "dur": 1399,
+          "vid": "lzUb3PgviT0",
+          "no": 120
+        },
+        {
+          "id": "rg-_s79uXLQqDU",
+          "t": "The Science Fair",
+          "season": 6,
+          "mins": 23,
+          "dur": 1405,
+          "vid": "_s79uXLQqDU",
+          "no": 121
+        },
+        {
+          "id": "rg-gTIfSJXXL8s",
+          "t": "Sedgwick the Tenant",
+          "season": 6,
+          "mins": 23,
+          "dur": 1405,
+          "vid": "gTIfSJXXL8s",
+          "no": 122
+        },
+        {
+          "id": "rg--TxduxZ_FY0",
+          "t": "The Driving Lesson",
+          "season": 6,
+          "mins": 23,
+          "dur": 1405,
+          "vid": "-TxduxZ_FY0",
+          "no": 123
+        },
+        {
+          "id": "rg-GLBKgwGik3U",
+          "t": "The Tax Refund",
+          "season": 6,
+          "mins": 23,
+          "dur": 1406,
+          "vid": "GLBKgwGik3U",
+          "no": 124
+        },
+        {
+          "id": "rg-IYK5_IZP92s",
+          "t": "No Church",
+          "season": 6,
+          "mins": 23,
+          "dur": 1404,
+          "vid": "IYK5_IZP92s",
+          "no": 125
+        },
+        {
+          "id": "rg-CfWz6WQRioo",
+          "t": "The Petting Zoo",
+          "season": 6,
+          "mins": 24,
+          "dur": 1412,
+          "vid": "CfWz6WQRioo",
+          "no": 126
+        },
+        {
+          "id": "rg-ox33XWTN7-k",
+          "t": "Good Government",
+          "season": 6,
+          "mins": 24,
+          "dur": 1411,
+          "vid": "ox33XWTN7-k",
+          "no": 127
+        },
+        {
+          "id": "rg-qeD8foFZs5g",
+          "t": "The Poker Game",
+          "season": 6,
+          "mins": 24,
+          "dur": 1410,
+          "vid": "qeD8foFZs5g",
+          "no": 128
+        },
+        {
+          "id": "rg-NPJFEpZ-uF8",
+          "t": "The Drill",
+          "season": 6,
+          "mins": 24,
+          "dur": 1411,
+          "vid": "NPJFEpZ-uF8",
+          "no": 129
+        },
+        {
+          "id": "rg-4hL72kpTags",
+          "t": "Maxi Golf",
+          "season": 6,
+          "mins": 24,
+          "dur": 1412,
+          "vid": "4hL72kpTags",
+          "no": 130
+        },
+        {
+          "id": "rg-tqDNFlOL0hQ",
+          "t": "Bernice's Birthday",
+          "season": 6,
+          "mins": 24,
+          "dur": 1411,
+          "vid": "tqDNFlOL0hQ",
+          "no": 131
+        },
+        {
+          "id": "rg-ozYaavmMUUY",
+          "t": "The Church Casino",
+          "season": 6,
+          "mins": 24,
+          "dur": 1411,
+          "vid": "ozYaavmMUUY",
+          "no": 132
+        },
+        {
+          "id": "rg-aplLwQQGAzg",
+          "t": "The House Raising",
+          "season": 6,
+          "mins": 24,
+          "dur": 1411,
+          "vid": "aplLwQQGAzg",
+          "no": 133
+        },
+        {
+          "id": "rg-r4vlvK1Vt1E",
+          "t": "The Love Boat",
+          "season": 6,
+          "mins": 24,
+          "dur": 1411,
+          "vid": "r4vlvK1Vt1E",
+          "no": 134
+        },
+        {
+          "id": "rg-Jn3ecpNBq08",
+          "t": "The Girlfriend",
+          "season": 6,
+          "mins": 24,
+          "dur": 1412,
+          "vid": "Jn3ecpNBq08",
+          "no": 135
+        },
+        {
+          "id": "rg-cErq-6FTIF0",
+          "t": "The New Lease",
+          "season": 6,
+          "mins": 24,
+          "dur": 1411,
+          "vid": "cErq-6FTIF0",
+          "no": 136
+        },
+        {
+          "id": "rg-Vjq3TQ-SDz8",
+          "t": "The Baseball Tryouts",
+          "season": 6,
+          "mins": 24,
+          "dur": 1410,
+          "vid": "Vjq3TQ-SDz8",
+          "no": 137
+        },
+        {
+          "id": "rg-RvnUulNYgjA",
+          "t": "30 Minutes Or Free",
+          "season": 6,
+          "mins": 24,
+          "dur": 1410,
+          "vid": "RvnUulNYgjA",
+          "no": 138
+        },
+        {
+          "id": "rg-QSSIGMmPpDY",
+          "t": "Fundraiser",
+          "season": 6,
+          "mins": 24,
+          "dur": 1410,
+          "vid": "QSSIGMmPpDY",
+          "no": 139
+        },
+        {
+          "id": "rg-4EtosSJE-70",
+          "t": "Real Estate",
+          "season": 6,
+          "mins": 24,
+          "dur": 1410,
+          "vid": "4EtosSJE-70",
+          "no": 140
+        },
+        {
+          "id": "rg--WoHKTEg4OE",
+          "t": "The Stag Party",
+          "season": 6,
+          "mins": 24,
+          "dur": 1410,
+          "vid": "-WoHKTEg4OE",
+          "no": 141
+        },
+        {
+          "id": "rg-9ar4bImjdio",
+          "t": "The Suits",
+          "season": 6,
+          "mins": 24,
+          "dur": 1410,
+          "vid": "9ar4bImjdio",
+          "no": 142
+        },
+        {
+          "id": "rg-mBqXojDNT18",
+          "t": "The High School Reunion",
+          "season": 6,
+          "mins": 24,
+          "dur": 1410,
+          "vid": "mBqXojDNT18",
+          "no": 143
+        },
+        {
+          "id": "rg-HXlNVkd-VB0",
+          "t": "Harold's Wheels",
+          "season": 6,
+          "mins": 24,
+          "dur": 1410,
+          "vid": "HXlNVkd-VB0",
+          "no": 144
+        },
+        {
+          "id": "rg-EIBxnm9IFA0",
+          "t": "The Running of the Bulls",
+          "season": 7,
+          "mins": 23,
+          "dur": 1384,
+          "vid": "EIBxnm9IFA0",
+          "no": 145
+        },
+        {
+          "id": "rg-EQOELqwdQ1E",
+          "t": "Swiss It Up",
+          "season": 7,
+          "mins": 23,
+          "dur": 1380,
+          "vid": "EQOELqwdQ1E",
+          "no": 146
+        },
+        {
+          "id": "rg-jeTSnoeZZMQ",
+          "t": "The Implosion",
+          "season": 7,
+          "mins": 23,
+          "dur": 1382,
+          "vid": "jeTSnoeZZMQ",
+          "no": 147
+        },
+        {
+          "id": "rg-Z1CbXkNdxfg",
+          "t": "Adopt-A-Highway",
+          "season": 7,
+          "mins": 23,
+          "dur": 1382,
+          "vid": "Z1CbXkNdxfg",
+          "no": 148
+        },
+        {
+          "id": "rg-_Skq8gBNr6Q",
+          "t": "The Strange Ranger",
+          "season": 7,
+          "mins": 23,
+          "dur": 1382,
+          "vid": "_Skq8gBNr6Q",
+          "no": 149
+        },
+        {
+          "id": "rg-jwohRfkuPHk",
+          "t": "Big Guy Little Guy",
+          "season": 7,
+          "mins": 23,
+          "dur": 1397,
+          "vid": "jwohRfkuPHk",
+          "no": 150
+        },
+        {
+          "id": "rg-S91GdCZ-Rog",
+          "t": "The Movie",
+          "season": 7,
+          "mins": 23,
+          "dur": 1402,
+          "vid": "S91GdCZ-Rog",
+          "no": 151
+        },
+        {
+          "id": "rg-lOHvMlQr5CA",
+          "t": "Expropriation",
+          "season": 7,
+          "mins": 23,
+          "dur": 1402,
+          "vid": "lOHvMlQr5CA",
+          "no": 152
+        },
+        {
+          "id": "rg-EKvGRAdWLWk",
+          "t": "The Stool Pigeon",
+          "season": 7,
+          "mins": 23,
+          "dur": 1402,
+          "vid": "EKvGRAdWLWk",
+          "no": 153
+        },
+        {
+          "id": "rg-yyy8gYkU2TY",
+          "t": "Celebrity",
+          "season": 7,
+          "mins": 23,
+          "dur": 1402,
+          "vid": "yyy8gYkU2TY",
+          "no": 154
+        },
+        {
+          "id": "rg-QbTVm1cQT4A",
+          "t": "Let Me Count The Ways",
+          "season": 7,
+          "mins": 23,
+          "dur": 1403,
+          "vid": "QbTVm1cQT4A",
+          "no": 155
+        },
+        {
+          "id": "rg-1dvlwZEnmCY",
+          "t": "Ep 156 (1997)",
+          "season": 7,
+          "mins": 23,
+          "dur": 1402,
+          "vid": "1dvlwZEnmCY",
+          "no": 156
+        },
+        {
+          "id": "rg-nUyvlJPsXLg",
+          "t": "The Splinter Lodge",
+          "season": 7,
+          "mins": 23,
+          "dur": 1402,
+          "vid": "nUyvlJPsXLg",
+          "no": 157
+        },
+        {
+          "id": "rg-Sv9unUmQjSw",
+          "t": "The Good Old Hockey Game",
+          "season": 7,
+          "mins": 23,
+          "dur": 1402,
+          "vid": "Sv9unUmQjSw",
+          "no": 158
+        },
+        {
+          "id": "rg-rieRkXQ_xPc",
+          "t": "Step Outside",
+          "season": 7,
+          "mins": 23,
+          "dur": 1402,
+          "vid": "rieRkXQ_xPc",
+          "no": 159
+        },
+        {
+          "id": "rg-Lx7PpuWd00o",
+          "t": "The Town Mall",
+          "season": 7,
+          "mins": 23,
+          "dur": 1392,
+          "vid": "Lx7PpuWd00o",
+          "no": 160
+        },
+        {
+          "id": "rg-S5oV6vhY1PY",
+          "t": "The Winter Carnival",
+          "season": 7,
+          "mins": 23,
+          "dur": 1402,
+          "vid": "S5oV6vhY1PY",
+          "no": 161
+        },
+        {
+          "id": "rg-w2yCxFVyFqE",
+          "t": "Harold's Leaving",
+          "season": 8,
+          "mins": 23,
+          "dur": 1367,
+          "vid": "w2yCxFVyFqE",
+          "no": 162
+        },
+        {
+          "id": "rg-TUJ7BdsXTyA",
+          "t": "Neither Rain Nor Sleet",
+          "season": 8,
+          "mins": 23,
+          "dur": 1363,
+          "vid": "TUJ7BdsXTyA",
+          "no": 164
+        },
+        {
+          "id": "rg-qza6DEmhhuQ",
+          "t": "The Cult Visit",
+          "season": 8,
+          "mins": 23,
+          "dur": 1364,
+          "vid": "qza6DEmhhuQ",
+          "no": 165
+        },
+        {
+          "id": "rg-XYQz8wf0cvM",
+          "t": "College Life",
+          "season": 8,
+          "mins": 23,
+          "dur": 1362,
+          "vid": "XYQz8wf0cvM"
+        },
+        {
+          "id": "rg-4ZzWdtvCE3E",
+          "t": "The New Monument",
+          "season": 8,
+          "mins": 23,
+          "dur": 1368,
+          "vid": "4ZzWdtvCE3E",
+          "no": 167
+        },
+        {
+          "id": "rg-TWgpythxGO0",
+          "t": "Free Apricots",
+          "season": 8,
+          "mins": 23,
+          "dur": 1368,
+          "vid": "TWgpythxGO0",
+          "no": 168
+        },
+        {
+          "id": "rg-m0i3PAQdaTg",
+          "t": "The Mayor Race",
+          "season": 8,
+          "mins": 23,
+          "dur": 1365,
+          "vid": "m0i3PAQdaTg",
+          "no": 169
+        },
+        {
+          "id": "rg-M2ggM6PFW9M",
+          "t": "Better To Give Than Receive",
+          "season": 8,
+          "mins": 23,
+          "dur": 1364,
+          "vid": "M2ggM6PFW9M",
+          "no": 170
+        },
+        {
+          "id": "rg-ZkUwsJ0sU5k",
+          "t": "Town Services Contract",
+          "season": 8,
+          "mins": 23,
+          "dur": 1365,
+          "vid": "ZkUwsJ0sU5k",
+          "no": 171
+        },
+        {
+          "id": "rg-o6aImXbkDro",
+          "t": "It's a Wonderful Red Green Christmas",
+          "season": 8,
+          "mins": 23,
+          "dur": 1364,
+          "vid": "o6aImXbkDro",
+          "no": 172
+        },
+        {
+          "id": "rg-NLxpRojWltM",
+          "t": "Life Cycle",
+          "season": 8,
+          "mins": 23,
+          "dur": 1365,
+          "vid": "NLxpRojWltM",
+          "no": 173
+        },
+        {
+          "id": "rg-7ddHwDfizrY",
+          "t": "Mad About You",
+          "season": 8,
+          "mins": 23,
+          "dur": 1364,
+          "vid": "7ddHwDfizrY",
+          "no": 174
+        },
+        {
+          "id": "rg-HKNAUxE7igY",
+          "t": "Bingo Was His Name",
+          "season": 8,
+          "mins": 23,
+          "dur": 1363,
+          "vid": "HKNAUxE7igY",
+          "no": 175
+        },
+        {
+          "id": "rg-4tDrGxmRqpo",
+          "t": "House Moving",
+          "season": 8,
+          "mins": 23,
+          "dur": 1358,
+          "vid": "4tDrGxmRqpo",
+          "no": 163
+        },
+        {
+          "id": "rg-ZVrOVuCQThM",
+          "t": "Harold's Job",
+          "season": 9,
+          "mins": 23,
+          "dur": 1365,
+          "vid": "ZVrOVuCQThM",
+          "no": 176
+        },
+        {
+          "id": "rg-4tQbmv3Pqtk",
+          "t": "The Fishing Derby",
+          "season": 9,
+          "mins": 23,
+          "dur": 1365,
+          "vid": "4tQbmv3Pqtk",
+          "no": 177
+        },
+        {
+          "id": "rg-BPWZV8Iyv9U",
+          "t": "Lady in Red",
+          "season": 9,
+          "mins": 23,
+          "dur": 1365,
+          "vid": "BPWZV8Iyv9U",
+          "no": 178
+        },
+        {
+          "id": "rg-epA2nNUHlYo",
+          "t": "The Bachelor Auction",
+          "season": 9,
+          "mins": 23,
+          "dur": 1360,
+          "vid": "epA2nNUHlYo",
+          "no": 179
+        },
+        {
+          "id": "rg-5RM6JJb3azE",
+          "t": "Angel",
+          "season": 9,
+          "mins": 23,
+          "dur": 1365,
+          "vid": "5RM6JJb3azE",
+          "no": 180
+        },
+        {
+          "id": "rg-XVbl4DHRXQ8",
+          "t": "School Bus Blimp",
+          "season": 9,
+          "mins": 23,
+          "dur": 1364,
+          "vid": "XVbl4DHRXQ8",
+          "no": 181
+        },
+        {
+          "id": "rg-gu_ZpjKHgpc",
+          "t": "Coup de Grass",
+          "season": 9,
+          "mins": 23,
+          "dur": 1365,
+          "vid": "gu_ZpjKHgpc",
+          "no": 182
+        },
+        {
+          "id": "rg-iyAmMJDpwDY",
+          "t": "Rent A Wreck",
+          "season": 9,
+          "mins": 23,
+          "dur": 1365,
+          "vid": "iyAmMJDpwDY",
+          "no": 183
+        },
+        {
+          "id": "rg-03zgsALuPvY",
+          "t": "Curse of the Mummy",
+          "season": 9,
+          "mins": 23,
+          "dur": 1364,
+          "vid": "03zgsALuPvY",
+          "no": 184
+        },
+        {
+          "id": "rg-0cxaoxBhPSk",
+          "t": "Roll Out the Barrels",
+          "season": 9,
+          "mins": 23,
+          "dur": 1365,
+          "vid": "0cxaoxBhPSk",
+          "no": 185
+        },
+        {
+          "id": "rg-zRw3eufBEQk",
+          "t": "No Retreat",
+          "season": 9,
+          "mins": 23,
+          "dur": 1364,
+          "vid": "zRw3eufBEQk",
+          "no": 186
+        },
+        {
+          "id": "rg-yKjAlqi_8MU",
+          "t": "The Battle Call",
+          "season": 9,
+          "mins": 23,
+          "dur": 1364,
+          "vid": "yKjAlqi_8MU",
+          "no": 187
+        },
+        {
+          "id": "rg-fx2kBLH8y_0",
+          "t": "Hurricane Doug",
+          "season": 9,
+          "mins": 23,
+          "dur": 1365,
+          "vid": "fx2kBLH8y_0",
+          "no": 188
+        },
+        {
+          "id": "rg-rsJIAJjdGJY",
+          "t": "Guinness World Records",
+          "season": 9,
+          "mins": 23,
+          "dur": 1365,
+          "vid": "rsJIAJjdGJY",
+          "no": 189
+        },
+        {
+          "id": "rg-3pdXkCs3ckc",
+          "t": "The Auto Club",
+          "season": 9,
+          "mins": 23,
+          "dur": 1364,
+          "vid": "3pdXkCs3ckc",
+          "no": 190
+        },
+        {
+          "id": "rg-TGsYgv56qdg",
+          "t": "Too Much Information",
+          "season": 9,
+          "mins": 23,
+          "dur": 1364,
+          "vid": "TGsYgv56qdg",
+          "no": 191
+        },
+        {
+          "id": "rg-nn5Mhws3rbg",
+          "t": "Sausage Envy",
+          "season": 10,
+          "mins": 23,
+          "dur": 1363,
+          "vid": "nn5Mhws3rbg",
+          "no": 193
+        },
+        {
+          "id": "rg-uURUqCj5VMQ",
+          "t": "Foster Child",
+          "season": 10,
+          "mins": 23,
+          "dur": 1362,
+          "vid": "uURUqCj5VMQ",
+          "no": 194
+        },
+        {
+          "id": "rg-NqdUxszTSuw",
+          "t": "What A Dump",
+          "season": 10,
+          "mins": 23,
+          "dur": 1363,
+          "vid": "NqdUxszTSuw",
+          "no": 195
+        },
+        {
+          "id": "rg-EnmHhQsaheA",
+          "t": "Winston's Wedding",
+          "season": 10,
+          "mins": 23,
+          "dur": 1362,
+          "vid": "EnmHhQsaheA",
+          "no": 196
+        },
+        {
+          "id": "rg-gnNnwK0ZJdw",
+          "t": "Man Of The Year",
+          "season": 10,
+          "mins": 23,
+          "dur": 1362,
+          "vid": "gnNnwK0ZJdw",
+          "no": 197
+        },
+        {
+          "id": "rg-KaDPbzEIrXE",
+          "t": "Survivor",
+          "season": 10,
+          "mins": 23,
+          "dur": 1361,
+          "vid": "KaDPbzEIrXE",
+          "no": 198
+        },
+        {
+          "id": "rg-9wvji_1YQho",
+          "t": "Historic Site",
+          "season": 10,
+          "mins": 23,
+          "dur": 1362,
+          "vid": "9wvji_1YQho",
+          "no": 199
+        },
+        {
+          "id": "rg-KAYl5PtS-PQ",
+          "t": "Twinning",
+          "season": 10,
+          "mins": 23,
+          "dur": 1361,
+          "vid": "KAYl5PtS-PQ",
+          "no": 200
+        },
+        {
+          "id": "rg-_Atp9bCo-Bo",
+          "t": "Lunar Eclipse",
+          "season": 10,
+          "mins": 23,
+          "dur": 1363,
+          "vid": "_Atp9bCo-Bo",
+          "no": 201
+        },
+        {
+          "id": "rg-2ZvWXfbiG2k",
+          "t": "Barter Starter",
+          "season": 10,
+          "mins": 23,
+          "dur": 1363,
+          "vid": "2ZvWXfbiG2k",
+          "no": 202
+        },
+        {
+          "id": "rg-_UXDNjsV1GE",
+          "t": "Out Of The Woods",
+          "season": 10,
+          "mins": 23,
+          "dur": 1362,
+          "vid": "_UXDNjsV1GE",
+          "no": 203
+        },
+        {
+          "id": "rg-Zl6fCaSRH6U",
+          "t": "Cheap Jeep",
+          "season": 10,
+          "mins": 23,
+          "dur": 1356,
+          "vid": "Zl6fCaSRH6U",
+          "no": 204
+        },
+        {
+          "id": "rg-iVvO1GD0pQo",
+          "t": "DNA All The Way",
+          "season": 10,
+          "mins": 23,
+          "dur": 1361,
+          "vid": "iVvO1GD0pQo",
+          "no": 205
+        },
+        {
+          "id": "rg-9Gvi4sOJe-0",
+          "t": "Who Wants To Be a Smart Guy",
+          "season": 10,
+          "mins": 23,
+          "dur": 1361,
+          "vid": "9Gvi4sOJe-0",
+          "no": 206
+        },
+        {
+          "id": "rg-OglINZ3bdlQ",
+          "t": "The Beaver Dam",
+          "season": 10,
+          "mins": 23,
+          "dur": 1361,
+          "vid": "OglINZ3bdlQ",
+          "no": 207
+        },
+        {
+          "id": "rg-7U1kcam2nSg",
+          "t": "The Dandruff Foundation",
+          "season": 10,
+          "mins": 23,
+          "dur": 1361,
+          "vid": "7U1kcam2nSg",
+          "no": 208
+        },
+        {
+          "id": "rg-aPJd-zq7kqs",
+          "t": "Damn You Emu",
+          "season": 10,
+          "mins": 23,
+          "dur": 1361,
+          "vid": "aPJd-zq7kqs",
+          "no": 209
+        },
+        {
+          "id": "rg-naJ18PUo55o",
+          "t": "No Duct Tape",
+          "season": 10,
+          "mins": 23,
+          "dur": 1361,
+          "vid": "naJ18PUo55o",
+          "no": 210
+        },
+        {
+          "id": "rg-5UaajE_g5l8",
+          "t": "New Job In Town",
+          "season": 11,
+          "mins": 23,
+          "dur": 1360,
+          "vid": "5UaajE_g5l8",
+          "no": 211
+        },
+        {
+          "id": "rg-UbwugRaJ1ac",
+          "t": "Gladiator",
+          "season": 11,
+          "mins": 23,
+          "dur": 1360,
+          "vid": "UbwugRaJ1ac",
+          "no": 212
+        },
+        {
+          "id": "rg-ziDK9khHw3c",
+          "t": "The Whooping Crane",
+          "season": 11,
+          "mins": 23,
+          "dur": 1360,
+          "vid": "ziDK9khHw3c",
+          "no": 213
+        },
+        {
+          "id": "rg-iI10MduiNoE",
+          "t": "Back to Nature",
+          "season": 11,
+          "mins": 23,
+          "dur": 1360,
+          "vid": "iI10MduiNoE",
+          "no": 214
+        },
+        {
+          "id": "rg-rCiXRPTh5I4",
+          "t": "Dalton's Hot Gift",
+          "season": 11,
+          "mins": 23,
+          "dur": 1360,
+          "vid": "rCiXRPTh5I4",
+          "no": 215
+        },
+        {
+          "id": "rg-v2beTMJ2vq0",
+          "t": "Viva Les Possums",
+          "season": 11,
+          "mins": 23,
+          "dur": 1360,
+          "vid": "v2beTMJ2vq0",
+          "no": 216
+        },
+        {
+          "id": "rg-GRmeKpp3FKU",
+          "t": "Y2 Cans",
+          "season": 11,
+          "mins": 23,
+          "dur": 1360,
+          "vid": "GRmeKpp3FKU",
+          "no": 217
+        },
+        {
+          "id": "rg-fJopUtKxEbk",
+          "t": "The Ghost of Possum Lodge",
+          "season": 11,
+          "mins": 23,
+          "dur": 1360,
+          "vid": "fJopUtKxEbk",
+          "no": 218
+        },
+        {
+          "id": "rg-MpJM4Y1ajew",
+          "t": "The Chainsaw Races",
+          "season": 11,
+          "mins": 23,
+          "dur": 1360,
+          "vid": "MpJM4Y1ajew",
+          "no": 219
+        },
+        {
+          "id": "rg-4TeMHhXfSNM",
+          "t": "Something In The Heir",
+          "season": 11,
+          "mins": 23,
+          "dur": 1360,
+          "vid": "4TeMHhXfSNM",
+          "no": 220
+        },
+        {
+          "id": "rg-2nPyFW4Rq5Q",
+          "t": "Daredevil",
+          "season": 11,
+          "mins": 23,
+          "dur": 1360,
+          "vid": "2nPyFW4Rq5Q",
+          "no": 221
+        },
+        {
+          "id": "rg-dWTKXVCW8HU",
+          "t": "Mike Goes Straight",
+          "season": 11,
+          "mins": 23,
+          "dur": 1360,
+          "vid": "dWTKXVCW8HU",
+          "no": 222
+        },
+        {
+          "id": "rg-bZRgW1-yRiM",
+          "t": "Xmas In July",
+          "season": 11,
+          "mins": 23,
+          "dur": 1360,
+          "vid": "bZRgW1-yRiM",
+          "no": 223
+        },
+        {
+          "id": "rg-s5XayitYb50",
+          "t": "The Fishing Derby",
+          "season": 11,
+          "mins": 23,
+          "dur": 1360,
+          "vid": "s5XayitYb50",
+          "no": 224
+        },
+        {
+          "id": "rg-U-UXAh22INg",
+          "t": "Masquerade Marathon",
+          "season": 11,
+          "mins": 23,
+          "dur": 1360,
+          "vid": "U-UXAh22INg",
+          "no": 225
+        },
+        {
+          "id": "rg-wpEwIumb1Go",
+          "t": "Harold's Dilemma",
+          "season": 11,
+          "mins": 23,
+          "dur": 1360,
+          "vid": "wpEwIumb1Go",
+          "no": 226
+        },
+        {
+          "id": "rg-kmJlwrUkoC8",
+          "t": "Go Fish",
+          "season": 12,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "kmJlwrUkoC8",
+          "no": 228
+        },
+        {
+          "id": "rg-4Ofc-sEd1OI",
+          "t": "The Possum Ponderosa",
+          "season": 12,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "4Ofc-sEd1OI",
+          "no": 229
+        },
+        {
+          "id": "rg-PfaGuo0sNLY",
+          "t": "Possum Air",
+          "season": 12,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "PfaGuo0sNLY",
+          "no": 230
+        },
+        {
+          "id": "rg-6jlV6ohRlDg",
+          "t": "The IQ Test",
+          "season": 12,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "6jlV6ohRlDg",
+          "no": 231
+        },
+        {
+          "id": "rg-VgiSShgx_lo",
+          "t": "The Day Of The Sunflowers",
+          "season": 12,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "VgiSShgx_lo",
+          "no": 232
+        },
+        {
+          "id": "rg-te5qX4nDuDE",
+          "t": "Reality Television",
+          "season": 12,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "te5qX4nDuDE",
+          "no": 233
+        },
+        {
+          "id": "rg-j-3LYyoi4Ts",
+          "t": "Possum Lodge Provincial Park",
+          "season": 12,
+          "mins": 22,
+          "dur": 1339,
+          "vid": "j-3LYyoi4Ts",
+          "no": 234
+        },
+        {
+          "id": "rg-42djPSZ530Q",
+          "t": "The Silver Wasp",
+          "season": 12,
+          "mins": 22,
+          "dur": 1339,
+          "vid": "42djPSZ530Q",
+          "no": 235
+        },
+        {
+          "id": "rg-PmlotNx0Vfo",
+          "t": "A Lot Like Christmas",
+          "season": 12,
+          "mins": 22,
+          "dur": 1346,
+          "vid": "PmlotNx0Vfo",
+          "no": 236
+        },
+        {
+          "id": "rg-wE6qdypK1a4",
+          "t": "Snowed In",
+          "season": 12,
+          "mins": 22,
+          "dur": 1341,
+          "vid": "wE6qdypK1a4",
+          "no": 237
+        },
+        {
+          "id": "rg-59Xf1Cbnoks",
+          "t": "The Go Go Bars",
+          "season": 12,
+          "mins": 22,
+          "dur": 1341,
+          "vid": "59Xf1Cbnoks",
+          "no": 238
+        },
+        {
+          "id": "rg-dJZb__Gvp94",
+          "t": "The Missile Crisis",
+          "season": 12,
+          "mins": 22,
+          "dur": 1341,
+          "vid": "dJZb__Gvp94",
+          "no": 239
+        },
+        {
+          "id": "rg-5sF-nk21DNw",
+          "t": "Never Send A Man",
+          "season": 12,
+          "mins": 22,
+          "dur": 1341,
+          "vid": "5sF-nk21DNw",
+          "no": 240
+        },
+        {
+          "id": "rg-sAPg-hmFtLE",
+          "t": "Power Struggle",
+          "season": 12,
+          "mins": 22,
+          "dur": 1341,
+          "vid": "sAPg-hmFtLE",
+          "no": 241
+        },
+        {
+          "id": "rg-E6IN_WDfQO4",
+          "t": "Mr. Possum Lake",
+          "season": 12,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "E6IN_WDfQO4",
+          "no": 242
+        },
+        {
+          "id": "rg-9xuYOfh1WnI",
+          "t": "Red And Breakfast",
+          "season": 12,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "9xuYOfh1WnI",
+          "no": 243
+        },
+        {
+          "id": "rg-_SCqGJOggy8",
+          "t": "The Moosetrap",
+          "season": 12,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "_SCqGJOggy8",
+          "no": 244
+        },
+        {
+          "id": "rg-XEt512yMAUU",
+          "t": "Stupid Cupid",
+          "season": 12,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "XEt512yMAUU",
+          "no": 245
+        },
+        {
+          "id": "rg-8zWBZ2JZNXM",
+          "t": "You've Got Oil",
+          "season": 13,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "8zWBZ2JZNXM",
+          "no": 246
+        },
+        {
+          "id": "rg-5Xqf0vitYfo",
+          "t": "The Drive-Thru",
+          "season": 13,
+          "mins": 22,
+          "dur": 1341,
+          "vid": "5Xqf0vitYfo",
+          "no": 247
+        },
+        {
+          "id": "rg-hOgg2rsNujM",
+          "t": "School Demo",
+          "season": 13,
+          "mins": 22,
+          "dur": 1341,
+          "vid": "hOgg2rsNujM",
+          "no": 248
+        },
+        {
+          "id": "rg-PKig5aYGP-k",
+          "t": "Change Will Do You Good",
+          "season": 13,
+          "mins": 22,
+          "dur": 1341,
+          "vid": "PKig5aYGP-k",
+          "no": 249
+        },
+        {
+          "id": "rg-ZzHjPOnk61Q",
+          "t": "The Earring",
+          "season": 13,
+          "mins": 22,
+          "dur": 1341,
+          "vid": "ZzHjPOnk61Q",
+          "no": 250
+        },
+        {
+          "id": "rg-URxDFiyFNjI",
+          "t": "Mailbox Wars",
+          "season": 13,
+          "mins": 22,
+          "dur": 1341,
+          "vid": "URxDFiyFNjI",
+          "no": 251
+        },
+        {
+          "id": "rg-yBrYnONjv6U",
+          "t": "The String Ball",
+          "season": 13,
+          "mins": 22,
+          "dur": 1341,
+          "vid": "yBrYnONjv6U",
+          "no": 252
+        },
+        {
+          "id": "rg-5MNEAYCtTKo",
+          "t": "The Spelling Bee",
+          "season": 13,
+          "mins": 22,
+          "dur": 1341,
+          "vid": "5MNEAYCtTKo",
+          "no": 253
+        },
+        {
+          "id": "rg-q-kz6mHEeTE",
+          "t": "Pay It Forward",
+          "season": 13,
+          "mins": 22,
+          "dur": 1341,
+          "vid": "q-kz6mHEeTE",
+          "no": 254
+        },
+        {
+          "id": "rg-XJxWeCWJJnQ",
+          "t": "Possum Day",
+          "season": 13,
+          "mins": 22,
+          "dur": 1341,
+          "vid": "XJxWeCWJJnQ",
+          "no": 255
+        },
+        {
+          "id": "rg-27NdtOI6Gkk",
+          "t": "The Boat Ramp",
+          "season": 13,
+          "mins": 22,
+          "dur": 1341,
+          "vid": "27NdtOI6Gkk",
+          "no": 256
+        },
+        {
+          "id": "rg-lV0WHKmA_K0",
+          "t": "Comrade Harold",
+          "season": 13,
+          "mins": 22,
+          "dur": 1341,
+          "vid": "lV0WHKmA_K0",
+          "no": 257
+        },
+        {
+          "id": "rg-RwFvmyYKoE8",
+          "t": "Spokesman Red",
+          "season": 13,
+          "mins": 22,
+          "dur": 1341,
+          "vid": "RwFvmyYKoE8",
+          "no": 258
+        },
+        {
+          "id": "rg-Bc-KPiRljjU",
+          "t": "The Chain Letter",
+          "season": 13,
+          "mins": 22,
+          "dur": 1341,
+          "vid": "Bc-KPiRljjU",
+          "no": 259
+        },
+        {
+          "id": "rg-S-dSmQbq4D4",
+          "t": "The Women's Circle",
+          "season": 13,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "S-dSmQbq4D4",
+          "no": 260
+        },
+        {
+          "id": "rg-33MVXDXyMFY",
+          "t": "Ranger Harold",
+          "season": 13,
+          "mins": 22,
+          "dur": 1341,
+          "vid": "33MVXDXyMFY",
+          "no": 261
+        },
+        {
+          "id": "rg-KOZMSNz-th8",
+          "t": "The Sink Hole",
+          "season": 13,
+          "mins": 22,
+          "dur": 1341,
+          "vid": "KOZMSNz-th8",
+          "no": 262
+        },
+        {
+          "id": "rg-xAAOUczPfBI",
+          "t": "Cyber Girl",
+          "season": 13,
+          "mins": 22,
+          "dur": 1341,
+          "vid": "xAAOUczPfBI",
+          "no": 263
+        },
+        {
+          "id": "rg-buC98P_VDKs",
+          "t": "Red's Hot Sauce",
+          "season": 14,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "buC98P_VDKs",
+          "no": 264
+        },
+        {
+          "id": "rg-mEUfFMYbLWU",
+          "t": "Life Is A Circus",
+          "season": 14,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "mEUfFMYbLWU",
+          "no": 265
+        },
+        {
+          "id": "rg-pEFmFbf3bFs",
+          "t": "One More To The Well",
+          "season": 14,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "pEFmFbf3bFs",
+          "no": 266
+        },
+        {
+          "id": "rg-2tvx9BZdn-g",
+          "t": "The Statue",
+          "season": 14,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "2tvx9BZdn-g",
+          "no": 267
+        },
+        {
+          "id": "rg-5H1G-zDVI9E",
+          "t": "False Idol",
+          "season": 14,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "5H1G-zDVI9E",
+          "no": 268
+        },
+        {
+          "id": "rg-rRplBkmEs6g",
+          "t": "Harold's One and Only",
+          "season": 14,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "rRplBkmEs6g",
+          "no": 269
+        },
+        {
+          "id": "rg-Um2nkyjA1NY",
+          "t": "The Grapes of Wrath",
+          "season": 14,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "Um2nkyjA1NY",
+          "no": 270
+        },
+        {
+          "id": "rg-QGxzd18YLY4",
+          "t": "The Lodge Election",
+          "season": 14,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "QGxzd18YLY4",
+          "no": 271
+        },
+        {
+          "id": "rg-fyXP9jLuwkU",
+          "t": "Ticket To Fame",
+          "season": 14,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "fyXP9jLuwkU",
+          "no": 272
+        },
+        {
+          "id": "rg-yiDpEuN6eHw",
+          "t": "Stay Tuned",
+          "season": 14,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "yiDpEuN6eHw",
+          "no": 273
+        },
+        {
+          "id": "rg-SOweWsNG1EA",
+          "t": "The Butter Man",
+          "season": 14,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "SOweWsNG1EA",
+          "no": 274
+        },
+        {
+          "id": "rg-6aUZBPKe22I",
+          "t": "Red Green Insurance",
+          "season": 14,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "6aUZBPKe22I",
+          "no": 275
+        },
+        {
+          "id": "rg-G2PLIGxysuo",
+          "t": "Lodge Luau",
+          "season": 14,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "G2PLIGxysuo",
+          "no": 276
+        },
+        {
+          "id": "rg-byKiHBR05ho",
+          "t": "Hoard of the Flies",
+          "season": 14,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "byKiHBR05ho",
+          "no": 277
+        },
+        {
+          "id": "rg-CL24DTEGoB0",
+          "t": "A Shot in the Dark",
+          "season": 14,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "CL24DTEGoB0",
+          "no": 278
+        },
+        {
+          "id": "rg-A0sg1Hk50sc",
+          "t": "Bye Bye Bonnie",
+          "season": 14,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "A0sg1Hk50sc",
+          "no": 279
+        },
+        {
+          "id": "rg-P5Y4RV8pcY0",
+          "t": "Fishy Canusa Games",
+          "season": 14,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "P5Y4RV8pcY0",
+          "no": 280
+        },
+        {
+          "id": "rg-LeD0uAOdfYc",
+          "t": "The Possum Drop",
+          "season": 14,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "LeD0uAOdfYc",
+          "no": 281
+        },
+        {
+          "id": "rg--b4-k_rYV70",
+          "t": "Rules of Engagement",
+          "season": 15,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "-b4-k_rYV70",
+          "no": 282
+        },
+        {
+          "id": "rg-032TumQEW8o",
+          "t": "The Folk Art Convention",
+          "season": 15,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "032TumQEW8o",
+          "no": 283
+        },
+        {
+          "id": "rg-OxtrGUXoTwo",
+          "t": "Mr Clean",
+          "season": 15,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "OxtrGUXoTwo",
+          "no": 284
+        },
+        {
+          "id": "rg-FOSety3qEIg",
+          "t": "No Tell Boatel",
+          "season": 15,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "FOSety3qEIg",
+          "no": 285
+        },
+        {
+          "id": "rg-ZFhecyzDJEQ",
+          "t": "Cell Hell",
+          "season": 15,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "ZFhecyzDJEQ",
+          "no": 286
+        },
+        {
+          "id": "rg-FqR4vNA3Qeo",
+          "t": "Cart Blanche",
+          "season": 15,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "FqR4vNA3Qeo",
+          "no": 287
+        },
+        {
+          "id": "rg-qteLSNqHPZQ",
+          "t": "New Yorkshire Puddings",
+          "season": 15,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "qteLSNqHPZQ",
+          "no": 288
+        },
+        {
+          "id": "rg-u9KixzsLLJw",
+          "t": "Exit Stag Right",
+          "season": 15,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "u9KixzsLLJw",
+          "no": 289
+        },
+        {
+          "id": "rg-khyhiasNRvE",
+          "t": "Mad You Say?",
+          "season": 15,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "khyhiasNRvE",
+          "no": 290
+        },
+        {
+          "id": "rg-0BMq-ryM5Pk",
+          "t": "There's No Place Like The Home",
+          "season": 15,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "0BMq-ryM5Pk",
+          "no": 291
+        },
+        {
+          "id": "rg-rV6Cm9Rqj6U",
+          "t": "Flying Blind",
+          "season": 15,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "rV6Cm9Rqj6U",
+          "no": 292
+        },
+        {
+          "id": "rg-xNWxFE-SiRY",
+          "t": "The Bigger The Better",
+          "season": 15,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "xNWxFE-SiRY",
+          "no": 293
+        },
+        {
+          "id": "rg-qXmpHimLg0A",
+          "t": "The Big Retreat",
+          "season": 15,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "qXmpHimLg0A",
+          "no": 294
+        },
+        {
+          "id": "rg-yykvv6V3KUg",
+          "t": "Rites Of Passage",
+          "season": 15,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "yykvv6V3KUg",
+          "no": 295
+        },
+        {
+          "id": "rg-RNN8RzHr6YI",
+          "t": "Sasquatch",
+          "season": 15,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "RNN8RzHr6YI",
+          "no": 296
+        },
+        {
+          "id": "rg-hQGePUR-ZCw",
+          "t": "Rain Man",
+          "season": 15,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "hQGePUR-ZCw",
+          "no": 297
+        },
+        {
+          "id": "rg-cBV2Ff-DDdM",
+          "t": "Love Is In The Air",
+          "season": 15,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "cBV2Ff-DDdM",
+          "no": 298
+        },
+        {
+          "id": "rg-SlfeSiz7Fr8",
+          "t": "Toe The Line",
+          "season": 15,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "SlfeSiz7Fr8",
+          "no": 299
+        },
+        {
+          "id": "rg-8q5dfFMre40",
+          "t": "Do As I Do",
+          "season": 15,
+          "mins": 22,
+          "dur": 1340,
+          "vid": "8q5dfFMre40",
+          "no": 300
+        }
+      ]
+    },
+    {
+      "id": "beverly-hillbillies",
+      "title": "The Beverly Hillbillies",
+      "kind": "sitcom",
+      "topic": "sitcoms",
+      "source": "archive",
+      "license": "Public domain: all 36 season-1 episodes and 19 season-2 episodes, because Orion Television (successor to Filmways) did not renew the copyrights. This file has 54 of those 55 (season 1 episode 19 was not on the Archive.org item).",
+      "ads": false,
+      "label": "Archive.org · public domain",
+      "poster": "https://static.tvmaze.com/uploads/images/medium_portrait/11/29898.jpg",
+      "about": "Public-domain episodes from season 1 and early season 2.",
+      "episodes": [
+        {
+          "id": "bh-s01e01",
+          "t": "The Clampetts Strike Oil",
+          "season": 1,
+          "ep": 1,
+          "mins": 25,
+          "dur": 1526,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e01-The-Clampetts-Strike-Oil.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e02",
+          "t": "Getting Settled",
+          "season": 1,
+          "ep": 2,
+          "mins": 26,
+          "dur": 1579,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e02-Getting-Settled.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e03",
+          "t": "Meanwhile, Back at the Cabin",
+          "season": 1,
+          "ep": 3,
+          "mins": 25,
+          "dur": 1503,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e03_Meanwhile_Back_At_The_Cabin.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e04",
+          "t": "The Clampetts Meet Mrs Drysdale",
+          "season": 1,
+          "ep": 4,
+          "mins": 26,
+          "dur": 1575,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e04-The-Clampetts-Meet-Mrs-Drysdale.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e05",
+          "t": "Jed Buys Stock",
+          "season": 1,
+          "ep": 5,
+          "mins": 24,
+          "dur": 1461,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e05_Jed_Buys_Stock.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e06",
+          "t": "Trick Or Treat",
+          "season": 1,
+          "ep": 6,
+          "mins": 25,
+          "dur": 1512,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e06_Trick_Or_Treat.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e07",
+          "t": "The Servants",
+          "season": 1,
+          "ep": 7,
+          "mins": 26,
+          "dur": 1562,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e07-The-Servants.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e08",
+          "t": "Jethro Goes to School",
+          "season": 1,
+          "ep": 8,
+          "mins": 26,
+          "dur": 1581,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e08-Jethro-Goes-to-School.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e09",
+          "t": "Elly's First Date",
+          "season": 1,
+          "ep": 9,
+          "mins": 25,
+          "dur": 1496,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e09_Ellys_First_Date.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e10",
+          "t": "Pygmalion and Elly",
+          "season": 1,
+          "ep": 10,
+          "mins": 26,
+          "dur": 1573,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e10-Pygmalion-and-Elly.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e11",
+          "t": "Elly Races Jethrine",
+          "season": 1,
+          "ep": 11,
+          "mins": 25,
+          "dur": 1492,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e11_Elly_Races_Jethrine.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e12",
+          "t": "The Great Feud",
+          "season": 1,
+          "ep": 12,
+          "mins": 25,
+          "dur": 1494,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e12_The_Great_Fued.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e13",
+          "t": "Home for Christmas",
+          "season": 1,
+          "ep": 13,
+          "mins": 25,
+          "dur": 1507,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e13_Home_For_Christmas.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e14",
+          "t": "No Place Like Home",
+          "season": 1,
+          "ep": 14,
+          "mins": 25,
+          "dur": 1507,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e14_No_Place_Like_Home.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e15",
+          "t": "Jed Rescues Pearl",
+          "season": 1,
+          "ep": 15,
+          "mins": 25,
+          "dur": 1495,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e15_Jed_Rescues_Pearl.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e16",
+          "t": "Back to Californy",
+          "season": 1,
+          "ep": 16,
+          "mins": 25,
+          "dur": 1496,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e16_Back_To_Californy.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e17",
+          "t": "Jed's Dilemma",
+          "season": 1,
+          "ep": 17,
+          "mins": 25,
+          "dur": 1494,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e17_Jeds_Dilemma.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e18",
+          "t": "Jed Saves the Drysdales' Marriage",
+          "season": 1,
+          "ep": 18,
+          "mins": 25,
+          "dur": 1507,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e18_Jed_Saves_The_Drysdales_Marriage.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e20",
+          "t": "Jed Throws a Wingding",
+          "season": 1,
+          "ep": 20,
+          "mins": 23,
+          "dur": 1391,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e20_Jed_Throws_A_WingDing.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e21",
+          "t": "Jed Plays Solomon",
+          "season": 1,
+          "ep": 21,
+          "mins": 25,
+          "dur": 1495,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/S01e21_jedPlaysSolomon.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e22",
+          "t": "Duke Steals A Wife",
+          "season": 1,
+          "ep": 22,
+          "mins": 25,
+          "dur": 1492,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e22_Duke_Steals_A_Wife.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e23",
+          "t": "Jed Buys The Freeway",
+          "season": 1,
+          "ep": 23,
+          "mins": 25,
+          "dur": 1489,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e23_Jed_Buys_The_Freeway.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e24",
+          "t": "Jed Becomes A Banker",
+          "season": 1,
+          "ep": 24,
+          "mins": 25,
+          "dur": 1495,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e24_Jed_Becomes_A_Banker.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e25",
+          "t": "The Family Tree",
+          "season": 1,
+          "ep": 25,
+          "mins": 25,
+          "dur": 1490,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e25_The_Family_Tree.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e26",
+          "t": "Jed Cuts The Family Tree",
+          "season": 1,
+          "ep": 26,
+          "mins": 25,
+          "dur": 1496,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e26_Jed_Cuts_The_Family_tree.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e27",
+          "t": "Granny's Spring Tonic",
+          "season": 1,
+          "ep": 27,
+          "mins": 25,
+          "dur": 1527,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e27-Grannys_Spring_Tonic.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e28",
+          "t": "Jed Pays His Income Tax",
+          "season": 1,
+          "ep": 28,
+          "mins": 25,
+          "dur": 1500,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e28_Jed_Pays_His_Income_Tax.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e29",
+          "t": "The Clampetts and the Dodgers",
+          "season": 1,
+          "ep": 29,
+          "mins": 25,
+          "dur": 1501,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e29_The_Clampetts_And_The_Dodgers.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e30",
+          "t": "Duke Becomes A Father",
+          "season": 1,
+          "ep": 30,
+          "mins": 25,
+          "dur": 1498,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e30_Duke_Becomes_A_Father.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e31",
+          "t": "The Clampetts Entertain",
+          "season": 1,
+          "ep": 31,
+          "mins": 25,
+          "dur": 1506,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e31_The_Clampetts_Entertain.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e32",
+          "t": "The Clampetts in Court",
+          "season": 1,
+          "ep": 32,
+          "mins": 25,
+          "dur": 1529,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e32-The-Clampetts-In-Court.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e33",
+          "t": "The Clampetts Get Psychoanalyzed",
+          "season": 1,
+          "ep": 33,
+          "mins": 25,
+          "dur": 1511,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e33_The_Clampetts_Get_Psychoanalyzed.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e34",
+          "t": "The Psychiatrist Gets Clampetted",
+          "season": 1,
+          "ep": 34,
+          "mins": 25,
+          "dur": 1500,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e34_The_Psychiatrist_Gets_Clampetted.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e35",
+          "t": "Elly Becomes A Secretary",
+          "season": 1,
+          "ep": 35,
+          "mins": 25,
+          "dur": 1496,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e35_Elly_Becomes_A_Secretary.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s01e36",
+          "t": "Jethro's Friend",
+          "season": 1,
+          "ep": 36,
+          "mins": 25,
+          "dur": 1497,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s01e36_Jethros_Friend.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s02e01",
+          "t": "Jed Gets The Misery",
+          "season": 2,
+          "ep": 1,
+          "mins": 25,
+          "dur": 1512,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s02e01_Jed_Gets_The_Misery.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s02e02",
+          "t": "Hair-Raising Holiday",
+          "season": 2,
+          "ep": 2,
+          "mins": 25,
+          "dur": 1502,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s02e02_Hair-Raising_Holiday.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s02e03",
+          "t": "Granny's Garden",
+          "season": 2,
+          "ep": 3,
+          "mins": 25,
+          "dur": 1505,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s02e03_Grannys_Garden.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s02e04",
+          "t": "Elly Starts to School",
+          "season": 2,
+          "ep": 4,
+          "mins": 24,
+          "dur": 1440,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s02e04_Elly_Starts_to_School.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s02e05",
+          "t": "The Clampett Look",
+          "season": 2,
+          "ep": 5,
+          "mins": 25,
+          "dur": 1503,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s02e05_The_Clampett_Look.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s02e06",
+          "t": "Jethro's First Love",
+          "season": 2,
+          "ep": 6,
+          "mins": 25,
+          "dur": 1491,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s02e06_Jethros_First_Love.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s02e07",
+          "t": "Chickadee Returns",
+          "season": 2,
+          "ep": 7,
+          "mins": 25,
+          "dur": 1484,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s02e07_Chickadee_Returns.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s02e08",
+          "t": "The Clampetts Are Overdrawn",
+          "season": 2,
+          "ep": 8,
+          "mins": 25,
+          "dur": 1496,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s02e08_The_Clampetts_Are_Overdrawn.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s02e09",
+          "t": "The Clampetts Go Hollywood",
+          "season": 2,
+          "ep": 9,
+          "mins": 25,
+          "dur": 1488,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s02e09_The_Clampetts_Go_Hollywood.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s02e10",
+          "t": "Turkey Day",
+          "season": 2,
+          "ep": 10,
+          "mins": 25,
+          "dur": 1501,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s02e10_Turkey_Day.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s02e11",
+          "t": "The Garden Party",
+          "season": 2,
+          "ep": 11,
+          "mins": 25,
+          "dur": 1495,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s02e11_The_Garden_Party.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s02e12",
+          "t": "Elly Needs a Maw",
+          "season": 2,
+          "ep": 12,
+          "mins": 25,
+          "dur": 1516,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s02e12-EllyNeedsAMaw.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s02e13",
+          "t": "The Clampetts Get Culture",
+          "season": 2,
+          "ep": 13,
+          "mins": 25,
+          "dur": 1503,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s02e13_The_Clampetts_Get_Culture.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s02e14",
+          "t": "Christmas at the Clampetts",
+          "season": 2,
+          "ep": 14,
+          "mins": 25,
+          "dur": 1494,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s02e14_Christmas_At_The_Clampetts.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s02e15",
+          "t": "A Man for Elly",
+          "season": 2,
+          "ep": 15,
+          "mins": 24,
+          "dur": 1433,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s02e15_A_Man_For_Elly.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s02e16",
+          "t": "The Giant Jackrabbit",
+          "season": 2,
+          "ep": 16,
+          "mins": 25,
+          "dur": 1493,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s02e16_The_Giant_JackRabbit.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s02e17",
+          "t": "The Girl from Home",
+          "season": 2,
+          "ep": 17,
+          "mins": 25,
+          "dur": 1520,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s02e17_The_Girl_From_Home.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s02e18",
+          "t": "Lafe Lingers On",
+          "season": 2,
+          "ep": 18,
+          "mins": 25,
+          "dur": 1471,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s02e18_Lafe_Lingers_On.mp4",
+          "item": "bevhill-s01e01-36"
+        },
+        {
+          "id": "bh-s02e19",
+          "t": "The Race for Queen",
+          "season": 2,
+          "ep": 19,
+          "mins": 25,
+          "dur": 1494,
+          "mp4": "https://archive.org/download/bevhill-s01e01-36/s02e19_The_Race_For_Queen.mp4",
+          "item": "bevhill-s01e01-36"
+        }
+      ]
+    },
+    {
+      "id": "lucy-show",
+      "title": "The Lucy Show",
+      "kind": "sitcom",
+      "topic": "sitcoms",
+      "source": "archive",
+      "license": "Public domain: 30 episodes (2 from season 1, 21 from season 5, 7 from season 6) whose copyrights were not renewed. “Lucy Puts Main Street on the Map” (season 5 episode 18) is still copyrighted and is not included.",
+      "ads": false,
+      "label": "Archive.org · public domain",
+      "poster": "https://static.tvmaze.com/uploads/images/medium_portrait/48/122092.jpg",
+      "about": "The 30 episodes widely documented as having lapsed into the public domain.",
+      "episodes": [
+        {
+          "id": "lucy-s1e18",
+          "t": "Lucy and Viv Put in a Shower",
+          "season": 1,
+          "ep": 18,
+          "mins": 26,
+          "dur": 1543,
+          "mp4": "https://archive.org/download/the-lucy-show/S1E18%20LUCH%20AND%20VIV%20PUT%20IN%20A%20SHOWER.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s1e19",
+          "t": "Lucy's Barbershop Quartet",
+          "season": 1,
+          "ep": 19,
+          "mins": 26,
+          "dur": 1544,
+          "mp4": "https://archive.org/download/the-lucy-show/S1E19%20LUCY%27S%20BARBERSHOP%20QUARTET.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s5e1",
+          "t": "Lucy and George Burns",
+          "season": 5,
+          "ep": 1,
+          "mins": 25,
+          "dur": 1525,
+          "mp4": "https://archive.org/download/the-lucy-show/S5E1%20LUCY%20MEETS%20GEORGE%20BURNS.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s5e2",
+          "t": "Lucy and the Submarine",
+          "season": 5,
+          "ep": 2,
+          "mins": 25,
+          "dur": 1520,
+          "mp4": "https://archive.org/download/the-lucy-show/S5E2%20LUCY%20AND%20THE%20SUBMARINE.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s5e3",
+          "t": "Lucy the Bean Queen",
+          "season": 5,
+          "ep": 3,
+          "mins": 25,
+          "dur": 1527,
+          "mp4": "https://archive.org/download/the-lucy-show/S5E3%20LUCY%20AND%20THE%20BEAN%20QUEEN.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s5e4",
+          "t": "Lucy and Paul Winchell",
+          "season": 5,
+          "ep": 4,
+          "mins": 25,
+          "dur": 1516,
+          "mp4": "https://archive.org/download/the-lucy-show/S5E4%20LUCY%20AND%20PAUL%20WINCHELL.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s5e5",
+          "t": "Lucy and the Ring-a-Ding-Ding",
+          "season": 5,
+          "ep": 5,
+          "mins": 25,
+          "dur": 1508,
+          "mp4": "https://archive.org/download/the-lucy-show/S5E5%20LUCY%20AND%20THE%20RING%20A%20DING%20DING.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s5e6",
+          "t": "Lucy Flies to London",
+          "season": 5,
+          "ep": 6,
+          "mins": 25,
+          "dur": 1520,
+          "mp4": "https://archive.org/download/the-lucy-show/S5E6%20LUCY%20FLIES%20TO%20LONDON.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s5e7",
+          "t": "Lucy Gets a Roommate",
+          "season": 5,
+          "ep": 7,
+          "mins": 22,
+          "dur": 1338,
+          "mp4": "https://archive.org/download/the-lucy-show/S5E7%20LUCY%20GETS%20A%20ROOMMATE.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s5e8",
+          "t": "Lucy and Carol in Palm Springs",
+          "season": 5,
+          "ep": 8,
+          "mins": 22,
+          "dur": 1349,
+          "mp4": "https://archive.org/download/the-lucy-show/S5E8%20LUCY%20AND%20CAROL%20IN%20PALM%20SPRINGS.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s5e9",
+          "t": "Lucy Gets Caught Up in the Draft",
+          "season": 5,
+          "ep": 9,
+          "mins": 25,
+          "dur": 1529,
+          "mp4": "https://archive.org/download/the-lucy-show/S5E9%20LUCY%20GETS%20CAUGHT%20UP%20IN%20THE%20DRAFT.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s5e10",
+          "t": "Lucy and John Wayne",
+          "season": 5,
+          "ep": 10,
+          "mins": 25,
+          "dur": 1513,
+          "mp4": "https://archive.org/download/the-lucy-show/S5E10%20LUCY%20AND%20JOHN%20WAYNE.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s5e11",
+          "t": "Lucy and Pat Collins",
+          "season": 5,
+          "ep": 11,
+          "mins": 25,
+          "dur": 1524,
+          "mp4": "https://archive.org/download/the-lucy-show/S5E11%20LUCY%20AND%20PAT%20COLLINS.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s5e12",
+          "t": "Lucy and the Monkey",
+          "season": 5,
+          "ep": 12,
+          "mins": 22,
+          "dur": 1342,
+          "mp4": "https://archive.org/download/the-lucy-show/S5E12%20LUCY%20AND%20THE%20MONKEY.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s5e13",
+          "t": "Lucy and Phil Silvers",
+          "season": 5,
+          "ep": 13,
+          "mins": 22,
+          "dur": 1347,
+          "mp4": "https://archive.org/download/the-lucy-show/S5E13%20LUCY%20AND%20THE%20EFFICIENCY%20EXPERT.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s5e14",
+          "t": "Lucy's Substitute Secretary",
+          "season": 5,
+          "ep": 14,
+          "mins": 25,
+          "dur": 1525,
+          "mp4": "https://archive.org/download/the-lucy-show/S5E14%20LUCY%27S%20SUBSTITUTE%20SECRETARY.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s5e15",
+          "t": "Viv Visits Lucy",
+          "season": 5,
+          "ep": 15,
+          "mins": 22,
+          "dur": 1343,
+          "mp4": "https://archive.org/download/the-lucy-show/S5E15%20VIV%20VISITS%20LUCY.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s5e16",
+          "t": "Lucy the Babysitter",
+          "season": 5,
+          "ep": 16,
+          "mins": 22,
+          "dur": 1341,
+          "mp4": "https://archive.org/download/the-lucy-show/S5E16%20LUCY%20THE%20BABYSITTER.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s5e17",
+          "t": "Main Street U.S.A.",
+          "season": 5,
+          "ep": 17,
+          "mins": 22,
+          "dur": 1343,
+          "mp4": "https://archive.org/download/the-lucy-show/S5E17%20MAIN%20STREET%20U.S.A.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s5e19",
+          "t": "Lucy Meets the Law",
+          "season": 5,
+          "ep": 19,
+          "mins": 25,
+          "dur": 1526,
+          "mp4": "https://archive.org/download/the-lucy-show/S5E19%20LUCY%20MEETS%20THE%20LAW.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s5e20",
+          "t": "Lucy the Fight Manager",
+          "season": 5,
+          "ep": 20,
+          "mins": 25,
+          "dur": 1523,
+          "mp4": "https://archive.org/download/the-lucy-show/S5E20%20LUCY%20THE%20FIGHT%20MANAGER.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s5e21",
+          "t": "Lucy and Tennessee Ernie Ford",
+          "season": 5,
+          "ep": 21,
+          "mins": 25,
+          "dur": 1528,
+          "mp4": "https://archive.org/download/the-lucy-show/S5E21%20LUCY%20MEETS%20TENNESSEE%20ERNIE%20FORD.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s5e22",
+          "t": "Lucy Meets Sheldon Leonard",
+          "season": 5,
+          "ep": 22,
+          "mins": 25,
+          "dur": 1523,
+          "mp4": "https://archive.org/download/the-lucy-show/S5E22%20LUCY%20MEETS%20SHELDON%20LEONARD.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s6e1",
+          "t": "Lucy Meets the Berles",
+          "season": 6,
+          "ep": 1,
+          "mins": 25,
+          "dur": 1522,
+          "mp4": "https://archive.org/download/the-lucy-show/S6E1%20LUCY%20MEETS%20THE%20BERLES.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s6e2",
+          "t": "Lucy Gets Trapped",
+          "season": 6,
+          "ep": 2,
+          "mins": 25,
+          "dur": 1499,
+          "mp4": "https://archive.org/download/the-lucy-show/S6E2%20LUCY%20GETS%20TRAPPED.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s6e3",
+          "t": "Lucy and the French Movie Star",
+          "season": 6,
+          "ep": 3,
+          "mins": 25,
+          "dur": 1523,
+          "mp4": "https://archive.org/download/the-lucy-show/S6E3%20LUCY%20AND%20THE%20FRENCH%20MOVIE%20STAR.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s6e4",
+          "t": "Lucy the Starmaker",
+          "season": 6,
+          "ep": 4,
+          "mins": 25,
+          "dur": 1525,
+          "mp4": "https://archive.org/download/the-lucy-show/S6E4%20LUCY%20AND%20THE%20STARMAKER.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s6e6",
+          "t": "Lucy Gets Jack Benny's Account",
+          "season": 6,
+          "ep": 6,
+          "mins": 25,
+          "dur": 1517,
+          "mp4": "https://archive.org/download/the-lucy-show/S6E6%20LUCY%20GETS%20JACK%20BENNY%27S%20ACCOUNT.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s6e7",
+          "t": "Little Old Lucy",
+          "season": 6,
+          "ep": 7,
+          "mins": 22,
+          "dur": 1348,
+          "mp4": "https://archive.org/download/the-lucy-show/S6E7%20LITTLE%20OLD%20LUCY.mp4",
+          "item": "the-lucy-show"
+        },
+        {
+          "id": "lucy-s6e8",
+          "t": "Lucy Meets Robert Goulet",
+          "season": 6,
+          "ep": 8,
+          "mins": 25,
+          "dur": 1527,
+          "mp4": "https://archive.org/download/the-lucy-show/S6E8%20LUCY%20AND%20ROBERT%20GOULET.mp4",
+          "item": "the-lucy-show"
+        }
+      ]
+    },
+    {
+      "id": "andy-griffith",
+      "title": "The Andy Griffith Show",
+      "kind": "sitcom",
+      "topic": "sitcoms",
+      "source": "archive",
+      "license": "Public domain: 16 season-3 episodes lapsed. Only the two items below had a Creative Commons public-domain mark and a working mp4 when checked.",
+      "ads": false,
+      "label": "Archive.org · public domain",
+      "poster": "https://static.tvmaze.com/uploads/images/medium_portrait/494/1235133.jpg",
+      "about": "Two of the 16 public-domain season-3 episodes, the ones we could confirm with a public-domain licence and a playable file.",
+      "episodes": [
+        {
+          "id": "ags-s3e23",
+          "t": "Andy Discovers America",
+          "season": 3,
+          "ep": 23,
+          "mins": 26,
+          "dur": 1530,
+          "mp4": "https://archive.org/download/Andy-Griffith-Show_Andy-Discovers-America/AndyGriffithShow_AndyDiscoversAmerica_512kb.mp4",
+          "item": "Andy-Griffith-Show_Andy-Discovers-America"
+        },
+        {
+          "id": "ags-s3e32",
+          "t": "The Big House",
+          "season": 3,
+          "ep": 32,
+          "mins": 23,
+          "dur": 1366,
+          "mp4": "https://archive.org/download/Andy_Griffith_The_Bighouse/Bighouse_512kb.mp4",
+          "item": "Andy_Griffith_The_Bighouse"
+        }
+      ]
+    },
+    {
+      "id": "mr-bean",
+      "title": "Mr. Bean",
+      "kind": "comedy",
+      "topic": "sitcoms",
+      "source": "youtube",
+      "channel": "MrBean",
+      "channelId": "UCkAGrHCLFmlK3H2kd6isipg",
+      "official": true,
+      "ads": true,
+      "label": "YouTube · may show ads",
+      "poster": "https://static.tvmaze.com/uploads/images/medium_portrait/45/113952.jpg",
+      "about": "The 14 official live-action full episodes on the Mr Bean Official channel.",
+      "episodes": [
+        {
+          "id": "bean-YEjMK9DB4no",
+          "t": "Mr. Bean",
+          "ep": 1,
+          "season": 1,
+          "mins": 25,
+          "dur": 1508,
+          "vid": "YEjMK9DB4no"
+        },
+        {
+          "id": "bean-r1NsFQUZhb8",
+          "t": "The Return of Mr. Bean",
+          "ep": 2,
+          "season": 1,
+          "mins": 25,
+          "dur": 1499,
+          "vid": "r1NsFQUZhb8"
+        },
+        {
+          "id": "bean-K_bX_jX9O8w",
+          "t": "The Curse of Mr. Bean",
+          "ep": 3,
+          "season": 1,
+          "mins": 25,
+          "dur": 1473,
+          "vid": "K_bX_jX9O8w"
+        },
+        {
+          "id": "bean-dUU7RAiLWrk",
+          "t": "Mr. Bean Goes to Town",
+          "ep": 4,
+          "season": 1,
+          "mins": 24,
+          "dur": 1451,
+          "vid": "dUU7RAiLWrk"
+        },
+        {
+          "id": "bean-YKv90WGMtGI",
+          "t": "The Trouble with Mr. Bean",
+          "ep": 5,
+          "season": 1,
+          "mins": 25,
+          "dur": 1472,
+          "vid": "YKv90WGMtGI"
+        },
+        {
+          "id": "bean-Rz_Hj-Fo-EU",
+          "t": "Mr. Bean Rides Again",
+          "ep": 6,
+          "season": 1,
+          "mins": 24,
+          "dur": 1422,
+          "vid": "Rz_Hj-Fo-EU"
+        },
+        {
+          "id": "bean-L2UCRNldC3s",
+          "t": "Merry Christmas, Mr. Bean",
+          "ep": 7,
+          "season": 1,
+          "mins": 25,
+          "dur": 1522,
+          "vid": "L2UCRNldC3s"
+        },
+        {
+          "id": "bean-Yi9207WmpTc",
+          "t": "Mr. Bean in Room 426",
+          "ep": 8,
+          "season": 1,
+          "mins": 24,
+          "dur": 1462,
+          "vid": "Yi9207WmpTc"
+        },
+        {
+          "id": "bean-IqFGj837W9A",
+          "t": "Do-It-Yourself Mr. Bean",
+          "ep": 9,
+          "season": 1,
+          "mins": 25,
+          "dur": 1499,
+          "vid": "IqFGj837W9A"
+        },
+        {
+          "id": "bean-JFf2GqonpR0",
+          "t": "Mind the Baby, Mr. Bean",
+          "ep": 10,
+          "season": 1,
+          "mins": 24,
+          "dur": 1460,
+          "vid": "JFf2GqonpR0"
+        },
+        {
+          "id": "bean-RVonJchNPEA",
+          "t": "Back to School Mr. Bean",
+          "ep": 11,
+          "season": 1,
+          "mins": 24,
+          "dur": 1470,
+          "vid": "RVonJchNPEA"
+        },
+        {
+          "id": "bean-WDrlalXfxec",
+          "t": "Tee Off, Mr. Bean",
+          "ep": 12,
+          "season": 1,
+          "mins": 25,
+          "dur": 1498,
+          "vid": "WDrlalXfxec"
+        },
+        {
+          "id": "bean-A_S0PQkwO5E",
+          "t": "Goodnight Mr. Bean",
+          "ep": 13,
+          "season": 1,
+          "mins": 24,
+          "dur": 1436,
+          "vid": "A_S0PQkwO5E"
+        },
+        {
+          "id": "bean-hz_e7SRecWw",
+          "t": "Hair by Mr. Bean of London",
+          "ep": 14,
+          "season": 1,
+          "mins": 26,
+          "dur": 1566,
+          "vid": "hz_e7SRecWw"
+        }
+      ]
+    }
+  ]
+}

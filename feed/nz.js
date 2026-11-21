@@ -160,7 +160,7 @@
       <p class="plsrc">Event Cinemas · cinema 503 · eventcinemas.co.nz</p></div></article>`;
   }
   function cineish(x) {
-    return x && (x.x === 'cine' || x.x === 'sportask' || x.x === 'relask' || (x.x === 'row' && (x.k === 'cine' || x.k === 'whg-ev' || x.k === 'whg-dev' || x.k === 'akl-con' || x.k === 'top40' || x.k === 'religion' || x.k === 'vidrow')));
+    return x && (x.x === 'cine' || x.x === 'sportask' || x.x === 'relask' || (x.x === 'row' && (x.k === 'cine' || x.k === 'whg-ev' || x.k === 'whg-dev' || x.k === 'akl-con' || x.k === 'top40' || x.k === 'religion' || x.k === 'vidrow' || x.k === 'ondemand')));
   }
   function insertCinema(order, nPins, filmOrFilms, now) {
     const list = !filmOrFilms ? [] : (Array.isArray(filmOrFilms) ? filmOrFilms : [filmOrFilms]);
@@ -223,7 +223,7 @@ function presentVideos(order) {
         if (fate === 'drop') continue;
         (fate === 'full' || it.vid || it.x === 'vlog' ? vids : keep).push(it);
       }
-      if (i.k === 'cine' || i.k === 'whg-ev' || i.k === 'whg-dev' || i.k === 'akl-con' || i.k === 'top40' || i.k === 'religion' || i.k === 'vidrow') {
+      if (i.k === 'cine' || i.k === 'whg-ev' || i.k === 'whg-dev' || i.k === 'akl-con' || i.k === 'top40' || i.k === 'religion' || i.k === 'vidrow' || i.k === 'ondemand') {
         const items = keep.concat(vids);
         if (items.length) out.push(Object.assign({}, i, { items: items }));
         continue;

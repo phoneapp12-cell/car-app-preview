@@ -229,13 +229,14 @@
       <button type="button" class="${on('all')}" data-tab="all"><span class="ic">▦</span>Today</button>
       <button type="button" class="${on('notif')}" data-tab="notif" aria-label="Notifications${nLabel}"><span class="ic ib-nbell"><svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 3.2a6.2 6.2 0 0 1 6.2 6.2v3.05l1.5 2.85a.95.95 0 0 1-.85 1.4H5.15a.95.95 0 0 1-.85-1.4l1.5-2.85V9.4A6.2 6.2 0 0 1 12 3.2Zm0 16.3a2.35 2.35 0 0 0 2.2-1.45H9.8A2.35 2.35 0 0 0 12 19.5Z"/></svg>${badge}</span>Notices</button>
       <button type="button" class="${on('games')}" data-tab="games"><span class="ic">✦</span>Games</button>
-      <button type="button" class="${on('you')}" data-tab="you"><span class="ic">◉</span>You</button>`;
+      <button type="button" class="${on('ondemand')}" data-tab="ondemand" aria-label="On demand"><span class="ic ib-odic"><svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><path fill="currentColor" d="M4.2 5.2A2 2 0 0 1 6.2 3.2h11.6a2 2 0 0 1 2 2v9.2a2 2 0 0 1-2 2h-4.4l.7 2.2h2.1v1.4H7.8v-1.4h2.1l.7-2.2H6.2a2 2 0 0 1-2-2V5.2Zm6.3 2.05v5.1l4.4-2.55-4.4-2.55Z"/></svg></span>On demand</button>`;
     document.documentElement.classList.toggle('ib-tab-all', t === 'all');
     document.documentElement.classList.toggle('ib-tab-family', t === 'family');
     document.documentElement.classList.toggle('ib-tab-people', t === 'people');
     document.documentElement.classList.toggle('ib-tab-notif', t === 'notif');
     document.documentElement.classList.toggle('ib-tab-games', t === 'games');
     document.documentElement.classList.toggle('ib-tab-you', t === 'you');
+    document.documentElement.classList.toggle('ib-tab-ondemand', t === 'ondemand');
   }
 
   /* ---- People / Games / You ---- */
@@ -382,6 +383,7 @@
       const t = typeof tab !== 'undefined' ? tab : 'all';
       const browse = [];
       browse.push(`<button type="button" class="mfopt${t === 'all' ? ' on' : ''}" data-mftab="all"><span class="mfe">▦</span><span>Today</span>${t === 'all' ? '<i>✓</i>' : ''}</button>`);
+      browse.push(`<button type="button" class="mfopt${t === 'ondemand' ? ' on' : ''}" data-mftab="ondemand"><span class="mfe">▶</span><span>On demand</span>${t === 'ondemand' ? '<i>✓</i>' : ''}</button>`);
       browse.push(`<button type="button" class="mfopt${t === 'notif' ? ' on' : ''}" data-mftab="notif"><span class="mfe">🔔</span><span>Notifications</span>${t === 'notif' ? '<i>✓</i>' : ''}</button>`);
       browse.push(`<button type="button" class="mfopt${t === 'people' ? ' on' : ''}" data-mftab="people"><span class="mfe">☺</span><span>People</span>${t === 'people' ? '<i>✓</i>' : ''}</button>`);
       browse.push(`<button type="button" class="mfopt${t === 'you' ? ' on' : ''}" data-mftab="you"><span class="mfe">◉</span><span>You</span>${t === 'you' ? '<i>✓</i>' : ''}</button>`);
@@ -505,13 +507,14 @@
     window.draw = function () {
       if (window.ibTodoOn || window.ibCalOn) { orig.apply(this, arguments); paintTabs(); ready(); return; }
       const t = typeof tab !== 'undefined' ? tab : 'all';
-      if (t === 'people' || t === 'notif' || t === 'games' || t === 'you') {
+      if (t === 'people' || t === 'notif' || t === 'games' || t === 'you' || t === 'ondemand') {
         try { if (typeof chips === 'function') chips(); } catch (e) { }
         const bf = document.getElementById('backfeed'); if (bf) bf.hidden = true;
         if (t === 'people') drawPeoplePage();
         else if (t === 'notif') { try { if (window.ibNotif && ibNotif.drawPage) ibNotif.drawPage(true); } catch (e) { } }
         else if (t === 'games') drawGamesPage();
-        else drawYouPage();
+        else if (t === 'you') drawYouPage();
+        else if (t === 'ondemand') { try { if (window.ibOnDemand && ibOnDemand.drawPage) ibOnDemand.drawPage(); } catch (e) { } }
         paintTabs(); ready(); return;
       }
       orig.apply(this, arguments);
