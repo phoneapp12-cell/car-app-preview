@@ -420,6 +420,40 @@
       return it && isDirectVideo(it.url) && isPortrait(it.width, it.height) && isAllowedTopic((it.title || '') + ' ' + (it.credit || ''));
     });
   }
+
+  function filterPeertube(items, profile) {
+    const out = [], seen = {};
+    for (const it of items || []) {
+      if (!it || it.vk !== 'peertube') continue;
+      const mp4 = it.ext || it.url;
+      if (!mp4 || !/\.mp4(\?|$)/i.test(mp4)) continue;
+      if (!durationOk(it.vdur)) continue;
+      if (it.vw && it.vh && !isPortrait(it.vw, it.vh)) continue;
+      if (!memberAllows(it, profile)) continue;
+      if (seen[mp4] || seen[it.vu]) continue;
+      if (it.vu) seen[it.vu] = 1;
+      seen[mp4] = 1;
+      out.push({
+        kind: 'mp4', id: 'pt-' + (it.vu || it.id), title: it.t || it.title || 'PeerTube clip',
+        credit: it.sn || 'PeerTube', url: mp4, topic: it.topic || '', src: it.src || '',
+        width: it.vw, height: it.vh, at: it.at
+      });
+    }
+    return out;
+  }
+  function weave(a, b, every) {
+    if (!b || !b.length) return (a || []).slice();
+    if (!a || !a.length) return b.slice();
+    const out = [];
+    let bi = 0, step = Math.max(2, every || 5);
+    for (let i = 0; i < a.length; i++) {
+      out.push(a[i]);
+      if (((i + 1) % step) === 0 && bi < b.length) out.push(b[bi++]);
+    }
+    while (bi < b.length) out.push(b[bi++]);
+    return out;
+  }
+
   function buildCatalog(feed, top40, profile, braynixPack, loves) {
     const items = (feed && feed.items) || feed || [];
     const reddit = filterReddit(items, profile);
@@ -429,8 +463,9 @@
        no longer mixes those clips into the reel. */
     const youtube = [];
     const braynix = braynixClips(braynixPack, profile);
+    const peertube = filterPeertube(items, profile);
     const merged = mergeBraynix(reddit, braynixPack, profile);
-    const mixed = withoutYoutube(loveRank(frontLoad(merged, it => isBraynix(it, braynixPack)), loves || readLoves(), braynixPack));
+    const mixed = withoutYoutube(loveRank(weave(frontLoad(merged, it => isBraynix(it, braynixPack)), peertube, 5), loves || readLoves(), braynixPack));
     return { reddit: merged, braynix, edu, music, youtube, mixed, fallback: filterPortrait(FALLBACK) };
   }
 
@@ -923,7 +958,7 @@
   root.ibShortsClose = close;
   root.ibShorts = {
     isPortrait, isDirectVideo, isAllowedTopic, isAllowedSub, isEduSource, isRedditClip,
-    durationOk, subredditOf, memberAllows, filterReddit, filterEduYoutube, top40Clips,
+    durationOk, subredditOf, memberAllows, filterReddit, filterPeertube, filterEduYoutube, top40Clips, weave,
     mixLane, filterPortrait, buildCatalog, FALLBACK, ALLOW_SUBS, EDU_SRC, MAX_DUR, YT_EVERY,
     isYoutubeClip, withoutYoutube,
     BOOST_SUBS, BOOST_EVERY, isBoosted, boostSource,

@@ -40,7 +40,8 @@ const sample = [
   { vk: 'reddit', vu: 'smile1234', t: 'A kind teacher', url: 'https://www.reddit.com/r/MadeMeSmile/comments/x/kind/', topic: 'kids', src: 'sv-smile', vdur: 30 },
   { vid: 'nasaVid111', t: 'Who Can Be a NASA Astronaut?', src: 'yt-nasa', topic: 'scifi', url: 'https://www.youtube.com/watch?v=nasaVid111' },
   { vid: 'kurzVid111', t: 'What Is Food Fortification?', src: 'fun-kurzgesagt', topic: 'science', url: 'https://www.youtube.com/watch?v=kurzVid111' },
-  { vid: 'dodoVid111', t: 'A rescued puppy', src: 'fun-dodo-all', topic: 'nature', url: 'https://www.youtube.com/watch?v=dodoVid111' }
+  { vid: 'dodoVid111', t: 'A rescued puppy', src: 'fun-dodo-all', topic: 'nature', url: 'https://www.youtube.com/watch?v=dodoVid111' },
+  { vk: 'peertube', vu: 'ptclip001', t: 'Satisfying 3D-Printed Fidget Toys', ext: 'https://tube.blueben.net/download/streaming-playlists/hls/videos/24931bc6-5e83-49e3-9c11-2dd6cf295103-480-fragmented.mp4', url: 'https://tube.blueben.net/videos/watch/24931bc6-5e83-49e3-9c11-2dd6cf295103', topic: 'fun', src: 'pt-blueben', vdur: 43, vw: 480, vh: 852, sn: 'BluebenTube' }
 ];
 const top40 = { songs: [
   { rank: 1, title: 'Babydoll', artist: 'Jamie Miller', videoId: '8g25GeJgxgs' },
@@ -77,7 +78,7 @@ test('the Mixkit list is portrait and only used as a fallback', () => {
   }
   const built = S.buildCatalog({ items: sample }, top40, { optIn: ['pets'] });
   assert.ok(built.mixed.length, 'the feed mix is used when clips exist');
-  assert.ok(built.mixed.every(it => it.kind === 'reddit' || it.kind === 'youtube'));
+  assert.ok(built.mixed.every(it => it.kind === 'reddit' || it.kind === 'youtube' || it.kind === 'mp4'));
   assert.ok(built.mixed.every(it => !it.fallback));
 });
 
@@ -266,3 +267,16 @@ test('playAt does not reset a Short that is already playing', () => {
   assert.match(js, /if \(i === playingI\)/);
   assert.match(js, /if \(i >= 0 && i !== playingI\) playAt\(i\)/);
 });
+
+test('PeerTube portrait MP4s are woven into Shorts and stay family-safe', () => {
+  const S = loadShorts();
+  const pts = S.filterPeertube(sample, { optIn: ['pets'] });
+  assert.equal(pts.length, 1);
+  assert.equal(pts[0].kind, 'mp4');
+  assert.match(pts[0].url, /\.mp4$/);
+  const built = S.buildCatalog({ items: sample }, top40, { optIn: ['pets'] });
+  assert.ok(built.mixed.some(it => it.kind === 'mp4' && it.src === 'pt-blueben'));
+  const blocked = S.filterPeertube([{ ...sample[sample.length - 1], t: 'NSFW fidget' }], { optIn: ['pets'] });
+  assert.equal(blocked.length, 0);
+});
+

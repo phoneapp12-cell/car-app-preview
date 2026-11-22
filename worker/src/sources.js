@@ -5,6 +5,7 @@ import { GEARTH, GSV } from './mapsfun.js';
 const pg = (id, topic, name, url, link, extra = {}) => ({ id, topic, kind: 'page', name, url, link, ...extra });
 const yt = (id, topic, name, ch, extra = {}) => ({ id, topic, kind: 'yt', name, ch, ...extra });
 const rd = (id, topic, sub, extra = {}) => ({ id, topic, kind: 'reddit', name: 'r/' + sub, url: `https://www.reddit.com/r/${sub}/top/.rss?t=day`, ...extra });
+const pt = (id, topic, host, extra = {}) => ({ id, topic, kind: 'peertube', name: extra.name || host.replace(/^https?:\/\//, ''), url: host.replace(/\/$/, ''), maxSec: 90, portraitOnly: true, ...extra });
 const rss = (id, topic, name, url, extra = {}) => ({ id, topic, kind: 'rss', name, url, og: true, ...extra }); // og: if a post has no picture, use its page's og:image
 
 // no esports or competitive play, no gore or adults-only games (on the video, board and fantasy games sources)
@@ -507,6 +508,10 @@ export const SOURCES_BASE = [
   rd('fun-braynix-oi', 'games', 'opticalillusions', { name: 'Braynix Games', url: 'https://www.reddit.com/r/opticalillusions/new/.rss', author: 'braynixgames', videosOnly: true, portraitOnly: true, maxSec: 90, max: 8, notWant: new RegExp(FUN_NOT.source + '|\\b(modi|putin|raga|xi jinping)\\b', 'i') }),
   rd('fun-braynix-puzzle', 'games', 'puzzle', { name: 'Braynix Games', url: 'https://www.reddit.com/r/puzzle/new/.rss', author: 'braynixgames', videosOnly: true, portraitOnly: true, maxSec: 90, max: 6, notWant: new RegExp(FUN_NOT.source + '|\\b(modi|putin|raga|xi jinping)\\b', 'i') }),
   rd('fun-braynix-user', 'games', 'u_braynixgames', { name: 'Braynix Games', url: 'https://www.reddit.com/user/braynixgames/submitted/.rss', author: 'braynixgames', videosOnly: true, portraitOnly: true, maxSec: 90, max: 10, notWant: new RegExp(FUN_NOT.source + '|\\b(modi|putin|raga|xi jinping)\\b', 'i') }),
+  /* Shorts: short family-safe portrait MP4s from PeerTube (funny / animal / satisfying). */
+  pt('pt-blueben', 'fun', 'https://tube.blueben.net', { name: 'BluebenTube', search: 'satisfying', want: /satisfying|fidget|handmade|leather|craft/i, max: 6, notWant: FUN_NOT }),
+  pt('pt-makertube', 'fun', 'https://makertube.net', { name: 'MakerTube', search: 'animal', category: 16, want: /\b(cat|cats|kitten|dog|puppy|puppies|animal|animals|pet|pets)\b/i, max: 6, notWant: FUN_NOT }),
+
 
   rd('fun-animalderps', 'nature', 'AnimalsBeingDerps', { imagesOnly: true, max: 3, int: ['Cute & funny pets'], notWant: new RegExp(/\b(nsfw|nude|naked|sex\w*|lingerie|bikini|onlyfans|porn|boob\w*|butt|drunk|beer|wine|vodka|drugs?|weed|cannabis|died|death|dead|kill\w*|murder|shoot\w*|gun|war|crash|injur\w*|hospital|cancer|funeral|abuse|police|arrest\w*|prison|trump|biden|elect\w*|politic\w*|rugby|football|soccer|cricket|nba|nfl|golf|tennis|olympic\w*|racing|race|bet\w*|casino|lottery|crypto|bitcoin|stocks?|invest\w*|money|\$\d|price|sale|deal|discount|buy|shop\w*|sponsor\w*|giveaway|tinder|dating|divorce|cheat\w*|wtf|f\*+|sh\*t)\b/i.source + '|\\b(horse rac\\w*|racehorse|jockey)\\b', 'i') }),
   rd('fun-uplifting', 'learn', 'UpliftingNews', { imagesOnly: true, max: 2, mood: 'calm', notWant: /\b(nsfw|nude|naked|sex\w*|lingerie|bikini|onlyfans|porn|boob\w*|butt|drunk|beer|wine|vodka|drugs?|weed|cannabis|died|death|dead|kill\w*|murder|shoot\w*|gun|war|crash|injur\w*|hospital|cancer|funeral|abuse|police|arrest\w*|prison|trump|biden|elect\w*|politic\w*|rugby|football|soccer|cricket|nba|nfl|golf|tennis|olympic\w*|racing|race|bet\w*|casino|lottery|crypto|bitcoin|stocks?|invest\w*|money|\$\d|price|sale|deal|discount|buy|shop\w*|sponsor\w*|giveaway|tinder|dating|divorce|cheat\w*|wtf|f\*+|sh\*t)\b/i }),

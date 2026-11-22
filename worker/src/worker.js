@@ -212,6 +212,70 @@ async function fetchReddit(src) {
   return parseReddit(xml, src);
 }
 
+function pickPeertubeFile(detail) {
+  const files = [...(detail.files || [])];
+  for (const sp of detail.streamingPlaylists || []) files.push(...(sp.files || []));
+  let best = null, anyPort = null;
+  for (const f of files) {
+    const w = +(f.width || 0), h = +(f.height || 0);
+    const url = f.fileDownloadUrl || f.fileUrl || '';
+    if (!url || !/\.mp4(\?|$)/i.test(url) || !w || !h || h <= w) continue;
+    const res = (f.resolution && f.resolution.id) || h;
+    const it = { url, w, h, res };
+    if (!anyPort || Math.abs((anyPort.res || anyPort.h) - 720) > Math.abs((res || h) - 720)) anyPort = it;
+    if (res > 1080) continue;
+    if (!best || Math.abs((best.res || best.h) - 720) > Math.abs((res || h) - 720)) best = it;
+  }
+  return best || anyPort;
+}
+async function fetchPeertube(src) {
+  const origin = String(src.url || '').replace(/\/$/, '');
+  const q = new URL(origin + '/api/v1/search/videos');
+  q.searchParams.set('search', src.search || 'animal');
+  q.searchParams.set('nsfw', 'false');
+  q.searchParams.set('isLive', 'false');
+  q.searchParams.set('durationMax', String(src.maxSec || 90));
+  q.searchParams.set('count', '20');
+  q.searchParams.set('sort', '-publishedAt');
+  if (src.category) q.searchParams.set('categoryOneOf', String(src.category));
+  const j = await (await get(q.href, { tries: 2, ms: 15000 })).json();
+  const data = (j && j.data) || [];
+  const candidates = [];
+  for (const v of data) {
+    if (!v || v.nsfw || v.isLive) continue;
+    const title = String(v.name || '');
+    const dur = +(v.duration || 0);
+    if (!title || dur <= 0 || dur > (src.maxSec || 90)) continue;
+    if (src.want && !src.want.test(title)) continue;
+    if (/\b(nsfw|nsfl|gore|rip|passed away|euthan|cancer)\b/i.test(title)) continue;
+    const uuid = v.uuid || v.shortUUID;
+    if (uuid) candidates.push({ v, title, dur, uuid });
+  }
+  const out = [];
+  for (const c of candidates.slice(0, 12)) {
+    let d;
+    try { d = await (await get(origin + '/api/v1/videos/' + c.uuid, { tries: 1, ms: 10000 })).json(); }
+    catch (e) { continue; }
+    if (!d || d.nsfw || d.isLive) continue;
+    const file = pickPeertubeFile(d);
+    if (!file) continue;
+    if (src.portraitOnly && file.h <= file.w) continue;
+    const watch = d.url || (origin + '/videos/watch/' + c.uuid);
+    const thumb = d.previewPath || d.thumbnailPath || (d.preview && d.preview.path) || '';
+    const img = !thumb ? '' : /^https?:/i.test(thumb) ? thumb : (origin + (thumb.startsWith('/') ? thumb : '/' + thumb));
+    if (!img) continue;
+    const by = ((d.account && (d.account.displayName || d.account.name)) || '').replace(/^\/?u\//i, '');
+    out.push({
+      id: 'pt' + c.uuid, t: clip(c.title, 160), s: '', url: watch, ext: file.url, img,
+      at: Date.parse(d.publishedAt || d.originallyPublishedAt || '') || Date.now(),
+      kind: 'video', vk: 'peertube', vu: c.uuid, vw: file.w, vh: file.h, vdur: c.dur, by: by || undefined
+    });
+    if (out.length >= (src.max || 6)) break;
+  }
+  src._via = 'peertube';
+  return out;
+}
+
 function parseYtRss(xml) {
   return (xml.match(/<entry>[\s\S]*?<\/entry>/gi) || []).map(e => ({ vid: strip(tag(e, 'yt:videoId')), t: strip(tag(e, 'title')), at: Date.parse(strip(tag(e, 'published'))) || Date.now(), s: clip(strip(tag(e, 'media:description')), 200) }));
 }
@@ -386,6 +450,7 @@ async function runSource(src, old = new Map()) {
     const day = Math.floor((Date.now() + 13 * 36e5) / 864e5), L = src.items, n = src.drip || 3, start = Date.parse(new Date(day * 864e5).toISOString().slice(0, 10) + 'T07:00:00+13:00');
     items = []; for (let k = 0; k < n; k++) { const x = L[(day * n + k) % L.length]; items.push({ id: src.id + ':' + x.id, t: x.t, s: x.s, url: src.url, img: x.img, at: Math.min(Date.now(), start + k * 4 * 36e5), kind: 'photo' }); }
   }
+  else if (src.kind === 'peertube') items = await fetchPeertube(src);
   else {
     if (src.kind === 'reddit') items = await fetchReddit(src);
     else { const xml = await (await get(src.url, { tries: 2 })).text(); items = parseRss(xml, src); }
