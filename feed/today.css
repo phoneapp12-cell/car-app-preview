@@ -214,5 +214,8 @@ html.today-look .today-cal-empty{display:block;margin:6px 0 2px;font-size:.86rem
 .today-nopen .nbody{min-width:0;flex:1}
 .today-nopen .nbody b{display:block;font-size:.92rem;font-weight:650;line-height:1.3}
 .today-nopen .nbody small{display:block;margin-top:3px;color:var(--mute);font-size:.75rem}
+.today-nsend{flex:none;align-self:center;min-height:44px;min-width:44px;padding:8px 12px;margin:0 2px 0 0;border:0;border-radius:22px;background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;font:700 .8rem var(--today-sans);cursor:pointer;white-space:nowrap}
+.today-nsend:hover,.today-nsend:focus{filter:brightness(1.05)}
+.today-nsend.sent,.today-nsend:disabled{background:var(--chip);color:var(--mute);filter:none;cursor:default}
 .today-nclear{flex:none;width:44px;border:0;background:none;color:var(--mute);font-size:1rem;cursor:pointer}
 .today-nclear:hover,.today-nclear:focus{color:var(--press)}
