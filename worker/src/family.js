@@ -226,7 +226,11 @@ export class Family extends DurableObject {
       const tick = await this.rt.tick();
       const now = Date.now();
       let friends = null; try { friends = await this.friends.tick(now); } catch (e) { friends = { err: String(e && e.message || e) }; }
-      return J({ ...tick, friends });
+      const aiPosts = this.all(`SELECT s.id, s.mid, m.name, s.snap, s.priv, s.at, s.aud FROM shares s JOIN members m ON m.id=s.mid WHERE s.del=0 AND s.mid LIKE 'ai:%' ORDER BY s.at DESC LIMIT 8`).map(r => {
+        let t = '', photos = 0; try { const j = JSON.parse(r.snap || '{}') || {}; t = String(j.t || '').slice(0, 400); photos = Array.isArray(j.photos) ? j.photos.length : 0; } catch (e) { }
+        return { id: r.id, mid: r.mid, name: r.name, t, priv: r.priv, at: r.at, aud: r.aud, photos };
+      });
+      return J({ ...tick, friends, aiPosts });
     }
 
     if (p === '/join') { // 1.9.230 a friend opens an invite link: no token yet, the invite code is the key (single use, 7 days)
