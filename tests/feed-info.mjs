@@ -565,16 +565,16 @@ for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 3, at.join(',
 const appSrc = fs.readFileSync('feed/app.js', 'utf8');
 for (const id of sights.TOPICS) assert.ok(appSrc.includes("'" + id + "'"), id);
 assert.ok(!/Math\.pow\(baseOf\(t\), 3\)/.test(appSrc));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.315'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.315'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('todos.js?v=1.9.315') && fs.readFileSync('feed/index.html', 'utf8').includes('todos.css?v=1.9.315'), 'to-do list is in the feed shell');
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.316'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.316'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('todos.js?v=1.9.316') && fs.readFileSync('feed/index.html', 'utf8').includes('todos.css?v=1.9.316'), 'to-do list is in the feed shell');
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("todos.js?v=' + VERSION") && fs.readFileSync('feed/sw.js', 'utf8').includes("todos.css?v=' + VERSION"));
 assert.ok(fs.readFileSync('feed/todos.js', 'utf8').includes('shared-todo') && fs.readFileSync('feed/todos.js', 'utf8').includes('due-dates'));
 assert.ok(fs.readFileSync('feed/todos.js', 'utf8').includes('function icsForTodo') && fs.readFileSync('feed/todos.js', 'utf8').includes('calendar.google.com/calendar/render'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.315'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.316'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.cdot.tv'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.bd ul.sum'));
-assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.315'"));
+assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.316'"));
 function swVersion(src) { const m = String(src).match(/const VERSION = '([^']+)'/); assert.ok(m, 'parent sw.js VERSION'); return m[1]; }
 const parentHere = swVersion(fs.readFileSync('sw.js', 'utf8'));
 let parentMain = parentHere;
@@ -613,12 +613,12 @@ assert.equal(artB.length, 1);
 assert.notEqual(artB[0].id, artA.id);
 seenArt.wasSeen = () => true;
 assert.equal(seenArt.ibArt.cards(0).length, 0);
-assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.315'"));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.316'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'art3d.js?v=' + VERSION"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'portal.js?v=' + VERSION"));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.315'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('whg.js?v=1.9.315'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('ib-preview.js?v=1.9.315'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.316'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('whg.js?v=1.9.316'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('ib-preview.js?v=1.9.316'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('#feed > .card.xc.relask::before') && fs.readFileSync('feed/index.html', 'utf8').includes('flex-wrap:nowrap'), 'religion Yes/No stay on screen');
 assert.ok(fs.readFileSync('feed/ib-preview.js', 'utf8').indexOf('data-ib-religion="yes"') < fs.readFileSync('feed/ib-preview.js', 'utf8').indexOf('Optional stories about traditional practices'), 'Yes/No sit above the blurb so they fit on a phone');
 
@@ -658,7 +658,7 @@ assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("cache: 'reload'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("u.pathname + '?v=' + VERSION"), 'game scripts are fetched at this VERSION, not from a stale unversioned cache');
 assert.ok(appSrc.includes('ibPortalRise'));
 assert.ok(!/portal-style\.jpg|attachments\/image/.test(portalSrc + fs.readFileSync('feed/index.html', 'utf8')));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.315'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.316'));
 assert.ok(appSrc.includes("['art3d', '3D art'"));
 assert.ok(appSrc.includes("['3D art', 'art3d'"));
 assert.ok(appSrc.includes("'art3d'"));
@@ -1497,10 +1497,10 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
 
 /* INF-26 On demand: official YouTube full episodes + public-domain Archive.org sitcoms */
 assert.ok(fs.existsSync('feed/on-demand.js') && fs.existsSync('feed/on-demand.json'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('on-demand.js?v=1.9.315'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('on-demand.js?v=1.9.316'));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'on-demand.js?v=' + VERSION"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'on-demand.json?v=' + VERSION"));
-assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.315'"), 'do not bump version in this preview');
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.316'"), 'do not bump version in this preview');
 const odData = JSON.parse(fs.readFileSync('feed/on-demand.json', 'utf8'));
 assert.ok(/^\d{4}-\d{2}-\d{2}$/.test(odData.checked));
 assert.ok(/oembed/i.test(odData.refresh) && /public-domain|public domain/i.test(odData.refresh));
@@ -4513,7 +4513,7 @@ if (live) {
   const todaySrc = fs.readFileSync('feed/today.js', 'utf8');
   const idx = fs.readFileSync('feed/index.html', 'utf8');
   const sw = fs.readFileSync('feed/sw.js', 'utf8');
-  assert.ok(idx.includes('notif.js?v=1.9.315') && sw.includes("'notif.js?v=' + VERSION"));
+  assert.ok(idx.includes('notif.js?v=1.9.316') && sw.includes("'notif.js?v=' + VERSION"));
   assert.ok(todaySrc.includes('data-tab="notif"') && todaySrc.includes('ib-nbadge') && todaySrc.includes('data-mftab="people"'));
   assert.ok(!/data-tab="people"/.test(todaySrc), 'People is no longer in the bottom tab bar');
   assert.ok(todaySrc.includes('data-mftab="people"') && todaySrc.includes('data-mftab="notif"'), 'People and Notifications both stay in the ☰ menu');
@@ -5766,7 +5766,7 @@ console.log('1.9.227 echo and 3 s pace ok');
   const map = SR.nzMapSvg();
   assert.ok(map.includes('class="sr-atlas"') && map.includes('AOTEAROA') && map.includes('Pacific Islands') && map.includes('SOUTHEAST ASIA') && map.includes('viewBox="-580 0 1220 2240"'));
   SR.MAP_STOPS.slice(26, 31).forEach(function (s) { assert.ok(Math.hypot(s.x - SR.ausXY(s.lat, s.lon).x, s.y - SR.ausXY(s.lat, s.lon).y) < 1.5, s.place + ' sits where it belongs beside Australia'); });
-  assert.ok(html.includes('sugar-rush.js?v=1.9.315'));
+  assert.ok(html.includes('sugar-rush.js?v=1.9.316'));
   for (const n of [27, 28, 29, 30, 31]) {
     const lv = SR.LEVELS[n - 1];
     assert.ok(!lv.target && !lv.hard);
@@ -5871,8 +5871,8 @@ console.log('1.9.227 echo and 3 s pace ok');
   assert.strictEqual(game.turns, 1);
   assert.strictEqual(SR.cloneState(game).turns, 1, 'simulation clones preserve conveyor direction');
   assert.ok(src.includes('function drawBeltLane') && src.includes('beltDirection(st.lv, lane, st.turns)'), 'the board shows its lane and next direction');
-  assert.ok(html.includes('sugar-rush.js?v=1.9.315') && html.includes('scores.js?v=1.9.315'));
-  assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.315'"));
+  assert.ok(html.includes('sugar-rush.js?v=1.9.316') && html.includes('scores.js?v=1.9.316'));
+  assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.316'"));
   console.log('1.9.245 conveyor levels and mechanics ok');
 }
 
