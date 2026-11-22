@@ -3,7 +3,7 @@
    Do not production-deploy from this branch. */
 (function (root) {
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const JSON_URL = 'on-demand.json?v=1.9.317';
+  const JSON_URL = 'on-demand.json?v=1.9.318';
   const OFFICIAL = {
     UCsfIjK5sy9Upzcf316Xpytw: 'RedGreenTV',
     UCkAGrHCLFmlK3H2kd6isipg: 'MrBean',
