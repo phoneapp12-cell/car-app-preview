@@ -165,11 +165,11 @@ export function board(sql, me, game) {
   if (!GAMES.includes(game)) return { status: 400, body: { err: 'unknown game' } };
   const ids = gameIds(sql, meRow(sql, me));
   const top = rows(sql, `SELECT s.mid, m.name, s.score, s.lines, s.level, s.won, s.opp, s.at FROM scores s JOIN members m ON m.id=s.mid AND m.removed=0 WHERE s.game=? AND s.mid IN (${inList(ids)}) ORDER BY s.score DESC, s.at ASC LIMIT 10`, game, ...ids)
-    .map(r => ({ name: r.name, score: r.score, at: r.at, lines: r.lines ?? undefined, level: r.level ?? undefined, won: r.won == null ? undefined : !!r.won, opp: r.opp || undefined, mine: r.mid === me.id }));
+    .map(r => ({ name: r.name, score: r.score, at: r.at, lines: r.lines ?? undefined, level: r.level ?? undefined, won: r.won == null ? undefined : !!r.won, opp: r.opp || undefined, mine: r.mid === me.id, ai: String(r.mid).startsWith('ai:') ? 1 : 0 }));
   const best = rows(sql, `SELECT s.mid, m.name, MAX(s.score) score, COUNT(*) games, SUM(CASE WHEN s.won=1 AND s.opp='computer' THEN 1 ELSE 0 END) wcpu, SUM(CASE WHEN s.won=1 AND s.opp='family' THEN 1 ELSE 0 END) wfam FROM scores s JOIN members m ON m.id=s.mid AND m.removed=0 WHERE s.game=? AND s.mid IN (${inList(ids)}) GROUP BY s.mid ORDER BY score DESC`, game, ...ids)
     .map(r => {
       const at = (rows(sql, `SELECT MIN(at) at FROM scores WHERE mid=? AND game=? AND score=?`, r.mid, game, r.score)[0] || {}).at;
-      const o = { name: r.name, score: r.score, at, games: r.games, mine: r.mid === me.id };
+      const o = { name: r.name, score: r.score, at, games: r.games, mine: r.mid === me.id, ai: String(r.mid).startsWith('ai:') ? 1 : 0 };
       if (game === 'scrabble') { o.winsComputer = r.wcpu || 0; o.winsFamily = r.wfam || 0; }
       return o;
     });
@@ -337,13 +337,13 @@ export function raceBoard(sql, me, now = Date.now(), notes = []) {
   const member = meRow(sql, me);
   const ids = gameIds(sql, member);
   const racers = rows(sql, `SELECT r.mid, m.name, r.icon, r.stop, r.stars, r.at FROM sugar_race r JOIN members m ON m.id=r.mid AND m.removed=0 WHERE r.mid IN (${inList(ids)}) ORDER BY r.stop DESC, r.stars DESC, m.name ASC`, ...ids)
-    .map(r => ({ name: r.name, icon: r.icon, stop: r.stop, stars: r.stars, at: r.at, mine: r.mid === me.id }));
+    .map(r => ({ name: r.name, icon: r.icon, stop: r.stop, stars: r.stars, at: r.at, mine: r.mid === me.id, ai: String(r.mid).startsWith('ai:') ? 1 : 0 }));
   const group = isFriend(member) ? 'friends' : 'family';
   if (group === 'friends') return { status: 200, body: { me: me.name, group, racers, event: raceEventView(sql, me, now) }, notes };
   // A family member's extra friends list is only their own host circle. Never expose another member's friend circle.
   const friendIds = circleIds(sql, member.id);
   const friends = rows(sql, `SELECT r.mid, m.name, r.icon, r.stop, r.stars, r.at FROM sugar_race r JOIN members m ON m.id=r.mid AND m.removed=0 WHERE r.mid IN (${inList(friendIds)}) ORDER BY r.stop DESC, r.stars DESC, m.name ASC`, ...friendIds)
-    .map(r => ({ name: r.name, icon: r.icon, stop: r.stop, stars: r.stars, at: r.at, mine: r.mid === me.id }));
+    .map(r => ({ name: r.name, icon: r.icon, stop: r.stop, stars: r.stars, at: r.at, mine: r.mid === me.id, ai: String(r.mid).startsWith('ai:') ? 1 : 0 }));
   const friendCount = (rows(sql, `SELECT COUNT(*) n FROM members WHERE removed=0 AND role='friend' AND host=?`, member.id)[0] || {}).n || 0;
   return { status: 200, body: { me: me.name, group, racers, friends, friendCount, event: raceEventView(sql, me, now) }, notes };
 }
@@ -363,7 +363,7 @@ export function lifeKey(mid) {
 const firstName = n => String(n || 'Someone').trim().split(/\s+/)[0] || 'Someone';
 function lifeFamily(sql, me) { // 1.9.230 people this member can see (family: the family and their own friends; a friend: their circle)
   const can = new Set(seeRows(sql, meRow(sql, me)).map(r => r.id));
-  return rows(sql, `SELECT m.id, m.name, r.icon FROM members m LEFT JOIN sugar_race r ON r.mid=m.id WHERE m.removed=0 AND m.id != ? ORDER BY m.name ASC`, me.id).filter(r => can.has(r.id));
+  return rows(sql, `SELECT m.id, m.name, r.icon FROM members m LEFT JOIN sugar_race r ON r.mid=m.id WHERE m.removed=0 AND m.id != ? AND m.id NOT LIKE 'ai:%' ORDER BY m.name ASC`, me.id).filter(r => can.has(r.id));
 }
 export function livesView(sql, me, now = Date.now()) {
   const day = nzDay(now);

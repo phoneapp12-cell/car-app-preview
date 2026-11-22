@@ -107,6 +107,9 @@ html.today-look .load.note,html.today-look #feed > .load{font-size:.8rem;padding
 .today-drow .who b{display:block;font-size:1rem}
 .today-drow .who small{color:var(--mute);font-size:.78rem}
 .today-drow .when{font-size:.72rem;color:var(--mute);text-align:right;font-weight:600}
+.today-drow .av.av-ai{padding:0;overflow:hidden;background:var(--chip)}
+.today-drow .av.av-ai img{width:100%;height:100%;object-fit:cover;display:block}
+.today-drow .who .aib{margin-left:6px;vertical-align:2px}
 .today-badge{display:inline-block;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--line);padding:2px 6px;border-radius:999px;margin-top:3px}
 .today-games{display:flex;flex-direction:column;gap:10px;margin:8px 0 16px}
 .today-game{display:block;width:100%;border:0;border-radius:18px;padding:16px 16px;color:#fff;text-align:left;font:700 1.05rem var(--today-sans);min-height:72px;box-shadow:0 6px 0 rgba(0,0,0,.08);cursor:pointer}

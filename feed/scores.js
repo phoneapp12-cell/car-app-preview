@@ -107,6 +107,7 @@
 .ibs-t td.dt{color:rgba(255,255,255,.6);font-size:13px}
 .ibs-t tr.me td{background:rgba(255,255,255,.08)}
 .ibs-t td.n .ibs-you{color:var(--ibs-acc,#22d3ee);font-size:12px;font-weight:600}.ibs-t td.n .ibs-you::before{content:' · '}
+.ibs-card .aib,.ibs-t .aib,.ibs-pb .aib{display:inline-block;margin-left:6px;font-size:10px;font-weight:800;letter-spacing:.04em;color:#fff;background:linear-gradient(135deg,#ec4899,#8b5cf6);padding:1px 6px;border-radius:8px;vertical-align:2px}
 .ibs-h{margin:12px 0 4px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.55)}
 .ibs-pb{list-style:none;margin:0 0 12px;padding:0;font-size:14px}
 .ibs-pb li{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.07)}
@@ -121,7 +122,7 @@
   function table(rows, opt) {
     if (!rows.length) return `<p class="ibs-note">${esc(opt.empty || 'No scores yet. Be the first!')}</p>`;
     return `<table class="ibs-t"><thead><tr><th class="r">#</th><th>Name</th><th class="s">Score</th><th>Date</th></tr></thead><tbody>${rows.map((x, i) =>
-      `<tr${x.mine ? ' class="me"' : ''}><td class="r">${i + 1}</td><td class="n">${esc(x.name || 'Player')}${x.mine ? ' <span class="ibs-you">you</span>' : ''}${x.note ? ` <small>${esc(x.note)}</small>` : ''}</td><td class="s">${num(x.score)}</td><td class="dt">${esc(nzDate(x.at))}</td></tr>`).join('')}</tbody></table>`;
+      `<tr${x.mine ? ' class="me"' : ''}><td class="r">${i + 1}</td><td class="n">${esc(x.name || 'Player')}${x.mine ? ' <span class="ibs-you">you</span>' : ''}${x.ai ? ' <small class="aib" title="An invented AI friend, not a real person">AI friend</small>' : ''}${x.note ? ` <small>${esc(x.note)}</small>` : ''}</td><td class="s">${num(x.score)}</td><td class="dt">${esc(nzDate(x.at))}</td></tr>`).join('')}</tbody></table>`;
   }
   // 1.9.205: the headline list is every member's personal best, not the top 10
   // individual games (one frequent player could fill those 10 and hide the others).
@@ -154,7 +155,7 @@
     if (!list || !list.length) return '';
     return `<p class="ibs-h">Everyone’s best</p><ul class="ibs-pb">${list.map(x => {
       const extra = game === 'scrabble' ? `wins: ${x.winsComputer || 0} v 🤖 · ${x.winsFamily || 0} v family` : `${x.games} game${x.games === 1 ? '' : 's'}`;
-      return `<li><span>${esc(x.name)}${x.mine ? ' <small>(you)</small>' : ''}</span><span><b>${num(x.score)}</b> <small>${esc(extra)}</small></span></li>`;
+      return `<li><span>${esc(x.name)}${x.mine ? ' <small>(you)</small>' : ''}${x.ai ? ' <small class="aib" title="An invented AI friend, not a real person">AI friend</small>' : ''}</span><span><b>${num(x.score)}</b> <small>${esc(extra)}</small></span></li>`;
     }).join('')}</ul>`;
   }
   function html(game, data, opt) {

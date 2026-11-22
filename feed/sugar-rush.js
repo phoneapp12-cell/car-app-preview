@@ -8117,7 +8117,7 @@
         el.style.top = mapYPct(stop.y);
         el.style.transform = 'translate(calc(-50% + ' + off.x + 'px), calc(-50% + ' + off.y + 'px))';
         el.innerHTML = '<span class="face" style="--ic:' + ic.color + '">' + ic.emoji + '</span><span class="nm">' + racerFirst(r.name) + '</span>';
-        el.setAttribute('aria-label', racerFirst(r.name) + ' is at ' + stop.place + (r.mine ? ' (you)' : ''));
+        el.setAttribute('aria-label', racerFirst(r.name) + (r.ai ? ', AI friend, ' : ' ') + 'is at ' + stop.place + (r.mine ? ' (you)' : ''));
         hold.appendChild(el);
       });
     });
@@ -8139,7 +8139,7 @@
         if (r.mine) li.className = 'me';
         const rank = doc.createElement('span'); rank.className = 'rk'; rank.textContent = String(i + 1); li.appendChild(rank);
         const face = doc.createElement('span'); face.className = 'face'; face.style.setProperty('--ic', ic.color); face.textContent = ic.emoji; li.appendChild(face);
-        const who = doc.createElement('span'); who.className = 'who'; who.appendChild(doc.createTextNode(racerFirst(r.name)));
+        const who = doc.createElement('span'); who.className = 'who'; who.appendChild(doc.createTextNode(racerFirst(r.name))); if (r.ai) { const tag = doc.createElement('small'); tag.className = 'aib'; tag.textContent = 'AI friend'; tag.title = 'An invented AI friend, not a real person'; who.appendChild(document.createTextNode(' ')); who.appendChild(tag); }
         if (r.mine) { const you = doc.createElement('em'); you.textContent = 'you'; who.appendChild(you); }
         li.appendChild(who);
         const at = doc.createElement('span'); at.className = 'at'; at.textContent = 'Level ' + Math.max(1, r.stop | 0); li.appendChild(at);
@@ -8189,12 +8189,12 @@
     const self = myLocalRacer();
     const group = data && data.group === 'friends' ? 'friends' : 'family';
     let racers = (data && Array.isArray(data.racers)) ? data.racers.map(function (r) {
-      return { name: r.name, icon: r.icon, stop: r.stop, stars: r.stars, mine: !!r.mine };
+      return { name: r.name, icon: r.icon, stop: r.stop, stars: r.stars, mine: !!r.mine, ai: !!r.ai };
     }) : [];
     if (!racers.some(function (r) { return r.mine; })) racers.push(self);
     else racers = racers.map(function (r) { return r.mine ? Object.assign({}, r, self) : r; });
     let friends = group === 'family' && data && Array.isArray(data.friends) ? data.friends.map(function (r) {
-      return { name: r.name, icon: r.icon, stop: r.stop, stars: r.stars, mine: !!r.mine };
+      return { name: r.name, icon: r.icon, stop: r.stop, stars: r.stars, mine: !!r.mine, ai: !!r.ai };
     }) : [];
     if (group === 'family') {
       if (!friends.some(function (r) { return r.mine; })) friends.push(self);

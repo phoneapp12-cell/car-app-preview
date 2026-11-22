@@ -6,6 +6,7 @@ import { isUnsafe } from './safe.js';
 import { DurableObject } from 'cloudflare:workers';
 import { Retain, nudgeFor, TAGS } from './retain.js';
 import { InfoBot, BOT_ID, BOT_NAME, AI_MODEL } from './ai.js';
+import { AiFriends, isAiFriend, PERSONAS as AI_PERSONAS, TEXT_MODEL as AI_FRIEND_TEXT, IMAGE_MODEL as AI_FRIEND_IMAGE } from './friends.js';
 import { paywallUrl, paywallHtml } from './paywall.js';
 import { preview, blockedWhy, findUrl, safeUrl, stockPics } from './preview.js';
 import { scoresInit, scoresRoute, clearShaneTetrisOnce, clearShaneTetrisOnce20261113, clearAllTetrisOnce20261114, sugarStopsOnce20261114 } from './scores.js'; // 1.9.149 family scoreboard; 12–14 Nov 2026 one-off Tetris clears
@@ -90,6 +91,7 @@ export class Family extends DurableObject {
     bindDict(lexicon);
     this.rt = new Retain(this); // 1.9.0
     this.bot = new InfoBot(this); // 1.9.12
+    this.friends = new AiFriends(this); // 1.9.318
     this.sql.exec(`CREATE TABLE IF NOT EXISTS clikes (cid INTEGER NOT NULL, mid TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (cid, mid))`); // 1.9.14 ❤️ on comments
     for (const t of ['reacts', 'clikes']) try { this.sql.exec(`ALTER TABLE ${t} ADD COLUMN emo TEXT`); } catch (e) { } // 1.9.42 ❤️😂😠😮😐😎 (null = ❤️)
     try { // 1.9.33 one reaction of each kind per member per item: make sure no duplicates exist (keeps the earliest row), once
@@ -118,7 +120,7 @@ export class Family extends DurableObject {
   }
   seesMid(me, mid, cache) { // 1.9.230 can this member see that person (comments, reactions, names)?
     if (mid === me.id) return true;
-    if (mid === BOT_ID) return !isFriend(me); // Info Bot replies can quote family threads: family only
+    if (mid === BOT_ID || isAiFriend(mid)) return !isFriend(me); // Info Bot and AI friends are family-only
     if (cache && mid in cache) return cache[mid];
     const v = sees(me, memberRow(this.sql, mid)); if (cache) cache[mid] = v; return v;
   }
@@ -185,7 +187,7 @@ export class Family extends DurableObject {
   thread(card, me) { // a card's comments as this member may see them (Info Bot hidden if they muted it)
     const hideBot = this.bot.muted(me.id), sc = {}, rows = this.all(`SELECT c.id, c.mid, m.name, CASE WHEN m.pshow=1 THEN m.pron END pron, c.text, c.at FROM comments c LEFT JOIN members m ON m.id=c.mid WHERE c.card=? AND c.del=0 ORDER BY c.at LIMIT 200`, card).filter(r => !(hideBot && r.mid === BOT_ID) && this.seesMid(me, r.mid, sc)); // 1.9.230 only comments from people this member can see
     const lk = {}; if (rows.length) for (const l of this.all(`SELECT l.cid, l.mid, CASE WHEN l.mid='bot:info' THEN '🤖 Info Bot' ELSE m.name END name, l.at, l.emo FROM clikes l LEFT JOIN members m ON m.id=l.mid WHERE (m.removed=0 OR l.mid='bot:info') AND l.cid IN (${rows.map(() => '?').join(',')}) ORDER BY l.at`, ...rows.map(r => r.id))) if (l.mid === BOT_ID || this.seesMid(me, l.mid, sc)) (lk[l.cid] ||= []).push({ mid: l.mid, name: l.name, at: l.at, emo: l.emo || undefined });
-    return rows.map(r => ({ ...r, name: r.mid === BOT_ID ? BOT_NAME : r.name || 'Former member', bot: r.mid === BOT_ID ? 1 : 0, mine: r.mid === me.id, likes: lk[r.id] || [] }));
+    return rows.map(r => ({ ...r, name: r.mid === BOT_ID ? BOT_NAME : r.name || 'Former member', bot: r.mid === BOT_ID ? 1 : 0, ai: isAiFriend(r.mid) ? 1 : 0, mine: r.mid === me.id, likes: lk[r.id] || [] }));
   }
   async fetch(req) {
     const u = new URL(req.url), p = u.pathname.replace(/^\/api/, ''), m = req.method;
@@ -219,7 +221,13 @@ export class Family extends DurableObject {
         return J({ ok: true, bytes: t.length }); }
       return J({ err: 'method' }, 405);
     }
-    if (p === '/tick') { if (!this.env.SEED_KEY || req.headers.get('X-Seed-Key') !== this.env.SEED_KEY) return J({ err: 'no' }, 403); return J(await this.rt.tick()); } // 1.9.0 from the cron
+    if (p === '/tick') { // 1.9.0 from the cron; 1.9.318 also runs AI friends
+      if (!this.env.SEED_KEY || req.headers.get('X-Seed-Key') !== this.env.SEED_KEY) return J({ err: 'no' }, 403);
+      const tick = await this.rt.tick();
+      const now = Date.now();
+      let friends = null; try { friends = await this.friends.tick(now); } catch (e) { friends = { err: String(e && e.message || e) }; }
+      return J({ ...tick, friends });
+    }
 
     if (p === '/join') { // 1.9.230 a friend opens an invite link: no token yet, the invite code is the key (single use, 7 days)
       if (m === 'GET') { // what the join screen shows: who invited them (first name only) and whether the link still works
@@ -297,7 +305,7 @@ export class Family extends DurableObject {
     { const r = await scrabbleRoute(this.sql, me, p, m, u, body, now, { note: (mid, text, card) => this.rt.note(mid, 'scrabble', text, card) }); if (r) return J(r.body, r.status); } // 1.9.214 family Scrabble
 
     // ---- admin: members and their invite links
-    if (p === '/members' && m === 'GET') { if (!admin) return J({ err: 'admin only' }, 403); return J(this.all(`SELECT m.id,m.name,m.role,m.host,m.created,m.seen,m.ver,m.pron,m.pshow,p.age,p.stage,p.sugg,p.sit FROM members m LEFT JOIN mprof p ON p.mid=m.id WHERE m.removed=0 ORDER BY m.created`)); }
+    if (p === '/members' && m === 'GET') { if (!admin) return J({ err: 'admin only' }, 403); const av = this.friends.avatars(); return J(this.all(`SELECT m.id,m.name,m.role,m.host,m.created,m.seen,m.ver,m.pron,m.pshow,p.age,p.stage,p.sugg,p.sit FROM members m LEFT JOIN mprof p ON p.mid=m.id WHERE m.removed=0 ORDER BY m.created`).map(m => isAiFriend(m.id) ? { ...m, ai: 1, bio: (AI_PERSONAS.find(x => x.id === m.id) || {}).bio || '', avatar: av[m.id] || null } : m)); }
     if (p === '/members' && m === 'POST') {
       if (!admin) return J({ err: 'admin only' }, 403);
       const b = await body(), name = clean(b.name, 40); if (!name) return J({ err: 'name needed' }, 400);
@@ -369,10 +377,10 @@ export class Family extends DurableObject {
       try { // 1.9.0 tell the post's owner, and anyone else already talking there (a direct reply goes straight away)
         const owner = /^sh\d+$/.test(card) ? (this.one(`SELECT mid FROM shares WHERE id=? AND del=0`, +card.slice(2)) || {}).mid : (this.one(`SELECT mid FROM shares WHERE orig=? AND del=0 ORDER BY at LIMIT 1`, card) || {}).mid;
         const short = text.length > 70 ? text.slice(0, 68) + '…' : text, sent = new Set([me.id]), sc = {};
-        if (owner && !sent.has(owner) && this.seesMid(me, owner, sc)) { sent.add(owner); await this.rt.note(owner, 'mine', `💬 ${me.name} on your post: “${short}”`, card); } // 1.9.230 only people who can see each other
+        if (owner && !isAiFriend(owner) && !sent.has(owner) && this.seesMid(me, owner, sc)) { sent.add(owner); await this.rt.note(owner, 'mine', `💬 ${me.name} on your post: “${short}”`, card); } // 1.9.230 only people who can see each other
         for (const r of this.all(`SELECT DISTINCT mid FROM comments WHERE card=? AND del=0 AND id<?`, card, cid)) if (!sent.has(r.mid) && r.mid !== BOT_ID && this.seesMid(me, r.mid, sc)) { sent.add(r.mid); await this.rt.note(r.mid, 'reply', `↩️ ${me.name} replied: “${short}”`, card); }
       } catch (e) { }
-      if (!isFriend(me)) try { await this.bot.consider(me, card, cid, text, now); } catch (e) { } // 1.9.12 🤖 sometimes answers (1.9.230 family threads only)
+      if (!isFriend(me) && !isAiFriend(me.id)) try { await this.bot.consider(me, card, cid, text, now); } catch (e) { } // 1.9.12 🤖 sometimes answers (1.9.230 family threads only)
       if (!this.bot.muted(me.id)) this.botReact('comment', cid, text, 0.35);
       return J({ id: cid, at: now });
     }
@@ -400,6 +408,14 @@ export class Family extends DurableObject {
     if (p === '/aibot/cfg' && m === 'PUT') { if (!admin) return J({ err: 'admin only' }, 403); const b = await body(), c = this.bot.cfg(); if ('on' in b) c.on = !!b.on; if (['rare', 'some', 'often'].includes(b.freq)) c.freq = b.freq; this.bot.save(c); if (!c.on) this.sql.exec(`DELETE FROM aiq`); return J({ cfg: this.bot.cfg() }); }
     if (p === '/aibot/try' && m === 'POST') { if (!admin) return J({ err: 'admin only' }, 403); const b = await body(); const out = {}; for (const md of (b.models || []).slice(0, 4)) { try { out[md] = await this.bot.reply({ cid: +b.cid, card: String(b.card), dry: 1 }, now, md); } catch (e) { out[md] = 'ERR ' + e.message; } } return J(out); } // admin testing: draft replies, nothing saved
     if (p === '/aibot/kick' && m === 'POST') { if (!admin) return J({ err: 'admin only' }, 403); this.sql.exec(`UPDATE aiq SET due=?`, now); await this.bot.run(now + 1); try { await this.rt.flush(); } catch (e) { } return J({ ok: 1, usage: this.bot.usage() }); } // testing: answer the queued ones now
+    // ---- 1.9.318 AI friends (Maisie Cole and Ned Farley): family-only invented locals, Workers AI, no notifications
+    if (p === '/aifriends' && m === 'GET') {
+      this.friends.ensureMembers(now);
+      return J({ on: this.friends.cfg().on, people: this.friends.list(), usage: this.friends.usage(), ...(admin ? { model: { text: AI_FRIEND_TEXT, image: AI_FRIEND_IMAGE }, ai: !!this.env.AI } : {}) });
+    }
+    if (p === '/aifriends/cfg' && m === 'PUT') { if (!admin) return J({ err: 'admin only' }, 403); const b = await body(), c = this.friends.cfg(); if ('on' in b) c.on = !!b.on; this.friends.save(c); return J({ on: this.friends.cfg().on }); }
+    if (p === '/aifriends/kick' && m === 'POST') { if (!admin) return J({ err: 'admin only' }, 403); const r = await this.friends.kick(now); return J(r); }
+
     if (p === '/recent') { // cards the family has talked about lately, newest first (for the 💬 Family tab)
       const can = seeIds(this.sql, me), by = new Map(); // 1.9.230 only comments from people this member can see
       for (const r of this.all(`SELECT card, mid, at, snap FROM comments WHERE del=0 AND mid!='bot:info' AND at>? ORDER BY at DESC LIMIT 3000`, now - 60 * 864e5)) {
@@ -413,7 +429,7 @@ export class Family extends DurableObject {
       const sc = {}; // 1.9.230 audiences: only posts this member may see, and only names they may see
       return J(this.all(`SELECT s.id, s.mid, m.name, m.role mrole, s.orig, s.snap, s.caption, s.priv, s.at, s.tag, s.vis, s.aud, s.circ FROM shares s LEFT JOIN members m ON m.id=s.mid WHERE s.del=0 AND s.at>? AND (s.vis IS NULL OR s.mid=? OR instr(s.vis, ?) > 0) ORDER BY s.at DESC LIMIT 160`, now - 90 * 864e5, me.id, ',' + me.id + ',')
         .filter(r => shareVisible(me, r) && (!isFriend(me) || r.priv !== 1)).slice(0, 80)
-        .map(r => { const card = r.priv ? 'sh' + r.id : r.orig; return { id: r.id, mid: r.mid, name: r.name || 'Former member', friend: r.mrole === 'friend' ? 1 : 0, orig: r.orig, card, snap: JSON.parse(r.snap), caption: r.caption || '', priv: !!r.priv, up: r.priv === 2, link: r.priv === 3, text: r.priv === 4, aud: r.vis ? 'pick' : r.aud || 'fam', to: r.vis ? r.vis.split(',').filter(x => x && x !== r.mid && this.seesMid(me, x, sc)).map(x => (x === me.id ? 'You' : (this.one(`SELECT name FROM members WHERE id=?`, x) || {}).name)).filter(Boolean) : null, tag: r.tag || '', at: r.at, mine: r.mid === me.id, likes: this.reactsOf(card, 'love', me), ups: this.reactsOf(card, 'up', me), nc: this.thread(card, me).length }; }));
+        .map(r => { const card = r.priv ? 'sh' + r.id : r.orig; return { id: r.id, mid: r.mid, name: r.name || 'Former member', friend: r.mrole === 'friend' ? 1 : 0, orig: r.orig, card, snap: JSON.parse(r.snap), caption: r.caption || '', priv: !!r.priv, up: r.priv === 2, link: r.priv === 3, text: r.priv === 4, aud: r.vis ? 'pick' : r.aud || 'fam', to: r.vis ? r.vis.split(',').filter(x => x && x !== r.mid && this.seesMid(me, x, sc)).map(x => (x === me.id ? 'You' : (this.one(`SELECT name FROM members WHERE id=?`, x) || {}).name)).filter(Boolean) : null, tag: r.tag || '', at: r.at, mine: r.mid === me.id, ai: isAiFriend(r.mid) ? 1 : 0, likes: this.reactsOf(card, 'love', me), ups: this.reactsOf(card, 'up', me), nc: this.thread(card, me).length }; }));
     }
     if (p === '/popular') { // 1.8.1 what the family has ❤️/👍'd in the last 4 days (ids, names, kind, time) – feeds everyone's ranking
       const rows = this.all(`SELECT l.card, l.kind, l.at, l.mid, m.name, l.emo FROM reacts l JOIN members m ON m.id=l.mid AND m.removed=0 WHERE l.at>? ORDER BY l.at DESC LIMIT 800`, now - 4 * 864e5), out = {};
@@ -455,9 +471,15 @@ export class Family extends DurableObject {
     }
     mm = p.match(/^\/photos\/(\d+)$/);
     if (mm && m === 'GET') {
-      const r = this.one(`SELECT ph.mid, ph.post, ph.data, s.mid smid, s.vis, s.aud, s.circ FROM photos ph LEFT JOIN shares s ON s.id=ph.post WHERE ph.id=? AND ((ph.post IS NOT NULL AND s.del=0) OR (ph.post IS NULL AND ph.mid=?))`, +mm[1], me.id);
-      if (!r || (r.post != null && !shareVisible(me, { mid: r.smid, vis: r.vis, aud: r.aud, circ: r.circ }))) return J({ err: 'gone' }, 404); // 1.9.230 same audience as the post
-      return new Response(r.data, { headers: { 'Content-Type': 'image/jpeg', 'X-Content-Type-Options': 'nosniff' } });
+      const r = this.one(`SELECT ph.mid, ph.post, ph.data, s.mid smid, s.vis, s.aud, s.circ FROM photos ph LEFT JOIN shares s ON s.id=ph.post WHERE ph.id=?`, +mm[1]);
+      if (!r) return J({ err: 'gone' }, 404);
+      const posted = r.post != null && shareVisible(me, { mid: r.smid, vis: r.vis, aud: r.aud, circ: r.circ });
+      const mineDraft = r.post == null && r.mid === me.id;
+      const aiAvatar = r.post == null && isAiFriend(r.mid) && !isFriend(me);
+      if (!(posted || mineDraft || aiAvatar)) return J({ err: 'gone' }, 404);
+      const u8 = r.data instanceof ArrayBuffer ? new Uint8Array(r.data) : (r.data && r.data.buffer ? new Uint8Array(r.data.buffer, r.data.byteOffset || 0, r.data.byteLength || r.data.length) : new Uint8Array(r.data || []));
+      const png = u8[0] === 0x89 && u8[1] === 0x50 && u8[2] === 0x4e && u8[3] === 0x47;
+      return new Response(r.data, { headers: { 'Content-Type': png ? 'image/png' : 'image/jpeg', 'X-Content-Type-Options': 'nosniff' } });
     }
     if (p === '/shares' && m === 'POST' && u.searchParams.get('photos') !== null) { // a post of the member's own photos
       const b = await body(), ids = [...new Set((b.photos || []).map(x => +x).filter(Boolean))];

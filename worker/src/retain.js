@@ -316,13 +316,13 @@ export class Retain {
   }
   cbAdmin(now = Date.now()) {
     const today = dnum(dayKey(now));
-    return this.all(`SELECT id, name FROM members WHERE removed=0 ORDER BY created`).map(m => { const lv = this.cbLastVisit(m.id), c = this.one(`SELECT last, n, sent, txt FROM cbn WHERE mid=?`, m.id) || {}; return { mid: m.id, name: m.name, lastVisit: lv, away: lv ? today - dnum(lv) : null, push: !!this.one(`SELECT 1 x FROM subs WHERE mid=?`, m.id), on: !!this.np(m.id).comeback, lastNudge: c.last || 0, inRow: c.last && lv && dnum(lv) >= dnum(dayKey(c.last)) ? 0 : c.n || 0, sent: c.sent || 0, txt: c.txt || '' }; });
+    return this.all(`SELECT id, name FROM members WHERE removed=0 AND id NOT LIKE 'ai:%' ORDER BY created`).map(m => { const lv = this.cbLastVisit(m.id), c = this.one(`SELECT last, n, sent, txt FROM cbn WHERE mid=?`, m.id) || {}; return { mid: m.id, name: m.name, lastVisit: lv, away: lv ? today - dnum(lv) : null, push: !!this.one(`SELECT 1 x FROM subs WHERE mid=?`, m.id), on: !!this.np(m.id).comeback, lastNudge: c.last || 0, inRow: c.last && lv && dnum(lv) >= dnum(dayKey(c.last)) ? 0 : c.n || 0, sent: c.sent || 0, txt: c.txt || '' }; });
   }
   async tick() {
     const now = Date.now(), day = dayKey(now), hr = nzHour(now); if (hr >= 19 && hr < 22) await this.streakNudge(now); try { await this.comeBack(now); } catch (e) { } try { await this.wxPoll(now); } catch (e) { } try { await this.npPoll(now); } catch (e) { } try { await this.evNotes(now); } catch (e) { } try { await this.apNotes(now); } catch (e) { } if (hr < 8) return { wait: 1 };
     const done = this.one(`SELECT v FROM meta WHERE k='drop'`); if (done && done.v === day) return { done: day };
     this.sql.exec(`INSERT INTO meta (k,v) VALUES ('drop',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v`, day);
-    const members = this.all(`SELECT id,name FROM members WHERE removed=0 AND role!='friend'`), dp = dailyPrompt(nzDay(now)), pl = dailyPoll(nzDay(now));
+    const members = this.all(`SELECT id,name FROM members WHERE removed=0 AND role!='friend' AND id NOT LIKE 'ai:%'`), dp = dailyPrompt(nzDay(now)), pl = dailyPoll(nzDay(now));
     for (const m of members) await this.note(m.id, 'daily', '📊 Today’s family poll: ' + pl.q + (dp.type === 'photo' ? ' · 📸 Photo challenge: ' + dp.text : ''), pl.key);
     for (const x of this.upcoming(now)) if (x.days === 0 || x.days === 7) for (const m of members) if (m.id !== x.mid) await this.note(m.id, 'dates', x.days === 0 ? `${x.kind === 'bday' ? '🎂' : '🎉'} Today: ${x.title}!` : `${x.kind === 'bday' ? '🎂' : '📅'} ${x.title} is a week away`, 'date' + x.id);
     await this.carNotes(now);
