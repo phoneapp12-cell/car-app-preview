@@ -234,8 +234,8 @@ export class AiFriends {
     return text;
   }
 
-  async generateImage(prompt) {
-    const u = this.usage(); if (u.img >= IMG_CAP) return null;
+  async generateImage(prompt, force) {
+    const u = this.usage(); if (!force && u.img >= IMG_CAP) return null;
     const ai = this.f.env && this.f.env.AI; if (!ai) return null;
     if (unsafeText(prompt)) return null;
     let r = null;
@@ -271,18 +271,18 @@ export class AiFriends {
     delete o['ai:maisie'];
     this.f.sql.exec(`INSERT INTO meta (k,v) VALUES ('aifavatar',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v`, JSON.stringify(o));
     const p = PERSONAS.find(x => x.id === 'ai:maisie');
-    const id = p ? await this.ensureAvatar(p, now) : null;
+    const id = p ? await this.ensureAvatar(p, now, true) : null;
     if (!id) return { err: 'no-avatar' };
     this.f.sql.exec(`INSERT INTO meta (k,v) VALUES ('aifavatar_rev',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v`, AVATAR_REV);
     return { ok: 1, id };
   }
 
-  async ensureAvatar(p, now) {
+  async ensureAvatar(p, now, force) {
     const have = this.avatars()[p.id];
     if (have && this.f.one(`SELECT id FROM photos WHERE id=? AND mid=?`, have, p.id)) return have;
     const who = p.pron === 'she' ? 'a friendly Pākehā woman in her early thirties with brown hair, kind eyes, a colourful handmade shirt' : 'a friendly Pākehā man in his early to mid-30s with short brown hair, a practical jacket, a warm open expression';
     const prompt = `A stylized illustrated portrait of ${who}, Whangārei local, soft daylight, tasteful, family-friendly, no text, no logo, not photorealistic, not a celebrity.`;
-    const bytes = await this.generateImage(prompt);
+    const bytes = await this.generateImage(prompt, force);
     if (!bytes) return null;
     const id = this.storePhoto(p.id, bytes, 768, 768, now);
     this.setAvatar(p.id, id);
