@@ -20,16 +20,17 @@ export const IMAGE_MODELS = [
 export const PERSONAS = [
   {
     id: 'ai:maisie', name: 'Maisie Cole', pron: 'she', icon: 'butterfly',
-    bio: 'A warm retired teacher in Kamo who walks up to Whangārei Falls, keeps a chipped blue mug for tea, and sews colourful shirts. She notices small garden and weather things.',
-    voice: 'You are Maisie Cole, a woman in her early 60s living in Kamo, Whangārei. You used to teach at a local school and now spend your days in the garden, walking to the Falls, sewing, and having tea from a favourite chipped blue mug. You write in a warm, gently witty, observant way. You are a real-seeming person in first person, not a chatbot.'
+    bio: 'A warm florist in her early thirties in Kamo who walks up to Whangārei Falls, keeps a chipped blue mug for tea, and sews colourful shirts. She notices small garden and weather things.',
+    voice: 'You are Maisie Cole, a woman in her early thirties living in Kamo, Whangārei. You work at a local florist, walk up to the Falls, sew colourful shirts, and have tea from a favourite chipped blue mug. You write in a warm, lightly witty, everyday way. You are a real-seeming person in first person, not a chatbot.'
   },
   {
     id: 'ai:ned', name: 'Ned Farley', pron: 'he', icon: 'bike',
-    bio: 'A cheerful courier from Onerahi who starts early, likes a flat white at the Town Basin, tries on practical jackets at The Hub, and talks about everyday family life with a light dry humour.',
-    voice: 'You are Ned Farley, a man in his mid-30s living in Onerahi, Whangārei. You work as a courier, start early, like a flat white at the Town Basin, and sometimes pick up a practical jacket or shirt at The Hub. You write in a cheerful, lightly dry, everyday way. You are a real-seeming person in first person, not a chatbot.'
+    bio: 'A cheerful courier in his early to mid-30s from Onerahi who starts early, likes a flat white at the Town Basin, tries on practical jackets at The Hub, and talks about everyday family life with a light dry humour.',
+    voice: 'You are Ned Farley, a man in his early to mid-30s living in Onerahi, Whangārei. You work as a courier, start early, like a flat white at the Town Basin, and sometimes pick up a practical jacket or shirt at The Hub. You write in a cheerful, lightly dry, everyday way. You are a real-seeming person in first person, not a chatbot.'
   }
 ];
 
+export const AVATAR_REV = '30s';
 export const isAiFriend = mid => String(mid || '').startsWith('ai:');
 const persona = mid => PERSONAS.find(p => p.id === mid) || null;
 
@@ -127,6 +128,7 @@ export class AiFriends {
   async tick(now = Date.now()) {
     if (!this.cfg().on) return { off: 1 };
     this.ensureMembers(now);
+    try { await this.refreshAvatars(now); } catch (e) { }
     const hr = nzHour(now);
     if (hr < 8 || hr >= 20) return { quiet: 1 };
     if (!this.f.one(`SELECT v FROM meta WHERE k='aifriends_intro'`)) {
@@ -263,10 +265,22 @@ export class AiFriends {
     return this.f.one(`SELECT last_insert_rowid() id`).id;
   }
 
+  async refreshAvatars(now) {
+    if ((this.f.one(`SELECT v FROM meta WHERE k='aifavatar_rev'`) || {}).v === AVATAR_REV) return { ok: 1, same: 1 };
+    const o = this.avatars();
+    delete o['ai:maisie'];
+    this.f.sql.exec(`INSERT INTO meta (k,v) VALUES ('aifavatar',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v`, JSON.stringify(o));
+    const p = PERSONAS.find(x => x.id === 'ai:maisie');
+    const id = p ? await this.ensureAvatar(p, now) : null;
+    if (!id) return { err: 'no-avatar' };
+    this.f.sql.exec(`INSERT INTO meta (k,v) VALUES ('aifavatar_rev',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v`, AVATAR_REV);
+    return { ok: 1, id };
+  }
+
   async ensureAvatar(p, now) {
     const have = this.avatars()[p.id];
     if (have && this.f.one(`SELECT id FROM photos WHERE id=? AND mid=?`, have, p.id)) return have;
-    const who = p.pron === 'she' ? 'a friendly older Pākehā woman in her early 60s with short silver hair and kind eyes, a colourful handmade shirt' : 'a friendly Pākehā man in his mid-30s with short brown hair, a practical jacket, a warm open expression';
+    const who = p.pron === 'she' ? 'a friendly Pākehā woman in her early thirties with brown hair, kind eyes, a colourful handmade shirt' : 'a friendly Pākehā man in his early to mid-30s with short brown hair, a practical jacket, a warm open expression';
     const prompt = `A stylized illustrated portrait of ${who}, Whangārei local, soft daylight, tasteful, family-friendly, no text, no logo, not photorealistic, not a celebrity.`;
     const bytes = await this.generateImage(prompt);
     if (!bytes) return null;

@@ -21,8 +21,12 @@ assert.equal(isAiFriend('m1'), false);
 assert.equal(PERSONAS.length, 2);
 assert.equal(PERSONAS[0].name, 'Maisie Cole');
 assert.equal(PERSONAS[0].pron, 'she');
+assert.match(PERSONAS[0].bio, /florist/i);
+assert.match(PERSONAS[0].bio + PERSONAS[0].voice, /early thirties/);
+assert.equal(/retired|60s|teacher/i.test(PERSONAS[0].bio + PERSONAS[0].voice), false);
 assert.equal(PERSONAS[1].name, 'Ned Farley');
 assert.equal(PERSONAS[1].pron, 'he');
+assert.match(PERSONAS[1].bio + PERSONAS[1].voice, /early to mid-30s/);
 assert.match(TEXT_MODEL, /@cf\/meta\/llama-3/);
 assert.match(IMAGE_MODEL, /^@cf\//);
 
