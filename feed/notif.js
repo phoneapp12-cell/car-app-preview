@@ -212,7 +212,8 @@
     const asks = Array.isArray(info.asks) ? info.asks : (info.family || []).filter(f => f && f.asked && !f.sent);
     for (const a of asks) {
       const name = firstName(a.name) || 'A family member';
-      out.push({ id: 'lv-ask:' + (a.key || a.name), kind: 'lives', icon: '🙏', title: name + ' would like a life in Sugar Rush', at: Number(a.at) || now, go: 'sugar' });
+      const key = typeof a.key === 'string' ? a.key : '';
+      out.push({ id: 'lv-ask:' + (key || a.name), kind: 'lives', icon: '🙏', title: name + ' would like a life in Sugar Rush', at: Number(a.at) || now, go: 'sugar', lifeTo: key, lifeName: name, lifeSent: !!a.sent });
     }
     return out;
   }
@@ -435,23 +436,47 @@
     if (it.go === 'url' && it.url) { try { root.open(it.url, '_blank', 'noopener'); } catch (e) { } }
   }
 
+  function rowHtml(it) {
+    const send = (it.kind === 'lives' && it.lifeTo)
+      ? '<button type="button" class="today-nsend' + (it.lifeSent ? ' sent' : '') + '" data-nsend="' + esc(it.lifeTo) + '" data-nid="' + esc(it.id) + '"' + (it.lifeSent ? ' disabled' : '') + ' aria-label="' + esc((it.lifeSent ? 'Already sent a life to ' : 'Send a life to ') + (it.lifeName || 'this family member')) + '">' + (it.lifeSent ? 'Sent ✓' : 'Send ❤️') + '</button>'
+      : '';
+    return '<div class="today-nrow' + (it.read ? ' read' : '') + '" data-nid="' + esc(it.id) + '">'
+      + '<button type="button" class="today-nopen" data-nopen="' + esc(it.id) + '"><span class="nic" aria-hidden="true">' + (it.icon || '🔔') + '</span><span class="nbody"><b>' + esc(it.title) + '</b><small>' + esc(it.when || '') + '</small></span></button>'
+      + send
+      + '<button type="button" class="today-nclear" data-nclear="' + esc(it.id) + '" aria-label="Clear">✕</button>'
+      + '</div>';
+  }
+  async function sendAskedLife(key) {
+    if (!key) return { ok: false, err: 'no player' };
+    const S = root.IBScores;
+    if (!S || typeof S.postLives !== 'function' || !(S.who && S.who())) {
+      return { ok: false, err: 'no family link' };
+    }
+    try {
+      const r = await S.postLives({ act: 'send', to: key });
+      if (r && (r.ok || r.err === 'already sent today')) return r;
+      return r || { ok: false, err: 'unreachable' };
+    } catch (e) {
+      return { ok: false, err: 'unreachable' };
+    }
+  }
+  function replaceItems(items) {
+    lastItems = items || [];
+    lastAt = Date.now();
+    return lastItems;
+  }
+
   const api = {
     KEY, HOME, FIVE_DAYS, QUAKE_KM,
     collect, unreadOf, badgeLabel, whenLabel, keepQuake, km, nearHome, coversPlace, localWarning, localOutage,
     fromCalendar, fromTodos, fromStories, fromWeather, fromPower, fromLives, fromScrabble, fromQuakes,
-    items: itemsNow, unread, refresh, markSeen, clearIds, openGo, loadStore,
+    items: itemsNow, unread, refresh, markSeen, clearIds, openGo, loadStore, rowHtml, sendAskedLife, replaceItems,
     drawPage: null
   };
   root.ibNotif = api;
 
   if (!root.document) return;
 
-  function rowHtml(it) {
-    return `<div class="today-nrow${it.read ? ' read' : ''}" data-nid="${esc(it.id)}">
-      <button type="button" class="today-nopen" data-nopen="${esc(it.id)}"><span class="nic" aria-hidden="true">${it.icon || '🔔'}</span><span class="nbody"><b>${esc(it.title)}</b><small>${esc(it.when || '')}</small></span></button>
-      <button type="button" class="today-nclear" data-nclear="${esc(it.id)}" aria-label="Clear">✕</button>
-    </div>`;
-  }
   function drawPage(mark) {
     const m = root.document.getElementById('feed'); if (!m) return;
     if (mark !== false) markSeen();
@@ -469,6 +494,31 @@
     root.document.addEventListener('click', function (e) {
       const t = e.target;
       if (!t || !t.closest) return;
+      const sendBtn = t.closest('[data-nsend]');
+      if (sendBtn) {
+        e.preventDefault(); e.stopPropagation();
+        if (sendBtn.disabled || sendBtn.classList.contains('sent')) return;
+        const key = sendBtn.getAttribute('data-nsend');
+        const id = sendBtn.getAttribute('data-nid');
+        sendBtn.disabled = true;
+        sendBtn.textContent = 'Sending…';
+        Promise.resolve(sendAskedLife(key)).then(function (r) {
+          if (r && (r.ok || r.err === 'already sent today')) {
+            sendBtn.textContent = 'Sent ✓';
+            sendBtn.classList.add('sent');
+            sendBtn.setAttribute('aria-label', r.ok ? 'Sent a life' : 'Already sent today');
+            if (id) markSeen([id]);
+            lastItems = lastItems.map(function (it) {
+              return (it.lifeTo === key) ? Object.assign({}, it, { lifeSent: true, read: true }) : it;
+            });
+          } else {
+            sendBtn.disabled = false;
+            sendBtn.textContent = 'Send ❤️';
+            sendBtn.setAttribute('aria-label', 'Send a life' + (r && r.err === 'no family link' ? ' (needs a family link)' : ' (try again)'));
+          }
+        });
+        return;
+      }
       const clrAll = t.closest('[data-nclearall]');
       if (clrAll) {
         e.preventDefault(); e.stopPropagation();

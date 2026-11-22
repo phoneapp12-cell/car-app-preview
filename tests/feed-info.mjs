@@ -4584,7 +4584,18 @@ if (live) {
   assert.ok(items.find(i => i.kind === 'story').title.includes('Sarah'));
   assert.ok(items.find(i => i.kind === 'scrabble').title.includes('Sarah'));
   assert.ok(items.find(i => i.kind === 'lives' && i.id === 'lv-ask:abc').title.includes('Sarah'));
-  assert.ok(items.find(i => i.id === 'lv-pend'));
+  const ask = items.find(i => i.id === 'lv-ask:abc');
+  assert.strictEqual(ask.lifeTo, 'abc');
+  assert.strictEqual(ask.lifeName, 'Sarah');
+  assert.strictEqual(ask.lifeSent, false);
+  const pend = items.find(i => i.id === 'lv-pend');
+  assert.ok(pend);
+  assert.ok(!pend.lifeTo, 'a life waiting for you is not a send-to-someone button');
+  const askRow = N.rowHtml(ask);
+  assert.ok(askRow.includes('data-nsend="abc"') && askRow.includes('Send ❤️') && askRow.includes('Send a life to Sarah'), 'the ask row has a one-tap Send button');
+  assert.ok(!N.rowHtml(pend).includes('data-nsend'), 'the pending-life row has no Send button');
+  const sentRow = N.rowHtml(Object.assign({}, ask, { lifeSent: true }));
+  assert.ok(sentRow.includes('Sent ✓') && sentRow.includes('disabled') && sentRow.includes('Already sent a life to Sarah'), 'sent state disables the button');
   assert.ok(items.find(i => i.kind === 'todo').title.includes('recycling'));
   assert.ok(items.find(i => i.kind === 'quake').title.includes('4.2'));
   assert.ok(!items.some(i => i.id === 'qk:2026p2'));
@@ -4623,6 +4634,30 @@ if (live) {
   }, { read: {}, cleared: {} });
   assert.ok(ranked.findIndex(i => i.kind === 'quake') < ranked.findIndex(i => i.kind === 'todo'));
   assert.ok(ranked.findIndex(i => i.kind === 'power') < ranked.findIndex(i => i.kind === 'todo'));
+
+  // asks[] from the Worker is preferred; people already sent to today stay off the list.
+  const fromAsks = N.fromLives({
+    pending: 0,
+    asks: [{ key: 'k2', name: 'Aranea Demo', at: now - 5000 }],
+    family: [{ key: 'k2', name: 'Aranea Demo', asked: true, sent: false }, { key: 'k3', name: 'Gus Friend', asked: true, sent: true }]
+  }, now);
+  assert.strictEqual(fromAsks.length, 1);
+  assert.strictEqual(fromAsks[0].lifeTo, 'k2');
+  assert.strictEqual(fromAsks[0].lifeName, 'Aranea');
+
+  const sentCalls = [];
+  ctx.IBScores = {
+    who: () => ({ id: 'm-shane', tok: 't' }),
+    postLives: async (data) => { sentCalls.push(data); return { ok: 1, sent: 'Sarah' }; }
+  };
+  const sent = await N.sendAskedLife('abc');
+  assert.deepEqual(sentCalls, [{ act: 'send', to: 'abc' }]);
+  assert.equal(sent.ok, 1);
+  ctx.IBScores = { who: () => null, postLives: async () => ({ ok: 1 }) };
+  const noLink = await N.sendAskedLife('abc');
+  assert.equal(noLink.err, 'no family link');
+  assert.ok(notifSrc.includes("S.postLives({ act: 'send', to: key })") || notifSrc.includes("postLives({ act: 'send', to: key })"));
+  assert.ok(todayCss.includes('.today-nsend') && todayCss.includes('#dc2626'), 'Send uses the red CTA');
 
   console.log('notifications tab and sources ok');
 }
