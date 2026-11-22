@@ -272,14 +272,16 @@
       const list = await fam('/members');
       const rows = (list || []).filter(x => x.role !== 'friend').map(x => ({ name: x.name, seen: x.seen, sub: x.role === 'admin' ? 'you · admin' : '', me: x.role === 'admin' || x.mine, role: x.role }));
       el.innerHTML = rows.map((x, i) => personRow(x, i)).join('') || '<p class="lede">Nobody else has joined yet.</p>';
+      try { if (typeof fillFamPhotos === 'function') fillFamPhotos(); } catch (e) { }
       if (typeof IS_ADMIN !== 'undefined' && IS_ADMIN) {
         el.insertAdjacentHTML('beforeend', `<p style="margin-top:18px"><button class="btn pri" data-ib-open-settings>Family &amp; friends settings</button></p>`);
       }
     } catch (e) { el.textContent = e.message || 'Couldn’t load people.'; }
   }
   function personRow(x, i) {
-    const when = x.me || x.role === 'admin' ? 'Online now' : x.seen ? (typeof ago === 'function' ? ago(x.seen) + ' ago' : '') : 'Hasn’t opened it yet';
-    return `<div class="today-drow">${avHtml(x.name, i)}<div class="who"><b>${esc(x.name)}</b><small>${esc(x.sub || '')}</small></div><div class="when">${esc(when)}</div></div>`;
+    const when = x.ai ? 'AI friend' : x.me || x.role === 'admin' ? 'Online now' : x.seen ? (typeof ago === 'function' ? ago(x.seen) + ' ago' : '') : 'Hasn’t opened it yet';
+    const av = x.ai && x.avatar && typeof FAM_API !== 'undefined' ? `<div class="av av-ai"><img data-fph="${+x.avatar}" alt=""></div>` : avHtml(x.name, i);
+    return `<div class="today-drow">${av}<div class="who"><b>${esc(x.name)}</b>${x.ai ? ' <small class="aib" title="An invented AI friend, not a real person">AI friend</small>' : ''}<small>${esc(x.sub || (x.ai && x.bio) || '')}</small></div><div class="when">${esc(when)}</div></div>`;
   }
 
   function gameBest(kind) {

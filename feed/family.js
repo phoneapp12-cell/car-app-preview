@@ -234,6 +234,8 @@ function famBar(i) {
   return lk + `<button class="fb" data-cmt="${esc(i.id)}" aria-label="Comments">💬<span class="cc">${n || ''}</span>${fresh ? '<i class="dot"></i>' : ''}</button>${i.kind === 'upload' || i.kind === 'text' || (i._share && (i._share.link || i._share.text)) ? '' : `<button class="fb" data-share="${esc(i.id)}" aria-label="Share with the family">🔁</button>`}`;
 }
 function famLifeBar(x) { return canShareLife(x) ? `<button class="fb" data-share-life="${esc(x.id)}" aria-label="Share with the family">🔁</button>` : ''; }
+function aiFriendTag(on) { return on ? '<small class="aib" title="An invented AI friend, not a real person">AI friend</small>' : ''; }
+
 function audBadge(s) { // 1.9.230 who a post is for, and a friend's posts marked as such
   const a = s.aud === 'fr' ? '🤝 Friends' : s.aud === 'both' ? '👨‍👩‍👧 + 🤝 Family & friends' : '';
   return (s.friend && !IS_FRIEND && !s.mine ? '<small class="shaud fr">🤝 Friend</small>' : '') + (a && !IS_FRIEND ? `<small class="shaud">${a}</small>` : '');
@@ -242,10 +244,10 @@ function shareHead(i) {
   const s = i._share; if (!s) return '';
   const h = shareHead0(i, s); return h.replace('</div>', audBadge(s) + '</div>'); }
 function shareHead0(i, s) {
-  if (s.up) return `<div class="shby">📷 Photo from <b>${esc(s.name)}</b> · ${esc(nzTime(s.at))}${s.mine || IS_ADMIN ? `<button class="mini" data-unshare="${s.id}" data-up="1">Delete</button>` : ''}</div>`;
+  if (s.up) return `<div class="shby">📷 Photo from <b>${esc(s.name)}</b>${aiFriendTag(s.ai)} · ${esc(nzTime(s.at))}${s.mine || IS_ADMIN ? `<button class="mini" data-unshare="${s.id}" data-up="1">Delete</button>` : ''}</div>`;
   if (s.text || i.kind === 'text') {
     const del = s.mine || IS_ADMIN ? `<button class="mini" data-unshare="${s.id}" data-text="1">Delete</button>` : '';
-    return `<div class="shby">✏️ Written by <b>${esc(s.mine ? 'You' : s.name)}</b> · ${esc(nzTime(s.at))}${del}${Array.isArray(s.to) && s.to.length ? `<small class="shto">🔒 Just for ${esc(s.to.join(', '))}${s.mine ? '' : ' (and ' + esc(s.name) + ')'}</small>` : ''}</div>`;
+    return `<div class="shby">✏️ Written by <b>${esc(s.mine ? 'You' : s.name)}</b>${aiFriendTag(s.ai)} · ${esc(nzTime(s.at))}${del}${Array.isArray(s.to) && s.to.length ? `<small class="shto">🔒 Just for ${esc(s.to.join(', '))}${s.mine ? '' : ' (and ' + esc(s.name) + ')'}</small>` : ''}</div>`;
   }
   const del = s.mine || IS_ADMIN ? `<button class="mini" data-unshare="${s.id}">Un-share</button>` : '';
   if (s.link) return `<div class="shby">🔗 Shared by <b>${esc(s.mine ? 'You' : s.name)}</b> · ${esc(nzTime(s.at))}${del}${Array.isArray(s.to) && s.to.length ? `<small class="shto">🔒 Just for ${esc(s.to.join(', '))}${s.mine ? '' : ' (and ' + esc(s.name) + ')'}</small>` : ''}${s.caption ? `<p>“${esc(s.caption)}”</p>` : ''}</div>`; // 1.9.16
@@ -305,7 +307,7 @@ document.addEventListener('click', e => {
   const th = t.closest('[data-cthumb]'); if (th) { e.preventDefault(); e.stopPropagation(); toggleCLike(+th.dataset.cthumb, 'up'); return; }
   const n = t.closest('[data-clikers]'); if (n) { e.preventDefault(); e.stopPropagation(); showCLikers(+n.dataset.clikers); }
 }, true);
-const cmRow = x => `<div class="cm${x.bot ? ' bot' : ''}"><b>${esc(x.name)}</b>${x.pron && { she: 1, he: 1, they: 1 }[x.pron] ? ` <small class="prn">(${{ she: 'she/her', he: 'he/him', they: 'they/them' }[x.pron]})</small>` : ''}${x.bot ? '<span class="aib" title="Replies written by AI">AI</span>' : ''} <small>${esc(nzTime(x.at))}</small>${x.mine || IS_ADMIN ? `<button class="cx" data-delc="${x.id}" aria-label="Delete comment">✕</button>` : ''}<p>${esc(x.text)}</p>${cmLikeBar(x)}</div>`;
+const cmRow = x => `<div class="cm${x.bot ? ' bot' : ''}${x.ai ? ' aif' : ''}"><b>${esc(x.name)}</b>${x.pron && { she: 1, he: 1, they: 1 }[x.pron] ? ` <small class="prn">(${{ she: 'she/her', he: 'he/him', they: 'they/them' }[x.pron]})</small>` : ''}${x.bot ? '<span class="aib" title="Replies written by AI">AI</span>' : ''}${x.ai ? '<span class="aib" title="An invented AI friend, not a real person">AI friend</span>' : ''} <small>${esc(nzTime(x.at))}</small>${x.mine || IS_ADMIN ? `<button class="cx" data-delc="${x.id}" aria-label="Delete comment">✕</button>` : ''}<p>${esc(x.text)}</p>${cmLikeBar(x)}</div>`;
 /* 1.9.19 💬 threads open by themselves: any card with comments shows the latest 2–3 (with ❤️ and a reply box) and
    "View all N comments" when there are more. They arrive in the same one batch request as the counts. */
 function autoThread(id) {
@@ -466,7 +468,7 @@ async function famList() {
   const el = $('#famlist'); if (!el) return;
   try {
     const list = await fam('/members');
-    el.innerHTML = list.filter(x => x.role !== 'friend').map(x => `<div class="row"><span>${x.role === 'admin' ? '⭐' : '👤'} ${esc(x.name)}<small class="sst">${x.role === 'admin' ? 'you · admin' : x.seen ? 'last here ' + esc(ago(x.seen)) + ' ago' : 'hasn’t opened it yet'}</small></span><span>${x.role === 'admin' ? '' : `<button class="mini" data-famtok="${x.id}" data-n="${esc(x.name)}">New link</button> <button class="mini" data-famdel="${x.id}" data-n="${esc(x.name)}">Remove</button>`}</span></div>`).join('');
+    el.innerHTML = list.filter(x => x.role !== 'friend').map(x => `<div class="row"><span>${x.role === 'admin' ? '⭐' : '👤'} ${esc(x.name)}${x.ai ? ' <small class="aib" title="An invented AI friend, not a real person">AI friend</small>' : ''}<small class="sst">${x.ai ? esc(x.bio || 'An invented AI friend in Info Book') : x.role === 'admin' ? 'you · admin' : x.seen ? 'last here ' + esc(ago(x.seen)) + ' ago' : 'hasn’t opened it yet'}</small></span><span>${x.role === 'admin' || x.ai ? '' : `<button class="mini" data-famtok="${x.id}" data-n="${esc(x.name)}">New link</button> <button class="mini" data-famdel="${x.id}" data-n="${esc(x.name)}">Remove</button>`}</span></div>`).join('');
   } catch (e) { el.textContent = e.message; }
 }
 function showLink(name, token) {
