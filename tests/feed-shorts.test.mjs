@@ -259,3 +259,10 @@ test('double-tap loves a Short and a single tap still goes to pause', () => {
   assert.equal(puzzle.length, 1, 'Braynix r/puzzle clips are kept even though the sub is not allowlisted');
   assert.match(puzzle[0].credit, /Braynix Games/);
 });
+
+test('playAt does not reset a Short that is already playing', () => {
+  const js = fs.readFileSync(path.join(root, 'feed/shorts.js'), 'utf8');
+  assert.match(js, /if \(video\.getAttribute\('src'\) !== src && video\.currentSrc !== src\) video\.src = src/);
+  assert.match(js, /if \(i === playingI\)/);
+  assert.match(js, /if \(i >= 0 && i !== playingI\) playAt\(i\)/);
+});

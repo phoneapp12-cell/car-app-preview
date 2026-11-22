@@ -476,7 +476,7 @@
     return { clips: [] };
   }
 
-  let on = false, hist = false, muted = true, catalog = [], io = null, reel = null, shell = null, audioEl = null, lastTapAt = 0, lastTapSlide = null, singleTapT = 0;
+  let on = false, hist = false, muted = true, catalog = [], io = null, reel = null, shell = null, audioEl = null, lastTapAt = 0, lastTapSlide = null, singleTapT = 0, playingI = -1;
 
   function stopAudio() {
     if (!audioEl) return;
@@ -615,6 +615,7 @@
     if (i < 0) return;
     slide.remove();
     catalog.splice(i, 1);
+    playingI = -1;
     if (!on) return;
     if (!catalog.length) {
       reel.innerHTML = `<p class="sh-empty">No clips could be played just now.</p>`;
@@ -626,15 +627,16 @@
 
   function attachReddit(video, it, resIndex) {
     const n = resIndex || 0;
+    const src = redditSrc(it.vu, CMAF_RES[n] || CMAF_RES[0]);
     video.dataset.ri = String(n);
     video.dataset.vu = it.vu;
-    video.src = redditSrc(it.vu, CMAF_RES[n] || CMAF_RES[0]);
+    if (video.getAttribute('src') !== src && video.currentSrc !== src) video.src = src;
     video.loop = true;
     video.muted = true; /* sound is on the separate audio track, or left muted until unmute */
     video.playsInline = true;
   }
   function attachMixkit(video, it) {
-    video.src = it.url;
+    if (it && it.url && video.getAttribute('src') !== it.url && video.currentSrc !== it.url) video.src = it.url;
     video.loop = true;
     video.muted = muted;
     video.playsInline = true;
@@ -698,6 +700,16 @@
   function playAt(i) {
     if (i < 0 || i >= catalog.length) return;
     paintLove();
+    if (i === playingI) {
+      const s = slides()[i], it = catalog[i], v = s && s.querySelector('video');
+      if (v && it && it.kind !== 'youtube' && v.paused) {
+        v.muted = it.kind === 'reddit' ? true : muted;
+        const go = v.play();
+        if (go && go.catch) go.catch(() => { v.muted = true; v.play().catch(() => { }); });
+      }
+      return;
+    }
+    playingI = i;
     slides().forEach((s, j) => {
       const it = catalog[j];
       s.classList.toggle('on', j === i);
@@ -736,6 +748,7 @@
 
   function renderReel(items) {
     catalog = items.slice();
+    playingI = -1;
     if (!catalog.length) {
       reel.innerHTML = `<p class="sh-empty">No shorts are ready just now. Try again when the feed has refreshed.</p>`;
       return;
@@ -766,7 +779,7 @@
         .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
       if (!onScreen) return;
       const i = slides().indexOf(onScreen.target);
-      if (i >= 0) playAt(i);
+      if (i >= 0 && i !== playingI) playAt(i);
     }, { root: reel, threshold: [0.65, 0.9] });
     slides().forEach(s => io.observe(s));
     playAt(0);
@@ -828,6 +841,7 @@
   function close(fromPop) {
     if (!on) return;
     on = false;
+    playingI = -1;
     document.documentElement.classList.remove('ib-shorts-on');
     if (io) { try { io.disconnect(); } catch (e) { } io = null; }
     stopAudio();
