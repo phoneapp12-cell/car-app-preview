@@ -1,4 +1,4 @@
-/* Info Book 1.9.316 – Sugar Rush, levels 1–75. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
+/* Info Book 1.9.317 – Sugar Rush, levels 1–75. Our own match-3 sweet-shop game (own art drawn on canvas, own names).
    Swap two sweets next to each other to make a line of 3 or more. 4 in a line makes a striped sweet (clears a row or
    column), an L or T makes a wrapped sweet (clears the 3x3 around it), 5 in a line makes a sprinkle bomb (clears every
    sweet of the colour it is swapped with).
@@ -1486,7 +1486,7 @@
     const next = Object.assign({}, p, { open: Math.max(p.open | 0, SHOP_REJOIN) });
     return next;
   }
-  // 1.9.316 Island Night Market: a Cook Islands side path after Rarotonga (17) that rejoins at Tonga (18).
+  // 1.9.317 Island Night Market: a Cook Islands side path after Rarotonga (17) that rejoins at Tonga (18).
   const MARKET_FROM = 17, MARKET_REJOIN = 18;
   const MARKET_SECONDS = 150, MARKET_BONUS_SEC = 8, MARKET_COINS = 10;
   // Shane's 'Swipe It Right' is 102 BPM in A major, with vocals, so the night-time speedup
@@ -3044,7 +3044,7 @@
     'sugar-rush-say-m.m4a': '9e645d94', 'sugar-rush-say-m.mp3': '8e05c831',
     'sugar-rush-shop-bell.mp3': '17a691af', 'sugar-rush-shop-chaching.mp3': '65082481', 'sugar-rush-shop-hmph.mp3': '04da5505',
     'sugar-rush-market-call.mp3': '8f3686d1', 'sugar-rush-market-basket.mp3': '9d329487',
-    // 1.9.316 Shane's 'Swipe It Right' (Suno, 102 BPM, A major), -17 LUFS, AAC 96k with an mp3 twin. Whole track, like the other songs; it fades in the last 1.3s.
+    // 1.9.317 Shane's 'Swipe It Right' (Suno, 102 BPM, A major), -17 LUFS, AAC 96k with an mp3 twin. Whole track, like the other songs; it fades in the last 1.3s.
     'sugar-rush-market.m4a': '1277099c', 'sugar-rush-market.mp3': 'b0e77ad5'
   };
   // 1.9.225 Spoken sayings as recorded clips, a female voice (Microsoft neural "Molly", en-NZ) and a male one
@@ -10088,7 +10088,7 @@
   function ensureMapExtras() {
     if (document.querySelector('script[src*="sugar-rush-map"]')) return;
     var s = document.createElement('script');
-    s.src = 'sugar-rush-map.js?v=1.9.316';
+    s.src = 'sugar-rush-map.js?v=1.9.317';
     s.async = false;
     document.body.appendChild(s);
   }
