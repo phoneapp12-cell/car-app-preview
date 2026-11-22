@@ -19,14 +19,20 @@ function stubSql() {
 assert.equal(isAiFriend('ai:maisie'), true);
 assert.equal(isAiFriend('m1'), false);
 assert.equal(PERSONAS.length, 2);
-assert.equal(PERSONAS[0].name, 'Maisie Cole');
+assert.equal(PERSONAS[0].name, 'Chloe');
+assert.equal(PERSONAS[0].id, 'ai:maisie');
 assert.equal(PERSONAS[0].pron, 'she');
 assert.match(PERSONAS[0].bio, /florist/i);
 assert.match(PERSONAS[0].bio + PERSONAS[0].voice, /early thirties/);
 assert.equal(/retired|60s|teacher/i.test(PERSONAS[0].bio + PERSONAS[0].voice), false);
-assert.equal(PERSONAS[1].name, 'Ned Farley');
+assert.equal(PERSONAS[1].name, 'Liam');
+assert.equal(PERSONAS[1].id, 'ai:ned');
 assert.equal(PERSONAS[1].pron, 'he');
 assert.match(PERSONAS[1].bio + PERSONAS[1].voice, /early to mid-30s/);
+const shown = PERSONAS.map(p => p.name + ' ' + p.bio + ' ' + p.voice).join('\n');
+assert.equal(/(Maisie|Cole|Ned|Farley|Turner|Parker|Chloe Turner|Liam Parker)/i.test(shown), false);
+assert.match(PERSONAS[0].voice, /\bChloe\b/);
+assert.match(PERSONAS[1].voice, /\bLiam\b/);
 assert.match(TEXT_MODEL, /@cf\/meta\/llama-3/);
 assert.match(IMAGE_MODEL, /^@cf\//);
 
@@ -86,7 +92,8 @@ assert.equal(friends.cfg().on, true);
 friends.ensureMembers(now);
 assert.ok(f.one(`SELECT id, name, pron, role, tok FROM members WHERE id='ai:maisie'`).tok == null);
 assert.equal(f.one(`SELECT pron FROM members WHERE id='ai:ned'`).pron, 'he');
-assert.equal(f.one(`SELECT name FROM members WHERE id='ai:maisie'`).name, 'Maisie Cole');
+assert.equal(f.one(`SELECT name FROM members WHERE id='ai:maisie'`).name, 'Chloe');
+assert.equal(f.one(`SELECT name FROM members WHERE id='ai:ned'`).name, 'Liam');
 
 const kick = await friends.kick(now);
 assert.equal(kick.ok, 1);
@@ -96,6 +103,10 @@ const posts = f.all(`SELECT mid, priv, aud FROM shares WHERE del=0`);
 assert.equal(posts.length, 2);
 assert.ok(posts.every(p => p.aud === 'fam'), 'family only');
 assert.equal(notes.length, 0, 'kick must not send notifications (friends never call note)');
+f.sql.exec(`UPDATE shares SET snap=? WHERE mid='ai:maisie'`, JSON.stringify({ t: 'old mug post', sn: 'Maisie Cole', kind: 'upload' }));
+assert.equal(friends.renameSnaps() > 0, true);
+assert.equal(JSON.parse(f.one(`SELECT snap FROM shares WHERE mid='ai:maisie'`).snap).sn, 'Chloe');
+assert.equal(JSON.parse(f.one(`SELECT snap FROM shares WHERE mid='ai:ned'`).snap).sn, 'Liam');
 
 // off switch stops tick work
 friends.save({ on: 0 });
@@ -114,15 +125,15 @@ await friends.maybeScores(now, true);
 sql.db.prepare(`INSERT INTO scores (game,mid,score,lines,level,won,opp,at) VALUES ('tetris','m2',20000,40,5,NULL,NULL,?)`).run(now);
 await friends.maybeScores(now + 864e5, true); // new day so it runs again
 const b = board(sql, { id: 'm1', name: 'Shane', role: 'admin' }, 'tetris');
-const maisie = (b.body.best || []).find(x => x.name === 'Maisie Cole');
-assert.ok(maisie && maisie.ai === 1);
-assert.ok(maisie.score < 20000, 'does not overtake a strong human best on the next update');
+const chloe = (b.body.best || []).find(x => x.name === 'Chloe');
+assert.ok(chloe && chloe.ai === 1);
+assert.ok(chloe.score < 20000, 'does not overtake a strong human best on the next update');
 const rb = raceBoard(sql, { id: 'm1', name: 'Shane', role: 'admin' }, now);
-assert.ok((rb.body.racers || []).some(r => r.ai && r.name === 'Ned Farley'));
+assert.ok((rb.body.racers || []).some(r => r.ai && r.name === 'Liam'));
 
 // lives list omits AI friends
 const lv = livesView(sql, { id: 'm1', name: 'Shane', role: 'admin' }, now);
-assert.ok(!(lv.family || []).some(x => /Maisie|Ned/.test(x.name)), 'AI friends are not in the lives send list');
+assert.ok(!(lv.family || []).some(x => /Chloe|Liam/.test(x.name)), 'AI friends are not in the lives send list');
 assert.equal(JSON.stringify(lv).includes('ai:'), false);
 
 console.log('aifriends tests ok');
