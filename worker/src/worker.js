@@ -137,6 +137,81 @@ function parseReddit(xml, src) {
   return out;
 }
 
+// Reddit's official RSS is often 403/429 from this Worker; arctic-shift is a public listing fallback (same item shape, same filters).
+function redditUsesArctic(src) {
+  return /^(sv-|vid-|fun-)/.test(src.id || '');
+}
+function arcticQuery(src) {
+  const q = new URL('https://arctic-shift.photon-reddit.com/api/posts/search');
+  q.searchParams.set('sort', 'desc');
+  q.searchParams.set('limit', String(Math.min(50, Math.max((src.max || 8) * 3, 16))));
+  const user = String(src.url || '').match(/reddit\.com\/(?:user|u)\/([^/?#]+)/i);
+  const sub = String(src.url || '').match(/reddit\.com\/r\/([^/?#]+)/i);
+  if (user) q.searchParams.set('author', user[1]);
+  else {
+    if (sub) q.searchParams.set('subreddit', sub[1]);
+    if (src.author) q.searchParams.set('author', src.author);
+  }
+  return q.href;
+}
+function parseArcticPosts(data, src) {
+  const out = [];
+  for (const p of data || []) {
+    if (!p || p.over_18) continue;
+    const title = String(p.title || '');
+    const permalink = p.permalink ? (String(p.permalink).startsWith('http') ? String(p.permalink) : 'https://www.reddit.com' + p.permalink) : '';
+    const linkOut = String(p.url_overridden_by_dest || p.url || '');
+    if (!title || !permalink) continue;
+    if (src.want && !src.want.test(title)) continue;
+    if (isPaywalled({ url: linkOut })) continue;
+    const by = String(p.author || '').replace(/^\/?u\//i, '');
+    if (src.author && by.toLowerCase() !== String(src.author).toLowerCase()) continue;
+    if (/\b(nsfw|nsfl|gore|rip|passed away|euthan|cancer)\b/i.test(title)) continue;
+    const yv = (linkOut.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([\w-]{11})/) || [])[1];
+    const mediaVu = ((p.media && p.media.reddit_video && p.media.reddit_video.fallback_url) || (p.secure_media && p.secure_media.reddit_video && p.secure_media.reddit_video.fallback_url) || '');
+    const rv = (linkOut.match(/v\.redd\.it\/([a-z0-9]{8,20})/i) || mediaVu.match(/v\.redd\.it\/([a-z0-9]{8,20})/i) || [])[1];
+    if (src.videosOnly && !yv && !rv) continue;
+    let img = '';
+    if (/^https:\/\/i\.redd\.it\/[\w-]+\.(jpe?g|png|webp|gif)$/i.test(linkOut)) img = linkOut;
+    else {
+      const srcImg = p.preview && p.preview.images && p.preview.images[0] && p.preview.images[0].source && p.preview.images[0].source.url;
+      const thumb = String(p.thumbnail || '');
+      if (srcImg) img = String(srcImg).replace(/&amp;/g, '&');
+      else if (/^https:\/\/(external-)?preview\.redd\.it\//.test(thumb)) img = thumb.replace(/&amp;/g, '&');
+    }
+    if (/\.gif$/i.test(img)) img = '';
+    if (yv) img = `https://i.ytimg.com/vi/${yv}/hqdefault.jpg`;
+    if (rv && !img) {
+      const srcImg = p.preview && p.preview.images && p.preview.images[0] && p.preview.images[0].source && p.preview.images[0].source.url;
+      if (srcImg) img = String(srcImg).replace(/&amp;/g, '&');
+    }
+    if (src.imagesOnly && !img) continue;
+    const body = clip(strip(String(p.selftext || '')), 200);
+    const it = { id: hash(permalink), t: clip(title, 160), s: body === title ? '' : body, url: permalink, ext: linkOut || undefined, img, at: p.created_utc ? Math.round(p.created_utc * 1000) : Date.now(), kind: yv || rv ? 'video' : img ? 'photo' : 'news', vid: yv || undefined, vk: rv ? 'reddit' : undefined, vu: rv || undefined, by: by || undefined };
+    const rvid = (p.media && p.media.reddit_video) || (p.secure_media && p.secure_media.reddit_video) || {};
+    if (rv && rvid.duration) it.vdur = Math.round(+rvid.duration);
+    if (rv && rvid.width && rvid.height) { it.vw = +rvid.width; it.vh = +rvid.height; }
+    out.push(it);
+  }
+  return out;
+}
+async function fetchRedditArctic(src) {
+  const r = await get(arcticQuery(src), { tries: 2, ms: 15000 });
+  const j = await r.json();
+  const data = Array.isArray(j) ? j : (j && j.data);
+  if (!Array.isArray(data)) throw new Error('arctic-shift: bad response');
+  return parseArcticPosts(data, src);
+}
+async function fetchReddit(src) {
+  if (redditUsesArctic(src)) {
+    try { const items = await fetchRedditArctic(src); src._via = 'arctic'; return items; }
+    catch (e) { /* official RSS if the fallback is down */ }
+  }
+  src._via = 'rss';
+  const xml = await (await get(src.url, { tries: 2 })).text();
+  return parseReddit(xml, src);
+}
+
 function parseYtRss(xml) {
   return (xml.match(/<entry>[\s\S]*?<\/entry>/gi) || []).map(e => ({ vid: strip(tag(e, 'yt:videoId')), t: strip(tag(e, 'title')), at: Date.parse(strip(tag(e, 'published'))) || Date.now(), s: clip(strip(tag(e, 'media:description')), 200) }));
 }
@@ -312,8 +387,8 @@ async function runSource(src, old = new Map()) {
     items = []; for (let k = 0; k < n; k++) { const x = L[(day * n + k) % L.length]; items.push({ id: src.id + ':' + x.id, t: x.t, s: x.s, url: src.url, img: x.img, at: Math.min(Date.now(), start + k * 4 * 36e5), kind: 'photo' }); }
   }
   else {
-    const xml = await (await get(src.url, { tries: 2 })).text();
-    items = src.kind === 'reddit' ? parseReddit(xml, src) : parseRss(xml, src);
+    if (src.kind === 'reddit') items = await fetchReddit(src);
+    else { const xml = await (await get(src.url, { tries: 2 })).text(); items = parseRss(xml, src); }
     if (src.kind === 'reddit') { // 1.9.93 how long each Reddit clip is (short ones fill the stories row: no ads, under 30s)
       for (const i of items) { const o = old.get(i.id); if (o && o.vdur) i.vdur = o.vdur; }
       const lim = src.author || src.portraitOnly || src.maxSec ? 16 : 6;
@@ -336,7 +411,7 @@ async function runSource(src, old = new Map()) {
     let pics = 0; const lim = src.picMax ?? 2;
     items = items.filter(i => i.img && !SHOW_RE.test(i.t)).map(i => ({ i, tip: TIP_RE.test(i.t) })).sort((a, b) => b.tip - a.tip).filter(x => x.tip || pics++ < lim).map(x => x.i);
   }
-  return items.filter(i => !isSport(i.t, i.s, i.url) && !isUnsafe(i, src.topic) && !isPaywalled(i)).slice(0, MAX_PER_SOURCE)
+  return items.filter(i => !isSport(i.t, i.s, i.url) && !isUnsafe(i, src.topic) && !isPaywalled(i) && !(src.notWant && src.notWant.test(i.t + ' ' + (i.s || '')))).slice(0, MAX_PER_SOURCE)
     .map(i => ({ ...i, src: src.id, sn: src.name, topic: src.topic, tag: i.tag || src.tag || undefined, party: i.party || src.party || undefined }));
 }
 
