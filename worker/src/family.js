@@ -412,7 +412,7 @@ export class Family extends DurableObject {
     if (p === '/aibot/cfg' && m === 'PUT') { if (!admin) return J({ err: 'admin only' }, 403); const b = await body(), c = this.bot.cfg(); if ('on' in b) c.on = !!b.on; if (['rare', 'some', 'often'].includes(b.freq)) c.freq = b.freq; this.bot.save(c); if (!c.on) this.sql.exec(`DELETE FROM aiq`); return J({ cfg: this.bot.cfg() }); }
     if (p === '/aibot/try' && m === 'POST') { if (!admin) return J({ err: 'admin only' }, 403); const b = await body(); const out = {}; for (const md of (b.models || []).slice(0, 4)) { try { out[md] = await this.bot.reply({ cid: +b.cid, card: String(b.card), dry: 1 }, now, md); } catch (e) { out[md] = 'ERR ' + e.message; } } return J(out); } // admin testing: draft replies, nothing saved
     if (p === '/aibot/kick' && m === 'POST') { if (!admin) return J({ err: 'admin only' }, 403); this.sql.exec(`UPDATE aiq SET due=?`, now); await this.bot.run(now + 1); try { await this.rt.flush(); } catch (e) { } return J({ ok: 1, usage: this.bot.usage() }); } // testing: answer the queued ones now
-    // ---- 1.9.318 AI friends (Maisie Cole and Ned Farley): family-only invented locals, Workers AI, no notifications
+    // ---- 1.9.318 AI friends (Chloe and Liam): family-only invented locals, Workers AI, no notifications
     if (p === '/aifriends' && m === 'GET') {
       this.friends.ensureMembers(now);
       return J({ on: this.friends.cfg().on, people: this.friends.list(), usage: this.friends.usage(), ...(admin ? { model: { text: AI_FRIEND_TEXT, image: AI_FRIEND_IMAGE }, ai: !!this.env.AI } : {}) });

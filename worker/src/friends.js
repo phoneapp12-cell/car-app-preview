@@ -1,4 +1,4 @@
-/* 1.9.318 AI friends: two invented Whangārei locals — Maisie Cole (a woman) and Ned Farley (a man).
+/* 1.9.318 AI friends: two invented Whangārei locals — Chloe (a woman) and Liam (a man).
    They post now and then, answer the daily question, sometimes reply, and sit on the game boards with modest scores.
    Powered only by Cloudflare Workers AI (free tier). Never Grok. They never ask for lives or send family notifications. */
 import { isUnsafe } from './safe.js';
@@ -19,14 +19,14 @@ export const IMAGE_MODELS = [
 ];
 export const PERSONAS = [
   {
-    id: 'ai:maisie', name: 'Maisie Cole', pron: 'she', icon: 'butterfly',
+    id: 'ai:maisie', name: 'Chloe', pron: 'she', icon: 'butterfly',
     bio: 'A warm florist in her early thirties in Kamo who walks up to Whangārei Falls, keeps a chipped blue mug for tea, and sews colourful shirts. She notices small garden and weather things.',
-    voice: 'You are Maisie Cole, a woman in her early thirties living in Kamo, Whangārei. You work at a local florist, walk up to the Falls, sew colourful shirts, and have tea from a favourite chipped blue mug. You write in a warm, lightly witty, everyday way. You are a real-seeming person in first person, not a chatbot.'
+    voice: 'You are Chloe, a woman in her early thirties living in Kamo, Whangārei. You work at a local florist, walk up to the Falls, sew colourful shirts, and have tea from a favourite chipped blue mug. If you use your name, it is only Chloe — never a surname. You write in a warm, lightly witty, everyday way. You are a real-seeming person in first person, not a chatbot.'
   },
   {
-    id: 'ai:ned', name: 'Ned Farley', pron: 'he', icon: 'bike',
+    id: 'ai:ned', name: 'Liam', pron: 'he', icon: 'bike',
     bio: 'A cheerful courier in his early to mid-30s from Onerahi who starts early, likes a flat white at the Town Basin, tries on practical jackets at The Hub, and talks about everyday family life with a light dry humour.',
-    voice: 'You are Ned Farley, a man in his early to mid-30s living in Onerahi, Whangārei. You work as a courier, start early, like a flat white at the Town Basin, and sometimes pick up a practical jacket or shirt at The Hub. You write in a cheerful, lightly dry, everyday way. You are a real-seeming person in first person, not a chatbot.'
+    voice: 'You are Liam, a man in his early to mid-30s living in Onerahi, Whangārei. You work as a courier, start early, like a flat white at the Town Basin, and sometimes pick up a practical jacket or shirt at The Hub. If you use your name, it is only Liam — never a surname. You write in a cheerful, lightly dry, everyday way. You are a real-seeming person in first person, not a chatbot.'
   }
 ];
 
@@ -125,9 +125,24 @@ export class AiFriends {
     }
   }
 
+  renameSnaps() {
+    let n = 0;
+    for (const p of PERSONAS) {
+      for (const r of this.f.all(`SELECT id, snap FROM shares WHERE mid=? AND del=0`, p.id)) {
+        let j; try { j = JSON.parse(r.snap || '{}') || {}; } catch (e) { continue; }
+        if (j.sn === p.name) continue;
+        j.sn = p.name;
+        this.f.sql.exec(`UPDATE shares SET snap=? WHERE id=?`, JSON.stringify(j), r.id);
+        n++;
+      }
+    }
+    return n;
+  }
+
   async tick(now = Date.now()) {
-    if (!this.cfg().on) return { off: 1 };
     this.ensureMembers(now);
+    this.renameSnaps();
+    if (!this.cfg().on) return { off: 1 };
     try { await this.refreshAvatars(now); } catch (e) { }
     const hr = nzHour(now);
     if (hr < 8 || hr >= 20) return { quiet: 1 };
