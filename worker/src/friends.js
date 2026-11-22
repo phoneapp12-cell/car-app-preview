@@ -7,7 +7,16 @@ import { dailyPrompt, nzDay } from './daily.js';
 import { tetrisMax } from './scores.js';
 
 export const TEXT_MODEL = '@cf/meta/llama-3.1-8b-instruct';
+export const TEXT_MODELS = [
+  '@cf/meta/llama-3.1-8b-instruct',
+  '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
+];
 export const IMAGE_MODEL = '@cf/lykon/dreamshaper-8-lcm';
+export const IMAGE_MODELS = [
+  '@cf/lykon/dreamshaper-8-lcm',
+  '@cf/black-forest-labs/flux-1-schnell',
+  '@cf/stabilityai/stable-diffusion-xl-base-1.0'
+];
 export const PERSONAS = [
   {
     id: 'ai:maisie', name: 'Maisie Cole', pron: 'she', icon: 'butterfly',
@@ -121,7 +130,10 @@ export class AiFriends {
     const hr = nzHour(now);
     if (hr < 8 || hr >= 20) return { quiet: 1 };
     if (!this.f.one(`SELECT v FROM meta WHERE k='aifriends_intro'`)) {
-      try { await this.intro(now); } catch (e) { }
+      try {
+        const intro = await this.intro(now);
+        if (!intro.ok) return { ran: 0, intro: false, err: intro.err || 'intro failed', posts: intro.posts || [] };
+      } catch (e) { return { ran: 0, intro: false, err: String(e && e.message || e) }; }
     }
     this.planDay(now);
     const due = this.f.all(`SELECT id, mid, kind FROM aifjob WHERE done=0 AND due<=? ORDER BY due LIMIT 6`, now + 30e3);
@@ -158,12 +170,15 @@ export class AiFriends {
 
   async intro(now) {
     this.ensureMembers(now);
+    const posts = [];
     for (const p of PERSONAS) {
       try { await this.ensureAvatar(p, now); } catch (e) { }
       const kind = p.id === 'ai:maisie' ? 'mug' : 'place';
-      await this.publish(p, kind, now, true);
+      posts.push(await this.publish(p, kind, now, true));
     }
-    this.f.sql.exec(`INSERT INTO meta (k,v) VALUES ('aifriends_intro',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v`, String(now));
+    const ok = posts.filter(x => x && x.id).length === PERSONAS.length;
+    if (ok) this.f.sql.exec(`INSERT INTO meta (k,v) VALUES ('aifriends_intro',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v`, String(now));
+    return { ok, posts, err: ok ? null : (posts.map(x => x && (x.err || x.skip) || 'failed').join('; ') || 'intro failed') };
   }
 
   async kick(now = Date.now()) {
@@ -200,13 +215,20 @@ export class AiFriends {
 
   async generate(p, user, max = 90) {
     const u = this.usage(); if (u.n >= TEXT_CAP) { this.log(0, 0, 1); return null; }
-    const ai = this.f.env && this.f.env.AI; if (!ai) return null;
+    const ai = this.f.env && this.f.env.AI; if (!ai) { this.lastErr = 'no-ai'; return null; }
     const sys = `${p.voice}\n${RULES}`;
-    const r = await ai.run(TEXT_MODEL, { messages: [{ role: 'system', content: sys }, { role: 'user', content: user }], max_tokens: max, temperature: 0.85 });
+    let r, last = null;
+    for (const model of TEXT_MODELS) {
+      try {
+        r = await ai.run(model, { messages: [{ role: 'system', content: sys }, { role: 'user', content: user }], max_tokens: max, temperature: 0.85 });
+        last = null;
+        break;
+      } catch (e) { last = String(e && e.message || e); r = null; }
+    }
     let text = String((r && (r.response || (r.result && r.result.response))) || '').replace(/^\s*["“]|["”]\s*$/g, '').replace(/#\w+/g, '').trim();
     if (text.length > MAX_POST) text = text.slice(0, MAX_POST - 1).replace(/\s+\S*$/, '') + '…';
     this.log(1, 0, 0);
-    if (!text || unsafeText(text)) { this.log(0, 0, 1); return null; }
+    if (!text || unsafeText(text)) { this.log(0, 0, 1); this.lastErr = last || (text ? 'unsafe' : 'empty'); return null; }
     return text;
   }
 
@@ -214,7 +236,15 @@ export class AiFriends {
     const u = this.usage(); if (u.img >= IMG_CAP) return null;
     const ai = this.f.env && this.f.env.AI; if (!ai) return null;
     if (unsafeText(prompt)) return null;
-    let r; try { r = await ai.run(IMAGE_MODEL, { prompt, num_steps: 8 }); } catch (e) { return null; }
+    let r = null;
+    for (const model of IMAGE_MODELS) {
+      try {
+        const input = /flux|schnell/i.test(model) ? { prompt } : { prompt, num_steps: 8 };
+        r = await ai.run(model, input);
+        break;
+      } catch (e) { r = null; }
+    }
+    if (!r) return null;
     this.log(0, 1, 0);
     const raw = r && (r.image || r.images && r.images[0]);
     let bytes = null;
@@ -255,7 +285,7 @@ export class AiFriends {
   async publish(p, kind, now, maybePhoto) {
     const wantPhoto = maybePhoto || Math.random() < 0.4;
     const text = await this.generate(p, this.topicHint(kind, p) + (wantPhoto ? ' If you mention a photo, keep the words able to stand alone.' : ''), 90);
-    if (!text) return { mid: p.id, skip: 'unsafe' };
+    if (!text) return { mid: p.id, skip: this.lastErr || 'unsafe', err: this.lastErr || 'unsafe' };
     let photoId = null;
     if (wantPhoto) {
       try {
