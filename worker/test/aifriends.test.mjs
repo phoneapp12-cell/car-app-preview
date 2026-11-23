@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { scoresInit, board, raceBoard, livesView, lifeKey } from '../src/scores.js';
-import { AiFriends, PERSONAS, TEXT_MODEL, IMAGE_MODEL, isAiFriend, unsafeText, pickPostCount, modestTetris, modestRace } from '../src/friends.js';
+import { AiFriends, PERSONAS, TEXT_MODEL, IMAGE_MODEL, isAiFriend, unsafeText, pickPostCount, modestTetris, modestRace, fallbackPoll } from '../src/friends.js';
+import { dailyPoll } from '../src/polls.js';
+import { nzDay } from '../src/daily.js';
 
 function stubSql() {
   const db = new DatabaseSync(':memory:');
@@ -62,7 +64,8 @@ sql.db.exec(`CREATE TABLE members (id TEXT PRIMARY KEY, name TEXT NOT NULL, role
   CREATE TABLE meta (k TEXT PRIMARY KEY, v TEXT);
   CREATE TABLE photos (id INTEGER PRIMARY KEY AUTOINCREMENT, mid TEXT NOT NULL, post INTEGER, w INTEGER, h INTEGER, size INTEGER NOT NULL, data BLOB NOT NULL, at INTEGER NOT NULL);
   CREATE TABLE shares (id INTEGER PRIMARY KEY AUTOINCREMENT, mid TEXT NOT NULL, orig TEXT, snap TEXT NOT NULL, caption TEXT, priv INTEGER DEFAULT 0, at INTEGER NOT NULL, del INTEGER DEFAULT 0, tag TEXT, aud TEXT, circ TEXT);
-  CREATE TABLE comments (id INTEGER PRIMARY KEY AUTOINCREMENT, card TEXT NOT NULL, mid TEXT NOT NULL, text TEXT NOT NULL, at INTEGER NOT NULL, snap TEXT, del INTEGER DEFAULT 0);`);
+  CREATE TABLE comments (id INTEGER PRIMARY KEY AUTOINCREMENT, card TEXT NOT NULL, mid TEXT NOT NULL, text TEXT NOT NULL, at INTEGER NOT NULL, snap TEXT, del INTEGER DEFAULT 0);
+  CREATE TABLE pollv (day TEXT NOT NULL, mid TEXT NOT NULL, opt INTEGER NOT NULL, at INTEGER, PRIMARY KEY (day, mid));`);
 sql.db.prepare(`INSERT INTO members (id,name,role,created,removed) VALUES ('m1','Shane','admin',1,0)`).run();
 sql.db.prepare(`INSERT INTO members (id,name,role,created,removed) VALUES ('m2','Sarah','member',1,0)`).run();
 scoresInit(sql);
@@ -135,5 +138,34 @@ assert.ok((rb.body.racers || []).some(r => r.ai && r.name === 'Liam'));
 const lv = livesView(sql, { id: 'm1', name: 'Shane', role: 'admin' }, now);
 assert.ok(!(lv.family || []).some(x => /Chloe|Liam/.test(x.name)), 'AI friends are not in the lives send list');
 assert.equal(JSON.stringify(lv).includes('ai:'), false);
+
+// poll: one vote each, no second vote, off switch, natural schedule
+const day = nzDay(now);
+const pl = dailyPoll(day);
+assert.ok(pl.opts.length >= 2);
+const fb = fallbackPoll(PERSONAS[0], pl);
+assert.ok(fb >= 0 && fb < pl.opts.length);
+replies.unshift('0');
+const v1 = await friends.votePoll(PERSONAS[0], now, day);
+assert.equal(v1.mid, 'ai:maisie');
+assert.equal(v1.opt, 0);
+assert.equal(v1.skip, undefined);
+const again = await friends.votePoll(PERSONAS[0], now, day);
+assert.equal(again.skip, 'already');
+assert.equal(f.all(`SELECT mid, opt FROM pollv WHERE mid='ai:maisie'`).length, 1);
+const late = await friends.votePoll(PERSONAS[1], now, '2026-11-22');
+assert.equal(late.skip, 'late');
+friends.planPolls(now);
+const jobs = f.all(`SELECT mid, kind, due FROM aifjob WHERE kind='poll' AND day=?`, day);
+assert.equal(jobs.filter(j => j.mid === 'ai:ned').length, 1, 'Liam gets a poll job even if the day was already planned');
+assert.equal(jobs.filter(j => j.mid === 'ai:maisie').length, 0, 'Chloe already voted so no poll job');
+const nedDue = jobs.find(j => j.mid === 'ai:ned').due;
+const end = Date.parse(day + 'T19:50:00+13:00');
+assert.ok(nedDue >= now + 7 * 60e3 && nedDue <= end);
+friends.save({ on: 0 });
+const offt = await friends.tick(now);
+assert.equal(offt.off, 1);
+assert.equal(f.one(`SELECT mid FROM pollv WHERE mid='ai:ned'`), null, 'off switch blocks new poll votes');
+friends.save({ on: 1 });
 
 console.log('aifriends tests ok');

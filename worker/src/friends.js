@@ -4,6 +4,7 @@
 import { isUnsafe } from './safe.js';
 import { SPORT_RE } from './sources.js';
 import { dailyPrompt, nzDay } from './daily.js';
+import { dailyPoll } from './polls.js';
 import { tetrisMax } from './scores.js';
 
 export const TEXT_MODEL = '@cf/meta/llama-3.1-8b-instruct';
@@ -51,6 +52,17 @@ export function unsafeText(t) {
   if (!s.trim()) return true;
   if (isUnsafe({ t: s }) || SPORT_RE.test(s) || POLITICS.test(s) || RELIGION.test(s) || LIVES_ASK.test(s) || MONEY.test(s) || PRIV.test(s) || AI_TELL.test(s)) return true;
   return false;
+}
+
+export function fallbackPoll(p, pl) {
+  const prefer = p.id === 'ai:maisie'
+    ? /tea|garden|walk|bush|beach|bake|pavlova|flower|morning|sunrise|fantail|honey|fruit|mild|cosy|salad|dinosaur/i
+    : /coffee|flat white|morning|beach|car|burger|meat|bbq|summer|crunchie|hokey|chips|alien/i;
+  const hits = (pl.opts || []).map((o, i) => prefer.test(o) ? i : -1).filter(i => i >= 0);
+  if (hits.length) return hits[0];
+  let h = 0; const s = String((pl && pl.day) || '') + (p.id || '');
+  for (let i = 0; i < s.length; i++) h = (h * 33 + s.charCodeAt(i)) >>> 0;
+  return (pl.opts && pl.opts.length) ? h % pl.opts.length : 0;
 }
 
 export function pickPostCount(rand = Math.random) {
@@ -153,14 +165,15 @@ export class AiFriends {
       } catch (e) { return { ran: 0, intro: false, err: String(e && e.message || e) }; }
     }
     this.planDay(now);
-    const due = this.f.all(`SELECT id, mid, kind FROM aifjob WHERE done=0 AND due<=? ORDER BY due LIMIT 6`, now + 30e3);
+    this.planPolls(now);
+    const due = this.f.all(`SELECT id, mid, kind, day FROM aifjob WHERE done=0 AND due<=? ORDER BY due LIMIT 6`, now + 30e3);
     const out = [];
     for (const j of due) {
       try { out.push(await this.runJob(j, now)); } catch (e) { this.log(0, 0, 1); this.f.sql.exec(`UPDATE aifjob SET done=2 WHERE id=?`, j.id); }
     }
     try { await this.maybeReply(now); } catch (e) { }
     try { await this.maybeScores(now); } catch (e) { }
-    return { ran: out.length, intro: !!this.f.one(`SELECT v FROM meta WHERE k='aifriends_intro'`) };
+    return { ran: out.length, intro: !!this.f.one(`SELECT v FROM meta WHERE k='aifriends_intro'`), polls: this.pollStatus(now) };
   }
 
   planDay(now) {
@@ -183,6 +196,34 @@ export class AiFriends {
         this.f.sql.exec(`INSERT INTO aifjob (day,mid,kind,due,done) VALUES (?,?,?,?,0)`, day, p.id, kind, due);
       }
     }
+  }
+
+  planPolls(now) {
+    const day = nzDay(now);
+    const start = nzMs(day, '08:00') || now, end = nzMs(day, '19:50') || (now + 8 * 36e5);
+    if (end <= start) return;
+    const dues = this.f.all(`SELECT due FROM aifjob WHERE day=? AND kind='poll'`, day).map(r => r.due);
+    for (const p of PERSONAS) {
+      if (this.f.one(`SELECT id FROM aifjob WHERE day=? AND mid=? AND kind='poll'`, day, p.id)) continue;
+      if (this.f.one(`SELECT mid FROM pollv WHERE day=? AND mid=?`, day, p.id)) continue;
+      const from = Math.max(start, now + 8 * 60e3);
+      if (from >= end) continue;
+      let due, tries = 0;
+      do { due = from + Math.floor(Math.random() * (end - from)); tries++; }
+      while (tries < 12 && dues.some(t => Math.abs(t - due) < 20 * 60e3));
+      due = Math.min(end, Math.max(from, due));
+      dues.push(due);
+      this.f.sql.exec(`INSERT INTO aifjob (day,mid,kind,due,done) VALUES (?,?,?,?,0)`, day, p.id, 'poll', due);
+    }
+  }
+
+  pollStatus(now) {
+    const day = nzDay(now);
+    return PERSONAS.map(p => {
+      const v = this.f.one(`SELECT opt, at FROM pollv WHERE day=? AND mid=?`, day, p.id);
+      const job = this.f.one(`SELECT due, done FROM aifjob WHERE day=? AND mid=? AND kind='poll'`, day, p.id);
+      return { mid: p.id, name: p.name, voted: v ? 1 : 0, opt: v ? v.opt : null, due: job ? job.due : null };
+    });
   }
 
   async intro(now) {
@@ -214,10 +255,45 @@ export class AiFriends {
   }
 
   async runJob(j, now) {
+    const p = persona(j.mid);
+    if (!p) { this.f.sql.exec(`UPDATE aifjob SET done=1 WHERE id=?`, j.id); return { skip: 'gone' }; }
+    if (j.kind === 'poll') {
+      const r = await this.votePoll(p, now, j.day);
+      if (!r || r.skip === 'no-pick') return r;
+      this.f.sql.exec(`UPDATE aifjob SET done=1 WHERE id=?`, j.id);
+      return r;
+    }
     this.f.sql.exec(`UPDATE aifjob SET done=1 WHERE id=?`, j.id);
-    const p = persona(j.mid); if (!p) return { skip: 'gone' };
     if (j.kind === 'daily') return this.answerDaily(p, now);
     return this.publish(p, j.kind, now, false);
+  }
+
+  async votePoll(p, now, jobDay) {
+    const day = nzDay(now);
+    if (jobDay && jobDay !== day) return { mid: p.id, skip: 'late' };
+    const pl = dailyPoll(day);
+    if (this.f.one(`SELECT mid FROM pollv WHERE day=? AND mid=?`, pl.day, p.id)) return { mid: p.id, skip: 'already', poll: pl.key };
+    const opt = await this.pickPoll(p, pl);
+    if (opt == null || !(opt >= 0 && opt < pl.opts.length)) return { mid: p.id, skip: 'no-pick', poll: pl.key };
+    this.f.sql.exec(`INSERT INTO pollv (day,mid,opt,at) VALUES (?,?,?,?) ON CONFLICT(day,mid) DO NOTHING`, pl.day, p.id, opt, now);
+    this.f.sql.exec(`UPDATE members SET seen=? WHERE id=?`, now, p.id);
+    return { mid: p.id, name: p.name, poll: pl.key, opt, pick: pl.opts[opt] };
+  }
+
+  async pickPoll(p, pl) {
+    const lines = pl.opts.map((o, i) => i + ': ' + o).join('\n');
+    const text = await this.generate(p, `Today's family poll is: "${pl.q}"\nOptions:\n${lines}\nPick the option that most fits you. Reply with only the option number (0 to ${pl.opts.length - 1}), nothing else.`, 8);
+    let i = NaN;
+    if (text) {
+      const m = String(text).trim().match(/^\s*([0-9]+)/);
+      if (m) i = +m[1];
+      if (!(i >= 0 && i < pl.opts.length)) {
+        const low = String(text).toLowerCase();
+        i = pl.opts.findIndex(o => low.includes(String(o).replace(/^\W+/, '').toLowerCase().slice(0, 12)));
+      }
+    }
+    if (!(i >= 0 && i < pl.opts.length)) i = fallbackPoll(p, pl);
+    return i;
   }
 
   topicHint(kind, p) {
