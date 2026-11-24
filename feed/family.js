@@ -13,10 +13,13 @@ let MEMBER = (() => { try { return JSON.parse(localStorage.getItem('mf.member') 
 function myName() { const n = MEMBER && !MEMBER.pending && MEMBER.name ? String(MEMBER.name).trim().split(/\s+/)[0] : ''; return n; }
 function forMe(cap) { const n = myName(); return (cap ? 'For ' : 'for ') + (n || 'you'); }
 function mine(cap) { const n = myName(); return n ? n + '’s' : (cap ? 'Your' : 'your'); }
+let URL_TRY_INV = '';
 (() => { // ?invite=… : keep the token, take it out of the address bar, check it below (famInit)
   const q = new URLSearchParams(location.search), inv = q.get('invite');
   if (inv && /^[\w-]{30,80}$/.test(inv)) {
-    if (!MEMBER || MEMBER.tok !== inv) { MEMBER = { tok: inv, pending: 1 }; localStorage.setItem('mf.member', JSON.stringify(MEMBER)); }
+    // Don't let a stale Home Screen start_url (an old invite) overwrite a working sign-in.
+    if (MEMBER && MEMBER.id && !MEMBER.pending && MEMBER.tok !== inv) URL_TRY_INV = inv;
+    else if (!MEMBER || MEMBER.tok !== inv) { MEMBER = { tok: inv, pending: 1 }; localStorage.setItem('mf.member', JSON.stringify(MEMBER)); }
   }
   if (inv) { try { sessionStorage.setItem('ibFromInvite', '1'); } catch (e) { } } // 1.9.104 opened from an invite link: install pop-up straight away
   if (inv) { q.delete('invite'); history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash); }
@@ -25,13 +28,17 @@ function mine(cap) { const n = myName(); return n ? n + '’s' : (cap ? 'Your' :
   if (fr && /^[\w-]{30,80}$/.test(fr)) { try { sessionStorage.setItem('ibFriendCode', fr); } catch (e) { } }
   if (fr) { q.delete('friend'); history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash); }
 })();
-const FAM_ON = !!(MEMBER && MEMBER.id && !MEMBER.pending);
-const IS_ADMIN = FAM_ON && MEMBER.role === 'admin';
-const IS_FRIEND = FAM_ON && MEMBER.role === 'friend'; // 1.9.230 a friend: sees their friends circle, never the family's things
+let FAM_ON, IS_ADMIN, IS_FRIEND, PRIVATE_OK, LS_PREFIX;
+function applyMemberFlags() {
+  FAM_ON = !!(MEMBER && MEMBER.id && !MEMBER.pending);
+  IS_ADMIN = FAM_ON && MEMBER.role === 'admin';
+  IS_FRIEND = FAM_ON && MEMBER.role === 'friend'; // 1.9.230 a friend: sees their friends circle, never the family's things
+  // Shane's own My App things are only read when this phone is his: no family member set up (as before 1.7.0) or his admin link.
+  PRIVATE_OK = !MEMBER || IS_ADMIN;
+  LS_PREFIX = MEMBER && MEMBER.id && MEMBER.role !== 'admin' ? 'mf.m.' + MEMBER.id + '.' : 'mf.';
+}
+applyMemberFlags();
 const famWord = () => IS_FRIEND ? 'your friends' : 'the family';
-// Shane's own My App things are only read when this phone is his: no family member set up (as before 1.7.0) or his admin link.
-const PRIVATE_OK = !MEMBER || IS_ADMIN;
-const LS_PREFIX = MEMBER && MEMBER.id && MEMBER.role !== 'admin' ? 'mf.m.' + MEMBER.id + '.' : 'mf.';
 // Board cards from My App that Shane may share on purpose. Personal reminders (cars, birthdays, health, to-dos, holidays,
 // deliveries, his garden, weather/power at home, photos, shopping, Kindle) are never shareable.
 const SHARE_BOARDS = new Set(['gardening', 'space', 'astro', 'travel', 'science', 'aitech', 'diy', 'coding', 'walk', 'video', 'top40', 'recipe', 'quote', 'fact', 'joke', 'webcam', 'cinema', 'prime', 'tv', 'concert', 'news', 'radio', 'lang', 'blog', 'podcast']);
@@ -82,18 +89,51 @@ async function famInit() {
   if (fcode && !MEMBER) { joinSheet(fcode); return; } // 1.9.230 a friend invite
   if (fcode && MEMBER) { try { sessionStorage.removeItem('ibFriendCode'); } catch (e) { } setTimeout(() => toast('Info Book is already set up on this phone'), 1500); }
   if (!MEMBER) { if (STANDALONE && !ls.get('noLink', false)) pasteLink(); return; }
+  if (URL_TRY_INV && MEMBER && MEMBER.id && !MEMBER.pending) {
+    const tryTok = URL_TRY_INV; URL_TRY_INV = '';
+    try {
+      const r = await fetch(FAM_API + '/me', { headers: { Authorization: 'Bearer ' + tryTok, 'X-App-Version': typeof APP_VERSION !== 'undefined' ? APP_VERSION : '' } });
+      const me = await r.json().catch(() => ({}));
+      if (r.ok && me.id) {
+        const next = { tok: tryTok, id: me.id, name: me.name, role: me.role, ...(me.friend ? { host: me.host || '' } : {}), ...(me.shane ? { shane: 1 } : {}) };
+        localStorage.setItem('mf.member', JSON.stringify(next));
+        MEMBER = next;
+        applyMemberFlags();
+        try { if (typeof draw === 'function') draw(); } catch (e) { }
+      }
+    } catch (e) { /* stale invite in the address: keep the working session */ }
+  }
   if (MEMBER.pending) {
     try {
       const me = await fam('/me');
-      const next = { tok: MEMBER.tok, id: me.id, name: me.name, role: me.role, ...(me.friend ? { host: me.host || '' } : {}) };
+      const next = { tok: MEMBER.tok, id: me.id, name: me.name, role: me.role, ...(me.friend ? { host: me.host || '' } : {}), ...(me.shane ? { shane: 1 } : {}) };
       localStorage.setItem('mf.member', JSON.stringify(next));
-      // 1.9.82: only one pending→ready reload per token (avoids open-time restart loops)
-      const key = 'ibPendRel:' + MEMBER.tok.slice(0, 12);
-      if (localStorage.getItem(key) !== me.id) { localStorage.setItem(key, me.id); location.reload(); }
-      else { MEMBER = next; /* already reloaded once; continue without another restart */ }
+      // Apply flags and redraw on this same load so Family/People/admin appear even if we skip a reload.
+      MEMBER = next;
+      applyMemberFlags();
+      try { if (typeof draw === 'function') draw(); } catch (e) { }
+      // 1.9.82: at most one pending→ready reload per token, and only if the flag actually stuck.
+      // If storage is ignored (some in-app browsers), a reload would loop and leave Today on boot skeletons.
+      // On Android, skip the reload — flags are already applied. iOS still gets one reload so a new
+      // Home Screen app can read the saved link.
+      const key = 'ibPendRel:' + String(MEMBER.tok || '').slice(0, 12);
+      let already = false, stuck = false;
+      try {
+        already = localStorage.getItem(key) === me.id;
+        if (!already) { localStorage.setItem(key, me.id); stuck = localStorage.getItem(key) === me.id; }
+      } catch (e) { }
+      if (!already && stuck && typeof IOS !== 'undefined' && IOS) { location.reload(); return; }
     }
-    catch (e) { if (e.status === 401) { localStorage.removeItem('mf.member'); $('#feed').insertAdjacentHTML('afterbegin', '<div class="empty">This invite link doesn’t work any more. Ask Shane for a new one.</div>'); } }
-    return;
+    catch (e) {
+      if (e.status === 401) {
+        try { localStorage.removeItem('mf.member'); } catch (err) { }
+        MEMBER = null;
+        applyMemberFlags();
+        try { $('#feed').insertAdjacentHTML('afterbegin', '<div class="empty">This invite link doesn’t work any more. Ask Shane for a new one.</div>'); } catch (err) { }
+        try { if (typeof STANDALONE !== 'undefined' && STANDALONE && typeof pasteLink === 'function') pasteLink(); } catch (err) { }
+      }
+      return;
+    }
   }
   PICK = MEMBER.role === 'admin' ? null : ls.get('pick', null); giveDefaults();
   if (PICK && !ls.get('seed104', 0)) { if (!PICK.includes('meals')) PICK.push('meals'); ls.set('pick', PICK); ls.set('seed104', 1); } // 1.9.104 easy weeknight meals on for everyone
