@@ -25,13 +25,17 @@ function mine(cap) { const n = myName(); return n ? n + '’s' : (cap ? 'Your' :
   if (fr && /^[\w-]{30,80}$/.test(fr)) { try { sessionStorage.setItem('ibFriendCode', fr); } catch (e) { } }
   if (fr) { q.delete('friend'); history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash); }
 })();
-const FAM_ON = !!(MEMBER && MEMBER.id && !MEMBER.pending);
-const IS_ADMIN = FAM_ON && MEMBER.role === 'admin';
-const IS_FRIEND = FAM_ON && MEMBER.role === 'friend'; // 1.9.230 a friend: sees their friends circle, never the family's things
+let FAM_ON, IS_ADMIN, IS_FRIEND, PRIVATE_OK, LS_PREFIX;
+function applyMemberFlags() {
+  FAM_ON = !!(MEMBER && MEMBER.id && !MEMBER.pending);
+  IS_ADMIN = FAM_ON && MEMBER.role === 'admin';
+  IS_FRIEND = FAM_ON && MEMBER.role === 'friend'; // 1.9.230 a friend: sees their friends circle, never the family's things
+  // Shane's own My App things are only read when this phone is his: no family member set up (as before 1.7.0) or his admin link.
+  PRIVATE_OK = !MEMBER || IS_ADMIN;
+  LS_PREFIX = MEMBER && MEMBER.id && MEMBER.role !== 'admin' ? 'mf.m.' + MEMBER.id + '.' : 'mf.';
+}
+applyMemberFlags();
 const famWord = () => IS_FRIEND ? 'your friends' : 'the family';
-// Shane's own My App things are only read when this phone is his: no family member set up (as before 1.7.0) or his admin link.
-const PRIVATE_OK = !MEMBER || IS_ADMIN;
-const LS_PREFIX = MEMBER && MEMBER.id && MEMBER.role !== 'admin' ? 'mf.m.' + MEMBER.id + '.' : 'mf.';
 // Board cards from My App that Shane may share on purpose. Personal reminders (cars, birthdays, health, to-dos, holidays,
 // deliveries, his garden, weather/power at home, photos, shopping, Kindle) are never shareable.
 const SHARE_BOARDS = new Set(['gardening', 'space', 'astro', 'travel', 'science', 'aitech', 'diy', 'coding', 'walk', 'video', 'top40', 'recipe', 'quote', 'fact', 'joke', 'webcam', 'cinema', 'prime', 'tv', 'concert', 'news', 'radio', 'lang', 'blog', 'podcast']);
@@ -85,15 +89,19 @@ async function famInit() {
   if (MEMBER.pending) {
     try {
       const me = await fam('/me');
-      const next = { tok: MEMBER.tok, id: me.id, name: me.name, role: me.role, ...(me.friend ? { host: me.host || '' } : {}) };
+      const next = { tok: MEMBER.tok, id: me.id, name: me.name, role: me.role, ...(me.friend ? { host: me.host || '' } : {}), ...(me.shane ? { shane: 1 } : {}) };
       localStorage.setItem('mf.member', JSON.stringify(next));
       // 1.9.82: only one pending→ready reload per token (avoids open-time restart loops)
       const key = 'ibPendRel:' + MEMBER.tok.slice(0, 12);
-      if (localStorage.getItem(key) !== me.id) { localStorage.setItem(key, me.id); location.reload(); }
-      else { MEMBER = next; /* already reloaded once; continue without another restart */ }
+      if (localStorage.getItem(key) !== me.id) { localStorage.setItem(key, me.id); location.reload(); return; }
+      // Same token already reloaded once, but this load still started as pending (e.g. sign-in was cleared
+      // and the old invite was opened again). Apply the member flags here so admin family settings appear
+      // without another restart, which used to leave FAM_ON/IS_ADMIN false for the rest of the page.
+      MEMBER = next;
+      applyMemberFlags();
+      try { if (typeof draw === 'function') draw(); } catch (e) { }
     }
-    catch (e) { if (e.status === 401) { localStorage.removeItem('mf.member'); $('#feed').insertAdjacentHTML('afterbegin', '<div class="empty">This invite link doesn’t work any more. Ask Shane for a new one.</div>'); } }
-    return;
+    catch (e) { if (e.status === 401) { localStorage.removeItem('mf.member'); $('#feed').insertAdjacentHTML('afterbegin', '<div class="empty">This invite link doesn’t work any more. Ask Shane for a new one.</div>'); } return; }
   }
   PICK = MEMBER.role === 'admin' ? null : ls.get('pick', null); giveDefaults();
   if (PICK && !ls.get('seed104', 0)) { if (!PICK.includes('meals')) PICK.push('meals'); ls.set('pick', PICK); ls.set('seed104', 1); } // 1.9.104 easy weeknight meals on for everyone
