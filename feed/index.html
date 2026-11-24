@@ -770,14 +770,25 @@ body[data-artopen] .artwin{overscroll-behavior:none}body[data-artopen] .artbar{o
 <script>
 /* 1.9.82 self-heal: if the feed is still skeletons after 9s (crash/stale cache), offer a manual reload.
    Auto-reload only on a real JS error, at most once per 10 minutes (localStorage). No controllerchange reload —
-   new SW versions apply quietly on the next open. */
+   new SW versions apply quietly on the next open.
+   The banner is attached to the body (not #feed): today-look hides #feed children that aren't .sk until ib-ready. */
 (function () {
   var fix = function () { var done = function () { location.replace(location.pathname + '?fresh=' + Date.now()); };
     try { Promise.all([caches.keys().then(function (k) { return Promise.all(k.map(function (n) { return caches.delete(n); })); }), navigator.serviceWorker ? navigator.serviceWorker.getRegistrations().then(function (r) { return Promise.all(r.map(function (x) { return x.update(); })); }) : 0]).then(done, done); } catch (e) { done(); } };
   window.__ibErr = 0; addEventListener('error', function () { window.__ibErr++; });
   setTimeout(function () {
-    var f = document.getElementById('feed'); if (!f || f.querySelector('.card,.empty,.load') || !f.querySelector('.sk')) return;
-    f.insertAdjacentHTML('afterbegin', '<div class="empty" id="ibheal">😕 Info Book didn’t load properly.<br><br><button class="btn pri" id="ibfix">↻ Reload Info Book</button></div>');
+    var f = document.getElementById('feed');
+    var ready = document.documentElement.classList.contains('ib-ready');
+    var hasPage = f && (f.querySelector('.card,.empty,.load,#today-hero,#today-people') || document.getElementById('today-hero'));
+    var stuckSk = f && f.querySelector('.sk') && !hasPage;
+    var stuckBoot = !ready && document.getElementById('ib-bootsk');
+    if (!stuckBoot && !stuckSk) return;
+    if (document.getElementById('ibheal')) return;
+    var box = document.createElement('div');
+    box.id = 'ibheal';
+    box.setAttribute('style', 'position:fixed;left:12px;right:12px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:20000;padding:14px 16px;border-radius:16px;background:var(--card,#fff);color:var(--ink,#111);box-shadow:0 8px 24px rgba(0,0,0,.18);text-align:center;font:inherit');
+    box.innerHTML = '😕 Info Book didn’t load properly.<br><br><button class="btn pri" id="ibfix">↻ Reload Info Book</button>';
+    document.body.appendChild(box);
     document.getElementById('ibfix').onclick = fix;
     if (window.__ibErr) {
       var art = false;

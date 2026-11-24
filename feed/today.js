@@ -8,6 +8,9 @@
   const esc = s => String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   document.documentElement.classList.add('today-look');
+  // Unhide the magazine chrome immediately. If a later script throws (or an invite
+  // reload never settles), Today would otherwise stay on boot skeletons with no tabs.
+  document.documentElement.classList.add('ib-ready');
 
   /* ---- NZ clock (Pacific/Auckland) ---- */
   function nzParts(d = new Date()) {
@@ -507,22 +510,25 @@
     if (typeof draw !== 'function') return;
     const orig = draw;
     window.draw = function () {
-      if (window.ibTodoOn || window.ibCalOn) { orig.apply(this, arguments); paintTabs(); ready(); return; }
-      const t = typeof tab !== 'undefined' ? tab : 'all';
-      if (t === 'people' || t === 'notif' || t === 'games' || t === 'you' || t === 'ondemand') {
-        try { if (typeof chips === 'function') chips(); } catch (e) { }
-        const bf = document.getElementById('backfeed'); if (bf) bf.hidden = true;
-        if (t === 'people') drawPeoplePage();
-        else if (t === 'notif') { try { if (window.ibNotif && ibNotif.drawPage) ibNotif.drawPage(true); } catch (e) { } }
-        else if (t === 'games') drawGamesPage();
-        else if (t === 'you') drawYouPage();
-        else if (t === 'ondemand') { try { if (window.ibOnDemand && ibOnDemand.drawPage) ibOnDemand.drawPage(); } catch (e) { } }
-        paintTabs(); ready(); return;
+      try {
+        if (window.ibTodoOn || window.ibCalOn) { orig.apply(this, arguments); paintTabs(); return; }
+        const t = typeof tab !== 'undefined' ? tab : 'all';
+        if (t === 'people' || t === 'notif' || t === 'games' || t === 'you' || t === 'ondemand') {
+          try { if (typeof chips === 'function') chips(); } catch (e) { }
+          const bf = document.getElementById('backfeed'); if (bf) bf.hidden = true;
+          if (t === 'people') drawPeoplePage();
+          else if (t === 'notif') { try { if (window.ibNotif && ibNotif.drawPage) ibNotif.drawPage(true); } catch (e) { } }
+          else if (t === 'games') drawGamesPage();
+          else if (t === 'you') drawYouPage();
+          else if (t === 'ondemand') { try { if (window.ibOnDemand && ibOnDemand.drawPage) ibOnDemand.drawPage(); } catch (e) { } }
+          paintTabs(); return;
+        }
+        orig.apply(this, arguments);
+        if (typeof tab !== 'undefined' && tab === 'all') { injectHero(); injectTodoCard(); }
+        paintTabs();
+      } finally {
+        ready();
       }
-      orig.apply(this, arguments);
-      if (typeof tab !== 'undefined' && tab === 'all') { injectHero(); injectTodoCard(); }
-      paintTabs();
-      ready();
     };
   }
 
