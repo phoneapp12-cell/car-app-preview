@@ -242,12 +242,5 @@ export async function sendRenoCountdownToAll(env, renoKey = DEFAULT_RENO_KEY, fe
 
 // Called every minute from worker.js REMIND_CRON. Fires at 8:30 pm NZT (20:30 Pacific/Auckland) every day.
 export async function runRenoReminder(env, fetchImpl = fetch, now = Date.now()) {
-  if (!env || !env.EVENTS_KV || !env.VAPID_PRIVATE_JWK) return { sent: 0 };
-  const nz = nzTimeParts(now);
-  // Fire in the 8:30 pm NZT window (20:30 to 20:44 in case a cron tick was slightly delayed)
-  if (nz.hour !== 20 || nz.minute < 30 || nz.minute > 44) return { skipped: 'not_830pm' };
-  let st = null;
-  try { st = await env.EVENTS_KV.get(RENO_REM_STATE_KEY, { type: 'json' }); } catch (e) { st = null; }
-  if (st && st.sentDay === nz.date) return { skipped: 'already_sent_today' };
-  return await sendRenoCountdownToAll(env, DEFAULT_RENO_KEY, fetchImpl, now, false);
+  return { skipped: 'project_finished', sent: 0 };
 }

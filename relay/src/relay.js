@@ -97,7 +97,6 @@ async function getRadioNow(idx, fetchImpl = fetch) {
   }
 }
 
-import { renoRoute } from './reno.js';
 import { carsAlexaRoute } from './cars-alexa.js';
 import { sharedTodoRoute, sharedCarRoute, sharedPhotoRoute } from './shared-todo.js';
 import { sharedPushRoute } from './shop-notify.js';
@@ -738,16 +737,10 @@ async function handleInner(request, env = {}, fetchImpl = fetch) {
     try { const [status, data] = await carsAlexaRoute(m !== 'GET' && body && body.off ? 'DELETE' : m, key, body, env); return new Response(JSON.stringify(data), { status, headers: H }); }
     catch (e) { return json(502, 'cars_unavailable', origin, env); }
   }
-  if (path === '/reno') { // 2.26.25: Millesha's Renovation (own key, own list)
+  if (path === '/reno') { // 2.29.28: Millesha's Renovation is finished — no more job-list reads or writes
     if (request.method !== 'POST') return json(405, 'method_not_allowed', origin, env);
     if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
-    let body;
-    try { const raw = await request.text(); if (raw.length > 120000) return json(413, 'too_large', origin, env); body = raw ? JSON.parse(raw) : {}; } catch (e) { return json(400, 'bad_request', origin, env); }
-    try {
-      const [status, data] = await renoRoute(body, env, Date.now(), fetchImpl);
-      if (data && data.error) return json(status, data.error, origin, env);
-      return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
-    } catch (e) { return json(502, 'reno_unavailable', origin, env); }
+    return new Response(JSON.stringify({ finished: true, items: [] }), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
   }
   if (path === '/shared-todo') {
     if (request.method !== 'POST') return json(405, 'method_not_allowed', origin, env);

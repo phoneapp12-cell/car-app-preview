@@ -493,10 +493,8 @@ export class Retain {
 
   async route(p, m, u, req, me, admin, J, body) {
     const now = Date.now(), today = dayKey(now);
-    if (p === '/reno' && m === 'GET') { // everyone in the family sees the same card; refreshed from My App's list at most every 30 min
-      const c = this.one(`SELECT v FROM meta WHERE k='reno'`); let r = c ? JSON.parse(c.v) : null;
-      if ((!r || now - r.got > 30 * 60e3) && this.f.env.RELAY_KV) { try { const list = JSON.parse(await this.f.env.RELAY_KV.get(RENO_KV) || 'null'); if (Array.isArray(list)) { r = { ...renoSummary(list, now), got: now }; this.sql.exec(`INSERT INTO meta (k,v) VALUES ('reno',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v`, JSON.stringify(r)); } } catch (e) { } }
-      return J(r ? { reno: r } : { reno: null });
+    if (p === '/reno' && m === 'GET') { // 2.29.28: Millesha's renovation is finished; keep the route so older clients just get no card
+      return J({ reno: null });
     }
     if (p === '/power' && m === 'GET') { try { await this.npPoll(now); } catch (e) { } const ok = +((this.one(`SELECT v FROM meta WHERE k='npok'`) || {}).v || 0); return J({ list: this.pwrList(now), checked: ok, src: NP_URL }); }
     if (p === '/power/test' && (m === 'POST' || m === 'DELETE')) { // admin only: a clearly marked TEST outage to check the card, removed afterwards
