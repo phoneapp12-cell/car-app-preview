@@ -55,7 +55,7 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== location.origin) return; // never touch other sites
-  if (/millesha\.html$/.test(url.pathname)) return; // 2.26.25: Millesha's own page loads straight from the network
+  if (/\/millesha(\.html)?$/.test(url.pathname)) return; // finished-project page, not the cached app shell
   if (/\/feed\//.test(url.pathname)) return; // 2.29.4: My Feed (./feed/) has its own service worker
   if (req.mode === 'navigate') {
     e.respondWith((async () => {

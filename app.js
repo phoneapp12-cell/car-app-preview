@@ -20202,7 +20202,6 @@ function Settings() {
   ${websiteSettingsRow()}
   <div class="sec" id="appearance">Appearance</div>
   ${homeLayoutPicker()}
-  ${renoSetting()}
   ${themePicker()}
   ${themeNowNote()}
   ${textSizePicker()}
@@ -22097,7 +22096,7 @@ function mfCat(x) {
   if (k === 'health' || k === 'med') return 'health'; if (k === 'todo' || k === 'rem') return 'todo'; if (k === 'gym') return 'gym';
   if (k === 'meal') return 'meal'; if (k === 'hol' || k === 'cd') return 'hol';
   try { const c = cuCat(x); if (c) return c; } catch (e) { }
-  return /reno|millesha/i.test(String(x.name || x.html || '')) ? 'reno' : 'event';
+  return /\breno\b/i.test(String(x.name || x.html || '')) ? 'reno' : 'event';
 }
 const MF_SPORT = /\b(sports?|rugby|cricket|netball|football|soccer|league|nrl|afl|nba|nfl|golf|tennis|boxing|ufc|motorsport|formula 1|f1|supercars|all blacks|black caps|silver ferns|olympics?|hockey|basketball|baseball|super rugby|wrestling|racing|athletics|tournament|grand prix|v8)\b/i;
 // 2.29.5: picture hints for each item (photos My App already has, or a subject for My Feed to find a picture of),
@@ -23217,20 +23216,11 @@ function langCard(k) {
     <button class="chip" onclick="langQuizStart('${k}')">Quick quiz</button></div>
     ${progLine(learnedN, L.list.length, 'Words learned', 'pgsm')}${quiz}</div>`;
 }
-/* ================= 2.26.25: Millesha's Renovation (temporary page; Settings can hide it when the project's finished) ================= */
-const RENO_KEY = '3im0XgV50Be1sR1NgqrHDMIjKltsOJcmG9g8Gj57'; // opens only the renovation job list on the relay
-const RENO_LINK = 'https://phoneapp12-cell.github.io/car-app-preview/millesha.html#k=' + RENO_KEY;
-const renoOn = () => !(S && S.settings && S.settings.renoHide);
-async function setRenoHide(v) { S.settings.renoHide = !!v; await save(); render(); toast(v ? 'Renovation page hidden.' : 'Renovation page back in the menu.'); }
-function renoSetting() { const on = renoOn(); return `<div class="list" id="renoset" style="margin-top:10px"><div class="srow"><div class="tx"><div class="t">Millesha’s Renovation</div><div class="s">${on ? 'Shown in the side menu' : 'Hidden (project finished)'}</div></div></div>
-  <div class="chips" style="padding:0 12px 12px"><button type="button" class="chip ${on ? 'on' : ''}" onclick="setRenoHide(false)">Show</button><button type="button" class="chip ${on ? '' : 'on'}" onclick="setRenoHide(true)">Hide when project finished</button></div></div>`; }
-async function renoShare() { try { if (navigator.share) { await navigator.share({ title: 'Millesha’s Renovation', text: 'Our renovation checklist – tick jobs off as you go:', url: RENO_LINK }); return; } } catch (e) { return; } try { await navigator.clipboard.writeText(RENO_LINK); toast('Link copied. Send it to Millesha.'); } catch (e) { prompt('Copy this link for Millesha', RENO_LINK); } }
+/* 2.29.28: Millesha's Renovation is finished. #reno stays as a short note for old bookmarks. Mum's and My Reno are unchanged. */
 function RenoPage() {
-  let body = ''; try { body = window.Reno ? Reno.html() : '<div class="card empty"><div class="t">Loading…</div></div>'; } catch (e) { body = ''; }
-  return `<button class="back" onclick="go('#projects')">${I('left')} Projects</button>` + header('Millesha’s Renovation', 'Room by room: clean, mop ceiling, speckle, sand, paint ceiling, paint walls, doors, flooring') +
-    `<button type="button" class="row card" style="margin-bottom:12px" onclick="renoShare()"><div class="tx"><div class="t">Share with Millesha</div><div class="s">Her own page with just this checklist. Nothing else from My App.</div></div>${I('right')}</button>` + body;
+  return `<button class="back" onclick="go('#projects')">${I('left')} Projects</button>` + header('Millesha’s Renovation', 'This project is finished') +
+    `<div class="card"><div class="t">This project is finished</div><div class="s">Millesha’s renovation checklist is complete, so it has been taken out of My App. Mum’s Renovation and My Renovations are still here.</div></div>`;
 }
-try { if (window.Reno) Reno.init({ key: RENO_KEY, me: 'Shane', onChange: () => { if ((location.hash || '').slice(1) === 'reno') render(); } }); } catch (e) { }
 
 /* ================= 2.26.36: Days off plan, Mum's Renovation, My Renovations ================= */
 // Days off plan: calm, at most 3 picks per day off (one reno block, one house job, free time). Swap / Skip. Unfinished things quietly roll on. Never Zeus.
@@ -23248,7 +23238,6 @@ function wkRenoSources() {
   const own = (S.myReno || []).filter(x => !x.done).sort((a, b) => (a.status === 'doing' ? 0 : 1) - (b.status === 'doing' ? 0 : 1))[0];
   return {
     mum: (() => { try { mumRenoReady(); const n = MumReno.next(); return n && { ic: '👵', t: 'Mum’s reno: ' + n.title, s: n.area, go: '#mumreno' }; } catch (e) { return null; } })(),
-    mill: (() => { try { const n = window.Reno && Reno.next(); return n && { ic: '🛠️', t: 'Millesha’s reno: ' + n.title, s: n.area, go: '#reno' }; } catch (e) { return null; } })(),
     own: own ? { ic: '🔨', t: 'My reno: ' + own.title, s: own.status === 'doing' ? 'In progress' : 'Your list', go: '#myreno' } : null
   };
 }
@@ -23257,7 +23246,7 @@ function wkPlanFor(o, ord) {
   if (o.dow === 0) notes.push('Cleaning job until 7pm');
   if (o.dow === 1) notes.push('At Mum’s today');
   if (o.dow === 2 || o.dow === 3) notes.push('Gym day');
-  const order = o.dow === 1 ? ['mum', 'mill', 'own'] : (ord % 2 ? ['own', 'mill', 'mum'] : ['mill', 'own', 'mum']);
+  const order = o.dow === 1 ? ['mum', 'own'] : (ord % 2 ? ['own', 'mum'] : ['own', 'mum']);
   const avail = order.filter(k => src[k]);
   if (o.dow !== 0 && avail.length) { const r = src[avail[(D.sw.reno || 0) % avail.length]]; slots.push({ k: 'reno', ic: r.ic, t: r.t, s: r.s + (o.dow === 1 && r.go === '#mumreno' ? ' · while you’re at Mum’s' : ''), go: r.go }); }
   const hi = ((w.house || 0) + ord + (D.sw.house || 0)) % WK_HOUSE.length, h = WK_HOUSE[hi];
@@ -24726,11 +24715,10 @@ function FoodPage() {
     (btIn ? '' : `<button type="button" class="btn small" style="margin:0 0 10px" onclick="btAddFood()">${I('plus')} Add to bottom bar</button>`) + `<div class="glgrid">${T.map(t => glTileHtml(t, false)).join('')}</div>`;
 }
 /* ---- 2.27.76: Projects page (#projects): one tile per project page, each with a live line from its own data.
-   Millesha's renovation only shows while it's switched on; nothing is shared from here. Mum's stays private to My App. */
+   Mum's stays private to My App. */
 function ProjectsPage() {
   const T = [], add = (k, title, fn, art, grad, go) => { let x = ''; try { x = String(fn() || ''); } catch (e) { } T.push({ k, cat: 'fun', title, s: x.slice(0, 70), art, grad, go }); };
   const rn = R => { const n = R.next(), p = R.progress(); return p + '% done' + (n ? ' · Next: ' + n.title + (n.area ? ' (' + n.area + ')' : '') : ''); };
-  try { if (renoOn() && window.Reno) add('reno', 'Millesha’s Renovation', () => rn(Reno), 'i3-house', ['#0d9488', '#155e75'], "go('#reno')"); } catch (e) { }
   add('mumreno', 'Mum’s Renovation', () => { const R = mumRenoReady(); return R ? rn(R) : ''; }, 'i3-house', ['#db2777', '#7c3aed'], "go('#mumreno')");
   add('myreno', 'My Renovations', () => { const L = myReno(), open = L.filter(x => !x.done), doing = open.find(x => x.status === 'doing'); return L.length ? plural(open.length, 'open job') + (doing ? ' · Doing: ' + doing.title : '') : 'No jobs yet'; }, 'i3-todo', ['#ca8a04', '#9a3412'], "go('#myreno')");
   add('weekend', 'Days off plan', () => { const o = wkOffDays(1)[0]; return o ? 'Next day off: ' + (o.i === 0 ? 'today' : o.i === 1 ? 'tomorrow' : fmtW(o.iso)) : 'No days off in the next two weeks'; }, 'i3-weather', ['#2563eb', '#1e3a8a'], "go('#weekend')");
@@ -32386,32 +32374,20 @@ function ListsHubPage() {
     <div class="foot">Swipe sideways between columns, or tap any pill above to open that full page.</div>`;
 }
 
-/* ---- 2. PROJECTS & TIDY HUB (#projects): Millesha's Reno, Mum's Reno, My Reno, Tidy & Organise, Days Off Plan ---- */
+/* ---- 2. PROJECTS & TIDY HUB (#projects): Mum's Reno, My Reno, Tidy & Organise, Days Off Plan ---- */
 const PROJ_PILLS = [
   ['#projects', '🛠️ Board'],
-  ['#reno', '🏠 Millesha’s Reno'],
   ['#mumreno', '👵 Mum’s Reno'],
   ['#myreno', '🔨 My Reno'],
   ['#tidy', '🧹 Tidy & Organise'],
   ['#weekend', '🌤️ Days Off Plan']
 ];
 function projHubMenu(k) {
-  const m = { reno: '#reno', mum: '#mumreno', mine: '#myreno', tidy: '#tidy', wk: '#weekend' }[k] || '#projects';
+  const m = { mum: '#mumreno', mine: '#myreno', tidy: '#tidy', wk: '#weekend' }[k] || '#projects';
   go(m);
 }
 ProjectsPage = function () {
   const cols = [];
-  try {
-    if (renoOn() && window.Reno) {
-      const p = Reno.progress(), nxt = Reno.next();
-      const jobs = (Reno.areas || []).filter(a => !a.final).flatMap(a => (a.jobs || []).map(j => ({ area: a.n, title: j[1], id: a.k + '-' + j[0] }))).slice(0, 4);
-      const html = grpCard([['🏠 Shared Checklist', '#0d9488'], [p + '% done', '#2563eb']], 'Millesha’s Renovation Progress', nxt ? `Next up: ${nxt.title} (${nxt.area})` : 'All main rooms complete', "go('#reno')", 'Deadline 22 Nov 2026') +
-        jobs.map(j => grpCard([[j.area, '#475569']], j.title, 'Tap to tick off or assign room', "go('#reno')")).join('') +
-        grpLinkBtn('#reno', 'Open Millesha’s Renovation');
-      cols.push(tbList('reno', 'Millesha’s Renovation', jobs.length + 1, html, false, 'projHub'));
-    }
-  } catch (e) { }
-
   try {
     const R = mumRenoReady();
     if (R) {
@@ -32445,7 +32421,7 @@ ProjectsPage = function () {
   return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` +
     grpPillsHtml(PROJ_PILLS, '#projects') +
     `<div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#0f766e,#1e3a8a 55%,#0f172a)"></div>
-    <div class="tbtop"><div><h1>Projects &amp; Tidy</h1><div style="font-size:.82rem;opacity:.9">Millesha’s reno, Mum’s reno, your house jobs, 10-min tidy spots &amp; days off</div></div><button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div>
+    <div class="tbtop"><div><h1>Projects &amp; Tidy</h1><div style="font-size:.82rem;opacity:.9">Mum’s reno, your house jobs, 10-min tidy spots &amp; days off</div></div><button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div>
     <div class="tblists">${cols.join('')}</div></div>` +
     (btIn ? '' : `<button type="button" class="btn small" style="margin:10px 0 0" onclick="btAddProjects()">${I('plus')} Add to bottom bar</button>`) +
     `<div class="foot">Swipe sideways between project boards, or tap a pill above to open that project page.</div>`;
@@ -33082,7 +33058,7 @@ More = function () {
   const cols = [
     makeCol('day', 'Everyday & Projects', '#2563eb', '#lists', 'Open Tasks & Lists board', [
       ['Tasks & Lists Board', 'To-do, Reminders, Flagged, Ideas, Notes, Birthdays, Countdowns, Diary & Photos', '#lists'],
-      ['Projects & Tidy Board', 'Millesha’s reno, Mum’s reno, My reno, 10-min Tidy & Days off plan', '#projects'],
+      ['Projects & Tidy Board', 'Mum’s reno, My reno, 10-min Tidy & Days off plan', '#projects'],
       ['Meals (Gluten Free)', 'Meal planner, GF Recipes, Shopping list & GF Safe List', '#food'],
       ['Calendar', 'Appointments, repeating events & public holidays', '#calendar']
     ]),
@@ -36026,7 +36002,6 @@ function openQuickMenuSheet() {
       ["#todo", `☑️ To-do${over5 ? " (" + over5 + " >5d)" : ""}`],
       ["#tidy", `🧹 10-Min Tidy (${tidyDone})`],
       ["#projects", "🛠️ Renovations Board"],
-      ["#reno", "🏠 Millesha’s Reno"],
       ["#mumreno", "👵 Mum’s Reno"],
       ["#myreno", "🔨 My Reno"],
       ["#birthdays", "🎂 Birthdays"],

@@ -17,9 +17,9 @@ async function xLoad(force) {
   if (IS_FRIEND) { try { const [prof, push, wx, triv] = await Promise.all([fam('/profile').catch(() => null), fam('/push/prefs').catch(() => null), fam('/weather').catch(() => null), fam('/trivia').catch(() => null)]); if (prof) X.prof = prof; if (push) X.push = push; X.wx = (wx && wx.list) || []; X.triv = triv && Array.isArray(triv.qs) ? triv : null; if (tab === 'family' || (tab === 'all' && scrollY < 300)) draw(); // 1.9.231 friends: weather warnings and daily trivia too
     if (prof && prof.streak) stChip(prof.streak); } catch (e) { } return; } // 1.9.230 friends: no family cards (the server says no anyway)
   const g = (p, d) => fam(p).catch(() => d);
-  const [daily, poll, mems, dates, cars, prof, push, streaks, reno, wx, sap] = await Promise.all([g('/daily', null), g('/poll', null), g('/memories', []), g('/dates', { list: [] }), g('/cars', { cars: [] }), g('/profile', null), g('/push/prefs', null), g('/streaks', { list: [] }), g('/reno', { reno: null }), g('/weather', { list: [] }), g('/sappts', { list: [] })]);
+  const [daily, poll, mems, dates, cars, prof, push, streaks, wx, sap] = await Promise.all([g('/daily', null), g('/poll', null), g('/memories', []), g('/dates', { list: [] }), g('/cars', { cars: [] }), g('/profile', null), g('/push/prefs', null), g('/streaks', { list: [] }), g('/weather', { list: [] }), g('/sappts', { list: [] })]);
   const pw = await g('/power', { list: [] }); X.pwr = (pw && pw.list) || []; X.pwrAt = (pw && pw.checked) || 0;
-  Object.assign(X, { daily, poll, mems: Array.isArray(mems) ? mems : [], dates: (dates && dates.list) || [], myBday: dates && 'mine' in dates ? dates.mine : undefined, bdImp: (dates && dates.imp) || 0, cars: (cars && cars.cars) || [], prof, push, streaks: (streaks && streaks.list) || [], reno: (reno && reno.reno) || null, wx: (wx && wx.list) || [], sappt: (sap && sap.list) || [], saCfg: (sap && sap.cfg) || null });
+  Object.assign(X, { daily, poll, mems: Array.isArray(mems) ? mems : [], dates: (dates && dates.list) || [], myBday: dates && 'mine' in dates ? dates.mine : undefined, bdImp: (dates && dates.imp) || 0, cars: (cars && cars.cars) || [], prof, push, streaks: (streaks && streaks.list) || [], reno: null, wx: (wx && wx.list) || [], sappt: (sap && sap.list) || [], saCfg: (sap && sap.cfg) || null });
   if (prof && prof.streak) stChip(prof.streak);
   badgeCheck(prof);
   if (IS_ADMIN) { carSync(); apptSync(); bdImport().then(bdToMyApp); }
@@ -49,11 +49,7 @@ function celebrate(s) { // milestones 3/7/14/30/50/100 – once each; and a note
     <div class="cbig">🔥 ${m}</div><h2>${m}-day streak${myName() ? ', ' + esc(myName()) : ''}!</h2><p>You’ve opened Info Book ${m} days in a row. New badge: <b>${MILE_NAME[m]}</b></p>${s.next ? `<p class="sst">Next milestone: ${s.next} days</p>` : ''}<button class="btn pri" id="celebok">Yay!</button></div></div>`);
 }
 /* ---- 🏠 Millesha's renovation: same for everyone, live countdown to the finish date (jobs come from My App's reno list) ---- */
-function renoItem() {
-  const r = X.reno; if (!r || !r.deadline) return null;
-  const n = dayN(r.deadline) - todayN(); if (n < 0 && !r.finished) return null; if (r.finished && n < -3) return null; // gone once the deadline has passed
-  return { id: 'reno', x: 'reno', r, n, topic: 'family', t: 'Millesha’s renovation', sn: 'Renovation' };
-}
+function renoItem() { return null; } // 2.29.28: Millesha's renovation project is finished
 function renoCard(i) {
   const r = i.r, n = i.n, dl = new Date(r.deadline + 'T12:00:00Z').toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
   const dshort = iso => new Date(iso + 'T12:00:00Z').toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
@@ -172,7 +168,7 @@ window.pins = function () {
     if (X.daily && X.daily.type === 'photo') out.push({ id: X.daily.key, x: 'daily', q: X.daily, topic: 'family', t: '📸 ' + X.daily.text, sn: 'Photo challenge' }); // 1.9.63 no more daily question
     const sg = suggestion(); if (sg) out.push(sg);
   }
-  const rn = renoItem(); return out.concat(basePins(), wn.length ? [{ id: 'wx-nz', x: 'wxnz', list: wn, topic: 'family', t: 'Severe weather elsewhere in NZ' }] : [], rn ? [rn] : []); // 🏠 reno sits just under the fireworks card
+  return out.concat(basePins(), wn.length ? [{ id: 'wx-nz', x: 'wxnz', list: wn, topic: 'family', t: 'Severe weather elsewhere in NZ' }] : []);
 };
 const baseDrawFamily = drawFamily;
 window.drawFamily = function () {
